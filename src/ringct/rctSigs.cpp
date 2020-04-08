@@ -106,6 +106,7 @@ namespace rct {
     //Borromean (c.f. gmax/andytoshi's paper)
     boroSig genBorromean(const key64 x, const key64 P1, const key64 P2, const bits indices) {
         key64 L[2], alpha;
+        LOKI_DEFER { memwipe(alpha, sizeof(alpha)); };
         key c;
         int naught = 0, prime = 0, ii = 0, jj=0;
         boroSig bb;

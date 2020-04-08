@@ -103,6 +103,8 @@ namespace rct {
         key L;
         key R;
         key ki;
+
+        ~multisig_kLRki() { memwipe(&k, sizeof(k)); }
     };
 
     struct multisig_out {

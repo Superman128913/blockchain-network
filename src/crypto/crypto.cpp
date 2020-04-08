@@ -290,6 +290,7 @@ namespace crypto {
     sc_mulsub(&sig.r, &sig.c, &unwrap(sec), &k);
     if (!sc_isnonzero((const unsigned char*)sig.r.data))
       goto try_again;
+    memwipe(&k, sizeof(k));
   }
 
   bool check_signature(const hash &prefix_hash, const public_key &pub, const signature &sig) {
@@ -386,6 +387,8 @@ namespace crypto {
 
     // sig.r = k - sig.c*r
     sc_mulsub(&sig.r, &sig.c, &unwrap(r), &k);
+
+    memwipe(&k, sizeof(k));
   }
 
   bool check_tx_proof(const hash &prefix_hash, const public_key &R, const public_key &A, const std::optional<public_key> &B, const public_key &D, const signature &sig) {
@@ -556,6 +559,7 @@ POP_WARNINGS
         random_scalar(sig[i].c);
         random_scalar(sig[i].r);
         if (ge_frombytes_vartime(&tmp3, &*pubs[i]) != 0) {
+          memwipe(&k, sizeof(k));
           local_abort("invalid pubkey");
         }
         ge_double_scalarmult_base_vartime(&tmp2, &sig[i].c, &tmp3, &sig[i].r);
@@ -569,6 +573,8 @@ POP_WARNINGS
     hash_to_scalar(buf.get(), rs_comm_size(pubs_count), h);
     sc_sub(&sig[sec_index].c, &h, &sum);
     sc_mulsub(&sig[sec_index].r, &sig[sec_index].c, &unwrap(sec), &k);
+
+    memwipe(&k, sizeof(k));
   }
 
   bool check_ring_signature(const hash &prefix_hash, const key_image &image,
