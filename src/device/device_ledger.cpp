@@ -258,10 +258,12 @@ namespace hw {
 
     static int device_id = 0;
 
-    #define PROTOCOL_VERSION                    3
+    #define PROTOCOL_VERSION                    4
 
     #define INS_NONE                            0x00
     #define INS_RESET                           0x02
+
+    #define INS_GET_NETWORK                     0x10
 
     #define INS_GET_KEY                         0x20
     #define INS_DISPLAY_ADDRESS                 0x21
@@ -538,6 +540,9 @@ namespace hw {
       this->disconnect();
       hw_device.connect(known_devices);
       this->reset();
+
+      check_network_type();
+
       #ifdef DEBUG_HWDEVICE
       cryptonote::account_public_address pubkey;
       this->get_public_address(pubkey);
@@ -562,6 +567,35 @@ namespace hw {
       this->disconnect();
       hw_device.release();
       return true;
+    }
+
+    static std::string nettype_string(cryptonote::network_type n) {
+        switch (n) {
+            case cryptonote::network_type::MAINNET: return "mainnet";
+            case cryptonote::network_type::TESTNET: return "testnet";
+            case cryptonote::network_type::STAGENET: return "stagenet";
+            case cryptonote::network_type::FAKECHAIN: return "fakenet";
+            default: return "(unknown)";
+        }
+    }
+
+    void device_ledger::check_network_type() {
+        auto locks = tools::unique_locks(device_locker, command_locker);
+
+        send_simple(INS_GET_NETWORK);
+
+        std::string coin{reinterpret_cast<const char*>(buffer_recv), 4};
+        auto device_nettype = static_cast<cryptonote::network_type>(buffer_recv[4]);
+        MDEBUG("Ledger wallet is set to " << coin << " " << nettype_string(device_nettype));
+        if (coin != COIN_NETWORK)
+            throw std::runtime_error{"Invalid wallet app: expected " + std::string{COIN_NETWORK} + ", got " + coin};
+        if (device_nettype != nettype)
+            throw std::runtime_error{"Ledger wallet is set to the wrong network type: expected " + nettype_string(nettype)
+                + " but the device is set to " + nettype_string(device_nettype)};
+    }
+
+    void device_ledger::set_network_type(cryptonote::network_type set_nettype) {
+        nettype = set_nettype;
     }
 
     bool  device_ledger::set_mode(device_mode mode) {
@@ -600,7 +634,7 @@ namespace hw {
     /*                             WALLET & ADDRESS                            */
     /* ======================================================================= */
 
-     bool device_ledger::get_public_address(cryptonote::account_public_address &pubkey){
+    bool device_ledger::get_public_address(cryptonote::account_public_address &pubkey){
         auto locks = tools::unique_locks(device_locker, command_locker);
 
         send_simple(INS_GET_KEY, 1);

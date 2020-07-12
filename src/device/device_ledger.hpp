@@ -38,11 +38,16 @@
 
 namespace hw {
 
+    using namespace std::literals;
+
     namespace ledger {
 
+    // Required coin value as returned by INS_GET_NETWORK during connection
+    constexpr auto COIN_NETWORK = "LOKI"sv;
+
     /* Minimal supported version */
-    #define MINIMAL_APP_VERSION_MAJOR    1
-    #define MINIMAL_APP_VERSION_MINOR    6
+    #define MINIMAL_APP_VERSION_MAJOR    0
+    #define MINIMAL_APP_VERSION_MINOR    9
     #define MINIMAL_APP_VERSION_MICRO    0
 
     #define VERSION(M,m,u)       ((M)<<16|(m)<<8|(u))
@@ -174,10 +179,13 @@ namespace hw {
         void send_simple(unsigned char ins, unsigned char p1 = 0x00);
         void send_secret(const unsigned char sec[32], int &offset);
         void receive_secret(unsigned char sec[32], int &offset);
+        void check_network_type();
 
         // hw running mode
         device_mode mode;
         bool tx_in_progress;
+
+        cryptonote::network_type nettype = cryptonote::network_type::UNDEFINED; // Set by the wallet before connecting
 
         // map public destination key to ephemeral destination key
         Keymap key_map;
@@ -238,6 +246,7 @@ namespace hw {
         bool  get_secret_keys(crypto::secret_key &viewkey , crypto::secret_key &spendkey) override;
         bool  generate_chacha_key(const cryptonote::account_keys &keys, crypto::chacha_key &key, uint64_t kdf_rounds) override;
         void  display_address(const cryptonote::subaddress_index& index, const std::optional<crypto::hash8> &payment_id) override;
+        void  set_network_type(cryptonote::network_type network_type) override;
 
         /* ======================================================================= */
         /*                               SUB ADDRESS                               */
