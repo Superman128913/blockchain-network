@@ -3901,7 +3901,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     {
       m_wallet_file = m_generate_from_device;
       // create wallet
-      auto r = new_wallet(vm);
+      auto r = new_device_wallet(vm);
       CHECK_AND_ASSERT_MES(r, false, tr("account creation failed"));
       password = *r;
       welcome = true;
@@ -4367,7 +4367,7 @@ std::optional<epee::wipeable_string> simple_wallet::new_wallet(const boost::prog
 }
 
 //----------------------------------------------------------------------------------------------------
-std::optional<epee::wipeable_string> simple_wallet::new_wallet(const boost::program_options::variables_map& vm)
+std::optional<epee::wipeable_string> simple_wallet::new_device_wallet(const boost::program_options::variables_map& vm)
 {
   std::pair<std::unique_ptr<tools::wallet2>, tools::password_container> rc;
   try { rc = tools::wallet2::make_new(vm, false, password_prompter); }
@@ -4396,6 +4396,10 @@ std::optional<epee::wipeable_string> simple_wallet::new_wallet(const boost::prog
   {
     bool create_address_file = command_line::get_arg(vm, arg_create_address_file);
     m_wallet->device_derivation_path(device_derivation_path);
+    message_writer(epee::console_color_white, true) << tr("Connecting to hardware device");
+    message_writer() << tr("Your hardware device will ask for permission to export your wallet view key.\n"
+                           "This is optional, but will significantly improve wallet syncing speed. Your\n"
+                           "spend key (needed to spend funds) does not leave the device.");
     m_wallet->restore(m_wallet_file, std::move(rc.second).password(), device_desc.empty() ? "Ledger" : device_desc, create_address_file);
     message_writer(epee::console_color_white, true) << tr("Generated new wallet on hw device: ")
       << m_wallet->get_account().get_public_address_str(m_wallet->nettype());
