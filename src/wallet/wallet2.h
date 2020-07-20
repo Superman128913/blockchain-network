@@ -519,13 +519,15 @@ private:
       const cryptonote::account_public_address &account_public_address,
       const crypto::secret_key& viewkey = crypto::secret_key(), bool create_address_file = true);
     /*!
-     * \brief Restore a wallet hold by an HW.
+     * \brief Restore a wallet from a hardware device
      * \param  wallet_        Name of wallet file
      * \param  password       Password of wallet file
      * \param  device_name    name of HW to use
      * \param  create_address_file     Whether to create an address file
+     * \param  status_callback callback to invoke with progress messages to display to the user
      */
-    void restore(const fs::path& wallet_, const epee::wipeable_string& password, const std::string &device_name, bool create_address_file = true);
+    void restore_from_device(const std::string& wallet_, const epee::wipeable_string& password, const std::string &device_name,
+            bool create_address_file = false, std::function<void(std::string msg)> status_callback = {});
 
     /*!
      * \brief Creates a multisig wallet

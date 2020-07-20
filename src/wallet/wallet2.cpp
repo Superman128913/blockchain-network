@@ -4937,13 +4937,8 @@ void wallet2::generate(const fs::path& wallet_, const epee::wipeable_string& pas
     store();
 }
 
-/*!
-* \brief Creates a wallet from a device
-* \param  wallet_        Name of wallet file
-* \param  password       Password of wallet file
-* \param  device_name    device string address
-*/
-void wallet2::restore(const fs::path& wallet_, const epee::wipeable_string& password, const std::string &device_name, bool create_address_file)
+void wallet2::restore_from_device(const std::string& wallet_, const epee::wipeable_string& password, const std::string &device_name,
+    bool create_address_file, std::function<void(std::string msg)> progress_callback)
 {
   clear();
   prepare_file_names(wallet_);
@@ -4963,6 +4958,8 @@ void wallet2::restore(const fs::path& wallet_, const epee::wipeable_string& pass
   m_account.create_from_device(hwdev);
   init_type(m_account.get_device().get_type());
   setup_keys(password);
+  if (progress_callback)
+    progress_callback(tr("Retrieved wallet address from device: ") + m_account.get_public_address_str(m_nettype));
   m_device_name = device_name;
 
   create_keys_file(wallet_, false, password, m_nettype != MAINNET || create_address_file);
@@ -4972,6 +4969,7 @@ void wallet2::restore(const fs::path& wallet_, const epee::wipeable_string& pass
     m_subaddress_lookahead_major = 5;
     m_subaddress_lookahead_minor = 20;
   }
+  progress_callback(tr("Setting up account and subaddresses"));
   setup_new_blockchain();
   if (!wallet_.empty()) {
     store();

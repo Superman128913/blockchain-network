@@ -4400,9 +4400,10 @@ std::optional<epee::wipeable_string> simple_wallet::new_device_wallet(const boos
     message_writer() << tr("Your hardware device will ask for permission to export your wallet view key.\n"
                            "This is optional, but will significantly improve wallet syncing speed. Your\n"
                            "spend key (needed to spend funds) does not leave the device.");
-    m_wallet->restore(m_wallet_file, std::move(rc.second).password(), device_desc.empty() ? "Ledger" : device_desc, create_address_file);
-    message_writer(epee::console_color_white, true) << tr("Generated new wallet on hw device: ")
-      << m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+    m_wallet->restore_from_device(
+            m_wallet_file, std::move(rc.second).password(), device_desc.empty() ? "Ledger" : device_desc, create_address_file,
+            [](const std::string& msg) { message_writer(epee::console_color_green, true) << msg; });
+    message_writer(epee::console_color_white, true) << tr("Finished setting up wallet from hw device");
   }
   catch (const std::exception& e)
   {
@@ -4508,7 +4509,7 @@ std::optional<epee::wipeable_string> simple_wallet::open_wallet(const boost::pro
       prefix = (boost::format(tr("Opened %u/%u multisig wallet%s")) % threshold % total % (ready ? "" : " (not yet finalized)")).str();
     else
       prefix = tr("Opened wallet");
-    message_writer(epee::console_color_white, true) <<
+    message_writer(epee::console_color_green, true) <<
       prefix << ": " << m_wallet->get_account().get_public_address_str(m_wallet->nettype());
     if (m_wallet->get_account().get_device()) {
        message_writer(epee::console_color_white, true) << "Wallet is on device: " << m_wallet->get_account().get_device().get_name();

@@ -35,6 +35,7 @@
 #include "cryptonote_basic/subaddress_index.h"
 #include "cryptonote_core/cryptonote_tx_utils.h"
 #include "common/lock.h"
+#include "common/varint.h"
 
 namespace hw {
 
@@ -1443,13 +1444,26 @@ namespace hw {
     void device_ledger::get_transaction_prefix_hash(const cryptonote::transaction_prefix& tx, crypto::hash& h) {
       auto locks = tools::unique_locks(device_locker, command_locker);
       
-      int pref_length = 0, pref_offset = 0, offset = 0;
-
       #ifdef DEBUG_HWDEVICE
       crypto::hash h_x;
       this->controle_device->get_transaction_prefix_hash(tx,h_x);
       MDEBUG("get_transaction_prefix_hash [[IN]] h_x/1 "<<h_x);
       #endif
+
+      // As of protocol version 4, we send:
+      // - tx version
+      // - tx type (transfer, registration, stake, lns)
+      // - tx lock time (if the tx has multiple lock times this will be the largest one)
+      // We then wait for confirmation from the device, and if we get it we continue by sending the
+      // data in chunks of 256 bytes at a time.  The last chunk will have a p2 subparameter of ff;
+      // otherwise the p2 subparameters are in order.
+      //
+      // In terms of subcommand parameters, then, this goes:
+      // (1) -- send version, type, locktime
+      // (2,0) -- 256 bytes and more to come
+      // (2,1) -- another 256 bytes and more to come
+      // ...
+      // (2,ff) -- last 256 bytes.  (Note that this could happen instead of (2,0), above).
     
       std::string tx_prefix;
       try {
@@ -1458,55 +1472,45 @@ namespace hw {
         ASSERT_MES_AND_THROW("unable to serialize transaction prefix: " << e.what());
       }
 
-      pref_length = tx_prefix.size();
-      const unsigned char* pref = reinterpret_cast<const unsigned char*>(tx_prefix.c_str());
+      // Safety check because this is the biggest the protocol can support (it's also an insanely
+      // large tx prefix).
+      CHECK_AND_ASSERT_THROW_MES(tx_prefix.size() <= 256*256, "Transaction prefix too big.");
 
-      offset = set_command_header_noopt(INS_PREFIX_HASH,1);
-      pref_offset = 0;
-      unsigned char v;
+      unsigned char* send = this->buffer_send + set_command_header_noopt(INS_PREFIX_HASH, 1);
 
-      //version as varint     
-      do {
-        v = pref[pref_offset];
-        this->buffer_send[offset] = v;
-        offset += 1;
-        pref_offset += 1;
-      } while (v&0x80);
+      // version as varint
+      tools::write_varint(send, static_cast<std::underlying_type_t<cryptonote::txversion>>(tx.version));
 
-      //locktime as var int
-      do {
-        v = pref[pref_offset];
-        this->buffer_send[offset] = v;
-        offset += 1;
-        pref_offset += 1;
-      } while (v&0x80);
+      // transaction type as varint
+      tools::write_varint(send, static_cast<std::underlying_type_t<cryptonote::txtype>>(tx.type));
 
-      this->buffer_send[4] = offset-5;
-      this->length_send = offset;
+      // Transactions can have multiple unlock times; find the longest one and send that
+      uint64_t max_unlock = 0;
+      for (size_t i = 0; i < tx.vout.size(); i++)
+        max_unlock = std::max(max_unlock, tx.get_unlock_time(i));
+      tools::write_varint(send, max_unlock);
+
+
+      this->length_send = send - this->buffer_send;
+      this->buffer_send[4] = length_send - 5;
       this->exchange_wait_on_input();
 
-      //hash remains
-      int cnt = 0;
-      while (pref_offset < pref_length) {
-        int len;
-        cnt++;
-        offset = set_command_header(INS_PREFIX_HASH,2,cnt);      
-        len = pref_length - pref_offset;
-        //options
-        if (len > (BUFFER_SEND_SIZE-7)) {
-          len = BUFFER_SEND_SIZE-7;
-          this->buffer_send[offset] = 0x80;
-        } else {
-          this->buffer_send[offset] = 0x00;
-        }
-        offset += 1;
-        //send chunk
-        memmove(&this->buffer_send[offset], pref+pref_offset, len);
-        offset += len;
-        pref_offset += len;
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+      // hash the full prefix
+      uint8_t cnt = 0;
+      for (size_t pos = 0; pos < tx_prefix.size(); pos += 256, ++cnt) {
+        size_t size = tx_prefix.size() - pos;
+        if (size > 256)
+          size = 256;
+        else
+          cnt = 0xff;
+
+        size_t header_size = set_command_header_noopt(INS_PREFIX_HASH, 2, cnt);
+        assert(header_size + 256 <= BUFFER_SEND_SIZE);
+
+        std::memcpy(this->buffer_send + header_size, &tx_prefix[pos], size);
+        this->buffer_send[4] = size;
+        this->length_send = header_size + size;
+        exchange();
       }
       memmove(h.data, &this->buffer_recv[0], 32);
       
