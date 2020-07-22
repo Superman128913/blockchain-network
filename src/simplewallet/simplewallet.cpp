@@ -144,6 +144,7 @@ namespace
   const command_line::arg_descriptor<std::string> arg_restore_date = {"restore-date", sw::tr("Restore from estimated blockchain height on specified date"), ""};
   const command_line::arg_descriptor<bool> arg_do_not_relay = {"do-not-relay", sw::tr("The newly created transaction will not be relayed to the loki network"), false};
   const command_line::arg_descriptor<bool> arg_create_address_file = {"create-address-file", sw::tr("Create an address file for new wallets"), false};
+  const command_line::arg_descriptor<std::string> arg_create_hwdev_txt = {"create-hwdev-txt", sw::tr("Create a .hwdev.txt file for new hardware-backed wallets containing the given comment")};
   const command_line::arg_descriptor<std::string> arg_subaddress_lookahead = {"subaddress-lookahead", tools::wallet2::tr("Set subaddress lookahead sizes to <major>:<minor>"), ""};
   const command_line::arg_descriptor<bool> arg_use_english_language_names = {"use-english-language-names", sw::tr("Display English language names"), false};
 
@@ -4395,6 +4396,9 @@ std::optional<epee::wipeable_string> simple_wallet::new_device_wallet(const boos
   try
   {
     bool create_address_file = command_line::get_arg(vm, arg_create_address_file);
+    std::optional<std::string> create_hwdev_txt;
+    if (!command_line::is_arg_defaulted(vm, arg_create_hwdev_txt))
+      create_hwdev_txt = command_line::get_arg(vm, arg_create_hwdev_txt);
     m_wallet->device_derivation_path(device_derivation_path);
     message_writer(epee::console_color_white, true) << tr("Connecting to hardware device");
     message_writer() << tr("Your hardware device will ask for permission to export your wallet view key.\n"
@@ -4402,7 +4406,7 @@ std::optional<epee::wipeable_string> simple_wallet::new_device_wallet(const boos
                            "spend key (needed to spend funds) does not leave the device.");
     m_wallet->restore_from_device(
             m_wallet_file, std::move(rc.second).password(), device_desc.empty() ? "Ledger" : device_desc, create_address_file,
-            [](const std::string& msg) { message_writer(epee::console_color_green, true) << msg; });
+            std::move(create_hwdev_txt), [](const std::string& msg) { message_writer(epee::console_color_green, true) << msg; });
     message_writer(epee::console_color_white, true) << tr("Finished setting up wallet from hw device");
   }
   catch (const std::exception& e)
@@ -10260,6 +10264,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_restore_date);
   command_line::add_arg(desc_params, arg_do_not_relay);
   command_line::add_arg(desc_params, arg_create_address_file);
+  command_line::add_arg(desc_params, arg_create_hwdev_txt);
   command_line::add_arg(desc_params, arg_subaddress_lookahead);
   command_line::add_arg(desc_params, arg_use_english_language_names);
 

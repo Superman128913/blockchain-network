@@ -2365,6 +2365,7 @@ namespace {
     if (ptr)
       throw wallet_rpc_error{error_code::UNKNOWN_ERROR, "Invalid filename"};
     fs::path wallet_file = req.filename.empty() ? fs::path{} : m_wallet_dir / fs::u8path(req.filename);
+    if (!req.hardware_wallet)
     {
       std::vector<std::string> languages;
       crypto::ElectrumWords::get_language_list(languages, false);
@@ -2383,15 +2384,21 @@ namespace {
     std::unique_ptr<tools::wallet2> wal = tools::wallet2::make_new(vm2, true, nullptr).first;
     if (!wal)
       throw wallet_rpc_error{error_code::UNKNOWN_ERROR, "Failed to create wallet"};
-    wal->set_seed_language(req.language);
+
+    if (!req.hardware_wallet)
+      wal->set_seed_language(req.language);
+
     rpc::GET_HEIGHT::request hreq{};
     rpc::GET_HEIGHT::response hres{};
     hres.height = 0;
     bool r = wal->invoke_http<rpc::GET_HEIGHT>(hreq, hres);
     if (r)
       wal->set_refresh_from_block_height(hres.height);
-    crypto::secret_key dummy_key;
-    wal->generate(wallet_file, req.password, dummy_key, false, false);
+
+    if (req.hardware_wallet)
+      wal->restore_from_device(wallet_file, req.password, req.device_name.empty() ? "Ledger" : req.device_name);
+    else
+      wal->generate(wallet_file, req.password);
 
     if (m_wallet)
       m_wallet->store();

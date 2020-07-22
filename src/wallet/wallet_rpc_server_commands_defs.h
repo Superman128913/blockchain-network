@@ -1652,7 +1652,7 @@ namespace tools::wallet_rpc {
   };
 
   LOKI_RPC_DOC_INTROSPECT
-  // Create a new wallet. You need to have set the argument "'–wallet-dir" when launching loki-wallet-rpc to make this work.
+  // Create a new wallet. You need to have set the argument "'--wallet-dir" when launching loki-wallet-rpc to make this work.
   struct CREATE_WALLET : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("create_wallet"); }
@@ -1662,6 +1662,9 @@ namespace tools::wallet_rpc {
       std::string filename; // Set the wallet file name.
       std::string password; // (Optional) Set the password to protect the wallet.
       std::string language; // Language for your wallets' seed.
+      bool hardware_wallet; // Create this wallet from a connected hardware wallet.  (`language` will be ignored).
+      std::string device_name; // When `hardware` is true, this specifies the hardware wallet device type (currently supported: "Ledger").  If omitted "Ledger" is used.
+      std::optional<std::string> device_label; // Custom label to write to a `wallet.hwdev.txt`. Can be empty; omit the parameter entirely to not write a .hwdev.txt file at all.
 
       KV_MAP_SERIALIZABLE
     };
@@ -1670,7 +1673,7 @@ namespace tools::wallet_rpc {
   };
 
   LOKI_RPC_DOC_INTROSPECT
-  // Open a wallet. You need to have set the argument "–-wallet-dir" when launching loki-wallet-rpc to make this work.
+  // Open a wallet. You need to have set the argument "--wallet-dir" when launching loki-wallet-rpc to make this work.
   // The wallet rpc executable may only open wallet files within the same directory as wallet-dir, otherwise use the
   // "--wallet-file" flag to open specific wallets.
   struct OPEN_WALLET : RPC_COMMAND
@@ -1679,7 +1682,7 @@ namespace tools::wallet_rpc {
 
     struct request
     {
-      std::string filename; // Wallet name stored in "–-wallet-dir".
+      std::string filename; // Wallet name stored in "--wallet-dir".
       std::string password; // The wallet password, set as "" if there's no password
       bool autosave_current; // (Optional: Default true): If a pre-existing wallet is open, save to disk before opening the new wallet.
 

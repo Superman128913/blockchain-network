@@ -4938,7 +4938,7 @@ void wallet2::generate(const fs::path& wallet_, const epee::wipeable_string& pas
 }
 
 void wallet2::restore_from_device(const std::string& wallet_, const epee::wipeable_string& password, const std::string &device_name,
-    bool create_address_file, std::function<void(std::string msg)> progress_callback)
+    bool create_address_file, std::optional<std::string> hwdev_label, std::function<void(std::string msg)> progress_callback)
 {
   clear();
   prepare_file_names(wallet_);
@@ -4969,7 +4969,12 @@ void wallet2::restore_from_device(const std::string& wallet_, const epee::wipeab
     m_subaddress_lookahead_major = 5;
     m_subaddress_lookahead_minor = 20;
   }
-  progress_callback(tr("Setting up account and subaddresses"));
+  if (hwdev_label) {
+    if (!save_to_file(m_wallet_file + ".hwdev.txt", *hwdev_label, true))
+      MERROR("failed to write .hwdev.txt comment file");
+  }
+  if (progress_callback)
+    progress_callback(tr("Setting up account and subaddresses"));
   setup_new_blockchain();
   if (!wallet_.empty()) {
     store();
