@@ -3498,6 +3498,8 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     if(!ask_wallet_create_if_needed()) return false;
   }
 
+  std::string default_restore_value = "0";
+
   if (!m_generate_new.empty() || m_restoring)
   {
     if (!m_subaddress_lookahead.empty() && !parse_subaddress_lookahead(m_subaddress_lookahead))
@@ -3906,22 +3908,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       CHECK_AND_ASSERT_MES(r, false, tr("account creation failed"));
       password = *r;
       welcome = true;
-      // if no block_height is specified, assume its a new account and start it "now"
-      if(m_wallet->get_refresh_from_block_height() == 0) {
-        {
-          tools::scoped_message_writer wrt = tools::msg_writer();
-          wrt << tr("No restore height is specified.") << " ";
-          wrt << tr("Assumed you are creating a new account, restore will be done from current estimated blockchain height.") << " ";
-          wrt << tr("Use --restore-height or --restore-date if you want to restore an already setup account from a specific height.");
-        }
-        std::string confirm = input_line(tr("Is this okay?"), true);
-        if (std::cin.eof() || !command_line::is_yes(confirm))
-          CHECK_AND_ASSERT_MES(false, false, tr("account creation aborted"));
-
-        m_wallet->set_refresh_from_block_height(m_wallet->estimate_blockchain_height() > 0 ? m_wallet->estimate_blockchain_height() - 1 : 0);
-        m_wallet->explicit_refresh_from_block_height(true);
-        m_restore_height = m_wallet->get_refresh_from_block_height();
-      }
+      default_restore_value = "curr";
     }
     else
     {
@@ -3940,7 +3927,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       welcome = true;
     }
 
-    if (m_restoring && m_generate_from_json.empty() && m_generate_from_device.empty())
+    if (m_restoring && m_generate_from_json.empty())
     {
       m_wallet->explicit_refresh_from_block_height(!(command_line::is_arg_defaulted(vm, arg_restore_height) &&
         command_line::is_arg_defaulted(vm, arg_restore_date)));
@@ -3969,18 +3956,24 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       bool connected = try_connect_to_daemon(false, &version);
       while (true)
       {
-        std::string heightstr;
-        if (!connected || version < rpc::version_t{1, 6})
-          heightstr = input_line("Restore from specific blockchain height (optional, default 0)");
-        else
-          heightstr = input_line("Restore from specific blockchain height (optional, default 0),\nor alternatively from specific date (YYYY-MM-DD)");
+        std::string prompt =
+            "\nEnter wallet restore blockchain height (e.g. 123456) or restore date\n"
+            "(e.g. 2020-07-21). Enter \"curr\" to use the current blockchain height.\n"
+            "NOTE: transactions before the restore height will not be detected.\n"
+            "[";
+        prompt += default_restore_value;
+        prompt += "]";
+        std::string heightstr = input_line(prompt);
         if (std::cin.eof())
           return false;
         if (heightstr.empty())
-        {
-          m_restore_height = 0;
+          heightstr = default_restore_value;
+        if (heightstr == "curr") {
+          m_restore_height = m_wallet->estimate_blockchain_height();
+          if (m_restore_height) --m_restore_height;
           break;
         }
+
         try
         {
           m_restore_height = boost::lexical_cast<uint64_t>(heightstr);
