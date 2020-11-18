@@ -12939,6 +12939,39 @@ uint64_t wallet2::get_approximate_blockchain_height() const
   return approx_blockchain_height;
 }
 
+static cryptonote::rpc::GET_SERVICE_NODES::response list_current_stakes()
+{
+  std::vector<rpc::GET_SERVICE_NODES::response::entry> service_node_states; 
+
+  auto [success, all_nodes] = wallet2::get_all_service_nodes();
+  if (!success)
+  {
+    all_nodes.service_node_states = service_node_states;
+    return all_nodes;
+  }
+
+  cryptonote::account_public_address const primary_address = wallet2::get_address();
+  for (rpc::GET_SERVICE_NODES::response::entry const &node_info : all_nodes)
+  {
+    for (const auto& contributor : node_info.contributors)
+    {
+      address_parse_info address_info = {};
+      if (!cryptonote::get_account_address_from_str(address_info, wallet2::nettype(), contributor.address))
+      {
+        continue;
+      }
+
+      if (primary_address != address_info.address)
+        continue;
+
+      service_node_states.push_back(node_info);
+    }
+  }
+
+  all_nodes.service_node_states = service_node_states;
+  return all_nodes;
+}
+
 void wallet2::set_lns_cache_record(wallet2::lns_detail detail)
 {
   lns_records_cache[detail.hashed_name] = std::move(detail);
