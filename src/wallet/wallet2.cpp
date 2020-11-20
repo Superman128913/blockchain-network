@@ -12939,16 +12939,15 @@ uint64_t wallet2::get_approximate_blockchain_height() const
   return approx_blockchain_height;
 }
 
-cryptonote::rpc::GET_SERVICE_NODES::response wallet2::list_current_stakes()
+std::vector<rpc::GET_SERVICE_NODES::response::entry> wallet2::list_current_stakes()
 {
 
-  cryptonote::rpc::GET_SERVICE_NODES::response response;
   std::vector<rpc::GET_SERVICE_NODES::response::entry> service_node_states; 
 
   auto [success, all_nodes] = this->get_all_service_nodes();
   if (!success)
   {
-    return response;
+    return service_node_states;
   }
 
   cryptonote::account_public_address const primary_address = this->get_address();
@@ -12969,8 +12968,7 @@ cryptonote::rpc::GET_SERVICE_NODES::response wallet2::list_current_stakes()
     }
   }
 
-  response.service_node_states = service_node_states;
-  return response;
+  return service_node_states;
 }
 
 void wallet2::set_lns_cache_record(wallet2::lns_detail detail)

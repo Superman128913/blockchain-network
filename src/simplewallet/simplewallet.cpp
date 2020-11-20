@@ -6271,12 +6271,7 @@ bool simple_wallet::query_locked_stakes(bool print_result)
   std::string msg_buf;
   {
     using namespace cryptonote;
-    auto [success, response] = m_wallet->get_all_service_nodes();
-    if (!success)
-    {
-      fail_msg_writer() << "Connection to daemon failed when requesting full service node list";
-      return has_locked_stakes;
-    }
+    auto response = m_wallet->list_current_stakes();
 
     cryptonote::account_public_address const primary_address = m_wallet->get_address();
     for (rpc::GET_SERVICE_NODES::response::entry const &node_info : response)
@@ -6284,16 +6279,6 @@ bool simple_wallet::query_locked_stakes(bool print_result)
       bool only_once = true;
       for (const auto& contributor : node_info.contributors)
       {
-        address_parse_info address_info = {};
-        if (!cryptonote::get_account_address_from_str(address_info, m_wallet->nettype(), contributor.address))
-        {
-          fail_msg_writer() << tr("Failed to parse string representation of address: ") << contributor.address;
-          continue;
-        }
-
-        if (primary_address != address_info.address)
-          continue;
-
         for (size_t i = 0; i < contributor.locked_contributions.size(); ++i)
         {
           const auto& contribution = contributor.locked_contributions[i];
