@@ -574,7 +574,7 @@ namespace hw {
         switch (n) {
             case cryptonote::network_type::MAINNET: return "mainnet";
             case cryptonote::network_type::TESTNET: return "testnet";
-            case cryptonote::network_type::STAGENET: return "stagenet";
+            case cryptonote::network_type::DEVNET: return "devnet";
             case cryptonote::network_type::FAKECHAIN: return "fakenet";
             default: return "(unknown)";
         }

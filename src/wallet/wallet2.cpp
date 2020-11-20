@@ -4970,7 +4970,9 @@ void wallet2::restore_from_device(const std::string& wallet_, const epee::wipeab
     m_subaddress_lookahead_minor = 20;
   }
   if (hwdev_label) {
-    if (!save_to_file(m_wallet_file + ".hwdev.txt", *hwdev_label, true))
+    fs::path hwdev_txt = m_wallet_file;
+    hwdev_txt += ".hwdev.txt";
+    if (!save_to_file(hwdev_txt, *hwdev_label, true))
       MERROR("failed to write .hwdev.txt comment file");
   }
   if (progress_callback)
