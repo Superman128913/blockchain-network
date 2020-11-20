@@ -12951,8 +12951,6 @@ cryptonote::rpc::GET_SERVICE_NODES::response wallet2::list_current_stakes()
     return response;
   }
 
-  response = 
-
   cryptonote::account_public_address const primary_address = this->get_address();
   for (rpc::GET_SERVICE_NODES::response::entry const &node_info : all_nodes)
   {
@@ -12971,8 +12969,8 @@ cryptonote::rpc::GET_SERVICE_NODES::response wallet2::list_current_stakes()
     }
   }
 
-  all_nodes.service_node_states = service_node_states;
-  return all_nodes;
+  response.service_node_states = service_node_states;
+  return response;
 }
 
 void wallet2::set_lns_cache_record(wallet2::lns_detail detail)
