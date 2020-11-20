@@ -564,7 +564,7 @@ namespace rct {
       catch (...) { return false; }
     }
 
-    key get_pre_mlsag_hash(const rctSig &rv, hw::device &hwdev)
+    key get_pre_clsag_hash(const rctSig &rv, hw::device &hwdev)
     {
       keyV hashes;
       hashes.reserve(3);
@@ -622,7 +622,7 @@ namespace rct {
         }
       }
       hashes.push_back(cn_fast_hash(kv));
-      hwdev.mlsag_prehash(blob, inputs, outputs, hashes, rv.outPk, prehash);
+      hwdev.clsag_prehash(blob, inputs, outputs, hashes, rv.outPk, prehash);
       return  prehash;
     }
 
@@ -1212,7 +1212,7 @@ namespace rct {
         genC(pseudoOuts[i], a[i], inamounts[i]);
         DP(pseudoOuts[i]);
 
-        key full_message = get_pre_mlsag_hash(rv,hwdev);
+        key full_message = get_pre_clsag_hash(rv, hwdev);
         if (msout)
         {
             msout->c.resize(inamounts.size());
@@ -1292,7 +1292,7 @@ namespace rct {
           if (!semantics) {
             //compute txn fee
             key txnFeeKey = scalarmultH(d2h(rv.txnFee));
-            bool mgVerd = verRctMG(rv.p.MGs[0], rv.mixRing, rv.outPk, txnFeeKey, get_pre_mlsag_hash(rv, hw::get_device("default")));
+            bool mgVerd = verRctMG(rv.p.MGs[0], rv.mixRing, rv.outPk, txnFeeKey, get_pre_clsag_hash(rv, hw::get_device("default")));
             DP("mg sig verified?");
             DP(mgVerd);
             if (!mgVerd) {
@@ -1456,7 +1456,7 @@ namespace rct {
 
         const keyV &pseudoOuts = bulletproof ? rv.p.pseudoOuts : rv.pseudoOuts;
 
-        const key message = get_pre_mlsag_hash(rv, hw::get_device("default"));
+        const key message = get_pre_clsag_hash(rv, hw::get_device("default"));
 
         results.clear();
         results.resize(rv.mixRing.size());

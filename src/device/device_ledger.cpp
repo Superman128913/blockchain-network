@@ -1820,7 +1820,7 @@ namespace hw {
         return true;
     }
 
-    bool device_ledger::mlsag_prehash(const std::string &blob, size_t inputs_size, size_t outputs_size,
+    bool device_ledger::clsag_prehash(const std::string &blob, size_t inputs_size, size_t outputs_size,
                                      const rct::keyV &hashes, const rct::ctkeyV &outPk,
                                      rct::key &prehash) {
         auto locks = tools::unique_locks(device_locker, command_locker);
@@ -1834,9 +1834,9 @@ namespace hw {
         const rct::keyV hashes_x  = hashes;
         const rct::ctkeyV outPk_x = outPk;
         rct::key prehash_x;
-        this->controle_device->mlsag_prehash(blob_x, inputs_size_x, outputs_size_x, hashes_x, outPk_x, prehash_x);
+        this->controle_device->clsag_prehash(blob_x, inputs_size_x, outputs_size_x, hashes_x, outPk_x, prehash_x);
         if (inputs_size) {
-          log_message("mlsag_prehash", (std::string("inputs_size not null: ") +  std::to_string(inputs_size)).c_str());
+          log_message("clsag_prehash", (std::string("inputs_size not null: ") +  std::to_string(inputs_size)).c_str());
         }
         this->key_map.log();
         #endif
@@ -1990,165 +1990,7 @@ namespace hw {
         memmove(prehash.bytes, this->buffer_recv,  32);
 
         #ifdef DEBUG_HWDEVICE
-        hw::ledger::check32("mlsag_prehash", "prehash", (char*)prehash_x.bytes, (char*)prehash.bytes);
-        #endif
-
-        return true;
-    }
-
-
-    bool device_ledger::mlsag_prepare(const rct::key &H, const rct::key &xx,
-                                     rct::key &a, rct::key &aG, rct::key &aHP, rct::key &II) {
-        auto locks = tools::unique_locks(device_locker, command_locker);
-
-        #ifdef DEBUG_HWDEVICE
-        const rct::key H_x = H;
-        const rct::key xx_x = hw::ledger::decrypt(xx);
-        rct::key a_x;
-        rct::key aG_x;
-        rct::key aHP_x;
-        rct::key II_x;
-        #endif
-
-        int offset = set_command_header_noopt(INS_MLSAG, 0x01);
-        //value H
-        memmove(this->buffer_send+offset, H.bytes, 32);
-        offset += 32;
-        //mask xin
-        this->send_secret(xx.bytes, offset);
-
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
-
-        offset = 0;
-        this->receive_secret(a.bytes, offset);
-        memmove(aG.bytes,  &this->buffer_recv[offset], 32);
-        offset +=32;
-        memmove(aHP.bytes, &this->buffer_recv[offset], 32);
-        offset +=32;
-        memmove(II.bytes,  &this->buffer_recv[offset], 32);
-
-        #ifdef DEBUG_HWDEVICE
-        a_x = hw::ledger::decrypt(a);
-
-        rct::scalarmultBase(aG_x, a_x);
-        rct::scalarmultKey(aHP_x, H_x, a_x);
-        rct::scalarmultKey(II_x, H_x, xx_x);
-        hw::ledger::check32("mlsag_prepare", "AG", (char*)aG_x.bytes, (char*)aG.bytes);
-        hw::ledger::check32("mlsag_prepare", "aHP", (char*)aHP_x.bytes, (char*)aHP.bytes);
-        hw::ledger::check32("mlsag_prepare", "II", (char*)II_x.bytes, (char*)II.bytes);
-        #endif
-
-        return true;
-    }
-
-    bool device_ledger::mlsag_prepare(rct::key &a, rct::key &aG) {
-        auto locks = tools::unique_locks(device_locker, command_locker);
-        int offset;
-
-        #ifdef DEBUG_HWDEVICE
-        rct::key a_x;
-        rct::key aG_x;
-        #endif
-
-        send_simple(INS_MLSAG, 0x01);
-
-        offset = 0;
-        this->receive_secret(a.bytes, offset);
-        memmove(aG.bytes,  &this->buffer_recv[offset], 32);
-
-        #ifdef DEBUG_HWDEVICE
-        a_x = hw::ledger::decrypt(a);
-        rct::scalarmultBase(aG_x, a_x);
-        hw::ledger::check32("mlsag_prepare", "AG", (char*)aG_x.bytes, (char*)aG.bytes);
-        #endif
-
-        return true;
-    }
-
-    bool device_ledger::mlsag_hash(const rct::keyV &long_message, rct::key &c) {
-        auto locks = tools::unique_locks(device_locker, command_locker);
-        size_t cnt;
-
-        #ifdef DEBUG_HWDEVICE
-        const rct::keyV long_message_x = long_message;
-        rct::key c_x;
-        this->controle_device->mlsag_hash(long_message_x, c_x);
-        #endif
-
-        cnt = long_message.size();
-        for (size_t i = 0; i<cnt; i++) {
-          int offset = set_command_header(INS_MLSAG, 0x02, i+1);
-          //options
-          this->buffer_send[offset] =
-              (i==(cnt-1))?0x00:0x80;  //last
-          offset += 1;
-          //msg part
-          memmove(this->buffer_send+offset, long_message[i].bytes, 32);
-          offset += 32;
-
-          this->buffer_send[4] = offset-5;
-          this->length_send = offset;
-          this->exchange();
-        }
-
-        memmove(c.bytes, &this->buffer_recv[0], 32);
-
-        #ifdef DEBUG_HWDEVICE
-        hw::ledger::check32("mlsag_hash", "c", (char*)c_x.bytes, (char*)c.bytes);
-        #endif
-
-        return true;
-    }
-
-    bool device_ledger::mlsag_sign(const rct::key &c, const rct::keyV &xx, const rct::keyV &alpha, const size_t rows, const size_t dsRows, rct::keyV &ss) {
-        auto locks = tools::unique_locks(device_locker, command_locker);
-
-        CHECK_AND_ASSERT_THROW_MES(dsRows<=rows, "dsRows greater than rows");
-        CHECK_AND_ASSERT_THROW_MES(xx.size() == rows, "xx size does not match rows");
-        CHECK_AND_ASSERT_THROW_MES(alpha.size() == rows, "alpha size does not match rows");
-        CHECK_AND_ASSERT_THROW_MES(ss.size() == rows, "ss size does not match rows");
-
-        #ifdef DEBUG_HWDEVICE
-        const rct::key c_x      = c;
-        const rct::keyV xx_x    = hw::ledger::decrypt(xx);
-        const rct::keyV alpha_x = hw::ledger::decrypt(alpha);
-        const int rows_x        = rows;
-        const int dsRows_x      = dsRows;
-        rct::keyV ss_x(ss.size());
-        this->controle_device->mlsag_sign(c_x, xx_x, alpha_x, rows_x, dsRows_x, ss_x);
-        #endif
-
-        for (size_t j = 0; j < dsRows; j++) {
-          int offset = set_command_header(INS_MLSAG, 0x03, j+1);
-          //options
-          this->buffer_send[offset] = 0x00;
-          if (j==(dsRows-1)) {
-            this->buffer_send[offset]  |= 0x80;  //last
-          }
-          offset += 1;
-          //xx
-          this->send_secret(xx[j].bytes, offset);
-          //alpa
-          this->send_secret(alpha[j].bytes, offset);
-
-          this->buffer_send[4] = offset-5;
-          this->length_send = offset;
-          this->exchange();
-
-          //ss
-          memmove(ss[j].bytes, &this->buffer_recv[0], 32);
-        }
-
-        for (size_t j = dsRows; j < rows; j++) {
-          sc_mulsub(ss[j].bytes, c.bytes, xx[j].bytes, alpha[j].bytes);
-        }
-
-        #ifdef DEBUG_HWDEVICE
-        for (size_t j = 0; j < rows; j++) {
-           hw::ledger::check32("mlsag_sign", "ss["+std::to_string(j)+"]", (char*)ss_x[j].bytes, (char*)ss[j].bytes);
-        }
+        hw::ledger::check32("clsag_prehash", "prehash", (char*)prehash_x.bytes, (char*)prehash.bytes);
         #endif
 
         return true;
@@ -2221,7 +2063,7 @@ namespace hw {
         #ifdef DEBUG_HWDEVICE
         const rct::keyV data_x  = data;
         rct::key        hash_x;
-        this->controle_device->mlsag_hash(data_x, hash_x);
+        this->controle_device->clsag_hash(data_x, hash_x);
         #endif
 
         size_t cnt;
@@ -2246,7 +2088,7 @@ namespace hw {
         memmove(hash.bytes, &this->buffer_recv[0], 32);
 
         #ifdef DEBUG_HWDEVICE
-        hw::ledger::check32("mlsag_hash", "hash", (char*)hash_x.bytes, (char*)hash.bytes);
+        hw::ledger::check32("clsag_hash", "hash", (char*)hash_x.bytes, (char*)hash.bytes);
         #endif
         return true;
     }
