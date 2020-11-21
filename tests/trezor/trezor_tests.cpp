@@ -536,14 +536,14 @@ static cryptonote::address_parse_info init_addr_parse_info(cryptonote::account_p
 static void expand_tsx(cryptonote::transaction &tx)
 {
   auto & rv = tx.rct_signatures;
-  if (rv.type == rct::RCTTypeFull)
+  if (rv.type == rct::RCTType::Full)
   {
     rv.p.MGs.resize(1);
     rv.p.MGs[0].II.resize(tx.vin.size());
     for (size_t n = 0; n < tx.vin.size(); ++n)
       rv.p.MGs[0].II[n] = rct::ki2rct(var::get<txin_to_key>(tx.vin[n]).k_image);
   }
-  else if (tools::equals_any(rv.type, rct::RCTTypeSimple, rct::RCTTypeBulletproof, rct::RCTTypeBulletproof2))
+  else if (tools::equals_any(rv.type, rct::RCTType::Simple, rct::RCTType::Bulletproof, rct::RCTType::Bulletproof2))
   {
     CHECK_AND_ASSERT_THROW_MES(rv.p.MGs.size() == tx.vin.size(), "Bad MGs size");
     for (size_t n = 0; n < tx.vin.size(); ++n)
@@ -552,7 +552,7 @@ static void expand_tsx(cryptonote::transaction &tx)
       rv.p.MGs[n].II[0] = rct::ki2rct(var::get<txin_to_key>(tx.vin[n]).k_image);
     }
   }
-  else if (rv.type == rct::RCTTypeCLSAG)
+  else if (rv.type == rct::RCTType::CLSAG)
   {
     if (!tx.pruned)
     {
@@ -607,7 +607,7 @@ const std::string gen_trezor_base::m_alice_spend_private = m_master_seed_str;
 const std::string gen_trezor_base::m_alice_view_private = "a6ccd4ac344a295d1387f8d18c81bdd394f1845de84188e204514ef9370fd403";
 
 gen_trezor_base::gen_trezor_base(){
-  m_rct_config = {rct::RangeProofPaddedBulletproof, 1};
+  m_rct_config = {rct::RangeProofType::PaddedBulletproof, 1};
   m_test_get_tx_key = true;
   m_network_type = cryptonote::TESTNET;
 }
@@ -843,7 +843,7 @@ bool gen_trezor_base::generate(std::vector<test_event_entry>& events)
   bool res = wallet_tools::fill_tx_sources(m_wl_alice.get(), sources, TREZOR_TEST_MIXIN, std::nullopt, MK_COINS(2), m_bt, selected_transfers, num_blocks(events) - 1, 0, 1);
   CHECK_AND_ASSERT_THROW_MES(res, "TX Fill sources failed");
 
-  construct_tx_to_key(tx_1, m_wl_alice.get(), m_bob_account, MK_COINS(1), sources, TREZOR_TEST_FEE, true, rct::RangeProofPaddedBulletproof, 1);
+  construct_tx_to_key(tx_1, m_wl_alice.get(), m_bob_account, MK_COINS(1), sources, TREZOR_TEST_FEE, true, rct::RangeProofType::PaddedBulletproof, 1);
   events.push_back(tx_1);
   MAKE_NEXT_BLOCK_TX1_HF(events, blk_6, blk_5r, m_miner_account, tx_1, CUR_HF);
   MDEBUG("Post 1st tsx: " << (num_blocks(events) - 1) << " at block: " << get_block_hash(blk_6));
@@ -1261,11 +1261,11 @@ void gen_trezor_base::set_hard_fork(uint8_t hf)
   if (hf < 9){
     throw std::runtime_error("Minimal supported Hardfork is 9");
   } else if (hf <= 11){
-    rct_config({rct::RangeProofPaddedBulletproof, 1});
+    rct_config({rct::RangeProofType::PaddedBulletproof, 1});
   } else if (hf == 12){
-    rct_config({rct::RangeProofPaddedBulletproof, 2});
+    rct_config({rct::RangeProofType::PaddedBulletproof, 2});
   } else if (hf == HF_VERSION_CLSAG){
-    rct_config({rct::RangeProofPaddedBulletproof, 3});
+    rct_config({rct::RangeProofType::PaddedBulletproof, 3});
   } else {
     throw std::runtime_error("Unsupported HF");
   }

@@ -27,6 +27,7 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
+#include "ringct/rctTypes.h"
 #include "version.h"
 #include "protocol.hpp"
 #include <unordered_map>
@@ -389,7 +390,7 @@ namespace tx {
   }
 
   TData::TData() {
-    rsig_type = 0;
+    rsig_type = rct::RangeProofType::Borromean;
     bp_version = 0;
     cur_input_idx = 0;
     cur_output_idx = 0;
@@ -430,32 +431,32 @@ namespace tx {
     }
   }
 
-  static unsigned get_rsig_type(const rct::RCTConfig &rct_config, size_t num_outputs){
-    if (rct_config.range_proof_type == rct::RangeProofBorromean){
-      return rct::RangeProofBorromean;
+  static rct::RangeProofType get_rsig_type(const rct::RCTConfig &rct_config, size_t num_outputs){
+    if (rct_config.range_proof_type == rct::RangeProofType::Borromean){
+      return rct::RangeProofType::Borromean;
     } else if (num_outputs > BULLETPROOF_MAX_OUTPUTS){
-      return rct::RangeProofMultiOutputBulletproof;
+      return rct::RangeProofType::MultiOutputBulletproof;
     } else {
-      return rct::RangeProofPaddedBulletproof;
+      return rct::RangeProofType::PaddedBulletproof;
     }
   }
 
-  static void generate_rsig_batch_sizes(std::vector<uint64_t> &batches, unsigned rsig_type, size_t num_outputs){
+  static void generate_rsig_batch_sizes(std::vector<uint64_t> &batches, rct::RangeProofType rsig_type, size_t num_outputs){
     size_t amount_batched = 0;
 
     while(amount_batched < num_outputs){
-      if (rsig_type == rct::RangeProofBorromean || rsig_type == rct::RangeProofBulletproof) {
+      if (rsig_type == rct::RangeProofType::Borromean || rsig_type == rct::RangeProofType::Bulletproof) {
         batches.push_back(1);
         amount_batched += 1;
 
-      } else if (rsig_type == rct::RangeProofPaddedBulletproof){
+      } else if (rsig_type == rct::RangeProofType::PaddedBulletproof){
         if (num_outputs > BULLETPROOF_MAX_OUTPUTS){
           throw std::invalid_argument("BP padded can support only BULLETPROOF_MAX_OUTPUTS statements");
         }
         batches.push_back(num_outputs);
         amount_batched += num_outputs;
 
-      } else if (rsig_type == rct::RangeProofMultiOutputBulletproof){
+      } else if (rsig_type == rct::RangeProofType::MultiOutputBulletproof){
         size_t batch_size = 1;
         while (batch_size * 2 + amount_batched <= num_outputs && batch_size * 2 <= BULLETPROOF_MAX_OUTPUTS){
           batch_size *= 2;
@@ -568,8 +569,8 @@ namespace tx {
     // Rsig decision
     auto rsig_data = tsx_data.mutable_rsig_data();
     m_ct.rsig_type = get_rsig_type(tx.rct_config, tx.splitted_dsts.size());
-    rsig_data->set_rsig_type(m_ct.rsig_type);
-    if (tx.rct_config.range_proof_type != rct::RangeProofBorromean){
+    rsig_data->set_rsig_type(static_cast<unsigned>(m_ct.rsig_type));
+    if (tx.rct_config.range_proof_type != rct::RangeProofType::Borromean){
       m_ct.bp_version = (m_aux_data->bp_version ? *m_aux_data->bp_version : 1);
       rsig_data->set_bp_version((uint32_t) m_ct.bp_version);
     }
@@ -858,7 +859,7 @@ namespace tx {
   void Signer::step_all_outs_set_ack(std::shared_ptr<const messages::monero::MoneroTransactionAllOutSetAck> ack, hw::device &hwdev){
     m_ct.rv = std::make_shared<rct::rctSig>();
     m_ct.rv->txnFee = ack->rv().txn_fee();
-    m_ct.rv->type = static_cast<uint8_t>(ack->rv().rv_type());
+    m_ct.rv->type = static_cast<rct::RCTType>(static_cast<uint8_t>(ack->rv().rv_type()));
     string_to_key(m_ct.rv->message, ack->rv().message());
 
     // Extra copy
@@ -912,7 +913,7 @@ namespace tx {
       }
     }
 
-    rct::key hash_computed = rct::get_pre_mlsag_hash(*(m_ct.rv), hwdev);
+    rct::key hash_computed = rct::get_pre_clsag_hash(*(m_ct.rv), hwdev);
     auto & hash = ack->full_message_hash();
 
     if (hash.size() != 32){
@@ -1014,7 +1015,7 @@ namespace tx {
       }
     }
 
-    if (m_ct.rv->type == rct::RCTTypeCLSAG){
+    if (m_ct.rv->type == rct::RCTType::CLSAG){
       m_ct.rv->p.CLSAGs.reserve(m_ct.signatures.size());
       for (size_t i = 0; i < m_ct.signatures.size(); ++i) {
         rct::clsag clsag;

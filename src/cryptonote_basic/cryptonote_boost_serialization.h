@@ -199,7 +199,7 @@ namespace boost
     else
     {
       a & (rct::rctSigBase&)x.rct_signatures;
-      if (x.rct_signatures.type != rct::RCTTypeNull)
+      if (x.rct_signatures.type != rct::RCTType::Null)
         a & x.rct_signatures.p;
     }
   }
@@ -330,13 +330,13 @@ namespace boost
   inline void serialize(Archive &a, rct::rctSigBase &x, const boost::serialization::version_type ver)
   {
     a & x.type;
-    if (x.type == rct::RCTTypeNull)
+    if (x.type == rct::RCTType::Null)
       return;
-    if (!tools::equals_any(x.type, rct::RCTTypeFull, rct::RCTTypeSimple, rct::RCTTypeBulletproof, rct::RCTTypeBulletproof2, rct::RCTTypeCLSAG))
+    if (!tools::equals_any(x.type, rct::RCTType::Full, rct::RCTType::Simple, rct::RCTType::Bulletproof, rct::RCTType::Bulletproof2, rct::RCTType::CLSAG))
       throw boost::archive::archive_exception(boost::archive::archive_exception::other_exception, "Unsupported rct type");
     // a & x.message; message is not serialized, as it can be reconstructed from the tx data
     // a & x.mixRing; mixRing is not serialized, as it can be reconstructed from the offsets
-    if (x.type == rct::RCTTypeSimple) // moved to prunable with bulletproofs
+    if (x.type == rct::RCTType::Simple) // moved to prunable with bulletproofs
       a & x.pseudoOuts;
     a & x.ecdhInfo;
     serializeOutPk(a, x.outPk, ver);
@@ -360,13 +360,13 @@ namespace boost
   inline void serialize(Archive &a, rct::rctSig &x, const boost::serialization::version_type ver)
   {
     a & x.type;
-    if (x.type == rct::RCTTypeNull)
+    if (x.type == rct::RCTType::Null)
       return;
-    if (!tools::equals_any(x.type, rct::RCTTypeFull, rct::RCTTypeSimple, rct::RCTTypeBulletproof, rct::RCTTypeBulletproof2, rct::RCTTypeCLSAG))
+    if (!tools::equals_any(x.type, rct::RCTType::Full, rct::RCTType::Simple, rct::RCTType::Bulletproof, rct::RCTType::Bulletproof2, rct::RCTType::CLSAG))
       throw boost::archive::archive_exception(boost::archive::archive_exception::other_exception, "Unsupported rct type");
     // a & x.message; message is not serialized, as it can be reconstructed from the tx data
     // a & x.mixRing; mixRing is not serialized, as it can be reconstructed from the offsets
-    if (x.type == rct::RCTTypeSimple)
+    if (x.type == rct::RCTType::Simple)
       a & x.pseudoOuts;
     a & x.ecdhInfo;
     serializeOutPk(a, x.outPk, ver);

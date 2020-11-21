@@ -353,7 +353,7 @@ namespace cryptonote
           if (Binary)
             unprunable_size = ar.streampos() - start_pos;
 
-          if (!pruned && rct_signatures.type != rct::RCTTypeNull)
+          if (!pruned && rct_signatures.type != rct::RCTType::Null)
           {
             ar.tag("rctsig_prunable");
             auto obj = ar.begin_object();
@@ -406,7 +406,7 @@ namespace cryptonote
     transaction_prefix::set_null();
     signatures.clear();
     rct_signatures = {};
-    rct_signatures.type = rct::RCTTypeNull;
+    rct_signatures.type = rct::RCTType::Null;
     set_hash_valid(false);
     set_blob_size_valid(false);
     pruned = false;

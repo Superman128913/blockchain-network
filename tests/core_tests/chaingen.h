@@ -507,15 +507,15 @@ uint64_t sum_amount(const std::vector<cryptonote::tx_source_entry>& sources);
 
 bool construct_tx_to_key(const std::vector<test_event_entry>& events, cryptonote::transaction& tx,
                          const cryptonote::block& blk_head, const cryptonote::account_base& from, const var_addr_t& to, uint64_t amount,
-                         uint64_t fee, size_t nmix, rct::RangeProofType range_proof_type=rct::RangeProofBorromean, int bp_version = 0);
+                         uint64_t fee, size_t nmix, rct::RangeProofType range_proof_type=rct::RangeProofType::Borromean, int bp_version = 0);
 
 bool construct_tx_to_key(const std::vector<test_event_entry>& events, cryptonote::transaction& tx, const cryptonote::block& blk_head,
                          const cryptonote::account_base& from, std::vector<cryptonote::tx_destination_entry> destinations,
-                         uint64_t fee, size_t nmix, rct::RangeProofType range_proof_type=rct::RangeProofBorromean, int bp_version = 0);
+                         uint64_t fee, size_t nmix, rct::RangeProofType range_proof_type=rct::RangeProofType::Borromean, int bp_version = 0);
 
 bool construct_tx_to_key(cryptonote::transaction& tx, const cryptonote::account_base& from, const var_addr_t& to, uint64_t amount,
                          std::vector<cryptonote::tx_source_entry> &sources,
-                         uint64_t fee, rct::RangeProofType range_proof_type=rct::RangeProofBorromean, int bp_version = 0);
+                         uint64_t fee, rct::RangeProofType range_proof_type=rct::RangeProofType::Borromean, int bp_version = 0);
 
 bool construct_tx_to_key(cryptonote::transaction& tx, const cryptonote::account_base& from, const std::vector<cryptonote::tx_destination_entry>& destinations,
                          std::vector<cryptonote::tx_source_entry> &sources,
@@ -530,7 +530,7 @@ bool construct_tx_rct(const cryptonote::account_keys& sender_account_keys,
     const std::vector<cryptonote::tx_destination_entry>& destinations,
     const std::optional<cryptonote::tx_destination_entry>& change_addr,
     std::vector<uint8_t> extra, cryptonote::transaction& tx, uint64_t unlock_time,
-    rct::RangeProofType range_proof_type=rct::RangeProofBorromean, int bp_version = 0);
+    rct::RangeProofType range_proof_type=rct::RangeProofType::Borromean, int bp_version = 0);
 
 
 uint64_t num_blocks(const std::vector<test_event_entry>& events);
@@ -1090,7 +1090,7 @@ inline bool do_replay_file(const std::string& filename)
 
 #define MAKE_TX_MIX_RCT(VEC_EVENTS, TX_NAME, FROM, TO, AMOUNT, NMIX, HEAD)                       \
   cryptonote::transaction TX_NAME;                                                             \
-  construct_tx_to_key(VEC_EVENTS, TX_NAME, HEAD, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, NMIX, rct::RangeProofPaddedBulletproof); \
+  construct_tx_to_key(VEC_EVENTS, TX_NAME, HEAD, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, NMIX, rct::RangeProofType::PaddedBulletproof); \
   VEC_EVENTS.push_back(TX_NAME);
 
 #define MAKE_TX(VEC_EVENTS, TX_NAME, FROM, TO, AMOUNT, HEAD) MAKE_TX_MIX(VEC_EVENTS, TX_NAME, FROM, TO, AMOUNT, 9, HEAD)
@@ -1105,7 +1105,7 @@ inline bool do_replay_file(const std::string& filename)
 
 
 #define MAKE_TX_MIX_LIST_RCT(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, NMIX, HEAD) \
-        MAKE_TX_MIX_LIST_RCT_EX(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, NMIX, HEAD, rct::RangeProofPaddedBulletproof, 1)
+        MAKE_TX_MIX_LIST_RCT_EX(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, NMIX, HEAD, rct::RangeProofType::PaddedBulletproof, 1)
 #define MAKE_TX_MIX_LIST_RCT_EX(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, NMIX, HEAD, RCT_TYPE, BP_VER)  \
   {                                                                                      \
     cryptonote::transaction t;                                                           \
@@ -1115,7 +1115,7 @@ inline bool do_replay_file(const std::string& filename)
   }
 
 #define MAKE_TX_MIX_DEST_LIST_RCT(VEC_EVENTS, SET_NAME, FROM, TO, NMIX, HEAD)            \
-        MAKE_TX_MIX_DEST_LIST_RCT_EX(VEC_EVENTS, SET_NAME, FROM, TO, NMIX, HEAD, rct::RangeProofPaddedBulletproof, 1)
+        MAKE_TX_MIX_DEST_LIST_RCT_EX(VEC_EVENTS, SET_NAME, FROM, TO, NMIX, HEAD, rct::RangeProofType::PaddedBulletproof, 1)
 #define MAKE_TX_MIX_DEST_LIST_RCT_EX(VEC_EVENTS, SET_NAME, FROM, TO, NMIX, HEAD, RCT_TYPE, BP_VER)  \
   {                                                                                      \
     cryptonote::transaction t;                                                           \

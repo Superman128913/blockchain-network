@@ -1208,14 +1208,14 @@ namespace cryptonote
         continue;
       const rct::rctSig &rv = tx_info[n].tx.rct_signatures;
       switch (rv.type) {
-        case rct::RCTTypeNull:
+        case rct::RCTType::Null:
           // coinbase should not come here, so we reject for all other types
           MERROR_VER("Unexpected Null rctSig type");
           set_semantics_failed(tx_info[n].tx_hash);
           tx_info[n].tvc.m_verifivation_failed = true;
           tx_info[n].result = false;
           break;
-        case rct::RCTTypeSimple:
+        case rct::RCTType::Simple:
           if (!rct::verRctSemanticsSimple(rv))
           {
             MERROR_VER("rct signature semantics check failed");
@@ -1225,7 +1225,7 @@ namespace cryptonote
             break;
           }
           break;
-        case rct::RCTTypeFull:
+        case rct::RCTType::Full:
           if (!rct::verRct(rv, true))
           {
             MERROR_VER("rct signature semantics check failed");
@@ -1235,9 +1235,9 @@ namespace cryptonote
             break;
           }
           break;
-        case rct::RCTTypeBulletproof:
-        case rct::RCTTypeBulletproof2:
-        case rct::RCTTypeCLSAG:
+        case rct::RCTType::Bulletproof:
+        case rct::RCTType::Bulletproof2:
+        case rct::RCTType::CLSAG:
           if (!is_canonical_bulletproof_layout(rv.p.bulletproofs))
           {
             MERROR_VER("Bulletproof does not have canonical form");

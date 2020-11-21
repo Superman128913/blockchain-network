@@ -386,13 +386,13 @@ namespace service_nodes
     {
       switch (tx.rct_signatures.type)
       {
-      case rct::RCTTypeSimple:
-      case rct::RCTTypeBulletproof:
-      case rct::RCTTypeBulletproof2:
-      case rct::RCTTypeCLSAG:
+      case rct::RCTType::Simple:
+      case rct::RCTType::Bulletproof:
+      case rct::RCTType::Bulletproof2:
+      case rct::RCTType::CLSAG:
         money_transferred = rct::decodeRctSimple(tx.rct_signatures, rct::sk2rct(scalar1), i, mask, hwdev);
         break;
-      case rct::RCTTypeFull:
+      case rct::RCTType::Full:
         money_transferred = rct::decodeRct(tx.rct_signatures, rct::sk2rct(scalar1), i, mask, hwdev);
         break;
       default:

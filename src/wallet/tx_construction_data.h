@@ -102,7 +102,7 @@ void serialize(Archive &a, wallet::tx_construction_data &x, const unsigned int v
   a & x.subaddr_indices;
   if (!typename Archive::is_saving())
   {
-    x.rct_config = { rct::RangeProofBorromean, 0 };
+    x.rct_config = { rct::RangeProofType::Borromean, 0 };
     if (ver < 6)
     {
       x.tx_type    = cryptonote::txtype::standard;
@@ -117,10 +117,10 @@ void serialize(Archive &a, wallet::tx_construction_data &x, const unsigned int v
     return;
   if (ver < 5)
   {
-    bool use_bulletproofs = x.rct_config.range_proof_type != rct::RangeProofBorromean;
+    bool use_bulletproofs = x.rct_config.range_proof_type != rct::RangeProofType::Borromean;
     a & use_bulletproofs;
     if (!typename Archive::is_saving())
-      x.rct_config = { use_bulletproofs ? rct::RangeProofBulletproof : rct::RangeProofBorromean, 0 };
+      x.rct_config = { use_bulletproofs ? rct::RangeProofType::Bulletproof : rct::RangeProofType::Borromean, 0 };
     return;
   }
   a & x.rct_config;

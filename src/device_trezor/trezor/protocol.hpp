@@ -30,6 +30,7 @@
 #ifndef MONERO_PROTOCOL_H
 #define MONERO_PROTOCOL_H
 
+#include "ringct/rctTypes.h"
 #include "trezor_defs.hpp"
 #include "device/device_cold.hpp"
 #include "messages_map.hpp"
@@ -170,7 +171,7 @@ namespace tx {
     TsxData tsx_data;
     wallet::tx_construction_data tx_data;
     cryptonote::transaction tx;
-    unsigned rsig_type;
+    rct::RangeProofType rsig_type;
     int bp_version;
     std::vector<uint64_t> grouping_vct;
     std::shared_ptr<MoneroRsigData> rsig_param;
@@ -289,11 +290,11 @@ namespace tx {
         throw std::invalid_argument("RV not initialized");
       }
       auto tp = m_ct.rv->type;
-      return tp == rct::RCTTypeSimple;
+      return tp == rct::RCTType::Simple;
     }
 
     bool is_req_bulletproof() const {
-      return m_ct.tx_data.rct_config.range_proof_type != rct::RangeProofBorromean;
+      return m_ct.tx_data.rct_config.range_proof_type != rct::RangeProofType::Borromean;
     }
 
     bool is_bulletproof() const {

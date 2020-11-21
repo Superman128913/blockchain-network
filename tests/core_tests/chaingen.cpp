@@ -1485,9 +1485,9 @@ uint64_t get_amount(const cryptonote::account_base& account, const cryptonote::t
   {
     if (rct::is_rct_simple(tx.rct_signatures.type))
       money_transferred = rct::decodeRctSimple(tx.rct_signatures, rct::sk2rct(scalar1), i, mask, hwdev);
-    else if (tx.rct_signatures.type == rct::RCTTypeFull)
+    else if (tx.rct_signatures.type == rct::RCTType::Full)
       money_transferred = rct::decodeRct(tx.rct_signatures, rct::sk2rct(scalar1), i, hwdev);
-    else if (tx.rct_signatures.type == rct::RCTTypeNull)
+    else if (tx.rct_signatures.type == rct::RCTType::Null)
       money_transferred = tx.vout[i].amount;
     else {
       LOG_PRINT_L0(__func__ << ": Unsupported rct type: " << +tx.rct_signatures.type);
@@ -1715,7 +1715,7 @@ bool fill_tx_sources(std::vector<cryptonote::tx_source_entry>& sources, const st
             {
                 rct::decodeRctSimple(tx.rct_signatures, rct::sk2rct(amount_key), oi.out_no, ts.mask, hw::get_device("default"));
             }
-            else if (tx.rct_signatures.type == rct::RCTTypeFull)
+            else if (tx.rct_signatures.type == rct::RCTType::Full)
             {
                 rct::decodeRct(tx.rct_signatures, rct::sk2rct(amount_key), oi.out_no, ts.mask, hw::get_device("default"));
             }
