@@ -599,6 +599,12 @@ struct Wallet
     }
 
    /**
+    * @brief listCurrentStakes - returns a list of the wallets locked stakes, provides both service node address and the staked amount
+    * @return 
+    */
+    virtual std::vector<std::pair<std::string, uint32_t>>* listCurrentStakes() const = 0;
+
+   /**
     * @brief watchOnly - checks if wallet is watch only
     * @return - true if watch only
     */

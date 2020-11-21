@@ -994,6 +994,13 @@ uint64_t WalletImpl::unlockedBalance(uint32_t accountIndex) const
     return m_wallet->unlocked_balance(accountIndex, false);
 }
 
+std::vector<std::pair<std::string, uint32_t>>* WalletImpl::listCurrentStakes() const
+{
+    std::vector<std::pair<std::string, uint32_t>>* stakes = new std::vector<std::pair<std::string, uint32_t>>;
+    
+    return stakes;
+}
+
 uint64_t WalletImpl::blockChainHeight() const
 {
     if(m_wallet->light_wallet()) {
