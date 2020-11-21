@@ -997,6 +997,19 @@ uint64_t WalletImpl::unlockedBalance(uint32_t accountIndex) const
 std::vector<std::pair<std::string, uint32_t>>* WalletImpl::listCurrentStakes() const
 {
     std::vector<std::pair<std::string, uint32_t>>* stakes = new std::vector<std::pair<std::string, uint32_t>>;
+
+    auto response = m_wallet->list_current_stakes();
+
+    for (rpc::GET_SERVICE_NODES::response::entry const &node_info : response)
+    {
+      for (const auto& contributor : node_info.contributors)
+      {
+        for (size_t i = 0; i < contributor.locked_contributions.size(); ++i)
+        {
+          stakes->push_back(std::make_pair(node_info.service_node_pubkey, contributor.amount));
+        }
+      }
+    }
     
     return stakes;
 }
