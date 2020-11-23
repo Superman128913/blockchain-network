@@ -49,6 +49,7 @@
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "cryptonote_basic/miner.h"
 #include "loki_economy.h"
+#include "ringct/rctSigs.h"
 
 #include "chaingen.h"
 #include "device/device.hpp"

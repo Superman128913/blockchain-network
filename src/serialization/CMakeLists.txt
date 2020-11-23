@@ -27,16 +27,4 @@
 # STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 # THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-add_library(serialization
-  json_object.cpp
-  )
-target_link_libraries(serialization
-  PUBLIC
-    common
-  PRIVATE
-    cryptonote_core
-    cryptonote_protocol
-    Boost::thread
-    version
-    extra)
-
+# Nothing to do here: serialization code is completely header-only.

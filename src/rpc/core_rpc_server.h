@@ -50,12 +50,12 @@
 #undef LOKI_DEFAULT_LOG_CATEGORY
 #define LOKI_DEFAULT_LOG_CATEGORY "daemon.rpc"
 
-namespace boost { namespace program_options {
+namespace boost::program_options {
 class options_description;
 class variables_map;
-}}
+}
 
-namespace cryptonote { namespace rpc {
+namespace cryptonote::rpc {
 
   /// Exception when trying to invoke an RPC command that indicate a parameter parse failure (will
   /// give an invalid params error for JSON-RPC, for example).
@@ -146,6 +146,11 @@ namespace cryptonote { namespace rpc {
   /// and then actually do the registration in core_rpc_server.cpp.
   extern const std::unordered_map<std::string, std::shared_ptr<const rpc_command>> rpc_commands;
 
+  // Function used for getting an output distribution; this is non-static because we need to get at
+  // it from the test suite, but should be considered internal.
+  namespace detail {
+    std::optional<output_distribution_data> get_output_distribution(const std::function<bool(uint64_t, uint64_t, uint64_t, uint64_t&, std::vector<uint64_t>&, uint64_t&)>& f, uint64_t amount, uint64_t from_height, uint64_t to_height, const std::function<crypto::hash(uint64_t)>& get_hash, bool cumulative, uint64_t blockchain_height);
+  }
 
   /**
    * Core RPC server.
@@ -331,6 +336,6 @@ private:
     bool m_was_bootstrap_ever_used;
   };
 
-}} // namespace cryptonote::rpc
+} // namespace cryptonote::rpc
 
 BOOST_CLASS_VERSION(nodetool::node_server<cryptonote::t_cryptonote_protocol_handler<cryptonote::core> >, 1);
