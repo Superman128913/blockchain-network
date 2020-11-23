@@ -32,8 +32,7 @@
 
 #include <cstddef>
 #include <vector>
-#include <iostream>
-#include <cinttypes>
+#include <cstdint>
 #include <sodium/crypto_verify_32.h>
 
 extern "C" {
@@ -44,8 +43,7 @@ extern "C" {
 #include "crypto/generic-ops.h"
 #include "crypto/crypto.h"
 
-#include "epee/hex.h"
-#include "epee/span.h"
+#include "common/hex.h"
 #include "serialization/variant.h"
 #include "common/util.h"
 
@@ -572,7 +570,7 @@ namespace cryptonote {
 
 namespace rct {
 inline std::ostream &operator <<(std::ostream &o, const rct::key &v) {
-  epee::to_hex::formatted(o, epee::as_byte_span(v)); return o;
+  return o << '<' << tools::type_to_hex(v) << '>';
 }
 }
 
