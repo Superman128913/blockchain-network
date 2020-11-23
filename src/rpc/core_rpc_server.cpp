@@ -2566,6 +2566,15 @@ namespace cryptonote { namespace rpc {
 
       return {std::move(distribution), start_height, base};
     }
+
+    static struct {
+      std::mutex mutex;
+      std::vector<std::uint64_t> cached_distribution;
+      std::uint64_t cached_from = 0, cached_to = 0, cached_start_height = 0, cached_base = 0;
+      crypto::hash cached_m10_hash = crypto::null_hash;
+      crypto::hash cached_top_hash = crypto::null_hash;
+      bool cached = false;
+    } output_dist_cache;
   }
 
   namespace detail {
@@ -2578,16 +2587,7 @@ namespace cryptonote { namespace rpc {
         bool cumulative,
         uint64_t blockchain_height)
     {
-      static struct D
-      {
-        std::mutex mutex;
-        std::vector<std::uint64_t> cached_distribution;
-        std::uint64_t cached_from, cached_to, cached_start_height, cached_base;
-        crypto::hash cached_m10_hash;
-        crypto::hash cached_top_hash;
-        bool cached;
-        D(): cached_from(0), cached_to(0), cached_start_height(0), cached_base(0), cached_m10_hash(crypto::null_hash), cached_top_hash(crypto::null_hash), cached(false) {}
-      } d;
+      auto& d = output_dist_cache;
       const std::unique_lock lock{d.mutex};
 
       crypto::hash top_hash = crypto::null_hash;
