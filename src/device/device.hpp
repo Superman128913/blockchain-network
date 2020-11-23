@@ -33,6 +33,7 @@
 #include "crypto/chacha.h"
 #include "ringct/rctTypes.h"
 #include "cryptonote_config.h"
+#include "epee/wipeable_string.h"
 
 
 #ifndef USE_DEVICE_LEDGER

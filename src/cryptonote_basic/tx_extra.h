@@ -35,6 +35,7 @@
 #include "serialization/binary_utils.h"
 #include "serialization/variant.h"
 #include "crypto/crypto.h"
+#include "common/hex.h"
 #include "loki_economy.h"
 #include "cryptonote_basic.h"
 
@@ -146,9 +147,13 @@ struct generic_signature
     FIELD(ed25519);
   END_SERIALIZE()
 };
+
 static_assert(sizeof(crypto::ed25519_signature) == sizeof(crypto::signature), "LNS allows storing either ed25519 or monero style signatures, we store all signatures into crypto::signature in LNS");
-inline std::ostream &operator<<(std::ostream &o, const generic_signature &v) { epee::to_hex::formatted(o, epee::as_byte_span(v.data)); return o; }
+inline std::ostream &operator<<(std::ostream &o, const generic_signature &v) {
+    return o << '<' << tools::type_to_hex(v.data) << '>';
 }
+
+} // namespace lns
 
 namespace std {
   static_assert(sizeof(lns::generic_owner) >= sizeof(std::size_t) && alignof(lns::generic_owner) >= alignof(std::size_t),

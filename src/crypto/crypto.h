@@ -40,8 +40,7 @@
 #include "epee/memwipe.h"
 #include "epee/mlocker.h"
 #include "generic-ops.h"
-#include "epee/hex.h"
-#include "epee/span.h"
+#include "common/hex.h"
 #include "hash.h"
 
 namespace crypto {
@@ -243,25 +242,25 @@ namespace crypto {
   }
 
   inline std::ostream &operator <<(std::ostream &o, const crypto::public_key &v) {
-    epee::to_hex::formatted(o, epee::as_byte_span(v)); return o;
+    return o << '<' << tools::type_to_hex(v) << '>';
   }
   inline std::ostream &operator <<(std::ostream &o, const crypto::secret_key &v) {
-    epee::to_hex::formatted(o, epee::as_byte_span(v)); return o;
+    return o << '<' << tools::type_to_hex(v) << '>';
   }
   inline std::ostream &operator <<(std::ostream &o, const crypto::key_derivation &v) {
-    epee::to_hex::formatted(o, epee::as_byte_span(v)); return o;
+    return o << '<' << tools::type_to_hex(v) << '>';
   }
   inline std::ostream &operator <<(std::ostream &o, const crypto::key_image &v) {
-    epee::to_hex::formatted(o, epee::as_byte_span(v)); return o;
+    return o << '<' << tools::type_to_hex(v) << '>';
   }
   inline std::ostream &operator <<(std::ostream &o, const crypto::signature &v) {
-    epee::to_hex::formatted(o, epee::as_byte_span(v)); return o;
+    return o << '<' << tools::type_to_hex(v) << '>';
   }
   inline std::ostream &operator <<(std::ostream &o, const crypto::ed25519_public_key &v) {
-    epee::to_hex::formatted(o, epee::as_byte_span(v)); return o;
+    return o << '<' << tools::type_to_hex(v) << '>';
   }
   inline std::ostream &operator <<(std::ostream &o, const crypto::x25519_public_key &v) {
-    epee::to_hex::formatted(o, epee::as_byte_span(v)); return o;
+    return o << '<' << tools::type_to_hex(v) << '>';
   }
   constexpr inline crypto::public_key null_pkey{};
   const inline crypto::secret_key null_skey{};
