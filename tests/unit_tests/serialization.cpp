@@ -579,28 +579,9 @@ TEST(Serialization, serializes_ringct)
   amount_keys.push_back(rct::hash_to_scalar(rct::zero()));
   rct::skpkGen(Sk, Pk);
   destinations.push_back(Pk);
-  //compute rct data with mixin 3
-  const rct::RCTConfig rct_config{ rct::RangeProofType::PaddedBulletproof, 2 };
-  auto s0 = rct::genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, NULL, NULL, 0, 3, rct_config, hw::get_device("default"));
-
-  ASSERT_FALSE(s0.p.MGs.empty());
-  ASSERT_TRUE(s0.p.CLSAGs.empty());
-  const auto& mg = s0.p.MGs[0];
-  auto mg1 = round_trip(s0.p.MGs[0]);
-  ASSERT_EQ(mg.ss, mg1.ss);
-  ASSERT_EQ(mg.cc, mg1.cc);
-
-  // mixRing and II are not serialized, they are meant to be reconstructed
-  ASSERT_TRUE(mg1.II.empty());
-
-  ASSERT_FALSE(s0.p.bulletproofs.empty());
-  auto& bp = s0.p.bulletproofs.front();
-  auto bp1 = round_trip(bp);
-  bp1.V = bp.V; // this is not saved, as it is reconstructed from other tx data
-  ASSERT_EQ(bp, bp1);
 
   const rct::RCTConfig rct_config_clsag{ rct::RangeProofType::PaddedBulletproof, 3 };
-  s0 = rct::genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, NULL, NULL, 0, 3, rct_config_clsag, hw::get_device("default"));
+  auto s0 = rct::genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, NULL, NULL, 0, 3, rct_config_clsag, hw::get_device("default"));
 
   ASSERT_FALSE(s0.p.CLSAGs.empty());
   ASSERT_TRUE(s0.p.MGs.empty());

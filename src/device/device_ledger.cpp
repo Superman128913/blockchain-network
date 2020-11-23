@@ -1849,8 +1849,6 @@ namespace hw {
         this->buffer_send[offset] = (inputs_size == 0)?0x00:0x80;
         offset += 1;
 
-        //type
-        uint8_t type = data[0];
         this->buffer_send[offset] = data[0];
         offset += 1;
 
@@ -1870,8 +1868,10 @@ namespace hw {
         // check fee user input
         CHECK_AND_ASSERT_THROW_MES(this->exchange_wait_on_input() == 0, "Fee denied on device.");
 
+        auto type = static_cast<rct::RCTType>(data[0]);
+
         //pseudoOuts
-        if (type == rct::RCTTypeSimple) {
+        if (type == rct::RCTType::Simple) {
           for ( i = 0; i < inputs_size; i++) {
             offset = set_command_header(INS_VALIDATE, 0x01, i+2);
             //options
@@ -1890,7 +1890,7 @@ namespace hw {
 
         // ======  Aout, Bout, AKout, C, v, k ======
         kv_offset = data_offset;
-        if (type==rct::RCTTypeBulletproof2 || type==rct::RCTTypeCLSAG) {
+        if (type==rct::RCTType::Bulletproof2 || type==rct::RCTType::CLSAG) {
           C_offset = kv_offset+ (8)*outputs_size;
         } else {
           C_offset = kv_offset+ (32+32)*outputs_size;
@@ -1907,7 +1907,7 @@ namespace hw {
           offset = set_command_header(INS_VALIDATE, 0x02, i+1);
           //options
           this->buffer_send[offset] = (i==outputs_size-1)? 0x00:0x80 ;
-          this->buffer_send[offset] |= (type==rct::RCTTypeBulletproof2 || type==rct::RCTTypeCLSAG)?0x02:0x00;
+          this->buffer_send[offset] |= (type==rct::RCTType::Bulletproof2 || type==rct::RCTType::CLSAG)?0x02:0x00;
           offset += 1;
           //is_subaddress
           this->buffer_send[offset] = outKeys.is_subaddress;
@@ -1928,7 +1928,7 @@ namespace hw {
           memmove(this->buffer_send+offset, data+C_offset,32);
           offset += 32;
           C_offset += 32;
-          if (type==rct::RCTTypeBulletproof2 || type==rct::RCTTypeCLSAG) {
+          if (type==rct::RCTType::Bulletproof2 || type==rct::RCTType::CLSAG) {
             //k
             memset(this->buffer_send+offset, 0, 32);
             offset += 32;

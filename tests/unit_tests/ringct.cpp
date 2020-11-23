@@ -86,57 +86,6 @@ TEST(ringct, Borromean)
         ASSERT_FALSE(verifyBorromean(bb, P1v, P2v));
 }
 
-TEST(ringct, MG_sigs)
-{
-    int j = 0;
-    int N = 0;
-
-        //Tests for MG Sigs
-        //#MG sig: true one
-        N = 3;// #cols
-        int   R = 3;// #rows
-        keyV xtmp = skvGen(R);
-        keyM xm = keyMInit(R, N);// = [[None]*N] #just used to generate test public keys
-        keyV sk = skvGen(R);
-        keyM P  = keyMInit(R, N);// = keyM[[None]*N] #stores the public keys;
-        int ind = 2;
-        int i = 0;
-        for (j = 0 ; j < R ; j++) {
-            for (i = 0 ; i < N ; i++)
-            {
-                xm[i][j] = skGen();
-                P[i][j] = scalarmultBase(xm[i][j]);
-            }
-        }
-        for (j = 0 ; j < R ; j++) {
-            sk[j] = xm[ind][j];
-        }
-        key message = identity();
-        mgSig IIccss = MLSAG_Gen(message, P, sk, NULL, NULL, ind, R, hw::get_device("default"));
-        ASSERT_TRUE(MLSAG_Ver(message, P, IIccss, R));
-
-        //#MG sig: false one
-        N = 3;// #cols
-        R = 3;// #rows
-        xtmp = skvGen(R);
-        keyM xx(N, xtmp);// = [[None]*N] #just used to generate test public keys
-        sk = skvGen(R);
-        //P (N, xtmp);// = keyM[[None]*N] #stores the public keys;
-
-        ind = 2;
-        for (j = 0 ; j < R ; j++) {
-            for (i = 0 ; i < N ; i++)
-            {
-                xx[i][j] = skGen();
-                P[i][j] = scalarmultBase(xx[i][j]);
-            }
-            sk[j] = xx[ind][j];
-        }
-        sk[2] = skGen();//assume we don't know one of the private keys..
-        IIccss = MLSAG_Gen(message, P, sk, NULL, NULL, ind, R, hw::get_device("default"));
-        ASSERT_FALSE(MLSAG_Ver(message, P, IIccss, R));
-}
-
 TEST(ringct, CLSAG)
 {
   const size_t N = 11;
@@ -335,13 +284,7 @@ TEST(ringct, range_proofs)
         skpkGen(Sk, Pk);
         destinations.push_back(Pk);
 
-        const rct::RCTConfig rct_config { RangeProofBorromean, 0 };
-
-        //compute rct data with mixin 3 - should fail since full type with > 1 input
-        bool ok = false;
-        try { genRct(rct::zero(), sc, pc, destinations, amounts, amount_keys, NULL, NULL, 3, rct_config, hw::get_device("default")); }
-        catch(...) { ok = true; }
-        ASSERT_TRUE(ok);
+        const rct::RCTConfig rct_config { RangeProofType::Borromean, 0 };
 
         //compute rct data with mixin 3
         rctSig s = genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, NULL, NULL, 0, 3, rct_config, hw::get_device("default"));
@@ -406,7 +349,7 @@ TEST(ringct, range_proofs_with_fee)
         skpkGen(Sk, Pk);
         destinations.push_back(Pk);
 
-        const rct::RCTConfig rct_config { RangeProofBorromean, 0 };
+        const rct::RCTConfig rct_config { RangeProofType::Borromean, 0 };
 
         //compute rct data with mixin 3
         rctSig s = genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, NULL, NULL, 1, 3, rct_config, hw::get_device("default"));
@@ -484,7 +427,7 @@ TEST(ringct, simple)
         //compute sig with mixin 2
         xmr_amount txnfee = 1;
 
-        const rct::RCTConfig rct_config { RangeProofBorromean, 0 };
+        const rct::RCTConfig rct_config { RangeProofType::Borromean, 0 };
         rctSig s = genRctSimple(message, sc, pc, destinations,inamounts, outamounts, amount_keys, NULL, NULL, txnfee, 2, rct_config, hw::get_device("default"));
 
         //verify ring ct signature
@@ -492,35 +435,6 @@ TEST(ringct, simple)
 
         //decode received amount corresponding to output pubkey index 1
         decodeRctSimple(s, amount_keys[1], 1, mask,  hw::get_device("default"));
-}
-
-static rct::rctSig make_sample_rct_sig(int n_inputs, const uint64_t input_amounts[], int n_outputs, const uint64_t output_amounts[], bool last_is_fee)
-{
-    ctkeyV sc, pc;
-    ctkey sctmp, pctmp;
-    std::vector<xmr_amount >amounts;
-    keyV destinations;
-    keyV amount_keys;
-    key Sk, Pk;
-
-    for (int n = 0; n < n_inputs; ++n) {
-        std::tie(sctmp, pctmp) = ctskpkGen(input_amounts[n]);
-        sc.push_back(sctmp);
-        pc.push_back(pctmp);
-    }
-
-    for (int n = 0; n < n_outputs; ++n) {
-        amounts.push_back(output_amounts[n]);
-        skpkGen(Sk, Pk);
-        if (n < n_outputs - 1 || !last_is_fee)
-        {
-          destinations.push_back(Pk);
-          amount_keys.push_back(rct::hash_to_scalar(rct::zero()));
-        }
-    }
-
-    const rct::RCTConfig rct_config { RangeProofBorromean, 0 };
-    return genRct(rct::zero(), sc, pc, destinations, amounts, amount_keys, NULL, NULL, 3, rct_config, hw::get_device("default"));
 }
 
 static rct::rctSig make_sample_simple_rct_sig(int n_inputs, const uint64_t input_amounts[], int n_outputs, const uint64_t output_amounts[], uint64_t fee)
@@ -546,26 +460,20 @@ static rct::rctSig make_sample_simple_rct_sig(int n_inputs, const uint64_t input
         destinations.push_back(Pk);
     }
 
-    const rct::RCTConfig rct_config { RangeProofBorromean, 0 };
+    const rct::RCTConfig rct_config { RangeProofType::Borromean, 0 };
     return genRctSimple(rct::zero(), sc, pc, destinations, inamounts, outamounts, amount_keys, NULL, NULL, fee, 3, rct_config, hw::get_device("default"));
 }
 
 static bool range_proof_test(bool expected_valid,
-    int n_inputs, const uint64_t input_amounts[], int n_outputs, const uint64_t output_amounts[], bool last_is_fee, bool simple)
+    int n_inputs, const uint64_t input_amounts[], int n_outputs, const uint64_t output_amounts[], bool last_is_fee)
 {
     //compute rct data
     bool valid;
     try {
         rctSig s;
         // simple takes fee as a parameter, non-simple takes it as an extra element to output amounts
-        if (simple) {
-          s = make_sample_simple_rct_sig(n_inputs, input_amounts, last_is_fee ? n_outputs - 1 : n_outputs, output_amounts, last_is_fee ? output_amounts[n_outputs - 1] : 0);
-          valid = verRctSimple(s);
-        }
-        else {
-          s = make_sample_rct_sig(n_inputs, input_amounts, n_outputs, output_amounts, last_is_fee);
-          valid = verRct(s);
-        }
+        s = make_sample_simple_rct_sig(n_inputs, input_amounts, last_is_fee ? n_outputs - 1 : n_outputs, output_amounts, last_is_fee ? output_amounts[n_outputs - 1] : 0);
+        valid = verRctSimple(s);
     }
     catch (const std::exception &e) {
         valid = false;
@@ -581,354 +489,193 @@ static bool range_proof_test(bool expected_valid,
 
 #define NELTS(array) (sizeof(array)/sizeof(array[0]))
 
-TEST(ringct, range_proofs_reject_empty_outs)
-{
-  const uint64_t inputs[] = {5000};
-  const uint64_t outputs[] = {};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
-}
-
 TEST(ringct, range_proofs_reject_empty_outs_simple)
 {
   const uint64_t inputs[] = {5000};
   const uint64_t outputs[] = {};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_reject_empty_ins)
-{
-  const uint64_t inputs[] = {};
-  const uint64_t outputs[] = {5000};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_reject_empty_ins_simple)
 {
   const uint64_t inputs[] = {};
   const uint64_t outputs[] = {5000};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_reject_all_empty)
-{
-  const uint64_t inputs[] = {};
-  const uint64_t outputs[] = {};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_reject_all_empty_simple)
 {
   const uint64_t inputs[] = {};
   const uint64_t outputs[] = {};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_accept_zero_empty)
-{
-  const uint64_t inputs[] = {0};
-  const uint64_t outputs[] = {};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_accept_zero_empty_simple)
 {
   const uint64_t inputs[] = {0};
   const uint64_t outputs[] = {};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_reject_empty_zero)
-{
-  const uint64_t inputs[] = {};
-  const uint64_t outputs[] = {0};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_reject_empty_zero_simple)
 {
   const uint64_t inputs[] = {};
   const uint64_t outputs[] = {0};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_accept_zero_zero)
-{
-  const uint64_t inputs[] = {0};
-  const uint64_t outputs[] = {0};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_accept_zero_zero_simple)
 {
   const uint64_t inputs[] = {0};
   const uint64_t outputs[] = {0};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_accept_zero_out_first)
-{
-  const uint64_t inputs[] = {5000};
-  const uint64_t outputs[] = {0, 5000};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_accept_zero_out_first_simple)
 {
   const uint64_t inputs[] = {5000};
   const uint64_t outputs[] = {0, 5000};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_accept_zero_out_last)
-{
-  const uint64_t inputs[] = {5000};
-  const uint64_t outputs[] = {5000, 0};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_accept_zero_out_last_simple)
 {
   const uint64_t inputs[] = {5000};
   const uint64_t outputs[] = {5000, 0};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_accept_zero_out_middle)
-{
-  const uint64_t inputs[] = {5000};
-  const uint64_t outputs[] = {2500, 0, 2500};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_accept_zero_out_middle_simple)
 {
   const uint64_t inputs[] = {5000};
   const uint64_t outputs[] = {2500, 0, 2500};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_accept_zero)
-{
-  const uint64_t inputs[] = {0};
-  const uint64_t outputs[] = {0};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_accept_zero_in_first_simple)
 {
   const uint64_t inputs[] = {0, 5000};
   const uint64_t outputs[] = {5000};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
+  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_accept_zero_in_last_simple)
 {
   const uint64_t inputs[] = {5000, 0};
   const uint64_t outputs[] = {5000};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
+  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_accept_zero_in_middle_simple)
 {
   const uint64_t inputs[] = {2500, 0, 2500};
   const uint64_t outputs[] = {5000};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_reject_single_lower)
-{
-  const uint64_t inputs[] = {5000};
-  const uint64_t outputs[] = {1};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_reject_single_lower_simple)
 {
   const uint64_t inputs[] = {5000};
   const uint64_t outputs[] = {1};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_reject_single_higher)
-{
-  const uint64_t inputs[] = {5000};
-  const uint64_t outputs[] = {5001};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_reject_single_higher_simple)
 {
   const uint64_t inputs[] = {5000};
   const uint64_t outputs[] = {5001};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_reject_single_out_negative)
-{
-  const uint64_t inputs[] = {5000};
-  const uint64_t outputs[] = {(uint64_t)-1000ll};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_reject_single_out_negative_simple)
 {
   const uint64_t inputs[] = {5000};
   const uint64_t outputs[] = {(uint64_t)-1000ll};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_reject_out_negative_first)
-{
-  const uint64_t inputs[] = {5000};
-  const uint64_t outputs[] = {(uint64_t)-1000ll, 6000};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_reject_out_negative_first_simple)
 {
   const uint64_t inputs[] = {5000};
   const uint64_t outputs[] = {(uint64_t)-1000ll, 6000};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_reject_out_negative_last)
-{
-  const uint64_t inputs[] = {5000};
-  const uint64_t outputs[] = {6000, (uint64_t)-1000ll};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_reject_out_negative_last_simple)
 {
   const uint64_t inputs[] = {5000};
   const uint64_t outputs[] = {6000, (uint64_t)-1000ll};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_reject_out_negative_middle)
-{
-  const uint64_t inputs[] = {5000};
-  const uint64_t outputs[] = {3000, (uint64_t)-1000ll, 3000};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_reject_out_negative_middle_simple)
 {
   const uint64_t inputs[] = {5000};
   const uint64_t outputs[] = {3000, (uint64_t)-1000ll, 3000};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_reject_single_in_negative)
-{
-  const uint64_t inputs[] = {(uint64_t)-1000ll};
-  const uint64_t outputs[] = {5000};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_reject_single_in_negative_simple)
 {
   const uint64_t inputs[] = {(uint64_t)-1000ll};
   const uint64_t outputs[] = {5000};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_reject_in_negative_first)
-{
-  const uint64_t inputs[] = {(uint64_t)-1000ll, 6000};
-  const uint64_t outputs[] = {5000};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_reject_in_negative_first_simple)
 {
   const uint64_t inputs[] = {(uint64_t)-1000ll, 6000};
   const uint64_t outputs[] = {5000};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_reject_in_negative_last)
-{
-  const uint64_t inputs[] = {6000, (uint64_t)-1000ll};
-  const uint64_t outputs[] = {5000};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_reject_in_negative_last_simple)
 {
   const uint64_t inputs[] = {6000, (uint64_t)-1000ll};
   const uint64_t outputs[] = {5000};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_reject_in_negative_middle)
-{
-  const uint64_t inputs[] = {3000, (uint64_t)-1000ll, 3000};
-  const uint64_t outputs[] = {5000};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_reject_in_negative_middle_simple)
 {
   const uint64_t inputs[] = {3000, (uint64_t)-1000ll, 3000};
   const uint64_t outputs[] = {5000};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_reject_higher_list)
-{
-  const uint64_t inputs[] = {5000};
-  const uint64_t outputs[] = {1000, 1000, 1000, 1000, 1000, 1000};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_reject_higher_list_simple)
 {
   const uint64_t inputs[] = {5000};
   const uint64_t outputs[] = {1000, 1000, 1000, 1000, 1000, 1000};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_accept_1_to_1)
-{
-  const uint64_t inputs[] = {5000};
-  const uint64_t outputs[] = {5000};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_accept_1_to_1_simple)
 {
   const uint64_t inputs[] = {5000};
   const uint64_t outputs[] = {5000};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
-}
-
-TEST(ringct, range_proofs_accept_1_to_N)
-{
-  const uint64_t inputs[] = {5000};
-  const uint64_t outputs[] = {1000, 1000, 1000, 1000, 1000};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, false));
+  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_accept_1_to_N_simple)
 {
   const uint64_t inputs[] = {5000};
   const uint64_t outputs[] = {1000, 1000, 1000, 1000, 1000};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false,true));
+  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_accept_N_to_1_simple)
 {
   const uint64_t inputs[] = {1000, 1000, 1000, 1000, 1000};
   const uint64_t outputs[] = {5000};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
+  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_accept_N_to_N_simple)
 {
   const uint64_t inputs[] = {1000, 1000, 1000, 1000, 1000};
   const uint64_t outputs[] = {1000, 1000, 1000, 1000, 1000};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
+  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_accept_very_long_simple)
@@ -942,7 +689,7 @@ TEST(ringct, range_proofs_accept_very_long_simple)
   }
   std::shuffle(inputs, inputs + N, crypto::random_device{});
   std::shuffle(outputs, outputs + N, crypto::random_device{});
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false, true));
+  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, HPow2)
@@ -999,96 +746,46 @@ TEST(ringct, prooveRange_is_non_deterministic)
   ASSERT_TRUE(memcmp(mask[0].bytes, mask[1].bytes, sizeof(mask[0].bytes)));
 }
 
-TEST(ringct, fee_0_valid)
-{
-  const uint64_t inputs[] = {2000};
-  const uint64_t outputs[] = {2000, 0};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, true, false));
-}
-
 TEST(ringct, fee_0_valid_simple)
 {
   const uint64_t inputs[] = {1000, 1000};
   const uint64_t outputs[] = {2000, 0};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, true, true));
-}
-
-TEST(ringct, fee_non_0_valid)
-{
-  const uint64_t inputs[] = {2000};
-  const uint64_t outputs[] = {1900, 100};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, true, false));
+  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, true));
 }
 
 TEST(ringct, fee_non_0_valid_simple)
 {
   const uint64_t inputs[] = {1000, 1000};
   const uint64_t outputs[] = {1900, 100};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, true, true));
-}
-
-TEST(ringct, fee_non_0_invalid_higher)
-{
-  const uint64_t inputs[] = {1000, 1000};
-  const uint64_t outputs[] = {1990, 100};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, true, false));
+  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, true));
 }
 
 TEST(ringct, fee_non_0_invalid_higher_simple)
 {
   const uint64_t inputs[] = {1000, 1000};
   const uint64_t outputs[] = {1990, 100};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, true, true));
-}
-
-TEST(ringct, fee_non_0_invalid_lower)
-{
-  const uint64_t inputs[] = {1000, 1000};
-  const uint64_t outputs[] = {1000, 100};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, true, false));
+  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, true));
 }
 
 TEST(ringct, fee_non_0_invalid_lower_simple)
 {
   const uint64_t inputs[] = {1000, 1000};
   const uint64_t outputs[] = {1000, 100};
-  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, true, true));
-}
-
-TEST(ringct, fee_burn_valid_one_out)
-{
-  const uint64_t inputs[] = {2000};
-  const uint64_t outputs[] = {0, 2000};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, true, false));
+  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, true));
 }
 
 TEST(ringct, fee_burn_valid_one_out_simple)
 {
   const uint64_t inputs[] = {1000, 1000};
   const uint64_t outputs[] = {0, 2000};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, true, true));
-}
-
-TEST(ringct, fee_burn_valid_zero_out)
-{
-  const uint64_t inputs[] = {2000};
-  const uint64_t outputs[] = {2000};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, true, false));
+  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, true));
 }
 
 TEST(ringct, fee_burn_valid_zero_out_simple)
 {
   const uint64_t inputs[] = {1000, 1000};
   const uint64_t outputs[] = {2000};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, true, true));
-}
-
-static rctSig make_sig()
-{
-  static const uint64_t inputs[] = {2000};
-  static const uint64_t outputs[] = {1000, 1000};
-  static rct::rctSig sig = make_sample_rct_sig(NELTS(inputs), inputs, NELTS(outputs), outputs, true);
-  return sig;
+  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, true));
 }
 
 #define TEST_rctSig_elements(name, op) \
@@ -1099,32 +796,6 @@ TEST(ringct, rctSig_##name) \
   op; \
   ASSERT_FALSE(rct::verRct(sig)); \
 }
-
-TEST_rctSig_elements(rangeSigs_empty, sig.p.rangeSigs.resize(0));
-TEST_rctSig_elements(rangeSigs_too_many, sig.p.rangeSigs.push_back(sig.p.rangeSigs.back()));
-TEST_rctSig_elements(rangeSigs_too_few, sig.p.rangeSigs.pop_back());
-TEST_rctSig_elements(mgSig_MG_empty, sig.p.MGs.resize(0));
-TEST_rctSig_elements(mgSig_ss_empty, sig.p.MGs[0].ss.resize(0));
-TEST_rctSig_elements(mgSig_ss_too_many, sig.p.MGs[0].ss.push_back(sig.p.MGs[0].ss.back()));
-TEST_rctSig_elements(mgSig_ss_too_few, sig.p.MGs[0].ss.pop_back());
-TEST_rctSig_elements(mgSig_ss0_empty, sig.p.MGs[0].ss[0].resize(0));
-TEST_rctSig_elements(mgSig_ss0_too_many, sig.p.MGs[0].ss[0].push_back(sig.p.MGs[0].ss[0].back()));
-TEST_rctSig_elements(mgSig_ss0_too_few, sig.p.MGs[0].ss[0].pop_back());
-TEST_rctSig_elements(mgSig_II_empty, sig.p.MGs[0].II.resize(0));
-TEST_rctSig_elements(mgSig_II_too_many, sig.p.MGs[0].II.push_back(sig.p.MGs[0].II.back()));
-TEST_rctSig_elements(mgSig_II_too_few, sig.p.MGs[0].II.pop_back());
-TEST_rctSig_elements(mixRing_empty, sig.mixRing.resize(0));
-TEST_rctSig_elements(mixRing_too_many, sig.mixRing.push_back(sig.mixRing.back()));
-TEST_rctSig_elements(mixRing_too_few, sig.mixRing.pop_back());
-TEST_rctSig_elements(mixRing0_empty, sig.mixRing[0].resize(0));
-TEST_rctSig_elements(mixRing0_too_many, sig.mixRing[0].push_back(sig.mixRing[0].back()));
-TEST_rctSig_elements(mixRing0_too_few, sig.mixRing[0].pop_back());
-TEST_rctSig_elements(ecdhInfo_empty, sig.ecdhInfo.resize(0));
-TEST_rctSig_elements(ecdhInfo_too_many, sig.ecdhInfo.push_back(sig.ecdhInfo.back()));
-TEST_rctSig_elements(ecdhInfo_too_few, sig.ecdhInfo.pop_back());
-TEST_rctSig_elements(outPk_empty, sig.outPk.resize(0));
-TEST_rctSig_elements(outPk_too_many, sig.outPk.push_back(sig.outPk.back()));
-TEST_rctSig_elements(outPk_too_few, sig.outPk.pop_back());
 
 static rct::rctSig make_sig_simple()
 {
@@ -1180,14 +851,6 @@ TEST(ringct, reject_gen_simple_ver_non_simple)
   const uint64_t outputs[] = {1000};
   rct::rctSig sig = make_sample_simple_rct_sig(NELTS(inputs), inputs, NELTS(outputs), outputs, 1000);
   ASSERT_FALSE(rct::verRct(sig));
-}
-
-TEST(ringct, reject_gen_non_simple_ver_simple)
-{
-  const uint64_t inputs[] = {2000};
-  const uint64_t outputs[] = {1000, 1000};
-  rct::rctSig sig = make_sample_rct_sig(NELTS(inputs), inputs, NELTS(outputs), outputs, true);
-  ASSERT_FALSE(rct::verRctSimple(sig));
 }
 
 TEST(ringct, key_ostream)

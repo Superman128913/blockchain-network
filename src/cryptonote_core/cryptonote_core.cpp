@@ -1249,7 +1249,7 @@ namespace cryptonote
           rvv.push_back(&rv); // delayed batch verification
           break;
         default:
-          MERROR_VER("Unknown rct type: " << rv.type);
+          MERROR_VER("Unknown rct type: " << (int)rv.type);
           set_semantics_failed(tx_info[n].tx_hash);
           tx_info[n].tvc.m_verifivation_failed = true;
           tx_info[n].result = false;

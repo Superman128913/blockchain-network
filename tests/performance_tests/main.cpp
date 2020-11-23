@@ -53,13 +53,11 @@
 #include "sc_reduce32.h"
 #include "sc_check.h"
 #include "cn_fast_hash.h"
-#include "rct_mlsag.h"
 #include "equality.h"
 #include "range_proof.h"
 #include "bulletproof.h"
 #include "crypto_ops.h"
 #include "multiexp.h"
-#include "sig_mlsag.h"
 #include "sig_clsag.h"
 
 namespace po = boost::program_options;
@@ -202,13 +200,6 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE1(filter, p, test_cn_fast_hash, 32);
   TEST_PERFORMANCE1(filter, p, test_cn_fast_hash, 16384);
 
-  TEST_PERFORMANCE3(filter, p, test_sig_mlsag, 4, 2, 2); // MLSAG verification
-  TEST_PERFORMANCE3(filter, p, test_sig_mlsag, 8, 2, 2);
-  TEST_PERFORMANCE3(filter, p, test_sig_mlsag, 16, 2, 2);
-  TEST_PERFORMANCE3(filter, p, test_sig_mlsag, 32, 2, 2);
-  TEST_PERFORMANCE3(filter, p, test_sig_mlsag, 64, 2, 2);
-  TEST_PERFORMANCE3(filter, p, test_sig_mlsag, 128, 2, 2);
-  TEST_PERFORMANCE3(filter, p, test_sig_mlsag, 256, 2, 2);
   TEST_PERFORMANCE3(filter, p, test_sig_clsag, 4, 2, 2); // CLSAG verification
   TEST_PERFORMANCE3(filter, p, test_sig_clsag, 8, 2, 2);
   TEST_PERFORMANCE3(filter, p, test_sig_clsag, 16, 2, 2);
@@ -216,9 +207,6 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE3(filter, p, test_sig_clsag, 64, 2, 2);
   TEST_PERFORMANCE3(filter, p, test_sig_clsag, 128, 2, 2);
   TEST_PERFORMANCE3(filter, p, test_sig_clsag, 256, 2, 2);
-
-  TEST_PERFORMANCE2(filter, p, test_ringct_mlsag, 11, false);
-  TEST_PERFORMANCE2(filter, p, test_ringct_mlsag, 11, true);
 
   TEST_PERFORMANCE2(filter, p, test_equality, memcmp32, true);
   TEST_PERFORMANCE2(filter, p, test_equality, memcmp32, false);

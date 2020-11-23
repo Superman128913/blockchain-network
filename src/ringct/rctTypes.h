@@ -243,7 +243,7 @@ namespace rct {
       if (Archive::is_deserializer)
         v.resize(size);
       else if (v.size() != size)
-        throw std::invalid_argument{"invalid "s + std::string{tag} + " size"s};
+        throw std::invalid_argument{"invalid " + std::string{tag} + " size: " + std::to_string(size) + " (given size) != " + std::to_string(v.size()) + " (# elements)"};
       return ar.begin_array();
     }
 
@@ -267,7 +267,7 @@ namespace rct {
     inline bool is_rct_bulletproof(RCTType type) { return tools::equals_any(type, RCTType::Bulletproof, RCTType::Bulletproof2, RCTType::CLSAG); }
     inline bool is_rct_borromean(RCTType type) { return tools::equals_any(type, RCTType::Simple, RCTType::Full); }
 
-    enum class RangeProofType { Borromean, Bulletproof, MultiOutputBulletproof, PaddedBulletproof };
+    enum class RangeProofType : uint8_t { Borromean = 0, Bulletproof = 1, MultiOutputBulletproof = 2, PaddedBulletproof = 3 };
     struct RCTConfig {
       RangeProofType range_proof_type;
       int bp_version;
@@ -285,7 +285,7 @@ namespace rct {
         template <typename Archive>
         void serialize_rctsig_base(Archive &ar, size_t inputs, size_t outputs)
         {
-          field_varint(ar, "type", type);
+          field_varint(ar, "type", type, [](const RCTType& x) { return x <= RCTType::CLSAG; });
           if (type == RCTType::Null)
             return;
           if (!tools::equals_any(type, RCTType::Full, RCTType::Simple, RCTType::Bulletproof, RCTType::Bulletproof2, RCTType::CLSAG))

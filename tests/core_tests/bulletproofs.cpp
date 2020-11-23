@@ -272,11 +272,12 @@ bool gen_bp_tx_validation_base::generate_with(std::vector<test_event_entry>& eve
       rct::key rct_tx_mask;
 
       uint64_t amount = 0;
-      const uint8_t type = rct_txes.back().rct_signatures.type;
+      const auto& sigs = rct_txes.back().rct_signatures;
+      const auto type = sigs.type;
       if (rct::is_rct_simple(type))
-        amount = rct::decodeRctSimple(rct_txes.back().rct_signatures, rct::sk2rct(amount_key), o, rct_tx_mask, hw::get_device("default"));
+        amount = rct::decodeRctSimple(sigs, rct::sk2rct(amount_key), o, rct_tx_mask, hw::get_device("default"));
       else
-        amount = rct::decodeRct(rct_txes.back().rct_signatures, rct::sk2rct(amount_key), o, rct_tx_mask, hw::get_device("default"));
+        amount = rct::decodeRct(sigs, rct::sk2rct(amount_key), o, rct_tx_mask, hw::get_device("default"));
 
       total_amount_encoded += amount;
     }
