@@ -41,7 +41,6 @@
 #include "crypto/hash.h"
 #include "cryptonote_config.h"
 #include "cryptonote_core/service_node_voting.h"
-#include "rpc/rpc_handler.h"
 #include "common/varint.h"
 #include "common/perf_timer.h"
 #include "common/meta.h"
@@ -1735,6 +1734,14 @@ namespace rpc {
       KV_MAP_SERIALIZABLE
     };
   };
+
+  struct output_distribution_data
+  {
+    std::vector<std::uint64_t> distribution;
+    std::uint64_t start_height;
+    std::uint64_t base;
+  };
+
 
   LOKI_RPC_DOC_INTROSPECT
   struct GET_OUTPUT_DISTRIBUTION : PUBLIC

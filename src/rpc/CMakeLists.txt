@@ -39,16 +39,9 @@ add_library(rpc_server_base
 add_library(rpc
   bootstrap_daemon.cpp
   core_rpc_server.cpp
-  rpc_handler.cpp
-  )
-
-add_library(daemon_messages
-  message.cpp
-  daemon_messages.cpp
   )
 
 add_library(daemon_rpc_server
-  daemon_handler.cpp
   http_server.cpp
   lmq_server.cpp
   )
@@ -85,20 +78,10 @@ target_link_libraries(rpc
     OpenSSL::SSL
     extra)
 
-target_link_libraries(daemon_messages
-  PRIVATE
-    cryptonote_core
-    cryptonote_protocol
-    version
-    serialization
-    extra)
-
 target_link_libraries(daemon_rpc_server
   PRIVATE
     rpc_server_base
     rpc
-    daemon_messages
-    serialization
     Boost::thread
     extra)
 
