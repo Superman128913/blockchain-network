@@ -111,7 +111,7 @@ void try_parse(std::string_view blob)
   return serialization::parse_binary(blob, s1);
 }
 
-TEST(Serialization, BinaryArchiveInts) {
+TEST(serialization, binary_archive_integers_fixed) {
   uint64_t x = 0xff00000000, x1;
 
   serialization::binary_string_archiver oar;
@@ -128,7 +128,7 @@ TEST(Serialization, BinaryArchiveInts) {
   ASSERT_EQ(x, x1);
 }
 
-TEST(Serialization, BinaryArchiveVarInts) {
+TEST(serialization, binary_archive_integers_variable) {
   uint64_t x = 0xff00000000, x1;
 
   serialization::binary_string_archiver oar;
@@ -144,7 +144,7 @@ TEST(Serialization, BinaryArchiveVarInts) {
   ASSERT_EQ(x, x1);
 }
 
-TEST(Serialization, Test1) {
+TEST(serialization, custom_type_serialization) {
   Struct1 s1;
   s1.si.push_back(0);
   {
@@ -169,7 +169,7 @@ TEST(Serialization, Test1) {
   ASSERT_THROW(try_parse(blob), std::runtime_error);
 }
 
-TEST(Serialization, Overflow) {
+TEST(serialization, overflow) {
   Blob x = { 0xff00000000 };
   Blob x1;
 
@@ -185,7 +185,7 @@ TEST(Serialization, Overflow) {
   ASSERT_EQ(0, bigvector.size());
 }
 
-TEST(Serialization, serializes_vector_uint64_as_varint)
+TEST(serialization, serializes_vector_uint64_as_varint)
 {
   std::vector<uint64_t> v;
   std::string blob;
@@ -240,7 +240,7 @@ TEST(Serialization, serializes_vector_uint64_as_varint)
   ASSERT_EQ(lokimq::to_hex(blob), "0364cc0184fe02");
 }
 
-TEST(Serialization, serializes_vector_int64_as_fixed_int)
+TEST(serialization, serializes_vector_int64_as_fixed_int)
 {
   std::vector<int64_t> v;
   std::string blob;
@@ -298,7 +298,7 @@ namespace
   }
 }
 
-TEST(Serialization, serializes_transaction_signatures_correctly)
+TEST(serialization, serializes_transaction_signatures_correctly)
 {
   using namespace cryptonote;
 
@@ -478,19 +478,19 @@ T round_trip(T& x)
   return y;
 }
 
-TEST(Serialization, serialize_rct_key) {
+TEST(serialization, serialize_rct_key) {
   auto key = rct::skGen();
   ASSERT_EQ(key, round_trip(key));
 }
 
-TEST(Serialization, serialize_rct_key_vector) {
+TEST(serialization, serialize_rct_key_vector) {
   auto keyv = rct::skvGen(30);
   for (auto& key : keyv)
     key = rct::skGen();
   ASSERT_EQ(keyv, round_trip(keyv));
 }
 
-TEST(Serialization, serialize_rct_key_matrix) {
+TEST(serialization, serialize_rct_key_matrix) {
   auto keym = rct::keyMInit(9, 12);
   for (auto& col : keym)
     for (auto& key : col)
@@ -498,14 +498,14 @@ TEST(Serialization, serialize_rct_key_matrix) {
   ASSERT_EQ(keym, round_trip(keym));
 }
 
-TEST(Serialization, serialize_rct_ctkey) {
+TEST(serialization, serialize_rct_ctkey) {
   rct::ctkey key;
   rct::skpkGen(key.dest, key.mask);
   rct::ctkey key2 = round_trip(key);
   ASSERT_EQ(tools::view_guts(key), tools::view_guts(key2));
 }
 
-TEST(Serialization, serialize_rct_ctkey_vector) {
+TEST(serialization, serialize_rct_ctkey_vector) {
   rct::ctkeyV keyv(14);
   for (auto& key : keyv)
     rct::skpkGen(key.dest, key.mask);
@@ -515,7 +515,7 @@ TEST(Serialization, serialize_rct_ctkey_vector) {
     ASSERT_EQ(tools::view_guts(keyv[i]), tools::view_guts(keyv2[i]));
 }
 
-TEST(Serialization, serialize_rct_ctkey_matrix) {
+TEST(serialization, serialize_rct_ctkey_matrix) {
   rct::ctkeyM keym(9);
   for (auto& col : keym) {
     col.resize(11);
@@ -531,7 +531,7 @@ TEST(Serialization, serialize_rct_ctkey_matrix) {
   }
 }
 
-TEST(Serialization, serialize_rct_ecdh) {
+TEST(serialization, serialize_rct_ecdh) {
   rct::ecdhTuple ecdh;
   ecdh.mask = rct::skGen();
   ecdh.amount = rct::skGen();
@@ -540,7 +540,7 @@ TEST(Serialization, serialize_rct_ecdh) {
   ASSERT_EQ(tools::view_guts(ecdh.amount), tools::view_guts(ecdh2.amount));
 }
 
-TEST(Serialization, serialize_boro_sig) {
+TEST(serialization, serialize_boro_sig) {
   rct::boroSig boro;
   for (auto& s : boro.s0)
     s = rct::skGen();
@@ -551,7 +551,7 @@ TEST(Serialization, serialize_boro_sig) {
   ASSERT_EQ(tools::view_guts(boro), tools::view_guts(boro2));
 }
 
-TEST(Serialization, serializes_ringct)
+TEST(serialization, serializes_ringct)
 {
   // create a full rct signature to use its innards
   std::vector<uint64_t> inamounts;
@@ -601,7 +601,7 @@ TEST(Serialization, serializes_ringct)
 //             - 2019-02-25 Doyle
 
 #if 0
-TEST(Serialization, portability_wallet)
+TEST(serialization, portability_wallet)
 {
   const cryptonote::network_type nettype = cryptonote::TESTNET;
   tools::wallet2 w(nettype);
@@ -737,7 +737,7 @@ TEST(Serialization, portability_wallet)
 }
 
 #define OUTPUT_EXPORT_FILE_MAGIC "Loki output export\003"
-TEST(Serialization, portability_outputs)
+TEST(serialization, portability_outputs)
 {
   const bool restricted = false;
   tools::wallet2 w(cryptonote::TESTNET, restricted);
@@ -883,7 +883,7 @@ inline void serialize(Archive &a, unsigned_tx_set &x, const boost::serialization
   a & x.txes;
   a & x.transfers;
 }
-TEST(Serialization, portability_unsigned_tx)
+TEST(serialization, portability_unsigned_tx)
 {
   // TODO(loki): We updated testnet genesis, is broken
   const bool restricted = false;
@@ -1083,7 +1083,7 @@ TEST(Serialization, portability_unsigned_tx)
 }
 
 #define SIGNED_TX_PREFIX "Loki signed tx set\004"
-TEST(Serialization, portability_signed_tx)
+TEST(serialization, portability_signed_tx)
 {
   const bool restricted = false;
   tools::wallet2 w(cryptonote::TESTNET, restricted);
