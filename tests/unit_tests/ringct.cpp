@@ -510,11 +510,11 @@ TEST(ringct, range_proofs_reject_all_empty_simple)
   EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
-TEST(ringct, range_proofs_accept_zero_empty_simple)
+TEST(ringct, range_proofs_reject_zero_empty_simple)
 {
   const uint64_t inputs[] = {0};
   const uint64_t outputs[] = {};
-  EXPECT_TRUE(range_proof_test(true, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
+  EXPECT_TRUE(range_proof_test(false, NELTS(inputs), inputs, NELTS(outputs), outputs, false));
 }
 
 TEST(ringct, range_proofs_reject_empty_zero_simple)
