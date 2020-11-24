@@ -284,7 +284,7 @@ TEST(ringct, range_proofs)
   skpkGen(Sk, Pk);
   destinations.push_back(Pk);
 
-  const rct::RCTConfig rct_config { RangeProofType::Borromean, 0 };
+  const rct::RCTConfig rct_config { RangeProofType::PaddedBulletproof, 0 };
 
   //compute rct data with mixin 3
   rctSig s = genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, NULL, NULL, 0, 3, rct_config, hw::get_device("default"));
@@ -349,7 +349,7 @@ TEST(ringct, range_proofs_with_fee)
   skpkGen(Sk, Pk);
   destinations.push_back(Pk);
 
-  const rct::RCTConfig rct_config { RangeProofType::Borromean, 0 };
+  const rct::RCTConfig rct_config { RangeProofType::PaddedBulletproof, 0 };
 
   //compute rct data with mixin 3
   rctSig s = genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, NULL, NULL, 1, 3, rct_config, hw::get_device("default"));
@@ -427,7 +427,7 @@ TEST(ringct, simple)
   //compute sig with mixin 2
   xmr_amount txnfee = 1;
 
-  const rct::RCTConfig rct_config { RangeProofType::Borromean, 0 };
+  const rct::RCTConfig rct_config { RangeProofType::PaddedBulletproof, 0 };
   rctSig s = genRctSimple(message, sc, pc, destinations,inamounts, outamounts, amount_keys, NULL, NULL, txnfee, 2, rct_config, hw::get_device("default"));
 
   //verify ring ct signature
@@ -460,7 +460,7 @@ static rct::rctSig make_sample_simple_rct_sig(int n_inputs, const uint64_t input
     destinations.push_back(Pk);
   }
 
-  const rct::RCTConfig rct_config { RangeProofType::Borromean, 0 };
+  const rct::RCTConfig rct_config { RangeProofType::PaddedBulletproof, 0 };
   return genRctSimple(rct::zero(), sc, pc, destinations, inamounts, outamounts, amount_keys, NULL, NULL, fee, 3, rct_config, hw::get_device("default"));
 }
 
