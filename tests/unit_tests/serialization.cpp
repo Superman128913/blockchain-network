@@ -468,107 +468,91 @@ TEST(Serialization, serializes_transaction_signatures_correctly)
   ASSERT_THROW(serialization::parse_binary(blob, tx1), std::runtime_error);
 }
 
-TEST(Serialization, serializes_ringct_types)
+template <typename T>
+T round_trip(T& x)
 {
-  std::string blob;
-  rct::key key0, key1;
-  rct::keyV keyv0, keyv1;
-  rct::keyM keym0, keym1;
-  rct::ctkey ctkey0, ctkey1;
-  rct::ctkeyV ctkeyv0, ctkeyv1;
-  rct::ctkeyM ctkeym0, ctkeym1;
-  rct::ecdhTuple ecdh0, ecdh1;
-  rct::boroSig boro0, boro1;
-  rct::mgSig mg0, mg1;
-  rct::clsag clsag0, clsag1;
-  rct::Bulletproof bp0, bp1;
-  rct::rctSig s0, s1;
-  cryptonote::transaction tx0, tx1;
+  static_assert(!std::is_const_v<T>);
+  std::string blob = serialization::dump_binary(x);
+  T y;
+  serialization::parse_binary(blob, y);
+  return y;
+}
 
-  key0 = rct::skGen();
-  ASSERT_NO_THROW(blob = serialization::dump_binary(key0));
-  ASSERT_NO_THROW(serialization::parse_binary(blob, key1));
-  ASSERT_TRUE(key0 == key1);
+TEST(Serialization, serialize_rct_key) {
+  auto key = rct::skGen();
+  ASSERT_EQ(key, round_trip(key));
+}
 
-  keyv0 = rct::skvGen(30);
-  for (size_t n = 0; n < keyv0.size(); ++n)
-    keyv0[n] = rct::skGen();
-  ASSERT_NO_THROW(blob = serialization::dump_binary(keyv0));
-  ASSERT_NO_THROW(serialization::parse_binary(blob, keyv1));
-  ASSERT_TRUE(keyv0.size() == keyv1.size());
-  for (size_t n = 0; n < keyv0.size(); ++n)
-  {
-    ASSERT_TRUE(keyv0[n] == keyv1[n]);
+TEST(Serialization, serialize_rct_key_vector) {
+  auto keyv = rct::skvGen(30);
+  for (auto& key : keyv)
+    key = rct::skGen();
+  ASSERT_EQ(keyv, round_trip(keyv));
+}
+
+TEST(Serialization, serialize_rct_key_matrix) {
+  auto keym = rct::keyMInit(9, 12);
+  for (auto& col : keym)
+    for (auto& key : col)
+      key = rct::skGen();
+  ASSERT_EQ(keym, round_trip(keym));
+}
+
+TEST(Serialization, serialize_rct_ctkey) {
+  rct::ctkey key;
+  rct::skpkGen(key.dest, key.mask);
+  rct::ctkey key2 = round_trip(key);
+  ASSERT_EQ(tools::view_guts(key), tools::view_guts(key2));
+}
+
+TEST(Serialization, serialize_rct_ctkey_vector) {
+  rct::ctkeyV keyv(14);
+  for (auto& key : keyv)
+    rct::skpkGen(key.dest, key.mask);
+  auto keyv2 = round_trip(keyv);
+  ASSERT_EQ(keyv.size(), keyv2.size());
+  for (size_t i = 0; i < keyv.size(); i++)
+    ASSERT_EQ(tools::view_guts(keyv[i]), tools::view_guts(keyv2[i]));
+}
+
+TEST(Serialization, serialize_rct_ctkey_matrix) {
+  rct::ctkeyM keym(9);
+  for (auto& col : keym) {
+    col.resize(11);
+    for (auto& key : col)
+      rct::skpkGen(key.dest, key.mask);
   }
-
-  keym0 = rct::keyMInit(9, 12);
-  for (size_t n = 0; n < keym0.size(); ++n)
-    for (size_t i = 0; i < keym0[n].size(); ++i)
-      keym0[n][i] = rct::skGen();
-  ASSERT_NO_THROW(blob = serialization::dump_binary(keym0));
-  ASSERT_NO_THROW(serialization::parse_binary(blob, keym1));
-  ASSERT_TRUE(keym0.size() == keym1.size());
-  for (size_t n = 0; n < keym0.size(); ++n)
-  {
-    ASSERT_TRUE(keym0[n].size() == keym1[n].size());
-    for (size_t i = 0; i < keym0[n].size(); ++i)
-    {
-      ASSERT_TRUE(keym0[n][i] == keym1[n][i]);
-    }
+  auto keym2 = round_trip(keym);
+  ASSERT_EQ(keym.size(), keym2.size());
+  for (size_t c = 0; c < keym.size(); c++) {
+    ASSERT_EQ(keym[c].size(), keym2[c].size());
+    for (size_t r = 0; r < keym[c].size(); r++)
+      ASSERT_EQ(tools::view_guts(keym[c][r]), tools::view_guts(keym2[c][r]));
   }
+}
 
-  rct::skpkGen(ctkey0.dest, ctkey0.mask);
-  ASSERT_NO_THROW(blob = serialization::dump_binary(ctkey0));
-  ASSERT_NO_THROW(serialization::parse_binary(blob, ctkey1));
-  ASSERT_TRUE(!memcmp(&ctkey0, &ctkey1, sizeof(ctkey0)));
+TEST(Serialization, serialize_rct_ecdh) {
+  rct::ecdhTuple ecdh;
+  ecdh.mask = rct::skGen();
+  ecdh.amount = rct::skGen();
+  auto ecdh2 = round_trip(ecdh);
+  ASSERT_EQ(tools::view_guts(ecdh.mask), tools::view_guts(ecdh2.mask));
+  ASSERT_EQ(tools::view_guts(ecdh.amount), tools::view_guts(ecdh2.amount));
+}
 
-  ctkeyv0 = std::vector<rct::ctkey>(14);
-  for (size_t n = 0; n < ctkeyv0.size(); ++n)
-    rct::skpkGen(ctkeyv0[n].dest, ctkeyv0[n].mask);
-  ASSERT_NO_THROW(blob = serialization::dump_binary(ctkeyv0));
-  ASSERT_NO_THROW(serialization::parse_binary(blob, ctkeyv1));
-  ASSERT_TRUE(ctkeyv0.size() == ctkeyv1.size());
-  for (size_t n = 0; n < ctkeyv0.size(); ++n)
-  {
-    ASSERT_TRUE(!memcmp(&ctkeyv0[n], &ctkeyv1[n], sizeof(ctkeyv0[n])));
-  }
+TEST(Serialization, serialize_boro_sig) {
+  rct::boroSig boro;
+  for (auto& s : boro.s0)
+    s = rct::skGen();
+  for (auto& s : boro.s1)
+    s = rct::skGen();
+  boro.ee = rct::skGen();
+  auto boro2 = round_trip(boro);
+  ASSERT_EQ(tools::view_guts(boro), tools::view_guts(boro2));
+}
 
-  ctkeym0 = std::vector<rct::ctkeyV>(9);
-  for (size_t n = 0; n < ctkeym0.size(); ++n)
-  {
-    ctkeym0[n] = std::vector<rct::ctkey>(11);
-    for (size_t i = 0; i < ctkeym0[n].size(); ++i)
-      rct::skpkGen(ctkeym0[n][i].dest, ctkeym0[n][i].mask);
-  }
-  ASSERT_NO_THROW(blob = serialization::dump_binary(ctkeym0));
-  ASSERT_NO_THROW(serialization::parse_binary(blob, ctkeym1));
-  ASSERT_TRUE(ctkeym0.size() == ctkeym1.size());
-  for (size_t n = 0; n < ctkeym0.size(); ++n)
-  {
-    ASSERT_TRUE(ctkeym0[n].size() == ctkeym1[n].size());
-    for (size_t i = 0; i < ctkeym0.size(); ++i)
-    {
-      ASSERT_TRUE(!memcmp(&ctkeym0[n][i], &ctkeym1[n][i], sizeof(ctkeym0[n][i])));
-    }
-  }
-
-  ecdh0.mask = rct::skGen();
-  ecdh0.amount = rct::skGen();
-  ASSERT_NO_THROW(blob = serialization::dump_binary(ecdh0));
-  ASSERT_NO_THROW(serialization::parse_binary(blob, ecdh1));
-  ASSERT_TRUE(!memcmp(&ecdh0.mask, &ecdh1.mask, sizeof(ecdh0.mask)));
-  ASSERT_TRUE(!memcmp(&ecdh0.amount, &ecdh1.amount, sizeof(ecdh0.amount)));
-
-  for (size_t n = 0; n < 64; ++n)
-  {
-    boro0.s0[n] = rct::skGen();
-    boro0.s1[n] = rct::skGen();
-  }
-  boro0.ee = rct::skGen();
-  ASSERT_NO_THROW(blob = serialization::dump_binary(boro0));
-  ASSERT_NO_THROW(serialization::parse_binary(blob, boro1));
-  ASSERT_TRUE(!memcmp(&boro0, &boro1, sizeof(boro0)));
-
+TEST(Serialization, serializes_ringct)
+{
   // create a full rct signature to use its innards
   std::vector<uint64_t> inamounts;
   rct::ctkeyV sc, pc;
@@ -597,47 +581,37 @@ TEST(Serialization, serializes_ringct_types)
   destinations.push_back(Pk);
   //compute rct data with mixin 3
   const rct::RCTConfig rct_config{ rct::RangeProofType::PaddedBulletproof, 2 };
-  s0 = rct::genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, NULL, NULL, 0, 3, rct_config, hw::get_device("default"));
+  auto s0 = rct::genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, NULL, NULL, 0, 3, rct_config, hw::get_device("default"));
 
   ASSERT_FALSE(s0.p.MGs.empty());
   ASSERT_TRUE(s0.p.CLSAGs.empty());
-  mg0 = s0.p.MGs[0];
-  ASSERT_NO_THROW(blob = serialization::dump_binary(mg0));
-  ASSERT_NO_THROW(serialization::parse_binary(blob, mg1));
-  ASSERT_TRUE(mg0.ss.size() == mg1.ss.size());
-  for (size_t n = 0; n < mg0.ss.size(); ++n)
-  {
-    ASSERT_TRUE(mg0.ss[n] == mg1.ss[n]);
-  }
-  ASSERT_TRUE(mg0.cc == mg1.cc);
+  const auto& mg = s0.p.MGs[0];
+  auto mg1 = round_trip(s0.p.MGs[0]);
+  ASSERT_EQ(mg.ss, mg1.ss);
+  ASSERT_EQ(mg.cc, mg1.cc);
 
   // mixRing and II are not serialized, they are meant to be reconstructed
   ASSERT_TRUE(mg1.II.empty());
 
   ASSERT_FALSE(s0.p.bulletproofs.empty());
-  bp0 = s0.p.bulletproofs.front();
-  ASSERT_NO_THROW(blob = serialization::dump_binary(bp0));
-  ASSERT_NO_THROW(serialization::parse_binary(blob, bp1));
-  bp1.V = bp0.V; // this is not saved, as it is reconstructed from other tx data
-  ASSERT_EQ(bp0, bp1);
+  auto& bp = s0.p.bulletproofs.front();
+  auto bp1 = round_trip(bp);
+  bp1.V = bp.V; // this is not saved, as it is reconstructed from other tx data
+  ASSERT_EQ(bp, bp1);
 
   const rct::RCTConfig rct_config_clsag{ rct::RangeProofType::PaddedBulletproof, 3 };
   s0 = rct::genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, NULL, NULL, 0, 3, rct_config_clsag, hw::get_device("default"));
 
   ASSERT_FALSE(s0.p.CLSAGs.empty());
   ASSERT_TRUE(s0.p.MGs.empty());
-  clsag0 = s0.p.CLSAGs[0];
 
-  ASSERT_NO_THROW(blob = serialization::dump_binary(clsag0));
-  ASSERT_NO_THROW(serialization::parse_binary(blob, clsag1));
-  ASSERT_TRUE(clsag0.s.size() == clsag1.s.size());
-  for (size_t n = 0; n < clsag0.s.size(); ++n)
-  {
-    ASSERT_TRUE(clsag0.s[n] == clsag1.s[n]);
-  }
-  ASSERT_TRUE(clsag0.c1 == clsag1.c1);
+  auto& clsag = s0.p.CLSAGs[0];
+  auto clsag1 = round_trip(clsag);
+
+  ASSERT_EQ(clsag.s, clsag1.s);
+  ASSERT_EQ(clsag.c1, clsag1.c1);
   // I is not serialized, they are meant to be reconstructed
-  ASSERT_TRUE(clsag0.D == clsag1.D);
+  ASSERT_EQ(clsag.D, clsag1.D);
 }
 
 // TODO(loki): These tests are broken because they rely on testnet which has
