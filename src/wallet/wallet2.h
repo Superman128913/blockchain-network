@@ -1107,8 +1107,28 @@ private:
      */
     void set_account_tag_description(const std::string& tag, const std::string& description);
 
+    /*!
+     * \brief Signs an arbitrary string using the wallet's secret spend key.
+     *
+     * \param data the data to sign
+     * \param index the subaccount/subaddress indices to use (if omitted: use main address)
+     *
+     * \return the signature.
+     *
+     * \throw std::logic_error if called on a view-only wallet.
+     */
     std::string sign(std::string_view data, cryptonote::subaddress_index index = {0, 0}) const;
-    bool verify(std::string_view data, const cryptonote::account_public_address &address, std::string_view signature) const;
+
+    /*!
+     * \brief Verifies a signed string.
+     *
+     * \param data - the data that has been signed.
+     * \param address - the public address of the wallet that signed the data.
+     * \param signature - the signature itself.
+     *
+     * \return true if the signature verified successfully, false if verification failed.
+     */
+    static bool verify(std::string_view data, const cryptonote::account_public_address &address, std::string_view signature);
 
     /*!
      * \brief sign_multisig_participant signs given message with the multisig public signer key
