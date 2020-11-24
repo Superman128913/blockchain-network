@@ -99,7 +99,7 @@ namespace hw {
     void device_io_hid::connect(void *params) {
       hid_conn_params *p = (struct hid_conn_params*)params;
       if (!this->connect(p->vid, p->pid, p->interface_number, p->usage_page)) {
-        ASSERT_X(false, "No device found");
+        ASSERT_X(false, "No device found. (Is the device running with the wallet app opened?)");
       }
     }
 
@@ -109,7 +109,7 @@ namespace hw {
           return;
         }        
       }
-      ASSERT_X(false, "No device found");
+      ASSERT_X(false, "No device found. (Is the device running with the wallet app opened?)");
     }
 
     hid_device_info *device_io_hid::find_device(hid_device_info *devices_list, std::optional<int> interface_number, std::optional<unsigned short> usage_page) {
