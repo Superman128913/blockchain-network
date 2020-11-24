@@ -775,69 +775,50 @@ TEST(ringct, fee_burn_valid_one_out_simple)
   EXPECT_TRUE(range_proof_test(NELTS(inputs), inputs, NELTS(outputs), outputs, 2000));
 }
 
-TEST(ringct, fee_burn_valid_zero_out_simple)
+TEST(ringct, fee_burn_invalid_zero_out_simple)
 {
   const uint64_t inputs[] = {1000, 1000};
   const uint64_t outputs[] = {};
-  EXPECT_TRUE(range_proof_test(NELTS(inputs), inputs, NELTS(outputs), outputs, 2000));
+  EXPECT_FALSE(range_proof_test(NELTS(inputs), inputs, NELTS(outputs), outputs, 2000));
+}
+
+static constexpr std::array<uint64_t, 2> base_inputs{1000, 1000};
+static constexpr std::array<uint64_t, 1> base_outputs{1000};
+static constexpr uint64_t base_fee = 1000;
+rct::rctSig base_sig() {
+    static const rct::rctSig base_sig = make_sample_simple_rct_sig(base_inputs.size(), base_inputs.data(), base_outputs.size(), base_outputs.data(), base_fee);
+    return base_sig;
+}
+
+TEST(ringct, rctSig_base) \
+{
+  rct::rctSig sig = base_sig();
+  ASSERT_TRUE(rct::verRctSimple(sig));
 }
 
 #define TEST_rctSig_elements(name, op) \
 TEST(ringct, rctSig_##name) \
 { \
-  rct::rctSig sig = make_sig(); \
-  ASSERT_TRUE(rct::verRct(sig)); \
-  op; \
-  ASSERT_FALSE(rct::verRct(sig)); \
-}
-
-static rct::rctSig make_sig_simple()
-{
-  static const uint64_t inputs[] = {1000, 1000};
-  static const uint64_t outputs[] = {1000};
-  static rct::rctSig sig = make_sample_simple_rct_sig(NELTS(inputs), inputs, NELTS(outputs), outputs, 1000);
-  return sig;
-}
-
-#define TEST_rctSig_elements_simple(name, op) \
-TEST(ringct, rctSig_##name##_simple) \
-{ \
-  rct::rctSig sig = make_sig_simple(); \
-  ASSERT_TRUE(rct::verRctSimple(sig)); \
+  rct::rctSig sig = base_sig(); \
   op; \
   ASSERT_FALSE(rct::verRctSimple(sig)); \
 }
 
-TEST_rctSig_elements_simple(rangeSigs_empty, sig.p.rangeSigs.resize(0));
-TEST_rctSig_elements_simple(rangeSigs_too_many, sig.p.rangeSigs.push_back(sig.p.rangeSigs.back()));
-TEST_rctSig_elements_simple(rangeSigs_too_few, sig.p.rangeSigs.pop_back());
-TEST_rctSig_elements_simple(mgSig_empty, sig.p.MGs.resize(0));
-TEST_rctSig_elements_simple(mgSig_too_many, sig.p.MGs.push_back(sig.p.MGs.back()));
-TEST_rctSig_elements_simple(mgSig_too_few, sig.p.MGs.pop_back());
-TEST_rctSig_elements_simple(mgSig0_ss_empty, sig.p.MGs[0].ss.resize(0));
-TEST_rctSig_elements_simple(mgSig0_ss_too_many, sig.p.MGs[0].ss.push_back(sig.p.MGs[0].ss.back()));
-TEST_rctSig_elements_simple(mgSig0_ss_too_few, sig.p.MGs[0].ss.pop_back());
-TEST_rctSig_elements_simple(mgSig_ss0_empty, sig.p.MGs[0].ss[0].resize(0));
-TEST_rctSig_elements_simple(mgSig_ss0_too_many, sig.p.MGs[0].ss[0].push_back(sig.p.MGs[0].ss[0].back()));
-TEST_rctSig_elements_simple(mgSig_ss0_too_few, sig.p.MGs[0].ss[0].pop_back());
-TEST_rctSig_elements_simple(mgSig0_II_empty, sig.p.MGs[0].II.resize(0));
-TEST_rctSig_elements_simple(mgSig0_II_too_many, sig.p.MGs[0].II.push_back(sig.p.MGs[0].II.back()));
-TEST_rctSig_elements_simple(mgSig0_II_too_few, sig.p.MGs[0].II.pop_back());
-TEST_rctSig_elements_simple(mixRing_empty, sig.mixRing.resize(0));
-TEST_rctSig_elements_simple(mixRing_too_many, sig.mixRing.push_back(sig.mixRing.back()));
-TEST_rctSig_elements_simple(mixRing_too_few, sig.mixRing.pop_back());
-TEST_rctSig_elements_simple(mixRing0_empty, sig.mixRing[0].resize(0));
-TEST_rctSig_elements_simple(mixRing0_too_many, sig.mixRing[0].push_back(sig.mixRing[0].back()));
-TEST_rctSig_elements_simple(mixRing0_too_few, sig.mixRing[0].pop_back());
-TEST_rctSig_elements_simple(pseudoOuts_empty, sig.pseudoOuts.resize(0));
-TEST_rctSig_elements_simple(pseudoOuts_too_many, sig.pseudoOuts.push_back(sig.pseudoOuts.back()));
-TEST_rctSig_elements_simple(pseudoOuts_too_few, sig.pseudoOuts.pop_back());
-TEST_rctSig_elements_simple(ecdhInfo_empty, sig.ecdhInfo.resize(0));
-TEST_rctSig_elements_simple(ecdhInfo_too_many, sig.ecdhInfo.push_back(sig.ecdhInfo.back()));
-TEST_rctSig_elements_simple(ecdhInfo_too_few, sig.ecdhInfo.pop_back());
-TEST_rctSig_elements_simple(outPk_empty, sig.outPk.resize(0));
-TEST_rctSig_elements_simple(outPk_too_many, sig.outPk.push_back(sig.outPk.back()));
-TEST_rctSig_elements_simple(outPk_too_few, sig.outPk.pop_back());
+TEST_rctSig_elements(mixRing_empty, sig.mixRing.resize(0));
+TEST_rctSig_elements(mixRing_too_many, sig.mixRing.push_back(sig.mixRing.back()));
+TEST_rctSig_elements(mixRing_too_few, sig.mixRing.pop_back());
+TEST_rctSig_elements(mixRing0_empty, sig.mixRing[0].resize(0));
+TEST_rctSig_elements(mixRing0_too_many, sig.mixRing[0].push_back(sig.mixRing[0].back()));
+TEST_rctSig_elements(mixRing0_too_few, sig.mixRing[0].pop_back());
+TEST_rctSig_elements(pseudoOuts_empty, sig.p.pseudoOuts.clear());
+TEST_rctSig_elements(pseudoOuts_too_many, sig.p.pseudoOuts.push_back(sig.p.pseudoOuts.back()));
+TEST_rctSig_elements(pseudoOuts_too_few, sig.p.pseudoOuts.pop_back());
+TEST_rctSig_elements(ecdhInfo_empty, sig.ecdhInfo.resize(0));
+TEST_rctSig_elements(ecdhInfo_too_many, sig.ecdhInfo.push_back(sig.ecdhInfo.back()));
+TEST_rctSig_elements(ecdhInfo_too_few, sig.ecdhInfo.pop_back());
+TEST_rctSig_elements(outPk_empty, sig.outPk.resize(0));
+TEST_rctSig_elements(outPk_too_many, sig.outPk.push_back(sig.outPk.back()));
+TEST_rctSig_elements(outPk_too_few, sig.outPk.pop_back());
 
 TEST(ringct, reject_gen_simple_ver_non_simple)
 {
