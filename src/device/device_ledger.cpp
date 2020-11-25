@@ -300,7 +300,6 @@ namespace hw {
     #define INS_GEN_TXOUT_KEYS                  0x7B
     #define INS_PREFIX_HASH                     0x7D
     #define INS_VALIDATE                        0x7C
-    #define INS_MLSAG                           0x7E
     #define INS_CLSAG                           0x7F
     #define INS_CLOSE_TX                        0x80
 
