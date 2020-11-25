@@ -365,9 +365,9 @@ namespace trezor {
       require_connected();
       std::string tmp_session_id;
       auto initMsg = std::make_shared<messages::management::Initialize>();
-      const auto data_cleaner = epee::misc_utils::create_scope_leave_handler([&]() {
+      LOKI_DEFER {
         memwipe(&tmp_session_id[0], tmp_session_id.size());
-      });
+      };
 
       if(!m_device_session_id.empty()) {
         tmp_session_id.assign(m_device_session_id.data(), m_device_session_id.size());
@@ -458,12 +458,12 @@ namespace trezor {
         m.set_allocated_pin(&pin_field);
       }
 
-      const auto data_cleaner = epee::misc_utils::create_scope_leave_handler([&]() {
+      LOKI_DEFER {
         m.release_pin();
         if (!pin_field.empty()){
           memwipe(&pin_field[0], pin_field.size());
         }
-      });
+      };
 
       resp = call_raw(&m);
     }
@@ -515,12 +515,12 @@ namespace trezor {
         }
       }
 
-      const auto data_cleaner = epee::misc_utils::create_scope_leave_handler([&]() {
+      LOKI_DEFER {
         m.release_passphrase();
         if (!passphrase_field.empty()){
           memwipe(&passphrase_field[0], passphrase_field.size());
         }
-      });
+      };
 
       resp = call_raw(&m);
     }
