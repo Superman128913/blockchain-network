@@ -121,12 +121,20 @@ namespace hw {
             bool  ecdhEncode(rct::ecdhTuple & unmasked, const rct::key & sharedSec, bool short_amount) override;
             bool  ecdhDecode(rct::ecdhTuple & masked, const rct::key & sharedSec, bool short_amount) override;
 
-            bool  generate_output_ephemeral_keys(const size_t tx_version, bool &found_change, const cryptonote::account_keys &sender_account_keys, const crypto::public_key &txkey_pub,  const crypto::secret_key &tx_key,
-                                                 const cryptonote::tx_destination_entry &dst_entr, const std::optional<cryptonote::tx_destination_entry> &change_addr, const size_t output_index,
-                                                 const bool &need_additional_txkeys, const std::vector<crypto::secret_key> &additional_tx_keys,
-                                                 std::vector<crypto::public_key> &additional_tx_public_keys,
-                                                 std::vector<rct::key> &amount_keys,
-                                                 crypto::public_key &out_eph_public_key) override;
+            bool generate_output_ephemeral_keys(
+                size_t tx_version,
+                bool& found_change,
+                const cryptonote::account_keys& sender_account_keys,
+                const crypto::public_key& txkey_pub,
+                const crypto::secret_key& tx_key,
+                const cryptonote::tx_destination_entry& dst_entr,
+                const std::optional<cryptonote::tx_destination_entry>& change_addr,
+                size_t output_index,
+                bool need_additional_txkeys,
+                const std::vector<crypto::secret_key>& additional_tx_keys,
+                std::vector<crypto::public_key>& additional_tx_public_keys,
+                std::vector<rct::key>& amount_keys,
+                crypto::public_key& out_eph_public_key) override;
 
             bool clsag_prehash(const std::string &blob, size_t inputs_size, size_t outputs_size, const rct::keyV &hashes, const rct::ctkeyV &outPk, rct::key &prehash) override;
             bool clsag_prepare(const rct::key &p, const rct::key &z, rct::key &I, rct::key &D, const rct::key &H, rct::key &a, rct::key &aG, rct::key &aH) override;
