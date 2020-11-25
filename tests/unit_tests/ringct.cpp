@@ -43,49 +43,6 @@
 using namespace crypto;
 using namespace rct;
 
-TEST(ringct, Borromean)
-{
-  int j = 0;
-
-  //Tests for Borromean signatures
-  //#boro true one, false one, C != sum Ci, and one out of the range..
-  int N = 64;
-  key64 xv;
-  key64 P1v;
-  key64 P2v;
-  bits indi;
-
-  for (j = 0 ; j < N ; j++) {
-    indi[j] = (int)randXmrAmount(2);
-
-    xv[j] = skGen();
-    if ( (int)indi[j] == 0 ) {
-      scalarmultBase(P1v[j], xv[j]);
-    } else {
-      addKeys1(P1v[j], xv[j], H2[j]);
-    }
-    subKeys(P2v[j], P1v[j], H2[j]);
-  }
-
-  //#true one
-  boroSig bb = genBorromean(xv, P1v, P2v, indi);
-  ASSERT_TRUE(verifyBorromean(bb, P1v, P2v));
-
-  //#false one
-  indi[3] = (indi[3] + 1) % 2;
-  bb = genBorromean(xv, P1v, P2v, indi);
-  ASSERT_FALSE(verifyBorromean(bb, P1v, P2v));
-
-  //#true one again
-  indi[3] = (indi[3] + 1) % 2;
-  bb = genBorromean(xv, P1v, P2v, indi);
-  ASSERT_TRUE(verifyBorromean(bb, P1v, P2v));
-
-  //#false one
-  bb = genBorromean(xv, P2v, P1v, indi);
-  ASSERT_FALSE(verifyBorromean(bb, P1v, P2v));
-}
-
 TEST(ringct, CLSAG)
 {
   const size_t N = 11;
@@ -729,15 +686,6 @@ TEST(ringct, d2b)
     d2b(b, amount);
     ASSERT_TRUE(amount == b2d(b));
   }
-}
-
-TEST(ringct, prooveRange_is_non_deterministic)
-{
-  key C[2], mask[2];
-  for (int n = 0; n < 2; ++n)
-    proveRange(C[n], mask[n], 80);
-  ASSERT_TRUE(memcmp(C[0].bytes, C[1].bytes, sizeof(C[0].bytes)));
-  ASSERT_TRUE(memcmp(mask[0].bytes, mask[1].bytes, sizeof(mask[0].bytes)));
 }
 
 TEST(ringct, fee_0_valid_simple)

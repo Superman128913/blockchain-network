@@ -54,7 +54,6 @@
 #include "sc_check.h"
 #include "cn_fast_hash.h"
 #include "equality.h"
-#include "range_proof.h"
 #include "bulletproof.h"
 #include "crypto_ops.h"
 #include "multiexp.h"
@@ -212,9 +211,6 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE2(filter, p, test_equality, memcmp32, false);
   TEST_PERFORMANCE2(filter, p, test_equality, verify32, false);
   TEST_PERFORMANCE2(filter, p, test_equality, verify32, false);
-
-  TEST_PERFORMANCE1(filter, p, test_range_proof, true);
-  TEST_PERFORMANCE1(filter, p, test_range_proof, false);
 
   TEST_PERFORMANCE2(filter, p, test_bulletproof, true, 1); // 1 bulletproof with 1 amount
   TEST_PERFORMANCE2(filter, p, test_bulletproof, false, 1);

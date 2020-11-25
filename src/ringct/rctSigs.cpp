@@ -104,38 +104,6 @@ namespace rct {
     }
 
     //Borromean (c.f. gmax/andytoshi's paper)
-    boroSig genBorromean(const key64 x, const key64 P1, const key64 P2, const bits indices) {
-        key64 L[2], alpha;
-        LOKI_DEFER { memwipe(alpha, sizeof(alpha)); };
-        key c;
-        int naught = 0, prime = 0, ii = 0, jj=0;
-        boroSig bb;
-        for (ii = 0 ; ii < 64 ; ii++) {
-            naught = indices[ii]; prime = (indices[ii] + 1) % 2;
-            skGen(alpha[ii]);
-            scalarmultBase(L[naught][ii], alpha[ii]);
-            if (naught == 0) {
-                skGen(bb.s1[ii]);
-                c = hash_to_scalar(L[naught][ii]);
-                addKeys2(L[prime][ii], bb.s1[ii], c, P2[ii]);
-            }
-        }
-        bb.ee = hash_to_scalar(L[1]); //or L[1]..
-        key LL, cc;
-        for (jj = 0 ; jj < 64 ; jj++) {
-            if (!indices[jj]) {
-                sc_mulsub(bb.s0[jj].bytes, x[jj].bytes, bb.ee.bytes, alpha[jj].bytes);
-            } else {
-                skGen(bb.s0[jj]);
-                addKeys2(LL, bb.s0[jj], bb.ee, P1[jj]); //different L0
-                cc = hash_to_scalar(LL);
-                sc_mulsub(bb.s1[jj].bytes, x[jj].bytes, cc.bytes, alpha[jj].bytes);
-            }
-        }
-        return bb;
-    }
-    
-    //see above.
     bool verifyBorromean(const boroSig &bb, const ge_p3 P1[64], const ge_p3 P2[64]) {
         key64 Lv1; key chash, LL;
         int ii = 0;
@@ -393,38 +361,6 @@ namespace rct {
     }
     
 
-
-    //proveRange and verRange
-    //proveRange gives C, and mask such that \sumCi = C
-    //   c.f. https://eprint.iacr.org/2015/1098 section 5.1
-    //   and Ci is a commitment to either 0 or 2^i, i=0,...,63
-    //   thus this proves that "amount" is in [0, 2^64]
-    //   mask is a such that C = aG + bH, and b = amount
-    //verRange verifies that \sum Ci = C and that each Ci is a commitment to 0 or 2^i
-    rangeSig proveRange(key & C, key & mask, const xmr_amount & amount) {
-        sc_0(mask.bytes);
-        identity(C);
-        bits b;
-        d2b(b, amount);
-        rangeSig sig;
-        key64 ai;
-        key64 CiH;
-        int i = 0;
-        for (i = 0; i < ATOMS; i++) {
-            skGen(ai[i]);
-            if (b[i] == 0) {
-                scalarmultBase(sig.Ci[i], ai[i]);
-            }
-            if (b[i] == 1) {
-                addKeys1(sig.Ci[i], ai[i], H2[i]);
-            }
-            subKeys(CiH[i], sig.Ci[i], H2[i]);
-            sc_add(mask.bytes, mask.bytes, ai[i].bytes);
-            addKeys(C, C, sig.Ci[i]);
-        }
-        sig.asig = genBorromean(ai, sig.Ci, CiH, b);
-        return sig;
-    }
 
     //proveRange and verRange
     //proveRange gives C, and mask such that \sumCi = C
