@@ -76,7 +76,7 @@ restore-legacy [--overwrite] FILENAME
     return exit_code;
 }
 
-int error(int exit_code, std::string_view msg) {
+[[nodiscard]] int error(int exit_code, std::string_view msg) {
     std::cout << "\n" << msg << "\n\n";
     return exit_code;
 }
@@ -310,7 +310,7 @@ int restore(bool ed25519, std::list<std::string_view> args) {
         std::cout << "\nIs this correct?  Press Enter to continue, Ctrl-C to cancel.\n";
         std::cin.getline(buf, 129);
         if (!std::cin.good())
-            error(99, "Aborted");
+            return error(99, "Aborted");
     }
 
     if (pubkey_pos != std::string::npos)
