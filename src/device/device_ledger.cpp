@@ -262,51 +262,63 @@ namespace hw {
 
     #define PROTOCOL_VERSION                    1
 
-    #define INS_NONE                            0x00
-    #define INS_RESET                           0x02
+#ifdef NDEBUG
+    #define LEDGER_INS(name, code) \
+    static constexpr uint8_t INS_##name = code
+#else
+    // Reverse lookup table for commands -> names, only available in debug compilations
+    static std::unordered_map<uint8_t, std::string_view> debug_ins_names;
+    static uint8_t debug_record_ins(uint8_t code, std::string_view name) { debug_ins_names.emplace(code, name); return code; }
 
-    #define INS_GET_NETWORK                     0x10
+    #define LEDGER_INS(name, code) \
+    static const uint8_t INS_##name = debug_record_ins(code, #name##sv)
+#endif
 
-    #define INS_GET_KEY                         0x20
-    #define INS_DISPLAY_ADDRESS                 0x21
-    #define INS_PUT_KEY                         0x22
-    #define INS_GET_CHACHA8_PREKEY              0x24
-    #define INS_VERIFY_KEY                      0x26
-    #define INS_MANAGE_SEEDWORDS                0x28
+    LEDGER_INS(NONE,                            0x00);
+    LEDGER_INS(RESET,                           0x02);
 
-    #define INS_SECRET_KEY_TO_PUBLIC_KEY        0x30
-    #define INS_GEN_KEY_DERIVATION              0x32
-    #define INS_DERIVATION_TO_SCALAR            0x34
-    #define INS_DERIVE_PUBLIC_KEY               0x36
-    #define INS_DERIVE_SECRET_KEY               0x38
-    #define INS_GEN_KEY_IMAGE                   0x3A
-    #define INS_SECRET_KEY_ADD                  0x3C
-    #define INS_SECRET_KEY_SUB                  0x3E
-    #define INS_GENERATE_KEYPAIR                0x40
-    #define INS_SECRET_SCAL_MUL_KEY             0x42
-    #define INS_SECRET_SCAL_MUL_BASE            0x44
+    LEDGER_INS(GET_NETWORK,                     0x10);
 
-    #define INS_DERIVE_SUBADDRESS_PUBLIC_KEY    0x46
-    #define INS_GET_SUBADDRESS                  0x48
-    #define INS_GET_SUBADDRESS_SPEND_PUBLIC_KEY 0x4A
-    #define INS_GET_SUBADDRESS_SECRET_KEY       0x4C
+    LEDGER_INS(GET_KEY,                         0x20);
+    LEDGER_INS(DISPLAY_ADDRESS,                 0x21);
+    LEDGER_INS(PUT_KEY,                         0x22);
+    LEDGER_INS(GET_CHACHA8_PREKEY,              0x24);
+    LEDGER_INS(VERIFY_KEY,                      0x26);
+    LEDGER_INS(MANAGE_SEEDWORDS,                0x28);
 
-    #define INS_OPEN_TX                         0x70
-    #define INS_SET_SIGNATURE_MODE              0x72
-    #define INS_GET_ADDITIONAL_KEY              0x74
-    #define INS_STEALTH                         0x76
-    #define INS_GEN_COMMITMENT_MASK             0x77
-    #define INS_BLIND                           0x78
-    #define INS_UNBLIND                         0x7A
-    #define INS_GEN_TXOUT_KEYS                  0x7B
-    #define INS_PREFIX_HASH                     0x7D
-    #define INS_VALIDATE                        0x7C
-    #define INS_CLSAG                           0x7F
-    #define INS_CLOSE_TX                        0x80
+    LEDGER_INS(SECRET_KEY_TO_PUBLIC_KEY,        0x30);
+    LEDGER_INS(GEN_KEY_DERIVATION,              0x32);
+    LEDGER_INS(DERIVATION_TO_SCALAR,            0x34);
+    LEDGER_INS(DERIVE_PUBLIC_KEY,               0x36);
+    LEDGER_INS(DERIVE_SECRET_KEY,               0x38);
+    LEDGER_INS(GEN_KEY_IMAGE,                   0x3A);
+    LEDGER_INS(SECRET_KEY_ADD,                  0x3C);
+    LEDGER_INS(SECRET_KEY_SUB,                  0x3E);
+    LEDGER_INS(GENERATE_KEYPAIR,                0x40);
+    LEDGER_INS(SECRET_SCAL_MUL_KEY,             0x42);
+    LEDGER_INS(SECRET_SCAL_MUL_BASE,            0x44);
 
-    #define INS_GET_TX_PROOF                    0xA0
+    LEDGER_INS(DERIVE_SUBADDRESS_PUBLIC_KEY,    0x46);
+    LEDGER_INS(GET_SUBADDRESS,                  0x48);
+    LEDGER_INS(GET_SUBADDRESS_SPEND_PUBLIC_KEY, 0x4A);
+    LEDGER_INS(GET_SUBADDRESS_SECRET_KEY,       0x4C);
 
-    #define INS_GET_RESPONSE                    0xc0
+    LEDGER_INS(OPEN_TX,                         0x70);
+    LEDGER_INS(SET_SIGNATURE_MODE,              0x72);
+    LEDGER_INS(GET_ADDITIONAL_KEY,              0x74);
+    LEDGER_INS(STEALTH,                         0x76);
+    LEDGER_INS(GEN_COMMITMENT_MASK,             0x77);
+    LEDGER_INS(BLIND,                           0x78);
+    LEDGER_INS(UNBLIND,                         0x7A);
+    LEDGER_INS(GEN_TXOUT_KEYS,                  0x7B);
+    LEDGER_INS(PREFIX_HASH,                     0x7D);
+    LEDGER_INS(VALIDATE,                        0x7C);
+    LEDGER_INS(CLSAG,                           0x7F);
+    LEDGER_INS(CLOSE_TX,                        0x80);
+
+    LEDGER_INS(GET_TX_PROOF,                    0xA0);
+
+    LEDGER_INS(GET_RESPONSE,                    0xc0);
 
     #define OPTION_MORE_DATA                    0x80
 
@@ -374,10 +386,17 @@ namespace hw {
 
       void device_ledger::logCMD() {
       if (apdu_verbose) {
-        std::string cmd;
-        for (size_t i = 0; i < 5; i++)
-          cmd += lokimq::to_hex(buffer_send + i, buffer_send + (i + 1)) + " ";
-        MDEBUG("CMD: " << cmd << lokimq::to_hex(buffer_send + 5, buffer_send + length_send));
+        std::ostringstream cmd;
+        cmd << std::hex << std::setfill('0');
+        cmd << "v=0x" << std::setw(2) << +buffer_send[0];
+        cmd << " i=0x" << std::setw(2) << +buffer_send[1];
+#ifndef NDEBUG
+        if (auto it = debug_ins_names.find(buffer_send[1]); it != debug_ins_names.end())
+          cmd << '[' << it->second << ']';
+#endif
+        cmd << " p=(0x" << std::setw(2) << +buffer_send[2] << ",0x" << std::setw(2) << +buffer_send[3] << ')';
+        cmd << " sz=0x" << std::setw(2) << +buffer_send[4] << '[' << std::to_string(buffer_send[4]) << "] ";
+        MDEBUG("CMD: " << cmd.str() << lokimq::to_hex(buffer_send + 5, buffer_send + length_send));
         last_cmd = std::chrono::steady_clock::now();
       }
     }
