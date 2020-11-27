@@ -53,9 +53,8 @@ namespace hw {
      *     - It assumes sensitive data encryption is off on device side.
      */
 
-    void buffer_to_str(char *to_buff,  size_t to_len, const char *buff, size_t len) ;
-    void log_hexbuffer(const std::string &msg,  const char* buff, size_t len);
-    void log_message(const std::string &msg, const std::string &info );
+    void log_hexbuffer(std::string_view msg, const void* buff, size_t len);
+    void log_message(std::string_view msg, std::string_view info );
 
     #ifdef WITH_DEVICE_LEDGER    
     namespace ledger {
@@ -73,8 +72,8 @@ namespace hw {
         crypto::ec_scalar decrypt(const crypto::ec_scalar &res);
         rct::keyV decrypt(const rct::keyV &keys);
 
-        void check32(const std::string &msg, const std::string &info, const char *h, const char *d, bool crypted=false);
-        void check8(const std::string &msg, const std::string &info, const char *h, const char *d,  bool crypted=false);
+        void check32(const std::string &msg, const std::string &info, const void *h, const void *d, bool crypted=false);
+        void check8(const std::string &msg, const std::string &info, const void *h, const void *d,  bool crypted=false);
 
         void set_check_verbose(bool verbose);
         #endif
