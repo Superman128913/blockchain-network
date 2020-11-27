@@ -180,6 +180,7 @@ namespace hw {
         void send_secret(const unsigned char sec[32], int &offset);
         void receive_secret(unsigned char sec[32], int &offset);
         void check_network_type();
+        void send_multipart_data(uint8_t ins, uint8_t p1, std::string_view data, uint8_t chunk_size);
 
         // hw running mode
         device_mode mode;

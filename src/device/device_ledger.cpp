@@ -307,6 +307,12 @@ namespace hw {
 
     #define INS_GET_RESPONSE                    0xc0
 
+    // When we have to send a bunch of data to be keccak hashed we send in chunks of this size; we
+    // could go up to 254, but Keccak uses 136-byte chunks so it makes some sense to send at that
+    // size.
+    constexpr size_t KECCAK_HASH_CHUNK_SIZE = 136;
+    static_assert(KECCAK_HASH_CHUNK_SIZE <= 254, "Max keccak data chunk size exceeds the protocol limit");
+
 
     device_ledger::device_ledger(): hw_device(0x0101, 0x05, 64, 2000) {
       this->id = device_id++;
@@ -1440,6 +1446,30 @@ namespace hw {
         return true;
     }
 
+    // Sends data in chunks using the given ins/p1 values, with p2 set to a sequence
+    // 1->2->....->255->1->...->0 so that the hw device can make sure it didn't miss anything.
+    // (Note the wrapping goes 255->1, not 255->0, as 0 always indicates the last piece).
+    // Max chunk size is 254 bytes.
+    void device_ledger::send_multipart_data(uint8_t ins, uint8_t p1, std::string_view data, uint8_t chunk_size) {
+      assert(chunk_size <= 254);
+      size_t cnt = 0;
+      while (!data.empty()) {
+        auto piece = data.substr(0, chunk_size);
+        data.remove_prefix(piece.size());
+        if (data.empty())
+          cnt = 0; // Signals last piece
+        else
+          cnt = cnt == 255 ? 1 : cnt + 1;
+
+        int offset = set_command_header_noopt(ins, p1, cnt);
+        std::memcpy(buffer_send+offset, piece.data(), piece.size());
+        offset += piece.size();
+        buffer_send[4] = offset-5;
+        length_send = offset;
+        exchange();
+      }
+    }
+
     void device_ledger::get_transaction_prefix_hash(const cryptonote::transaction_prefix& tx, crypto::hash& h) {
       auto locks = tools::unique_locks(device_locker, command_locker);
       
@@ -1454,15 +1484,8 @@ namespace hw {
       // - tx type (transfer, registration, stake, lns)
       // - tx lock time (if the tx has multiple lock times this will be the largest one)
       // We then wait for confirmation from the device, and if we get it we continue by sending the
-      // data in chunks of 256 bytes at a time.  The last chunk will have a p2 subparameter of ff;
-      // otherwise the p2 subparameters are in order.
-      //
-      // In terms of subcommand parameters, then, this goes:
-      // (1) -- send version, type, locktime
-      // (2,0) -- 256 bytes and more to come
-      // (2,1) -- another 256 bytes and more to come
-      // ...
-      // (2,ff) -- last 256 bytes.  (Note that this could happen instead of (2,0), above).
+      // data in chunks.  The last chunk will have a p2 subparameter of 0;
+      // otherwise the p2 subparameters are in order starting at 1 (and, if we wrap, we go from 255->1).
     
       std::string tx_prefix;
       try {
@@ -1470,10 +1493,6 @@ namespace hw {
       } catch (const std::exception& e) {
         ASSERT_MES_AND_THROW("unable to serialize transaction prefix: " << e.what());
       }
-
-      // Safety check because this is the biggest the protocol can support (it's also an insanely
-      // large tx prefix).
-      CHECK_AND_ASSERT_THROW_MES(tx_prefix.size() <= 256*256, "Transaction prefix too big.");
 
       unsigned char* send = this->buffer_send + set_command_header_noopt(INS_PREFIX_HASH, 1);
 
@@ -1828,12 +1847,10 @@ namespace hw {
         return true;
     }
 
-    bool device_ledger::clsag_prehash(const std::string &blob, size_t inputs_size, size_t outputs_size,
+    bool device_ledger::clsag_prehash(const std::string &data, size_t inputs_size, size_t outputs_size,
                                      const rct::keyV &hashes, const rct::ctkeyV &outPk,
                                      rct::key &prehash) {
         auto locks = tools::unique_locks(device_locker, command_locker);
-        unsigned int  data_offset, C_offset, kv_offset, i;
-        const char *data;
 
         #ifdef DEBUG_HWDEVICE
         const std::string blob_x  = blob;
@@ -1854,22 +1871,15 @@ namespace hw {
         // ======  u8 type, varint txnfee ======
         int offset = set_command_header(INS_VALIDATE, 0x01, 0x01);
         //options
-        this->buffer_send[offset] = (inputs_size == 0)?0x00:0x80;
-        offset += 1;
+        this->buffer_send[offset++] = (inputs_size == 0) ? 0x00 : OPTION_MORE_DATA;
 
-        this->buffer_send[offset] = data[0];
-        offset += 1;
+        this->buffer_send[offset++] = data[0];
 
-        //txnfee
-        data_offset = 1;
-        while (data[data_offset]&0x80) {
-          this->buffer_send[offset] = data[data_offset];
-          offset += 1;
-          data_offset += 1;
-        }
-        this->buffer_send[offset] = data[data_offset];
-        offset += 1;
-        data_offset += 1;
+        // txnfee
+        size_t data_offset = 1;
+        while (data[data_offset] & 0x80)
+          this->buffer_send[offset++] = data[data_offset++];
+        this->buffer_send[offset++] = data[data_offset++];
 
         this->buffer_send[4] = offset-5;
         this->length_send = offset;
@@ -1880,13 +1890,13 @@ namespace hw {
 
         //pseudoOuts
         if (type == rct::RCTType::Simple) {
-          for ( i = 0; i < inputs_size; i++) {
+          for (size_t i = 0; i < inputs_size; i++) {
             offset = set_command_header(INS_VALIDATE, 0x01, i+2);
             //options
             this->buffer_send[offset] = (i==inputs_size-1)? 0x00:0x80;
             offset += 1;
             //pseudoOut
-            memmove(this->buffer_send+offset, data+data_offset,32);
+            memmove(this->buffer_send+offset, &data[data_offset],32);
             offset += 32;
             data_offset += 32;
 
@@ -1897,13 +1907,9 @@ namespace hw {
         }
 
         // ======  Aout, Bout, AKout, C, v, k ======
-        kv_offset = data_offset;
-        if (type==rct::RCTType::Bulletproof2 || type==rct::RCTType::CLSAG) {
-          C_offset = kv_offset+ (8)*outputs_size;
-        } else {
-          C_offset = kv_offset+ (32+32)*outputs_size;
-        }
-        for ( i = 0; i < outputs_size; i++) {
+        size_t kv_offset = data_offset;
+        size_t C_offset = kv_offset + 8 * outputs_size;
+        for (size_t i = 0; i < outputs_size; i++) {
           ABPkeys outKeys;
           bool found;
 
@@ -1925,15 +1931,15 @@ namespace hw {
           offset++;
           //Aout
           memmove(this->buffer_send+offset, outKeys.Aout.bytes, 32);
-          offset+=32;
+          offset += 32;
           //Bout
           memmove(this->buffer_send+offset, outKeys.Bout.bytes, 32);
-          offset+=32;
+          offset += 32;
           //AKout
           this->send_secret(outKeys.AKout.bytes, offset);
 
           //C
-          memmove(this->buffer_send+offset, data+C_offset,32);
+          memmove(this->buffer_send+offset, &data[C_offset], 32);
           offset += 32;
           C_offset += 32;
           if (type==rct::RCTType::Bulletproof2 || type==rct::RCTType::CLSAG) {
@@ -1942,18 +1948,14 @@ namespace hw {
             offset += 32;
             //v
             memset(this->buffer_send+offset, 0, 32);
-            memmove(this->buffer_send+offset, data+kv_offset,8);
+            memmove(this->buffer_send+offset, &data[kv_offset], 8);
             offset += 32;
             kv_offset += 8;
           } else {
-            //k
-            memmove(this->buffer_send+offset, data+kv_offset,32);
-            offset += 32;
-            kv_offset += 32;
-            //v
-            memmove(this->buffer_send+offset, data+kv_offset,32);
-            offset += 32;
-            kv_offset += 32;
+            // k, v
+            memmove(this->buffer_send+offset, &data[kv_offset], 32+32);
+            offset += 32+32;
+            kv_offset += 32+32;
           }
 
           this->buffer_send[4] = offset-5;
@@ -1967,35 +1969,34 @@ namespace hw {
 
         // ======   C[], message, proof======
         C_offset = kv_offset;
-        for (i = 0; i < outputs_size; i++) {
+        for (size_t i = 0; i < outputs_size; i++) {
           offset = set_command_header(INS_VALIDATE, 0x03, i+1);
           //options
           this->buffer_send[offset] = 0x80 ;
           offset += 1;
           //C
-          memmove(this->buffer_send+offset, data+C_offset,32);
+          memmove(this->buffer_send+offset, &data[C_offset], 32);
           offset += 32;
           C_offset += 32;
 
           this->buffer_send[4] = offset-5;
           this->length_send = offset;
           this->exchange();
-
         }
 
-        offset = set_command_header_noopt(INS_VALIDATE, 0x03, i+1);
+        offset = set_command_header_noopt(INS_VALIDATE, 0x03, outputs_size+1);
         //message
-        memmove(this->buffer_send+offset, hashes[0].bytes,32);
+        memmove(this->buffer_send+offset, hashes[0].bytes, 32);
         offset += 32;
         //proof
-        memmove(this->buffer_send+offset,  hashes[2].bytes,32);
+        memmove(this->buffer_send+offset,  hashes[2].bytes, 32);
         offset += 32;
 
         this->buffer_send[4] = offset-5;
         this->length_send = offset;
         this->exchange();
 
-        memmove(prehash.bytes, this->buffer_recv,  32);
+        memmove(prehash.bytes, this->buffer_recv, 32);
 
         #ifdef DEBUG_HWDEVICE
         hw::ledger::check32("clsag_prehash", "prehash", (char*)prehash_x.bytes, (char*)prehash.bytes);
@@ -2024,7 +2025,7 @@ namespace hw {
         rct::scalarmultKey(I,H,p); // I = p*H
         rct::scalarmultKey(D,H,z); // D = z*H
         */
-        int offset = set_command_header_noopt(INS_CLSAG, 0x01);
+        int offset = set_command_header_noopt(INS_CLSAG, 1);
         //p
         this->send_secret(p.bytes, offset);
         //z
@@ -2065,7 +2066,7 @@ namespace hw {
         return true;
     }
 
-    bool device_ledger::clsag_hash(const rct::keyV &data, rct::key &hash) {
+    bool device_ledger::clsag_hash(const rct::keyV &keydata, rct::key &hash) {
         auto locks = tools::unique_locks(device_locker, command_locker);
 
         #ifdef DEBUG_HWDEVICE
@@ -2074,23 +2075,8 @@ namespace hw {
         this->controle_device->clsag_hash(data_x, hash_x);
         #endif
 
-        size_t cnt;
-        int offset;
-
-        cnt = data.size();
-        for (size_t i = 0; i<cnt; i++) {
-          offset = set_command_header(INS_CLSAG, 0x02, i+1);
-          //options
-          this->buffer_send[offset] = (i==(cnt-1))?0x00:0x80;  //last
-          offset += 1;
-          //msg part
-          memmove(this->buffer_send+offset, data[i].bytes, 32);
-          offset += 32;
-
-          this->buffer_send[4] = offset-5;
-          this->length_send = offset;
-          this->exchange();
-        }
+        std::string_view data{reinterpret_cast<const char*>(keydata.data()), sizeof(rct::key)*keydata.size()};
+        send_multipart_data(INS_CLSAG, 2, data, KECCAK_HASH_CHUNK_SIZE);
 
         //c/hash
         memmove(hash.bytes, &this->buffer_recv[0], 32);
@@ -2123,7 +2109,7 @@ namespace hw {
         sc_mulsub(s.bytes,c.bytes,s0_add_z_mu_C.bytes,a.bytes);
         */
 
-        int offset = set_command_header_noopt(INS_CLSAG, 0x03);
+        int offset = set_command_header_noopt(INS_CLSAG, 3);
 
         //c
         //discard, unse internal one
