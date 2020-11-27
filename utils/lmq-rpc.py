@@ -42,7 +42,7 @@ if len(sys.argv) > 1 and len(sys.argv[1]) == 64 and all(x in "0123456789abcdefAB
         my_privkey = my_privkey.encode()
 
         print("No curve client privkey given; generated a random one (pubkey: {}, privkey: {})".format(
-            my_pubkey.hex(), my_privkey.hex()))
+            my_pubkey.hex(), my_privkey.hex()), file=sys.stderr)
     socket.curve_secretkey = my_privkey
     socket.curve_publickey = my_pubkey
 
