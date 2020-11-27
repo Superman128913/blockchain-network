@@ -55,35 +55,13 @@ namespace hw {
       apdu_verbose = verbose;
     }
 
-    #define TRACKD MTRACE("hw")
-    #define ASSERT_SW(sw,ok,msk) CHECK_AND_ASSERT_THROW_MES(((sw)&(mask))==(ok), \
-      "Wrong Device Status: " << "0x" << std::hex << (sw) << " (" << Status::to_string(sw) << "), " << \
-      "EXPECTED 0x" << std::hex << (ok) << " (" << Status::to_string(ok) << "), " << \
-      "MASK 0x" << std::hex << (mask));
-    #define ASSERT_T0(exp)       CHECK_AND_ASSERT_THROW_MES(exp, "Protocol assert failure: "#exp ) ;
-    #define ASSERT_X(exp,msg)    CHECK_AND_ASSERT_THROW_MES(exp, msg);
-
 #ifdef DEBUG_HWDEVICE
     crypto::secret_key dbg_viewkey;
     crypto::secret_key dbg_spendkey;
 #endif
 
-    struct Status
-    {
-      unsigned int code;
-      const char *string;
-
-      constexpr operator unsigned int() const
-      {
-        return this->code;
-      }
-
-      static const char *to_string(unsigned int code);
-    };
-
-    // Must be sorted in ascending order by the code
-    #define LEDGER_STATUS(status) {status, #status}
-    constexpr Status status_codes[] = {
+    #define LEDGER_STATUS(status) {status, #status##sv}
+    constexpr std::pair<unsigned int, std::string_view> status_codes[] = {
       LEDGER_STATUS(SW_BYTES_REMAINING_00),
       LEDGER_STATUS(SW_WARNING_STATE_UNCHANGED),
       LEDGER_STATUS(SW_STATE_TERMINATED),
@@ -124,14 +102,21 @@ namespace hw {
       LEDGER_STATUS(SW_ALGORITHM_UNSUPPORTED)
     };
 
-    const char *Status::to_string(unsigned int code)
+    constexpr std::string_view status_string(unsigned int code)
     {
-      constexpr size_t status_codes_size = sizeof(status_codes) / sizeof(status_codes[0]);
-      constexpr const Status *status_codes_end = &status_codes[status_codes_size];
-
-      const Status *item = std::lower_bound(&status_codes[0], status_codes_end, code);
-      return (item == status_codes_end || code < *item) ? "UNKNOWN" : item->string;
+      for (auto& [code_, str] : status_codes)
+        if (code_ == code)
+          return str;
+      return "UNKNOWN"sv;
     }
+
+    #define ASSERT_SW(sw,ok,msk) CHECK_AND_ASSERT_THROW_MES(((sw)&(mask))==(ok), \
+      "Wrong Device Status: " << "0x" << std::hex << (sw) << " (" << status_string(sw) << "), " << \
+      "EXPECTED 0x" << std::hex << (ok) << " (" << status_string(ok) << "), " << \
+      "MASK 0x" << std::hex << (mask));
+    #define ASSERT_T0(exp)       CHECK_AND_ASSERT_THROW_MES(exp, "Protocol assert failure: "#exp ) ;
+    #define ASSERT_X(exp,msg)    CHECK_AND_ASSERT_THROW_MES(exp, msg);
+
 
     /* ===================================================================== */
     /* ===                        hmacmap                               ==== */
