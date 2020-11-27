@@ -180,7 +180,9 @@ namespace hw {
         int  set_command_header_noopt(unsigned char ins, unsigned char p1 = 0x00, unsigned char p2 = 0x00);
         void send_simple(unsigned char ins, unsigned char p1 = 0x00);
         void send_secret(const unsigned char sec[32], int &offset);
+        void send_secret(const char sec[32], int &offset) { send_secret(reinterpret_cast<const unsigned char*>(sec), offset); }
         void receive_secret(unsigned char sec[32], int &offset);
+        void receive_secret(char sec[32], int &offset) { receive_secret(reinterpret_cast<unsigned char*>(sec), offset); }
         void check_network_type();
         void send_multipart_data(uint8_t ins, uint8_t p1, std::string_view data, uint8_t chunk_size);
 
