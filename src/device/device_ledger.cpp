@@ -36,6 +36,7 @@
 #include "cryptonote_core/cryptonote_tx_utils.h"
 #include "common/lock.h"
 #include "common/varint.h"
+#include <chrono>
 
 namespace hw {
 
@@ -376,14 +377,16 @@ namespace hw {
         std::string cmd;
         for (size_t i = 0; i < 5; i++)
           cmd += lokimq::to_hex(buffer_send + i, buffer_send + (i + 1)) + " ";
-        MDEBUG("CMD  : " << cmd << lokimq::to_hex(buffer_send + 5, buffer_send + length_send));
+        MDEBUG("CMD: " << cmd << lokimq::to_hex(buffer_send + 5, buffer_send + length_send));
+        last_cmd = std::chrono::steady_clock::now();
       }
     }
 
     void device_ledger::logRESP() {
       if (apdu_verbose)
-        MDEBUG("RESP : " << lokimq::to_hex(std::string_view{reinterpret_cast<const char*>(&sw), sizeof(sw)})
-            << ' ' << lokimq::to_hex(buffer_recv, buffer_recv + length_recv));
+        MDEBUG("RESP (+" << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - last_cmd).count() << "ms): "
+              << lokimq::to_hex(std::string_view{reinterpret_cast<const char*>(&sw), sizeof(sw)})
+              << ' ' << lokimq::to_hex(buffer_recv, buffer_recv + length_recv));
     }
 
     int device_ledger::set_command_header(unsigned char ins, unsigned char p1, unsigned char p2) {

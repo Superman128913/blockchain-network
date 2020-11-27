@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <cstddef>
 #include <string>
 #include "device.hpp"
@@ -169,6 +170,7 @@ namespace hw {
         unsigned char buffer_recv[BUFFER_RECV_SIZE];
         unsigned int  sw;
         unsigned int  id;
+        std::chrono::steady_clock::time_point last_cmd;
         void logCMD(void);
         void logRESP(void);
         unsigned int exchange(unsigned int ok=SW_OK, unsigned int mask=0xFFFF);
