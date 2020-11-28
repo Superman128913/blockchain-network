@@ -497,7 +497,7 @@ namespace tools
 
     m_restricted = command_line::get_arg(m_vm, arg_restricted);
 
-    m_server_header = "loki-wallet-rpc/"s + (m_restricted ? std::to_string(LOKI_VERSION[0]) : LOKI_VERSION_STR);
+    m_server_header = "loki-wallet-rpc/"s + (m_restricted ? std::to_string(LOKI_VERSION[0]) : std::string{LOKI_VERSION_STR});
 
     m_cors = {rpc_config.access_control_origins.begin(), rpc_config.access_control_origins.end()};
 
