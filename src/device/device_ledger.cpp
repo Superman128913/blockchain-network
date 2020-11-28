@@ -1711,9 +1711,10 @@ namespace hw {
             CHECK_AND_ASSERT_THROW_MES(found, "Pout not found");
           }
           offset = set_command_header(INS_VALIDATE, 0x02, i+1);
-          //options
-          buffer_send[offset++] = ((i == outputs_size-1) ? 0x00 : 0x80)
-            | ((type==rct::RCTType::Bulletproof2 || type==rct::RCTType::CLSAG) ? 0x02 : 0x00);
+          auto& options = buffer_send[offset++];
+          options = 0x00;
+          if (i < outputs_size-1)
+            options |= OPTION_MORE_DATA;
 
           buffer_send[offset++] = outKeys.is_subaddress; //is_subaddress
           buffer_send[offset++] = outKeys.is_change_address; //is_change_address
@@ -1723,6 +1724,7 @@ namespace hw {
           send_bytes(&data[C_offset], 32, offset); //C
           C_offset += 32;
           if (type ==rct::RCTType::Bulletproof2 || type == rct::RCTType::CLSAG) {
+            options |= 0x02;
             send_bytes(crypto::null_hash.data, 32, offset); // k
             send_bytes(&data[kv_offset], 8, offset); // v
             kv_offset += 8;
