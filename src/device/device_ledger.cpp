@@ -1642,12 +1642,8 @@ namespace hw {
       this->buffer_send[offset] = need_additional_txkeys;
       offset++;
       //additional_tx_key
-      if (need_additional_txkeys) {
+      if (need_additional_txkeys)
         this->send_secret(additional_txkey.sec.data, offset);
-      } else {
-        memset(&this->buffer_send[offset], 0, 32);
-        offset += 32;
-      }
 
       this->buffer_send[4] = offset-5;
       this->length_send = offset;
