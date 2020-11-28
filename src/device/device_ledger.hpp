@@ -102,10 +102,6 @@ namespace hw {
     #define SW_OK                                0x9000
     #define SW_ALGORITHM_UNSUPPORTED             0x9484
 
-    namespace {
-        bool apdu_verbose =true;
-    }
-
     void set_apdu_verbose(bool verbose);
 
     class ABPkeys {
@@ -147,8 +143,8 @@ namespace hw {
     public:
         std::vector<SecHMAC>  hmacs;
 
-        void find_mac(const uint8_t sec[32], uint8_t hmac[32]) ;
-        void add_mac(const uint8_t sec[32], const uint8_t hmac[32]) ;
+        void find_mac(const unsigned char sec[32], unsigned char hmac[32]) ;
+        void add_mac(const unsigned char sec[32], const unsigned char hmac[32]) ;
         void clear() ;
     };
 
@@ -159,32 +155,40 @@ namespace hw {
     class device_ledger : public hw::device {
     private:
         // Locker for concurrent access
-        mutable std::recursive_mutex   device_locker;
-        mutable std::mutex   command_locker;
+        mutable std::recursive_mutex device_locker;
+        mutable std::mutex command_locker;
 
         //IO
         hw::io::device_io_hid hw_device;
-        unsigned int  length_send;
+        unsigned int length_send;
         unsigned char buffer_send[BUFFER_SEND_SIZE];
-        unsigned int  length_recv;
+        unsigned int length_recv;
         unsigned char buffer_recv[BUFFER_RECV_SIZE];
-        unsigned int  sw;
-        unsigned int  id;
+        unsigned int sw;
+        unsigned int id;
         std::chrono::steady_clock::time_point last_cmd;
-        void logCMD(void);
-        void logRESP(void);
-        unsigned int exchange(unsigned int ok=SW_OK, unsigned int mask=0xFFFF);
-        unsigned int exchange_wait_on_input(unsigned int ok=SW_OK, unsigned int mask=0xFFFF);
-        void reset_buffer(void);
-        int  set_command_header(unsigned char ins, unsigned char p1 = 0x00, unsigned char p2 = 0x00);
-        int  set_command_header_noopt(unsigned char ins, unsigned char p1 = 0x00, unsigned char p2 = 0x00);
+        void logCMD();
+        void logRESP();
+        unsigned int exchange(bool wait_on_input = false);
+        void reset_buffer();
+        int set_command_header(unsigned char ins, unsigned char p1 = 0x00, unsigned char p2 = 0x00);
+        int set_command_header_noopt(unsigned char ins, unsigned char p1 = 0x00, unsigned char p2 = 0x00);
         void send_simple(unsigned char ins, unsigned char p1 = 0x00);
+        void send_bytes(const void* buf, size_t size, int& offset);
+        void receive_bytes(void* dest, size_t size, int& offset);
+        void receive_bytes(void* dest, size_t size);
+        void send_u32(uint32_t x, int& offset);
+        uint32_t receive_u32(int& offset);
+        uint32_t receive_u32();
         void send_secret(const unsigned char sec[32], int &offset);
         void send_secret(const char sec[32], int &offset) { send_secret(reinterpret_cast<const unsigned char*>(sec), offset); }
         void receive_secret(unsigned char sec[32], int &offset);
         void receive_secret(char sec[32], int &offset) { receive_secret(reinterpret_cast<unsigned char*>(sec), offset); }
         void check_network_type();
-        void send_multipart_data(uint8_t ins, uint8_t p1, std::string_view data, uint8_t chunk_size);
+        void exchange_multipart_data(uint8_t ins, uint8_t p1, std::string_view data, uint8_t chunk_size);
+
+        void send_finish(int& offset);
+        unsigned int finish_and_exchange(int& offset, bool wait_on_input = false);
 
         // hw running mode
         device_mode mode;
@@ -194,9 +198,15 @@ namespace hw {
 
         // map public destination key to ephemeral destination key
         Keymap key_map;
-        bool  add_output_key_mapping(const crypto::public_key &Aout, const crypto::public_key &Bout, const bool is_subaddress, const bool is_change,
-                                     const bool need_additional, const size_t real_output_index,
-                                     const rct::key &amount_key,  const crypto::public_key &out_eph_public_key);
+        bool add_output_key_mapping(
+            const crypto::public_key& Aout,
+            const crypto::public_key& Bout,
+            bool is_subaddress,
+            bool is_change,
+            bool need_additional,
+            size_t real_output_index,
+            const rct::key& amount_key,
+            const crypto::public_key& out_eph_public_key);
         //hmac for some encrypted value
         HMACmap hmac_map;
 
@@ -206,7 +216,7 @@ namespace hw {
         
         //extra debug
         #ifdef DEBUG_HWDEVICE
-        device *controle_device;
+        device *debug_device;
         #endif
 
     public:
@@ -218,19 +228,19 @@ namespace hw {
 
         explicit operator bool() const override {return this->connected(); }
 
-        bool  reset(void);
+        bool  reset();
 
         /* ======================================================================= */
         /*                              SETUP/TEARDOWN                             */
         /* ======================================================================= */
-        bool set_name(const std::string &name) override;
+        bool set_name(std::string_view name) override;
 
-        const std::string get_name() const override;
-        bool init(void) override;
+        std::string get_name() const override;
+        bool init() override;
         bool release() override;
-        bool connect(void) override;
+        bool connect() override;
         bool disconnect() override;
-        bool connected(void) const;
+        bool connected() const;
 
         bool set_mode(device_mode mode) override;
 
@@ -240,9 +250,9 @@ namespace hw {
         /* ======================================================================= */
         /*  LOCKER                                                                 */
         /* ======================================================================= */ 
-        void lock(void)  override;
-        void unlock(void) override;
-        bool try_lock(void) override;
+        void lock()  override;
+        void unlock() override;
+        bool try_lock() override;
 
         /* ======================================================================= */
         /*                             WALLET & ADDRESS                            */
@@ -317,7 +327,7 @@ namespace hw {
         bool clsag_sign(const rct::key &c, const rct::key &a, const rct::key &p, const rct::key &z, const rct::key &mu_P, const rct::key &mu_C, rct::key &s) override;
 
 
-        bool  close_tx(void) override;
+        bool close_tx() override;
 
     };
 

@@ -119,10 +119,10 @@ namespace hw {
         /* ======================================================================= */
         /*                              SETUP/TEARDOWN                             */
         /* ======================================================================= */
-        virtual bool set_name(const std::string &name) = 0;
-        virtual const std::string get_name() const = 0;
+        virtual bool set_name(std::string_view name) = 0;
+        virtual std::string get_name() const = 0;
 
-        virtual  bool init(void) = 0;
+        virtual bool init(void) = 0;
         virtual bool release() = 0;
 
         virtual bool connect(void) = 0;

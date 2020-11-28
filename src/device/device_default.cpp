@@ -59,12 +59,12 @@ namespace hw {
         /* ======================================================================= */
         /*                              SETUP/TEARDOWN                             */
         /* ======================================================================= */
-        bool device_default::set_name(const std::string &name)  {
+        bool device_default::set_name(std::string_view name) {
             this->name = name;
             return true;
         }
-        const std::string device_default::get_name()  const {
-            return this->name;
+        std::string device_default::get_name() const {
+            return name;
         }
         
         bool device_default::init(void) {

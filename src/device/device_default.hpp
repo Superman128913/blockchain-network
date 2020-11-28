@@ -50,8 +50,8 @@ namespace hw {
              /* ======================================================================= */
             /*                              SETUP/TEARDOWN                             */
             /* ======================================================================= */
-            bool set_name(const std::string &name) override;
-            const std::string get_name() const override;
+            bool set_name(std::string_view name) override;
+            std::string get_name() const override;
 
             bool init(void) override;
             bool release() override;
