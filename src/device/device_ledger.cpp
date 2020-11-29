@@ -1306,11 +1306,7 @@ namespace hw {
         int offset = set_command_header_noopt(INS_OPEN_TX, 0x01);
 
         //account
-        buffer_send[offset+0] = 0x00;
-        buffer_send[offset+1] = 0x00;
-        buffer_send[offset+2] = 0x00;
-        buffer_send[offset+3] = 0x00;
-        offset += 4;
+        send_u32(0, offset);
 
         finish_and_exchange(offset);
 
