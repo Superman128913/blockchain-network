@@ -44,7 +44,7 @@
 #include "hash.h"
 
 namespace {
-  static void local_abort(const char *msg)
+  void local_abort(const char *msg)
   {
     fprintf(stderr, "%s\n", msg);
 #ifdef NDEBUG
@@ -69,18 +69,29 @@ namespace crypto {
 #include "random.h"
   }
 
+  // These nasty dirty hacks are unspeakable disgusting.  This is only here because all of these
+  // have a `.data` element, but it is a `char` instead of an `unsigned char`.  So rather than
+  // change it to `unsigned char`, the author decided that he should overload `&` to do a
+  // reinterpret_cast.  WTF.
+  //
+  // TODO: fix this garbage by making the ec_ types use unsigned char instead of char.
+
+  // EW!
   static inline unsigned char *operator &(ec_point &point) {
     return &reinterpret_cast<unsigned char &>(point);
   }
 
+  // EW!
   static inline const unsigned char *operator &(const ec_point &point) {
     return &reinterpret_cast<const unsigned char &>(point);
   }
 
+  // EW!
   static inline unsigned char *operator &(ec_scalar &scalar) {
     return &reinterpret_cast<unsigned char &>(scalar);
   }
 
+  // EW!
   static inline const unsigned char *operator &(const ec_scalar &scalar) {
     return &reinterpret_cast<const unsigned char &>(scalar);
   }
@@ -293,6 +304,8 @@ namespace crypto {
     memwipe(&k, sizeof(k));
   }
 
+  static constexpr ec_point infinity = {{ 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
+
   bool check_signature(const hash &prefix_hash, const public_key &pub, const signature &sig) {
     ge_p2 tmp2;
     ge_p3 tmp3;
@@ -309,7 +322,6 @@ namespace crypto {
     }
     ge_double_scalarmult_base_vartime(&tmp2, &sig.c, &tmp3, &sig.r);
     ge_tobytes(&buf.comm, &tmp2);
-    static const ec_point infinity = {{ 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
     if (memcmp(&buf.comm, &infinity, 32) == 0)
       return false;
     hash_to_scalar(&buf, sizeof(s_comm), c);
@@ -496,33 +508,36 @@ namespace crypto {
     ge_tobytes(&image, &point2);
   }
 
-PUSH_WARNINGS
-DISABLE_VS_WARNINGS(4200)
-  struct ec_point_pair {
-    ec_point a, b;
-  };
   struct rs_comm {
-    hash h;
-    struct ec_point_pair ab[];
+    hash prefix;
+    std::vector<std::pair<ec_point, ec_point>> ab;
+
+    rs_comm(const hash& h, size_t pubs_count) : prefix{h}, ab{pubs_count} {}
+
+    ec_scalar hash_to_scalar() const {
+      KECCAK_CTX state;
+      keccak_init(&state);
+      keccak_update(&state, reinterpret_cast<const uint8_t*>(&prefix), sizeof(prefix));
+      static_assert(sizeof(ab[0]) == 64); // Ensure no padding
+      keccak_update(&state, reinterpret_cast<const uint8_t*>(ab.data()), 64*ab.size());
+      ec_scalar result;
+      keccak_finish(&state, reinterpret_cast<uint8_t*>(&result));
+      sc_reduce32(&result);
+      return result;
+    };
   };
-POP_WARNINGS
 
-  static inline size_t rs_comm_size(size_t pubs_count) {
-    return sizeof(rs_comm) + pubs_count * sizeof(ec_point_pair);
-  }
+  void generate_ring_signature(
+      const hash& prefix_hash,
+      const key_image& image,
+      const public_key* const* pubs,
+      size_t pubs_count,
+      const secret_key& sec,
+      size_t sec_index,
+      signature* sig) {
 
-  void generate_ring_signature(const hash &prefix_hash, const key_image &image,
-    const public_key *const *pubs, size_t pubs_count,
-    const secret_key &sec, size_t sec_index,
-    signature *sig) {
-    size_t i;
-    ge_p3 image_unp;
-    ge_dsmp image_pre;
-    ec_scalar sum, k, h;
-    std::shared_ptr<rs_comm> buf(reinterpret_cast<rs_comm *>(malloc(rs_comm_size(pubs_count))), free);
-    if (!buf)
-      local_abort("malloc failure");
     assert(sec_index < pubs_count);
+
 #if !defined(NDEBUG)
     {
       ge_p3 t;
@@ -534,27 +549,32 @@ POP_WARNINGS
       assert(*pubs[sec_index] == t2);
       generate_key_image(*pubs[sec_index], sec, t3);
       assert(image == t3);
-      for (i = 0; i < pubs_count; i++) {
+      for (size_t i = 0; i < pubs_count; i++) {
         assert(check_key(*pubs[i]));
       }
     }
 #endif
+    ge_p3 image_unp;
     if (ge_frombytes_vartime(&image_unp, &image) != 0) {
       local_abort("invalid key image");
     }
+    ge_dsmp image_pre;
     ge_dsm_precomp(image_pre, &image_unp);
+    ec_scalar sum;
     sc_0(&sum);
-    buf->h = prefix_hash;
-    for (i = 0; i < pubs_count; i++) {
+
+    rs_comm rs{prefix_hash, pubs_count};
+    ec_scalar k;
+    for (size_t i = 0; i < pubs_count; i++) {
       ge_p2 tmp2;
       ge_p3 tmp3;
       if (i == sec_index) {
         random_scalar(k);
         ge_scalarmult_base(&tmp3, &k);
-        ge_p3_tobytes(&buf->ab[i].a, &tmp3);
+        ge_p3_tobytes(&rs.ab[i].first, &tmp3);
         hash_to_ec(*pubs[i], tmp3);
         ge_scalarmult(&tmp2, &k, &tmp3);
-        ge_tobytes(&buf->ab[i].b, &tmp2);
+        ge_tobytes(&rs.ab[i].second, &tmp2);
       } else {
         random_scalar(sig[i].c);
         random_scalar(sig[i].r);
@@ -563,42 +583,42 @@ POP_WARNINGS
           local_abort("invalid pubkey");
         }
         ge_double_scalarmult_base_vartime(&tmp2, &sig[i].c, &tmp3, &sig[i].r);
-        ge_tobytes(&buf->ab[i].a, &tmp2);
+        ge_tobytes(&rs.ab[i].first, &tmp2);
         hash_to_ec(*pubs[i], tmp3);
         ge_double_scalarmult_precomp_vartime(&tmp2, &sig[i].r, &tmp3, &sig[i].c, image_pre);
-        ge_tobytes(&buf->ab[i].b, &tmp2);
+        ge_tobytes(&rs.ab[i].second, &tmp2);
         sc_add(&sum, &sum, &sig[i].c);
       }
     }
-    hash_to_scalar(buf.get(), rs_comm_size(pubs_count), h);
+    ec_scalar h = rs.hash_to_scalar();
     sc_sub(&sig[sec_index].c, &h, &sum);
     sc_mulsub(&sig[sec_index].r, &sig[sec_index].c, &unwrap(sec), &k);
 
     memwipe(&k, sizeof(k));
   }
 
-  bool check_ring_signature(const hash &prefix_hash, const key_image &image,
-    const public_key *const *pubs, size_t pubs_count,
-    const signature *sig) {
-    size_t i;
-    ge_p3 image_unp;
-    ge_dsmp image_pre;
-    ec_scalar sum, h;
-    std::shared_ptr<rs_comm> buf(reinterpret_cast<rs_comm *>(malloc(rs_comm_size(pubs_count))), free);
-    if (!buf)
-      return false;
+  bool check_ring_signature(
+      const hash& prefix_hash,
+      const key_image& image,
+      const public_key* const* pubs,
+      size_t pubs_count,
+      const signature* sig) {
 #if !defined(NDEBUG)
     for (i = 0; i < pubs_count; i++) {
       assert(check_key(*pubs[i]));
     }
 #endif
+    ge_p3 image_unp;
     if (ge_frombytes_vartime(&image_unp, &image) != 0) {
       return false;
     }
+    ge_dsmp image_pre;
     ge_dsm_precomp(image_pre, &image_unp);
+    ec_scalar sum;
     sc_0(&sum);
-    buf->h = prefix_hash;
-    for (i = 0; i < pubs_count; i++) {
+
+    rs_comm rs{prefix_hash, pubs_count};
+    for (size_t i = 0; i < pubs_count; i++) {
       ge_p2 tmp2;
       ge_p3 tmp3;
       if (sc_check(&sig[i].c) != 0 || sc_check(&sig[i].r) != 0) {
@@ -608,13 +628,13 @@ POP_WARNINGS
         return false;
       }
       ge_double_scalarmult_base_vartime(&tmp2, &sig[i].c, &tmp3, &sig[i].r);
-      ge_tobytes(&buf->ab[i].a, &tmp2);
+      ge_tobytes(&rs.ab[i].first, &tmp2);
       hash_to_ec(*pubs[i], tmp3);
       ge_double_scalarmult_precomp_vartime(&tmp2, &sig[i].r, &tmp3, &sig[i].c, image_pre);
-      ge_tobytes(&buf->ab[i].b, &tmp2);
+      ge_tobytes(&rs.ab[i].second, &tmp2);
       sc_add(&sum, &sum, &sig[i].c);
     }
-    hash_to_scalar(buf.get(), rs_comm_size(pubs_count), h);
+    ec_scalar h = rs.hash_to_scalar();
     sc_sub(&h, &h, &sum);
     return sc_isnonzero(&h) == 0;
   }
