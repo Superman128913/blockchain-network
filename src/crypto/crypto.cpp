@@ -85,50 +85,52 @@ namespace crypto {
     return &reinterpret_cast<const unsigned char &>(scalar);
   }
 
-  static auto get_random_lock()
-  {
-    static std::mutex random_mutex;
-    return std::lock_guard{random_mutex};
-  }
+  static std::mutex random_mutex;
+
 
   void generate_random_bytes_thread_safe(size_t N, uint8_t *bytes)
   {
-    auto lock = get_random_lock();
+    std::lock_guard lock{random_mutex};
     generate_random_bytes_not_thread_safe(N, bytes);
   }
 
   void add_extra_entropy_thread_safe(const void *ptr, size_t bytes)
   {
-    auto lock = get_random_lock();
+    std::lock_guard lock{random_mutex};
     add_extra_entropy_not_thread_safe(ptr, bytes);
   }
 
-  static inline bool less32(const unsigned char *k0, const unsigned char *k1)
+  // 2^252+27742317777372353535851937790883648493
+  static constexpr unsigned char L[32] = {
+    0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10
+  };
+
+  // Returns true iff 32-byte, little-endian unsigned integer a is less than L
+  static inline bool sc_is_canonical(const unsigned char* a)
   {
-    for (int n = 31; n >= 0; --n)
+    for (size_t n = 31; n < 32; --n)
     {
-      if (k0[n] < k1[n])
+      if (a[n] < L[n])
         return true;
-      if (k0[n] > k1[n])
+      if (a[n] > L[n])
         return false;
     }
     return false;
   }
 
-  void random32_unbiased(unsigned char *bytes)
+  void random_scalar(unsigned char *bytes)
   {
-    // l = 2^252 + 27742317777372353535851937790883648493.
-    // it fits 15 in 32 bytes
-    static const unsigned char limit[32] = { 0xe3, 0x6a, 0x67, 0x72, 0x8b, 0xce, 0x13, 0x29, 0x8f, 0x30, 0x82, 0x8c, 0x0b, 0xa4, 0x10, 0x39, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0 };
+    std::lock_guard lock{random_mutex};
     do
     {
-      generate_random_bytes_thread_safe(32, bytes);
-    } while (!sc_isnonzero(bytes) && !less32(bytes, limit)); // should be good about 15/16 of the time
-    sc_reduce32(bytes);
+      generate_random_bytes_not_thread_safe(32, bytes);
+      bytes[31] &= 0b0001'1111; // Mask the 3 most significant bits off because no acceptable value ever has them set (the value would be >L)
+    } while (!(sc_is_canonical(bytes) && sc_isnonzero(bytes)));
   }
-  /* generate a random 32-byte (256-bit) integer and copy it to res */
-  static inline void random_scalar(ec_scalar &res) {
-    random32_unbiased((unsigned char*)res.data);
+  /* generate a random ]0..L[ scalar */
+  void random_scalar(ec_scalar &res) {
+    random_scalar(reinterpret_cast<unsigned char*>(res.data));
   }
 
   void hash_to_scalar(const void *data, size_t length, ec_scalar &res) {

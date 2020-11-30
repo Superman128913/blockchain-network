@@ -125,7 +125,8 @@ namespace crypto {
   using x25519_secret_key = epee::mlocked<tools::scrubbed<x25519_secret_key_>>;
 
   void hash_to_scalar(const void *data, size_t length, ec_scalar &res);
-  void random32_unbiased(unsigned char *bytes);
+  void random_scalar(unsigned char* bytes);
+  void random_scalar(ec_scalar& res);
 
   static_assert(sizeof(ec_point) == 32 && sizeof(ec_scalar) == 32 &&
     sizeof(public_key) == 32 && sizeof(secret_key) == 32 &&
