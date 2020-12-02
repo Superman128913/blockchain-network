@@ -41,6 +41,9 @@
 #include "common/varint.h"
 #include "epee/warnings.h"
 #include "crypto.h"
+extern "C" {
+#include "keccak.h"
+}
 #include "hash.h"
 
 namespace {
