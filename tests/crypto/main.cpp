@@ -231,7 +231,7 @@ int main(int argc, char *argv[]) {
       expected.resize(pubs_count);
       getvar(input, pubs_count * sizeof(signature), expected.data());
       actual.resize(pubs_count);
-      generate_ring_signature(prefix_hash, image, pubs.data(), pubs_count, sec, sec_index, actual.data());
+      generate_ring_signature(prefix_hash, image, pubs, sec, sec_index, actual.data());
       if (expected != actual) {
         goto error;
       }
@@ -254,7 +254,7 @@ int main(int argc, char *argv[]) {
       sigs.resize(pubs_count);
       getvar(input, pubs_count * sizeof(signature), sigs.data());
       get(input, expected);
-      actual = check_ring_signature(prefix_hash, image, pubs.data(), pubs_count, sigs.data());
+      actual = check_ring_signature(prefix_hash, image, pubs, sigs.data());
       if (expected != actual) {
         goto error;
       }

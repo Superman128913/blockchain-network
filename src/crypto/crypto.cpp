@@ -323,7 +323,7 @@ namespace crypto {
     if (sc_check(&sig.c) != 0 || sc_check(&sig.r) != 0 || !sc_isnonzero(&sig.c)) {
       return false;
     }
-    ge_double_scalarmult_base_vartime(&tmp2, &sig.c, &tmp3, &sig.r);
+    ge_double_scalarmult_base_vartime(&tmp2, &sig.c, &tmp3, &sig.r); // tmp2 = sig.c A + sig.r G
     ge_tobytes(&buf.comm, &tmp2);
     if (memcmp(&buf.comm, &infinity, 32) == 0)
       return false;
@@ -533,8 +533,7 @@ namespace crypto {
   void generate_ring_signature(
       const hash& prefix_hash,
       const key_image& image,
-      const public_key* const* pubs,
-      size_t pubs_count,
+      const std::vector<const public_key*>& pubs,
       const secret_key& sec,
       size_t sec_index,
       signature* sig) {
@@ -557,54 +556,54 @@ namespace crypto {
       }
     }
 #endif
-    ge_p3 image_unp;
+    ge_p3 image_unp; // I
     if (ge_frombytes_vartime(&image_unp, &image) != 0) {
       local_abort("invalid key image");
     }
     ge_dsmp image_pre;
     ge_dsm_precomp(image_pre, &image_unp);
     ec_scalar sum;
-    sc_0(&sum);
+    sc_0(&sum); // will be sum of cj, j≠s
 
-    rs_comm rs{prefix_hash, pubs_count};
-    ec_scalar k;
-    for (size_t i = 0; i < pubs_count; i++) {
+    rs_comm rs{prefix_hash, pubs.size()};
+    ec_scalar qs;
+    for (size_t i = 0; i < pubs.size(); i++) {
       ge_p2 tmp2;
       ge_p3 tmp3;
-      if (i == sec_index) {
-        random_scalar(k);
-        ge_scalarmult_base(&tmp3, &k);
+      if (i == sec_index) { // this is the true key image
+        random_scalar(qs); // qs = random
+        ge_scalarmult_base(&tmp3, &qs); // Ls = qs G
         ge_p3_tobytes(&rs.ab[i].first, &tmp3);
-        hash_to_ec(*pubs[i], tmp3);
-        ge_scalarmult(&tmp2, &k, &tmp3);
+        hash_to_ec(*pubs[i], tmp3); // Hp(Ps)
+        ge_scalarmult(&tmp2, &qs, &tmp3); // Rs = qs Hp(Ps)
         ge_tobytes(&rs.ab[i].second, &tmp2);
+        // We don't set ci, ri yet because we first need the sum of all the other cj's/rj's
       } else {
-        random_scalar(sig[i].c);
-        random_scalar(sig[i].r);
+        random_scalar(sig[i].c); // ci = wi = random
+        random_scalar(sig[i].r); // ri = qi = random
         if (ge_frombytes_vartime(&tmp3, &*pubs[i]) != 0) {
-          memwipe(&k, sizeof(k));
+          memwipe(&qs, sizeof(qs));
           local_abort("invalid pubkey");
         }
-        ge_double_scalarmult_base_vartime(&tmp2, &sig[i].c, &tmp3, &sig[i].r);
+        ge_double_scalarmult_base_vartime(&tmp2, &sig[i].c, &tmp3, &sig[i].r); // Li = cj Pj + rj G = qj G + wj Pj
         ge_tobytes(&rs.ab[i].first, &tmp2);
-        hash_to_ec(*pubs[i], tmp3);
-        ge_double_scalarmult_precomp_vartime(&tmp2, &sig[i].r, &tmp3, &sig[i].c, image_pre);
+        hash_to_ec(*pubs[i], tmp3); // Hp(Pj)
+        ge_double_scalarmult_precomp_vartime(&tmp2, &sig[i].r, &tmp3, &sig[i].c, image_pre); // Ri = qj Hp(Pj) + wj I
         ge_tobytes(&rs.ab[i].second, &tmp2);
         sc_add(&sum, &sum, &sig[i].c);
       }
     }
-    ec_scalar h = rs.hash_to_scalar();
-    sc_sub(&sig[sec_index].c, &h, &sum);
-    sc_mulsub(&sig[sec_index].r, &sig[sec_index].c, &unwrap(sec), &k);
+    ec_scalar c = rs.hash_to_scalar(); // c = Hs(prefix_hash || L0 || ... || L{n-1} || R0 || ... || R{n-1})
+    sc_sub(&sig[sec_index].c, &c, &sum); // cs = c - sum(ci, i≠s) = c - sum(wi)
+    sc_mulsub(&sig[sec_index].r, &sig[sec_index].c, &unwrap(sec), &qs); // rs = qs - cs*x
 
-    memwipe(&k, sizeof(k));
+    memwipe(&qs, sizeof(qs));
   }
 
   bool check_ring_signature(
       const hash& prefix_hash,
       const key_image& image,
-      const public_key* const* pubs,
-      size_t pubs_count,
+      const std::vector<const public_key*>& pubs,
       const signature* sig) {
 #if !defined(NDEBUG)
     for (i = 0; i < pubs_count; i++) {
@@ -620,8 +619,8 @@ namespace crypto {
     ec_scalar sum;
     sc_0(&sum);
 
-    rs_comm rs{prefix_hash, pubs_count};
-    for (size_t i = 0; i < pubs_count; i++) {
+    rs_comm rs{prefix_hash, pubs.size()};
+    for (size_t i = 0; i < pubs.size(); i++) {
       ge_p2 tmp2;
       ge_p3 tmp3;
       if (sc_check(&sig[i].c) != 0 || sc_check(&sig[i].r) != 0) {
@@ -641,4 +640,74 @@ namespace crypto {
     sc_sub(&h, &h, &sum);
     return sc_isnonzero(&h) == 0;
   }
+
+  void generate_key_image_signature(
+      const key_image& image, // I
+      const public_key& pub, // A
+      const secret_key& sec, // a
+      signature& sig
+      /* FIXME: hwdevice */
+      ) {
+    static_assert(sizeof(hash) == sizeof(key_image));
+    ec_scalar k;
+    random_scalar(k); // k = random
+    rs_comm rs{reinterpret_cast<const hash&>(image), 1};
+
+    ge_p3 tmp3;
+    ge_scalarmult_base(&tmp3, &k); // L = kG
+    ge_p3_tobytes(&rs.ab[0].first, &tmp3); // store L
+
+    hash_to_ec(pub, tmp3); // H(A)
+    ge_p2 tmp2;
+    ge_scalarmult(&tmp2, &k, &tmp3); // R = kH(A)
+    ge_tobytes(&rs.ab[0].second, &tmp2); // store R
+
+
+    sig.c = rs.hash_to_scalar(); // c = H(I || L || R) = H(I || kG || kH(A))
+    sc_mulsub(&sig.r, &sig.c, &unwrap(sec), &k); // r = k - ac = k - aH(I || kG || kH(A))
+
+    memwipe(&k, sizeof(k));
+  }
+
+  bool check_key_image_signature(
+      const key_image& image,
+      const public_key& pub,
+      const signature& sig) {
+
+    assert(check_key(pub));
+    ge_p3 image_unp;
+    if (ge_frombytes_vartime(&image_unp, &image) != 0 || sc_check(&sig.c) != 0 || sc_check(&sig.r) != 0)
+      return false;
+    ge_dsmp image_pre;
+    ge_dsm_precomp(image_pre, &image_unp);
+
+    rs_comm rs{reinterpret_cast<const hash&>(image), 1};
+    ge_p3 tmp3;
+    if (ge_frombytes_vartime(&tmp3, &pub) != 0)
+      return false;
+
+    ge_p2 tmp2;
+    // Step one: reconstruct the signer's L = kG.
+    // The signature r was constructed as r = k - ac, so:
+    // k  = ac + r
+    // kG = cA + rG = L
+    ge_double_scalarmult_base_vartime(&tmp2, &sig.c, &tmp3, &sig.r); // L = cA + rG
+    ge_tobytes(&rs.ab[0].first, &tmp2); // store L
+
+    // Step two: reconstruct the signer's R = kH(A)
+    // The signature r was constructed as r = k - ac, so:
+    // rH(A) = kH(A) - acH(A)
+    // and since aH(A) == I (the key image, by definition):
+    // kH(A) = rH(A) + cI = R
+    hash_to_ec(pub, tmp3); // H(A)
+    ge_double_scalarmult_precomp_vartime(&tmp2, &sig.r, &tmp3, &sig.c, image_pre); // R = rH(A) + cI
+    ge_tobytes(&rs.ab[0].second, &tmp2); // store R
+
+    // Now we can calculate our own H(I || L || R), and compare it to the signature's c (which was
+    // set to the signer's H(I || L || R) calculation).
+    ec_scalar h = rs.hash_to_scalar();
+    sc_sub(&h, &h, &sig.c);
+    return sc_isnonzero(&h) == 0;
+  }
+
 }

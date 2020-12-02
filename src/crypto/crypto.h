@@ -201,9 +201,43 @@ namespace crypto {
   void derive_secret_key(const key_derivation &derivation, std::size_t output_index, const secret_key &base, secret_key &derived_key);
   bool derive_subaddress_public_key(const public_key &out_key, const key_derivation &derivation, std::size_t output_index, public_key &result);
 
-  /* Generation and checking of a standard signature.
+  /* Generation and checking of a non-standard Monero curve 25519 signature.  This is a custom
+   * scheme that is not Ed25519 because it uses a random "r" (unlike Ed25519's use of a
+   * deterministic value), it requires pre-hashing the message (Ed25519 does not), and produces
+   * signatures that cannot be verified using Ed25519 verification methods (because the order of
+   * hashed values differs).
+   *
+   * Given M = H(msg)
+   * r = random scalar
+   * R = rG
+   * c = H(M || A || R)
+   *
+   * and then the signature for this is:
+   *
+   * s = r - ac
+   * Signature is: (c, s)   (but in the struct these are named "c" and "r")
+   *
+   * Contrast this with standard Ed25519 signature:
+   *
+   * Given M = msg
+   * r = H(seed_hash_2nd_half || M)
+   * R = rG
+   * c = H(R || A || M)
+   * s = r + ac
+   * Signature is: (R, s)
+   *
+   * For verification:
+   *
+   * Monero: given signature (c, s), message hash M, and pubkey A:
+   *
+   * R = sG + cA
+   * Check: H(M||A||R) == c
+   *
+   * Ed25519: given signature (R, s), (unhashed) message M, pubkey A:
+   * Check: sB == R + H(R||A||M)A
    */
   void generate_signature(const hash &prefix_hash, const public_key &pub, const secret_key &sec, signature &sig);
+  // See above.
   bool check_signature(const hash &prefix_hash, const public_key &pub, const signature &sig);
 
   /* Generation and checking of a tx proof; given a tx pubkey R, the recipient's view pubkey A, and the key 
@@ -220,27 +254,34 @@ namespace crypto {
    * To check the signature, it is necessary to collect all the keys that were used to generate it. To detect double spends, it is necessary to check that each key image is used at most once.
    */
   void generate_key_image(const public_key &pub, const secret_key &sec, key_image &image);
-  void generate_ring_signature(const hash &prefix_hash, const key_image &image,
-    const public_key *const *pubs, std::size_t pubs_count,
-    const secret_key &sec, std::size_t sec_index,
-    signature *sig);
-  bool check_ring_signature(const hash &prefix_hash, const key_image &image,
-    const public_key *const *pubs, std::size_t pubs_count,
-    const signature *sig);
+  void generate_ring_signature(
+      const hash& prefix_hash,
+      const key_image& image,
+      const std::vector<const public_key*>& pubs,
+      const secret_key& sec,
+      std::size_t sec_index,
+      signature* sig);
+  bool check_ring_signature(
+      const hash& prefix_hash,
+      const key_image& image,
+      const std::vector<const public_key*>& pubs,
+      const signature* sig);
 
-  /* Variants with vector<const public_key *> parameters.
-   */
-  inline void generate_ring_signature(const hash &prefix_hash, const key_image &image,
-    const std::vector<const public_key *> &pubs,
-    const secret_key &sec, std::size_t sec_index,
-    signature *sig) {
-    generate_ring_signature(prefix_hash, image, pubs.data(), pubs.size(), sec, sec_index, sig);
-  }
-  inline bool check_ring_signature(const hash &prefix_hash, const key_image &image,
-    const std::vector<const public_key *> &pubs,
-    const signature *sig) {
-    return check_ring_signature(prefix_hash, image, pubs.data(), pubs.size(), sig);
-  }
+  // Signature on a single key image.  The does the same thing as generate_ring_signature with 1
+  // pubkey (and secret index of 0), but slightly more efficiently, and with hardware device
+  // implementation.  (This is still used for key image export and for exposing key images in stake
+  // transactions).
+  void generate_key_image_signature(
+      const key_image& image,
+      const public_key& pub,
+      const secret_key& sec,
+      signature& sig
+      /* FIXME: hwdevice */
+      );
+  bool check_key_image_signature(
+      const key_image& image,
+      const public_key& pub,
+      const signature& sig);
 
   inline std::ostream &operator <<(std::ostream &o, const crypto::public_key &v) {
     return o << '<' << tools::type_to_hex(v) << '>';
