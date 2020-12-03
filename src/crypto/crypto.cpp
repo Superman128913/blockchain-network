@@ -543,7 +543,7 @@ namespace crypto {
       size_t sec_index,
       signature* sig) {
 
-    assert(sec_index < pubs_count);
+    assert(sec_index < pubs.size());
 
 #if !defined(NDEBUG)
     {
@@ -556,7 +556,7 @@ namespace crypto {
       assert(*pubs[sec_index] == t2);
       generate_key_image(*pubs[sec_index], sec, t3);
       assert(image == t3);
-      for (size_t i = 0; i < pubs_count; i++) {
+      for (size_t i = 0; i < pubs.size(); i++) {
         assert(check_key(*pubs[i]));
       }
     }
@@ -611,7 +611,7 @@ namespace crypto {
       const std::vector<const public_key*>& pubs,
       const signature* sig) {
 #if !defined(NDEBUG)
-    for (i = 0; i < pubs_count; i++) {
+    for (size_t i = 0; i < pubs.size(); i++) {
       assert(check_key(*pubs[i]));
     }
 #endif
