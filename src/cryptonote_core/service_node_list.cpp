@@ -2745,11 +2745,12 @@ namespace service_nodes
 
   static crypto::hash hash_uptime_proof(const cryptonote::NOTIFY_UPTIME_PROOF::request &proof, uint8_t hf_version)
   {
-    auto buf = tools::memcpy_le(proof.pubkey.data, proof.timestamp, proof.public_ip, proof.storage_port, proof.pubkey_ed25519.data, proof.qnet_port, proof.storage_lmq_port);
+    auto buf = tools::memcpy_le(proof.pubkey.data, proof.timestamp, proof.public_ip, proof.storage_port, proof.pubkey_ed25519.data, proof.qnet_port, proof.storage_lmq_port, proof.storage_version, proof.lokinet_version);
     size_t buf_size = buf.size();
 
-    if (hf_version < cryptonote::network_version_15_lns) // TODO - can be removed post-HF15
-      buf_size -= sizeof(proof.storage_lmq_port);
+    //TODO - Can be removed post-HF17
+    if (hf_version < HF_VERSION_PROOF_VERSION)
+      buf_size -= (sizeof(proof.storage_version) + sizeof(proof.lokinet_version));
 
     crypto::hash result;
     crypto::cn_fast_hash(buf.data(), buf_size, result);
@@ -2757,7 +2758,7 @@ namespace service_nodes
   }
 
   cryptonote::NOTIFY_UPTIME_PROOF::request service_node_list::generate_uptime_proof(
-      uint32_t public_ip, uint16_t storage_port, uint16_t storage_lmq_port, uint16_t quorumnet_port) const
+      uint32_t public_ip, uint16_t storage_port, uint16_t storage_lmq_port, std::array<uint16_t, 3> ss_version, uint16_t quorumnet_port, std::array<uint16_t, 3> lokinet_version) const
   {
     assert(m_service_node_keys);
     const auto& keys = *m_service_node_keys;
@@ -2770,6 +2771,10 @@ namespace service_nodes
     result.storage_lmq_port                         = storage_lmq_port;
     result.qnet_port                                = quorumnet_port;
     result.pubkey_ed25519                           = keys.pub_ed25519;
+
+    result.storage_version                          = ss_version;
+    result.lokinet_version                          = lokinet_version;
+
 
     crypto::hash hash = hash_uptime_proof(result, m_blockchain.get_current_hard_fork_version());
     crypto::generate_signature(hash, keys.pub, keys.key, result.sig);
