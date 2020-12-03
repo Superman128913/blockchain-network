@@ -1608,7 +1608,7 @@ bool gen_trezor_live_refresh::generate(std::vector<test_event_entry>& events)
     ::crypto::public_key pub_ver;
     ::crypto::key_image ki;
 
-    ::crypto::random32_unbiased((unsigned char*)r.data);
+    ::crypto::random_scalar((unsigned char*)r.data);
     ::crypto::secret_key_to_public_key(r, R);
     memcpy(D.data, rct::scalarmultKey(rct::pk2rct(R), rct::sk2rct(m_alice_account.get_keys().m_view_secret_key)).bytes, 32);
 
