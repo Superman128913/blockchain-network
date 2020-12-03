@@ -147,6 +147,12 @@ namespace crypto {
     random_scalar(reinterpret_cast<unsigned char*>(res.data));
   }
 
+  ec_scalar random_scalar() {
+    ec_scalar res;
+    random_scalar(res);
+    return res;
+  }
+
   void hash_to_scalar(const void *data, size_t length, ec_scalar &res) {
     cn_fast_hash(data, length, reinterpret_cast<hash &>(res));
     sc_reduce32(&res);
@@ -370,8 +376,7 @@ namespace crypto {
 #endif
 
     // pick random k
-    ec_scalar k;
-    random_scalar(k);
+    ec_scalar k = random_scalar();
     
     s_comm_2 buf;
     buf.msg = prefix_hash;
@@ -649,8 +654,7 @@ namespace crypto {
       /* FIXME: hwdevice */
       ) {
     static_assert(sizeof(hash) == sizeof(key_image));
-    ec_scalar k;
-    random_scalar(k); // k = random
+    ec_scalar k = random_scalar(); // k = random
     rs_comm rs{reinterpret_cast<const hash&>(image), 1};
 
     ge_p3 tmp3;
