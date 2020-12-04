@@ -52,7 +52,7 @@ namespace service_nodes
   struct quorum;
 
   struct checkpoint_vote { crypto::hash block_hash; };
-  struct state_change_vote { uint16_t worker_index; new_state state; };
+  struct state_change_vote { uint16_t worker_index; new_state state; uint16_t reason;};
 
   enum struct quorum_type : uint8_t
   {

@@ -350,6 +350,7 @@ namespace cryptonote
     service_nodes::new_state state;
     uint64_t                 block_height;
     uint32_t                 service_node_index;
+    uint16_t                 reason;
     std::vector<vote>        votes;
 
     tx_extra_service_node_state_change() = default;
@@ -369,6 +370,14 @@ namespace cryptonote
       VARINT_FIELD(service_node_index);
       FIELD(votes);
     END_SERIALIZE()
+  };
+
+  // Describes the reason for a service node being decommissioned. Included in demerit votes and the decommission transaction itself.
+  enum Decommission_Reason {
+    missed_uptime_proof = 0x1,
+    missed_checkpoints = 0x2,
+    missed_pulse_participations = 0x4,
+    storage_server_unreachable = 0x8
   };
 
   // Pre-Heimdall service node deregistration data; it doesn't carry the state change (it is only
