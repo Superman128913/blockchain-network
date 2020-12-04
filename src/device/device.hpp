@@ -204,7 +204,7 @@ namespace hw {
                                        const crypto::public_key &R, const crypto::public_key &A, const std::optional<crypto::public_key> &B, const crypto::public_key &D, const crypto::secret_key &r,
                                        crypto::signature &sig) = 0;
 
-        virtual bool  open_tx(crypto::secret_key &tx_key) = 0;
+        virtual bool  open_tx(crypto::secret_key &tx_key, uint8_t txversion, uint8_t txtype) = 0;
 
         virtual void get_transaction_prefix_hash(const cryptonote::transaction_prefix& tx, crypto::hash& h) = 0;
         
@@ -239,6 +239,10 @@ namespace hw {
         virtual bool clsag_prepare(const rct::key &p, const rct::key &z, rct::key &I, rct::key &D, const rct::key &H, rct::key &a, rct::key &aG, rct::key &aH) = 0;
         virtual bool clsag_hash(const rct::keyV &data, rct::key &hash) = 0;
         virtual bool clsag_sign(const rct::key &c, const rct::key &a, const rct::key &p, const rct::key &z, const rct::key &mu_P, const rct::key &mu_C, rct::key &s) = 0;
+
+        // Retrieves the tx secret key from the device.  `key` will be whatever we got back from the
+        // device, but for hardware devices that value may be encrypted or null.
+        virtual bool add_tx_secret_key_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::secret_key& key) = 0;
 
         virtual bool  close_tx(void) = 0;
 

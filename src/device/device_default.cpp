@@ -281,7 +281,7 @@ namespace hw {
             crypto::generate_tx_proof(prefix_hash, R, A, B, D, r, sig);
         }
 
-        bool device_default::open_tx(crypto::secret_key &tx_key) {
+        bool device_default::open_tx(crypto::secret_key &tx_key, uint8_t /*version*/, uint8_t /*type*/) {
             cryptonote::keypair txkey = cryptonote::keypair::generate(*this);
             tx_key = txkey.sec;
             return true;
@@ -410,6 +410,12 @@ namespace hw {
 
             return true;
         }
+
+        bool device_default::add_tx_secret_key_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::secret_key& key) {
+            cryptonote::add_tx_secret_key_to_tx_extra(tx_extra, key);
+            return true;
+        }
+
 
         bool device_default::close_tx() {
             return true;

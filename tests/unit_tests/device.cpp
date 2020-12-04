@@ -58,7 +58,8 @@ TEST(device, open_close)
 {
   hw::core::device_default dev;
   crypto::secret_key key;
-  ASSERT_TRUE(dev.open_tx(key));
+  uint8_t version = 0, type = 0; // These get ignored for the default device so don't worry about them
+  ASSERT_TRUE(dev.open_tx(key, version, type));
   ASSERT_TRUE(dev.close_tx());
 }
 

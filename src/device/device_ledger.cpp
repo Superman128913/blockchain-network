@@ -281,6 +281,7 @@ namespace hw {
     LEDGER_INS(OPEN_TX,                         0x70);
     LEDGER_INS(SET_SIGNATURE_MODE,              0x72);
     LEDGER_INS(GET_ADDITIONAL_KEY,              0x74);
+    LEDGER_INS(GET_TX_SECRET_KEY,               0x75);
     LEDGER_INS(STEALTH,                         0x76);
     LEDGER_INS(GEN_COMMITMENT_MASK,             0x77);
     LEDGER_INS(BLIND,                           0x78);
@@ -1324,7 +1325,7 @@ namespace hw {
 #endif
     }
 
-    bool device_ledger::open_tx(crypto::secret_key &tx_key) {
+    bool device_ledger::open_tx(crypto::secret_key &tx_key, uint8_t txversion, uint8_t txtype) {
         auto locks = tools::unique_locks(device_locker, command_locker, *this);
 
         key_map.clear();
@@ -1334,6 +1335,8 @@ namespace hw {
 
         //account
         send_u32(0, offset);
+        send_bytes(&txversion, 1, offset);
+        send_bytes(&txtype, 1, offset);
 
         finish_and_exchange(offset);
 
@@ -1900,6 +1903,18 @@ namespace hw {
         return true;
     }
 
+    bool device_ledger::add_tx_secret_key_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::secret_key&) {
+        auto locks = tools::unique_locks(device_locker, command_locker);
+
+        // This will fail if this isn't an open stake tx.
+        send_simple(INS_GET_TX_SECRET_KEY);
+        crypto::secret_key key; // Don't need to use the one passed in, the ledger has it stored already in internal state
+        receive_bytes(key.data, 32);
+
+        cryptonote::add_tx_secret_key_to_tx_extra(tx_extra, key);
+
+        return true;
+    }
 
     bool device_ledger::close_tx() {
         auto locks = tools::unique_locks(device_locker, command_locker);

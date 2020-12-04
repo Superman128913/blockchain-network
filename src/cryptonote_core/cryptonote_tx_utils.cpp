@@ -637,8 +637,10 @@ namespace cryptonote
     tx.extra = extra;
     crypto::public_key txkey_pub;
 
-    if (tx.type == txtype::stake)
-      add_tx_secret_key_to_tx_extra(tx.extra, tx_key);
+    if (tx.type == txtype::stake) {
+      bool added = hwdev.add_tx_secret_key_to_tx_extra(tx.extra, tx_key);
+      CHECK_AND_NO_ASSERT_MES(added, false, "Failed to add tx secret key to stake transaction");
+    }
 
     // if we have a stealth payment id, find it and encrypt it with the tx key now
     std::vector<tx_extra_field> tx_extra_fields;
@@ -1002,7 +1004,9 @@ namespace cryptonote
   bool construct_tx_and_get_tx_key(const account_keys& sender_account_keys, const std::unordered_map<crypto::public_key, subaddress_index>& subaddresses, std::vector<tx_source_entry>& sources, std::vector<tx_destination_entry>& destinations, const std::optional<cryptonote::tx_destination_entry>& change_addr, const std::vector<uint8_t> &extra, transaction& tx, uint64_t unlock_time, crypto::secret_key &tx_key, std::vector<crypto::secret_key> &additional_tx_keys, const rct::RCTConfig &rct_config, rct::multisig_out *msout, loki_construct_tx_params const &tx_params)
   {
     hw::device &hwdev = sender_account_keys.get_device();
-    hwdev.open_tx(tx_key);
+    auto txversion = static_cast<uint8_t>(transaction::get_max_version_for_hf(tx_params.hf_version));
+    auto txtype = static_cast<uint8_t>(tx_params.tx_type);
+    hwdev.open_tx(tx_key, txversion, txtype);
     try {
       // figure out if we need to make additional tx pubkeys
       size_t num_stdaddresses = 0;
