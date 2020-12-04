@@ -8617,7 +8617,14 @@ wallet2::request_stake_unlock_result wallet2::can_request_stake_unlock(const cry
         return result;
       }
 
-      if (!generate_signature_for_request_stake_unlock(unlock.key_image, unlock.signature, unlock.nonce))
+      // We used to use a 32-byte time value concatenated to itself 8 times as a message hash, but
+      // that accomplishes nothing (there is no point in using a nonce in the message itself: a
+      // signature already has its own nonce), so now we just sign with a null hash and always send
+      // out a nonce value of 0.  The nonce value, unfortunately, can't be easily removed from the
+      // key image unlock tx_extra data without versioning/replacing it, so we still send this 0,
+      // but this will hopefully make it easier in the future to eliminate from the tx extra.
+      unlock.nonce = 0;
+      if (!generate_signature_for_request_stake_unlock(unlock.key_image, unlock.signature))
       {
         result.msg = tr("Failed to generate signature to sign request. The key image: ") + contribution.key_image + (" doesn't belong to this wallet");
         return result;
@@ -14554,44 +14561,48 @@ bool wallet2::contains_key_image(const crypto::key_image& key_image) const {
   return result;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::generate_signature_for_request_stake_unlock(crypto::key_image const &key_image, crypto::signature &signature, uint32_t &nonce) const
+bool wallet2::generate_signature_for_request_stake_unlock(const crypto::key_image& key_image, crypto::signature& signature) const
 {
-  const auto &key_image_it = m_key_images.find(key_image);
+  auto key_image_it = m_key_images.find(key_image);
   if (key_image_it == m_key_images.end())
     return false;
 
-  size_t transfer_details_index = key_image_it->second;
-  transfer_details const &td    = m_transfers[transfer_details_index];
-  cryptonote::keypair in_ephemeral;
+  const auto& td = m_transfers[key_image_it->second];
+
+  // get ephemeral public key
+  const auto& target = td.m_tx.vout[td.m_internal_output_index].target;
+  THROW_WALLET_EXCEPTION_IF(!std::holds_alternative<txout_to_key>(target), error::wallet_internal_error, "Output is not txout_to_key");
+  const auto& pkey = var::get<cryptonote::txout_to_key>(target).key;
+
+  crypto::public_key tx_pub_key;
+  if (!try_get_tx_pub_key_using_td(td, tx_pub_key))
   {
-    // get ephemeral public key
-    const cryptonote::tx_out &out = td.m_tx.vout[td.m_internal_output_index];
-    THROW_WALLET_EXCEPTION_IF(!std::holds_alternative<txout_to_key>(out.target), error::wallet_internal_error, "Output is not txout_to_key");
-    const cryptonote::txout_to_key &o = var::get<cryptonote::txout_to_key>(out.target);
-    const crypto::public_key pkey = o.key;
-
-    crypto::public_key tx_pub_key;
-    if (!try_get_tx_pub_key_using_td(td, tx_pub_key))
-    {
-      // TODO(doyle): TODO(loki): Fallback to old get tx pub key method for
-      // incase for now. But we need to go find out why we can't just use
-      // td.m_pk_index for everything? If we were able to decode the output
-      // using that, why not use it for everthing?
-      tx_pub_key = get_tx_pub_key_from_received_outs(td);
-    }
-    const std::vector<crypto::public_key> additional_tx_pub_keys = get_additional_tx_pub_keys_from_extra(td.m_tx);
-
-    // generate ephemeral secret key
-    crypto::key_image ki;
-    bool r = cryptonote::generate_key_image_helper(m_account.get_keys(), m_subaddresses, pkey, tx_pub_key, additional_tx_pub_keys, td.m_internal_output_index, in_ephemeral, ki, m_account.get_device());
-    THROW_WALLET_EXCEPTION_IF(!r, error::wallet_internal_error, "Failed to generate key image");
-    THROW_WALLET_EXCEPTION_IF(td.m_key_image_known && !td.m_key_image_partial && ki != td.m_key_image, error::wallet_internal_error, "key_image generated not matched with cached key image");
-    THROW_WALLET_EXCEPTION_IF(in_ephemeral.pub != pkey, error::wallet_internal_error, "key_image generated ephemeral public key not matched with output_key");
+    // TODO(doyle): TODO(loki): Fallback to old get tx pub key method for
+    // incase for now. But we need to go find out why we can't just use
+    // td.m_pk_index for everything? If we were able to decode the output
+    // using that, why not use it for everthing?
+    tx_pub_key = get_tx_pub_key_from_received_outs(td);
   }
 
-  nonce = static_cast<uint32_t>(time(nullptr));
-  crypto::hash hash = service_nodes::generate_request_stake_unlock_hash(nonce);
-  crypto::generate_signature(hash, in_ephemeral.pub, in_ephemeral.sec, signature);
+  // generate ephemeral secret key
+  cryptonote::keypair in_ephemeral;
+  crypto::key_image ki;
+  bool r = cryptonote::generate_key_image_helper(
+      m_account.get_keys(),
+      m_subaddresses,
+      pkey,
+      tx_pub_key,
+      get_additional_tx_pub_keys_from_extra(td.m_tx),
+      td.m_internal_output_index,
+      in_ephemeral,
+      ki,
+      m_account.get_device());
+  THROW_WALLET_EXCEPTION_IF(!r, error::wallet_internal_error, "Failed to generate key image");
+  THROW_WALLET_EXCEPTION_IF(td.m_key_image_known && !td.m_key_image_partial && ki != td.m_key_image, error::wallet_internal_error, "key_image generated not matched with cached key image");
+  THROW_WALLET_EXCEPTION_IF(in_ephemeral.pub != pkey, error::wallet_internal_error, "key_image generated ephemeral public key not matched with output_key");
+
+  // null_hash because we hard-code a nonce of 0 (see comment in can_request_stake_unlock)
+  crypto::generate_signature(crypto::null_hash, in_ephemeral.pub, in_ephemeral.sec, signature);
   return true;
 }
 //----------------------------------------------------------------------------------------------------

@@ -3620,8 +3620,8 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         return false;
       }
 
-      crypto::hash const hash = service_nodes::generate_request_stake_unlock_hash(unlock.nonce);
-      if (!crypto::check_signature(hash, contribution.key_image_pub_key, unlock.signature))
+      if (!crypto::check_signature(service_nodes::generate_request_stake_unlock_hash(unlock.nonce),
+                  contribution.key_image_pub_key, unlock.signature))
       {
         MERROR("Could not verify key image unlock transaction signature for tx: " << get_transaction_hash(tx));
         return false;

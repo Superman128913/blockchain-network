@@ -834,8 +834,8 @@ namespace service_nodes
       if (cit != contributor.locked_contributions.end())
       {
         // NOTE(loki): This should be checked in blockchain check_tx_inputs already
-        crypto::hash const hash = service_nodes::generate_request_stake_unlock_hash(unlock.nonce);
-        if (crypto::check_signature(hash, cit->key_image_pub_key, unlock.signature))
+        if (crypto::check_signature(service_nodes::generate_request_stake_unlock_hash(unlock.nonce),
+                    cit->key_image_pub_key, unlock.signature))
         {
           duplicate_info(it->second).requested_unlock_height = unlock_height;
           return true;

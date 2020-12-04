@@ -436,7 +436,7 @@ namespace cryptonote
   {
     crypto::key_image key_image;
     crypto::signature signature;
-    uint32_t          nonce;
+    uint32_t          nonce; // TODO: remove this nonce value if we ever have to make other changes to this structure
 
     // Compares equal if this represents the same key image unlock (but does *not* require equality of signature/nonce)
     bool operator==(const tx_extra_tx_key_image_unlock &other) const { return key_image == other.key_image; }
