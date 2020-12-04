@@ -31,6 +31,7 @@
 
 
 #include "device_default.hpp"
+#include "crypto/crypto.h"
 #include "epee/int-util.h"
 #include "cryptonote_basic/account.h"
 #include "cryptonote_basic/subaddress_index.h"
@@ -259,6 +260,11 @@ namespace hw {
 
         bool device_default::generate_key_image(const crypto::public_key &pub, const crypto::secret_key &sec, crypto::key_image &image){
             crypto::generate_key_image(pub, sec,image);
+            return true;
+        }
+
+        bool device_default::generate_key_image_signature(const crypto::key_image& image, const crypto::public_key& pub, const crypto::secret_key& sec, crypto::signature& sig) {
+            crypto::generate_key_image_signature(image, pub, sec, sig);
             return true;
         }
 

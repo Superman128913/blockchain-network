@@ -276,9 +276,7 @@ namespace crypto {
       const key_image& image,
       const public_key& pub,
       const secret_key& sec,
-      signature& sig
-      /* FIXME: hwdevice */
-      );
+      signature& sig);
   bool check_key_image_signature(
       const key_image& image,
       const public_key& pub,

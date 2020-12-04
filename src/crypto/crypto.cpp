@@ -650,9 +650,7 @@ namespace crypto {
       const key_image& image, // I
       const public_key& pub, // A
       const secret_key& sec, // a
-      signature& sig
-      /* FIXME: hwdevice */
-      ) {
+      signature& sig) {
     static_assert(sizeof(hash) == sizeof(key_image));
     ec_scalar k = random_scalar(); // k = random
     rs_comm rs{reinterpret_cast<const hash&>(image), 1};

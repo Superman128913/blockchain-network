@@ -266,6 +266,7 @@ namespace hw {
     LEDGER_INS(DERIVE_PUBLIC_KEY,               0x36);
     LEDGER_INS(DERIVE_SECRET_KEY,               0x38);
     LEDGER_INS(GEN_KEY_IMAGE,                   0x3A);
+    LEDGER_INS(GEN_KEY_IMAGE_SIGNATURE,         0x3B);
     LEDGER_INS(SECRET_KEY_ADD,                  0x3C);
     LEDGER_INS(SECRET_KEY_SUB,                  0x3E);
     LEDGER_INS(GENERATE_KEYPAIR,                0x40);
@@ -1237,6 +1238,32 @@ namespace hw {
 
 #ifdef DEBUG_HWDEVICE
         hw::ledger::check32("generate_key_image", "image", image_x.data, image.data);
+#endif
+
+        return true;
+    }
+
+    bool device_ledger::generate_key_image_signature(const crypto::key_image& image, const crypto::public_key& pub, const crypto::secret_key& sec, crypto::signature& sig) {
+        auto locks = tools::unique_locks(device_locker, command_locker);
+
+        int offset = set_command_header_noopt(INS_GEN_KEY_IMAGE_SIGNATURE);
+        send_bytes(image.data, 32, offset);
+        send_bytes(pub.data, 32, offset);
+        send_secret(sec.data, offset);
+
+        finish_and_exchange(offset);
+
+        receive_bytes(reinterpret_cast<char*>(&sig), 64);
+
+#ifdef DEBUG_HWDEVICE
+        // We can't check the actual returned signature byte values because a random component is
+        // involved, but we *can* attempt to verify the signature
+        bool good = crypto::check_key_image_signature(image, pub, sig);
+        log_hexbuffer("generate_key_image_signature: key image", image.data, 32);
+        log_hexbuffer("generate_key_image_signature: pubkey", pub.data, 32);
+        log_hexbuffer("generate_key_image_signature: signature.c", sig.c.data, 32);
+        log_hexbuffer("generate_key_image_signature: signature.r", sig.r.data, 32);
+        log_message("generate_key_image_signature: signature returned from device", good ? "passed" : "FAILED");
 #endif
 
         return true;

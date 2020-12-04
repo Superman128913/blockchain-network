@@ -863,7 +863,7 @@ namespace cryptonote
             return false;
           }
 
-          crypto::generate_key_image_signature(proof.key_image, out_eph_public_key, ephemeral_keys.sec, proof.signature);
+          hwdev.generate_key_image_signature(proof.key_image, out_eph_public_key, ephemeral_keys.sec, proof.signature);
         }
       }
 
