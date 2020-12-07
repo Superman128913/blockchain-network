@@ -368,11 +368,13 @@ namespace service_nodes
                 auto test_results = check_service_node(obligations_height_hf_version, node_key, info);
                 bool passed       = test_results.passed();
 
+                uint16_t reason = 0;
+
                 //TODO sean
-                result.storage_server_reachable = false;
-                result.uptime_proved = false;
-                result.checkpoint_participation = false;
-                result.pulse_participation = false;
+                if (!test_results.uptime_proved) reason &= cryptonote::Decommission_Reason::missed_uptime_proof;
+                if (!test_results.checkpoint_participation) reason &= cryptonote::Decommission_Reason::missed_checkpoints;
+                if (!test_results.pulse_participation) reason &= cryptonote::Decommission_Reason::missed_pulse_participations;
+                if (!test_results.storage_server_reachable) reason &= cryptonote::Decommission_Reason::storage_server_unreachable;
 
                 new_state vote_for_state;
                 if (passed) {
