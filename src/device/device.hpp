@@ -34,6 +34,7 @@
 #include "ringct/rctTypes.h"
 #include "cryptonote_config.h"
 #include "epee/wipeable_string.h"
+#include "cryptonote_basic/txtypes.h"
 
 
 #ifndef USE_DEVICE_LEDGER
@@ -205,7 +206,7 @@ namespace hw {
                                        const crypto::public_key &R, const crypto::public_key &A, const std::optional<crypto::public_key> &B, const crypto::public_key &D, const crypto::secret_key &r,
                                        crypto::signature &sig) = 0;
 
-        virtual bool  open_tx(crypto::secret_key &tx_key, uint8_t txversion, uint8_t txtype) = 0;
+        virtual bool  open_tx(crypto::secret_key &tx_key, cryptonote::txversion txversion, cryptonote::txtype txtype) = 0;
 
         virtual void get_transaction_prefix_hash(const cryptonote::transaction_prefix& tx, crypto::hash& h) = 0;
         

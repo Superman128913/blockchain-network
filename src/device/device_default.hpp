@@ -113,7 +113,7 @@ namespace hw {
                                    const crypto::public_key &R, const crypto::public_key &A, const std::optional<crypto::public_key> &B, const crypto::public_key &D, const crypto::secret_key &r,
                                    crypto::signature &sig) override;
 
-            bool  open_tx(crypto::secret_key &tx_key, uint8_t txversion, uint8_t txtype) override;
+            bool open_tx(crypto::secret_key &tx_key, cryptonote::txversion txversion, cryptonote::txtype txtype) override;
             void get_transaction_prefix_hash(const cryptonote::transaction_prefix& tx, crypto::hash& h) override;
 
             bool  encrypt_payment_id(crypto::hash8 &payment_id, const crypto::public_key &public_key, const crypto::secret_key &secret_key) override;

@@ -1004,9 +1004,7 @@ namespace cryptonote
   bool construct_tx_and_get_tx_key(const account_keys& sender_account_keys, const std::unordered_map<crypto::public_key, subaddress_index>& subaddresses, std::vector<tx_source_entry>& sources, std::vector<tx_destination_entry>& destinations, const std::optional<cryptonote::tx_destination_entry>& change_addr, const std::vector<uint8_t> &extra, transaction& tx, uint64_t unlock_time, crypto::secret_key &tx_key, std::vector<crypto::secret_key> &additional_tx_keys, const rct::RCTConfig &rct_config, rct::multisig_out *msout, loki_construct_tx_params const &tx_params)
   {
     hw::device &hwdev = sender_account_keys.get_device();
-    auto txversion = static_cast<uint8_t>(transaction::get_max_version_for_hf(tx_params.hf_version));
-    auto txtype = static_cast<uint8_t>(tx_params.tx_type);
-    hwdev.open_tx(tx_key, txversion, txtype);
+    hwdev.open_tx(tx_key, transaction::get_max_version_for_hf(tx_params.hf_version), tx_params.tx_type);
     try {
       // figure out if we need to make additional tx pubkeys
       size_t num_stdaddresses = 0;

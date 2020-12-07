@@ -423,6 +423,11 @@ namespace hw {
       send_bytes(&x, 4, offset);
     }
 
+    void device_ledger::send_u16(uint16_t x, int& offset) {
+      boost::endian::native_to_big_inplace(x);
+      send_bytes(&x, 2, offset);
+    }
+
     uint32_t device_ledger::receive_u32(int& offset) {
       uint32_t x;
       receive_bytes(&x, 4, offset);
@@ -1359,7 +1364,7 @@ namespace hw {
 #endif
     }
 
-    bool device_ledger::open_tx(crypto::secret_key &tx_key, uint8_t txversion, uint8_t txtype) {
+    bool device_ledger::open_tx(crypto::secret_key &tx_key, cryptonote::txversion txversion, cryptonote::txtype txtype) {
         auto locks = tools::unique_locks(device_locker, command_locker, *this);
 
         key_map.clear();
@@ -1367,10 +1372,8 @@ namespace hw {
         tx_in_progress = true;
         int offset = set_command_header_noopt(INS_OPEN_TX, 0x01);
 
-        //account
-        send_u32(0, offset);
-        send_bytes(&txversion, 1, offset);
-        send_bytes(&txtype, 1, offset);
+        send_u16(static_cast<uint16_t>(txversion), offset);
+        send_u16(static_cast<uint16_t>(txtype), offset);
 
         finish_and_exchange(offset);
 

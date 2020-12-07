@@ -171,6 +171,7 @@ namespace hw {
         void send_bytes(const void* buf, size_t size, int& offset);
         void receive_bytes(void* dest, size_t size, int& offset);
         void receive_bytes(void* dest, size_t size);
+        void send_u16(uint16_t x, int& offset);
         void send_u32(uint32_t x, int& offset);
         uint32_t receive_u32(int& offset);
         uint32_t receive_u32();
@@ -291,7 +292,7 @@ namespace hw {
                                    const crypto::public_key &R, const crypto::public_key &A, const std::optional<crypto::public_key> &B, const crypto::public_key &D, const crypto::secret_key &r,
                                    crypto::signature &sig) override;
         
-        bool  open_tx(crypto::secret_key &tx_key, uint8_t tx_version, uint8_t tx_type) override;
+        bool open_tx(crypto::secret_key &tx_key, cryptonote::txversion tx_version, cryptonote::txtype tx_type) override;
 
         void get_transaction_prefix_hash(const cryptonote::transaction_prefix& tx, crypto::hash& h) override;
     
