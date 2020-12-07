@@ -38,6 +38,7 @@
 #include "cryptonote_core/cryptonote_tx_utils.h"
 #include "ringct/rctOps.h"
 #include "cryptonote_config.h"
+#include <sodium/crypto_generichash.h>
 
 namespace hw {
 
@@ -270,6 +271,21 @@ namespace hw {
 
         bool device_default::generate_unlock_signature(const crypto::public_key& pub, const crypto::secret_key& sec, crypto::signature& sig) {
             crypto::generate_signature(cryptonote::tx_extra_tx_key_image_unlock::HASH, pub, sec, sig);
+            return true;
+        }
+
+        bool device_default::generate_lns_signature(std::string_view sig_data, const cryptonote::account_keys& keys, const cryptonote::subaddress_index& index, crypto::signature& sig) {
+            crypto::hash hash;
+            crypto_generichash(reinterpret_cast<unsigned char*>(hash.data), sizeof(hash), reinterpret_cast<const unsigned char*>(sig_data.data()), sig_data.size(), nullptr, 0);
+
+            crypto::secret_key skey = keys.m_spend_secret_key;
+            if (!index.is_zero())
+              sc_secret_add(skey, skey, get_subaddress_secret_key(keys.m_view_secret_key, index));
+
+            crypto::public_key pkey;
+            secret_key_to_public_key(skey, pkey);
+
+            crypto::generate_signature(hash, pkey, skey, sig);
             return true;
         }
 

@@ -664,8 +664,12 @@ cryptonote::transaction loki_chain_generator::create_loki_name_system_tx_update(
   if (!signature)
   {
     signature = &signature_;
-    crypto::hash hash = lns::tx_extra_signature_hash(encrypted_value.to_view(), owner, backup_owner, prev_txid);
-    *signature = lns::make_monero_signature(hash, src.get_keys().m_account_address.m_spend_public_key, src.get_keys().m_spend_secret_key);
+    auto data = lns::tx_extra_signature(encrypted_value.to_view(), owner, backup_owner, prev_txid);
+    crypto::hash hash{};
+    if (!data.empty())
+        crypto_generichash(reinterpret_cast<unsigned char*>(hash.data), sizeof(hash), reinterpret_cast<const unsigned char*>(data.data()), data.size(), nullptr, 0);
+    generate_signature(hash, src.get_keys().m_account_address.m_spend_public_key, src.get_keys().m_spend_secret_key, signature->monero);
+    signature->type = lns::generic_owner_sig_type::monero;
   }
 
   std::vector<uint8_t> extra;

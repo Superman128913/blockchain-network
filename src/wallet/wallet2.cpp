@@ -8661,24 +8661,19 @@ static bool try_generate_lns_signature(wallet2 const &wallet, std::string const 
   std::optional<cryptonote::subaddress_index> index = wallet.get_subaddress_index(curr_owner_parsed.address);
   if (!index) return false;
 
-  // TODO(doyle): Taken from wallet2.cpp::get_reserve_proof
-  crypto::secret_key skey = wallet.get_account().get_keys().m_spend_secret_key;
-  if (!index->is_zero())
-  {
-    crypto::secret_key m = wallet.get_account().get_device().get_subaddress_secret_key(wallet.get_account().get_keys().m_view_secret_key, *index);
-    crypto::secret_key tmp = skey;
-    sc_add((unsigned char*)&skey, (unsigned char*)&m, (unsigned char*)&tmp);
-  }
+  auto& account = wallet.get_account();
+  auto& hwdev = account.get_device();
 
-  crypto::public_key pkey;
-  crypto::secret_key_to_public_key(skey, pkey);
+  auto sig_data = lns::tx_extra_signature(
+      result.encrypted_value.to_view(),
+      new_owner ? &result.owner : nullptr,
+      new_backup_owner ? &result.backup_owner : nullptr,
+      result.prev_txid);
+  if (sig_data.empty()) return false;
 
-  crypto::hash hash = lns::tx_extra_signature_hash(result.encrypted_value.to_view(),
-                                                   new_owner ? &result.owner : nullptr,
-                                                   new_backup_owner ? &result.backup_owner : nullptr,
-                                                   result.prev_txid);
-  if (!hash) return false;
-  result.signature = lns::make_monero_signature(hash, pkey, skey);
+  hwdev.generate_lns_signature(sig_data, account.get_keys(), *index, result.signature.monero);
+  result.signature.type = lns::generic_owner_sig_type::monero;
+
   return true;
 }
 

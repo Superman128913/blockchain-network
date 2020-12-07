@@ -2131,6 +2131,22 @@ bool loki_name_system_update_mapping::generate(std::vector<test_event_entry> &ev
   return true;
 }
 
+template <typename... Args>
+static crypto::hash lns_signature_hash(Args&&... args) {
+  crypto::hash hash{};
+  auto data = lns::tx_extra_signature(std::forward<Args>(args)...);
+  if (!data.empty())
+    crypto_generichash(reinterpret_cast<unsigned char*>(hash.data), sizeof(hash), reinterpret_cast<const unsigned char*>(data.data()), data.size(), nullptr, 0);
+  return hash;
+}
+
+lns::generic_signature lns_monero_signature(const crypto::hash& h, const crypto::public_key& pkey, const crypto::secret_key& skey) {
+    lns::generic_signature result{};
+    result.type = lns::generic_owner_sig_type::monero;
+    generate_signature(h, pkey, skey, result.monero);
+    return result;
+}
+
 bool loki_name_system_update_mapping_multiple_owners::generate(std::vector<test_event_entry>& events)
 {
   std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
@@ -2174,7 +2190,7 @@ bool loki_name_system_update_mapping_multiple_owners::generate(std::vector<test_
     {
       lns_keys_t temp_keys = make_lns_keys(gen.add_account());
       lns::mapping_value encrypted_value = temp_keys.session_value.make_encrypted(name);
-      crypto::hash hash = lns::tx_extra_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
+      crypto::hash hash = lns_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
       auto signature = lns::make_ed25519_signature(hash, owner1_key);
 
       cryptonote::transaction tx2 = gen.create_and_add_loki_name_system_tx_update(miner, gen.hardfork(), lns::mapping_type::session, name, &encrypted_value, nullptr /*owner*/, nullptr /*backup_owner*/, &signature);
@@ -2195,7 +2211,7 @@ bool loki_name_system_update_mapping_multiple_owners::generate(std::vector<test_
     {
       lns_keys_t temp_keys = make_lns_keys(gen.add_account());
       lns::mapping_value encrypted_value = temp_keys.session_value.make_encrypted(name);
-      crypto::hash hash = lns::tx_extra_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
+      crypto::hash hash = lns_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
       auto signature = lns::make_ed25519_signature(hash, owner2_key);
 
       cryptonote::transaction tx2 = gen.create_and_add_loki_name_system_tx_update(miner, gen.hardfork(), lns::mapping_type::session, name, &encrypted_value, nullptr /*owner*/, nullptr /*backup_owner*/, &signature);
@@ -2231,8 +2247,8 @@ bool loki_name_system_update_mapping_multiple_owners::generate(std::vector<test_
     {
       lns_keys_t temp_keys = make_lns_keys(gen.add_account());
       lns::mapping_value encrypted_value = temp_keys.session_value.make_encrypted(name);
-      crypto::hash hash = lns::tx_extra_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
-      auto signature = lns::make_monero_signature(hash, owner1.wallet.address.m_spend_public_key, account1.get_keys().m_spend_secret_key);
+      crypto::hash hash = lns_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
+      auto signature = lns_monero_signature(hash, owner1.wallet.address.m_spend_public_key, account1.get_keys().m_spend_secret_key);
 
       cryptonote::transaction tx2 = gen.create_and_add_loki_name_system_tx_update(miner, gen.hardfork(), lns::mapping_type::session, name, &encrypted_value, nullptr /*owner*/, nullptr /*backup_owner*/, &signature);
       gen.create_and_add_next_block({tx2});
@@ -2252,8 +2268,8 @@ bool loki_name_system_update_mapping_multiple_owners::generate(std::vector<test_
     {
       lns_keys_t temp_keys = make_lns_keys(gen.add_account());
       lns::mapping_value encrypted_value = temp_keys.session_value.make_encrypted(name);
-      crypto::hash hash = lns::tx_extra_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
-      auto signature = lns::make_monero_signature(hash, owner2.wallet.address.m_spend_public_key, account2.get_keys().m_spend_secret_key);
+      crypto::hash hash = lns_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
+      auto signature = lns_monero_signature(hash, owner2.wallet.address.m_spend_public_key, account2.get_keys().m_spend_secret_key);
 
       cryptonote::transaction tx2 = gen.create_and_add_loki_name_system_tx_update(miner, gen.hardfork(), lns::mapping_type::session, name, &encrypted_value, nullptr /*owner*/, nullptr /*backup_owner*/, &signature);
       gen.create_and_add_next_block({tx2});
@@ -2292,7 +2308,7 @@ bool loki_name_system_update_mapping_multiple_owners::generate(std::vector<test_
     {
       lns_keys_t temp_keys = make_lns_keys(gen.add_account());
       lns::mapping_value encrypted_value = temp_keys.session_value.make_encrypted(name);
-      crypto::hash hash = lns::tx_extra_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
+      crypto::hash hash = lns_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
       auto signature = lns::make_ed25519_signature(hash, owner1_key);
 
       cryptonote::transaction tx2 = gen.create_and_add_loki_name_system_tx_update(miner, gen.hardfork(), lns::mapping_type::session, name, &encrypted_value, nullptr /*owner*/, nullptr /*backup_owner*/, &signature);
@@ -2313,8 +2329,8 @@ bool loki_name_system_update_mapping_multiple_owners::generate(std::vector<test_
     {
       lns_keys_t temp_keys = make_lns_keys(gen.add_account());
       lns::mapping_value encrypted_value = temp_keys.session_value.make_encrypted(name);
-      crypto::hash hash = lns::tx_extra_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
-      auto signature = lns::make_monero_signature(hash, owner2.wallet.address.m_spend_public_key, account2.get_keys().m_spend_secret_key);
+      crypto::hash hash = lns_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
+      auto signature = lns_monero_signature(hash, owner2.wallet.address.m_spend_public_key, account2.get_keys().m_spend_secret_key);
 
       cryptonote::transaction tx2 = gen.create_and_add_loki_name_system_tx_update(miner, gen.hardfork(), lns::mapping_type::session, name, &encrypted_value, nullptr /*owner*/, nullptr /*backup_owner*/, &signature);
       gen.create_and_add_next_block({tx2});
@@ -2353,8 +2369,8 @@ bool loki_name_system_update_mapping_multiple_owners::generate(std::vector<test_
       lns_keys_t temp_keys = make_lns_keys(gen.add_account());
 
       lns::mapping_value encrypted_value = temp_keys.session_value.make_encrypted(name);
-      crypto::hash hash = lns::tx_extra_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
-      auto signature = lns::make_monero_signature(hash, owner1.wallet.address.m_spend_public_key, account1.get_keys().m_spend_secret_key);
+      crypto::hash hash = lns_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
+      auto signature = lns_monero_signature(hash, owner1.wallet.address.m_spend_public_key, account1.get_keys().m_spend_secret_key);
 
       cryptonote::transaction tx2 = gen.create_and_add_loki_name_system_tx_update(miner, gen.hardfork(), lns::mapping_type::session, name, &encrypted_value, nullptr /*owner*/, nullptr /*backup_owner*/, &signature);
       gen.create_and_add_next_block({tx2});
@@ -2375,7 +2391,7 @@ bool loki_name_system_update_mapping_multiple_owners::generate(std::vector<test_
       lns_keys_t temp_keys = make_lns_keys(gen.add_account());
 
       lns::mapping_value encrypted_value = temp_keys.session_value.make_encrypted(name);
-      crypto::hash hash = lns::tx_extra_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
+      crypto::hash hash = lns_signature_hash(encrypted_value.to_view(), nullptr /*owner*/, nullptr /*backup_owner*/, txid);
       auto signature = lns::make_ed25519_signature(hash, owner2_key);
 
       cryptonote::transaction tx2 = gen.create_and_add_loki_name_system_tx_update(miner, gen.hardfork(), lns::mapping_type::session, name, &encrypted_value, nullptr /*owner*/, nullptr /*backup_owner*/, &signature);

@@ -39,6 +39,10 @@
 #include <chrono>
 #include <boost/endian/conversion.hpp>
 
+#ifdef DEBUG_HWDEVICE
+#include <sodium/crypto_generichash.h>
+#endif
+
 namespace hw {
 
   namespace ledger {
@@ -294,6 +298,7 @@ namespace hw {
 
     LEDGER_INS(GET_TX_PROOF,                    0xA0);
     LEDGER_INS(GEN_UNLOCK_SIGNATURE,            0xA2);
+    LEDGER_INS(GEN_LNS_SIGNATURE,               0xA3);
 
     LEDGER_INS(GET_RESPONSE,                    0xc0);
 
@@ -304,6 +309,9 @@ namespace hw {
     // size.
     constexpr size_t KECCAK_HASH_CHUNK_SIZE = 136;
     static_assert(KECCAK_HASH_CHUNK_SIZE <= 254, "Max keccak data chunk size exceeds the protocol limit");
+
+    constexpr size_t BLAKE2B_HASH_CHUNK_SIZE = 128;
+    static_assert(BLAKE2B_HASH_CHUNK_SIZE <= 254, "Max BLAKE2b data chunk size exceeds the protocol limit");
 
 
     device_ledger::device_ledger(): hw_device(0x0101, 0x05, 64, 2000) {
@@ -1305,6 +1313,24 @@ namespace hw {
         log_hexbuffer("generate_unlock_signature: signature.r", sig.r.data, 32);
         log_message("generate_unlock_signature: signature returned from device", good ? "passed" : "FAILED");
 #endif
+
+        return true;
+    }
+
+    bool device_ledger::generate_lns_signature(std::string_view sig_data, const cryptonote::account_keys& keys, const cryptonote::subaddress_index& index, crypto::signature& sig) {
+        // Initialize (prompts the user):
+        int offset = set_command_header_noopt(INS_GEN_LNS_SIGNATURE);
+        CHECK_AND_ASSERT_THROW_MES(finish_and_exchange(offset, true) == SW_OK, "LNS denied on device.");
+
+        // Send lns signature data to be hashed:
+        exchange_multipart_data(INS_GEN_LNS_SIGNATURE, 1, sig_data, BLAKE2B_HASH_CHUNK_SIZE);
+
+        // Send the subaddr indices and get the signature:
+        offset = set_command_header_noopt(INS_GEN_LNS_SIGNATURE, 2);
+        send_bytes(&index, sizeof(index), offset);
+        finish_and_exchange(offset);
+
+        receive_bytes(reinterpret_cast<char*>(&sig), 64);
 
         return true;
     }
