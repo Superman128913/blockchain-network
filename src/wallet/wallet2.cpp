@@ -42,6 +42,7 @@
 #include <lokimq/base64.h>
 #include "common/password.h"
 #include "common/string_util.h"
+#include "cryptonote_basic/tx_extra.h"
 #include "cryptonote_core/loki_name_system.h"
 #include "common/rules.h"
 #include "cryptonote_config.h"
@@ -8623,7 +8624,7 @@ wallet2::request_stake_unlock_result wallet2::can_request_stake_unlock(const cry
       // out a nonce value of 0.  The nonce value, unfortunately, can't be easily removed from the
       // key image unlock tx_extra data without versioning/replacing it, so we still send this 0,
       // but this will hopefully make it easier in the future to eliminate from the tx extra.
-      unlock.nonce = 0;
+      unlock.nonce = tx_extra_tx_key_image_unlock::FAKE_NONCE;
       if (!generate_signature_for_request_stake_unlock(unlock.key_image, unlock.signature))
       {
         result.msg = tr("Failed to generate signature to sign request. The key image: ") + contribution.key_image + (" doesn't belong to this wallet");
@@ -14585,6 +14586,7 @@ bool wallet2::generate_signature_for_request_stake_unlock(const crypto::key_imag
   }
 
   // generate ephemeral secret key
+  auto& hwdev = m_account.get_device();
   cryptonote::keypair in_ephemeral;
   crypto::key_image ki;
   bool r = cryptonote::generate_key_image_helper(
@@ -14596,13 +14598,14 @@ bool wallet2::generate_signature_for_request_stake_unlock(const crypto::key_imag
       td.m_internal_output_index,
       in_ephemeral,
       ki,
-      m_account.get_device());
+      hwdev);
   THROW_WALLET_EXCEPTION_IF(!r, error::wallet_internal_error, "Failed to generate key image");
   THROW_WALLET_EXCEPTION_IF(td.m_key_image_known && !td.m_key_image_partial && ki != td.m_key_image, error::wallet_internal_error, "key_image generated not matched with cached key image");
   THROW_WALLET_EXCEPTION_IF(in_ephemeral.pub != pkey, error::wallet_internal_error, "key_image generated ephemeral public key not matched with output_key");
 
-  // null_hash because we hard-code a nonce of 0 (see comment in can_request_stake_unlock)
-  crypto::generate_signature(crypto::null_hash, in_ephemeral.pub, in_ephemeral.sec, signature);
+  THROW_WALLET_EXCEPTION_IF(
+      !hwdev.generate_unlock_signature(in_ephemeral.pub, in_ephemeral.sec, signature),
+      error::wallet_internal_error, "Hardware device failed to sign the unlock request");
   return true;
 }
 //----------------------------------------------------------------------------------------------------

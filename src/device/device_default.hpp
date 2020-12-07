@@ -102,6 +102,7 @@ namespace hw {
             bool  secret_key_to_public_key(const crypto::secret_key &sec, crypto::public_key &pub) override;
             bool  generate_key_image(const crypto::public_key &pub, const crypto::secret_key &sec, crypto::key_image &image) override;
             bool  generate_key_image_signature(const crypto::key_image& image, const crypto::public_key& pub, const crypto::secret_key& sec, crypto::signature& sig) override;
+            bool  generate_unlock_signature(const crypto::public_key& pub, const crypto::secret_key& sec, crypto::signature& sig) override;
 
 
             /* ======================================================================= */

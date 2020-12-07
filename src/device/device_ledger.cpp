@@ -293,6 +293,7 @@ namespace hw {
     LEDGER_INS(CLOSE_TX,                        0x80);
 
     LEDGER_INS(GET_TX_PROOF,                    0xA0);
+    LEDGER_INS(GEN_UNLOCK_SIGNATURE,            0xA2);
 
     LEDGER_INS(GET_RESPONSE,                    0xc0);
 
@@ -1265,6 +1266,39 @@ namespace hw {
         log_hexbuffer("generate_key_image_signature: signature.c", sig.c.data, 32);
         log_hexbuffer("generate_key_image_signature: signature.r", sig.r.data, 32);
         log_message("generate_key_image_signature: signature returned from device", good ? "passed" : "FAILED");
+#endif
+
+        return true;
+    }
+
+    bool device_ledger::generate_unlock_signature(const crypto::public_key& pub, const crypto::secret_key& sec, crypto::signature& sig) {
+        auto locks = tools::unique_locks(device_locker, command_locker);
+
+#ifdef DEBUG_HWDEVICE
+        log_hexbuffer("generate_unlock_signature: [[IN]]  pub ", pub.data, 32);
+        const crypto::secret_key sec_x = hw::ledger::decrypt(sec);
+        log_hexbuffer("generate_unlock_signature: [[IN]]  sec ", sec_x.data, 32);
+#endif
+
+        // Ask for confirmation:
+        int offset = set_command_header_noopt(INS_GEN_UNLOCK_SIGNATURE);
+        CHECK_AND_ASSERT_THROW_MES(finish_and_exchange(offset, true) == SW_OK, "Unlock denied on device.");
+
+        // If we got permission then we can ask for the actual signature:
+        offset = set_command_header_noopt(INS_GEN_UNLOCK_SIGNATURE, 1);
+        send_bytes(pub.data, 32, offset);
+        send_secret(sec.data, offset);
+        finish_and_exchange(offset);
+
+        receive_bytes(reinterpret_cast<char*>(&sig), 64);
+
+#ifdef DEBUG_HWDEVICE
+        // We can't check the actual returned signature byte values because a random component is
+        // involved, but we *can* attempt to verify the signature
+        bool good = crypto::check_signature(cryptonote::tx_extra_tx_key_image_unlock::HASH, pub, sig);
+        log_hexbuffer("generate_unlock_signature: signature.c", sig.c.data, 32);
+        log_hexbuffer("generate_unlock_signature: signature.r", sig.r.data, 32);
+        log_message("generate_unlock_signature: signature returned from device", good ? "passed" : "FAILED");
 #endif
 
         return true;

@@ -31,6 +31,7 @@
 #include "loki_tests.h"
 #include "common/string_util.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
+#include "cryptonote_basic/tx_extra.h"
 #include "cryptonote_config.h"
 #include "cryptonote_core/loki_name_system.h"
 #include "cryptonote_core/service_node_list.h"

@@ -438,6 +438,19 @@ namespace cryptonote
     crypto::signature signature;
     uint32_t          nonce; // TODO: remove this nonce value if we ever have to make other changes to this structure
 
+    // The value we sign when signing an unlock request.  For backwards compatibility we send this as a
+    // "nonce" (although it isn't and never was a nonce), which is required to be an unsigned 32-bit
+    // value.  We could just as easily sign with crypto::null_hash, but using a distinct value makes it
+    // slightly less likely that we could end up using the same message as some other signing process.
+    static constexpr crypto::hash HASH{
+      'U','N','L','K','U','N','L','K','U','N','L','K','U','N','L','K',
+      'U','N','L','K','U','N','L','K','U','N','L','K','U','N','L','K'};
+    // For now, we still have to send that (not a) "nonce" value in the unlock tx on the wire, but
+    // future HF versions could remove it from the wire (though at 4 bytes it isn't worth doing
+    // until we also need to make some other change to unlocks here).  So for now, we always send
+    // this in `nonce`.
+    static constexpr uint32_t FAKE_NONCE = 0x4B4C4E55;
+
     // Compares equal if this represents the same key image unlock (but does *not* require equality of signature/nonce)
     bool operator==(const tx_extra_tx_key_image_unlock &other) const { return key_image == other.key_image; }
 
