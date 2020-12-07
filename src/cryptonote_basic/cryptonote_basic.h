@@ -44,6 +44,7 @@
 #include "crypto/hash.h"
 #include "ringct/rctTypes.h"
 #include "device/device.hpp"
+#include "txtypes.h"
 
 namespace service_nodes
 {
@@ -164,23 +165,6 @@ namespace cryptonote
     END_SERIALIZE()
 
 
-  };
-
-  enum class txversion : uint16_t {
-    v0 = 0,
-    v1,
-    v2_ringct,
-    v3_per_output_unlock_times,
-    v4_tx_types,
-    _count,
-  };
-  enum class txtype : uint16_t {
-    standard,
-    state_change,
-    key_image_unlock,
-    stake,
-    loki_name_system,
-    _count
   };
 
   // Blink quorum statuses.  Note that the underlying numeric values is used in the RPC.  `none` is
