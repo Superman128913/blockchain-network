@@ -368,6 +368,7 @@ namespace cryptonote
       ENUM_FIELD(state, state < service_nodes::new_state::_count);
       VARINT_FIELD(block_height);
       VARINT_FIELD(service_node_index);
+      VARINT_FIELD(reason);
       FIELD(votes);
     END_SERIALIZE()
   };
