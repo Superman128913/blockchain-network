@@ -368,6 +368,12 @@ namespace service_nodes
                 auto test_results = check_service_node(obligations_height_hf_version, node_key, info);
                 bool passed       = test_results.passed();
 
+                //TODO sean
+                result.storage_server_reachable = false;
+                result.uptime_proved = false;
+                result.checkpoint_participation = false;
+                result.pulse_participation = false;
+
                 new_state vote_for_state;
                 if (passed) {
                   if (info.is_decommissioned()) {
@@ -415,7 +421,7 @@ namespace service_nodes
                   }
                 }
 
-                quorum_vote_t vote = service_nodes::make_state_change_vote(m_obligations_height, static_cast<uint16_t>(index_in_group), node_index, vote_for_state, reason,my_keys);
+                quorum_vote_t vote = service_nodes::make_state_change_vote(m_obligations_height, static_cast<uint16_t>(index_in_group), node_index, vote_for_state, reason, my_keys);
                 cryptonote::vote_verification_context vvc;
                 if (!handle_vote(vote, vvc))
                   LOG_ERROR("Failed to add state change vote; reason: " << print_vote_verification_context(vvc, &vote));
