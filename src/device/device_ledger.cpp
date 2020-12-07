@@ -270,7 +270,6 @@ namespace hw {
     LEDGER_INS(DERIVE_PUBLIC_KEY,               0x36);
     LEDGER_INS(DERIVE_SECRET_KEY,               0x38);
     LEDGER_INS(GEN_KEY_IMAGE,                   0x3A);
-    LEDGER_INS(GEN_KEY_IMAGE_SIGNATURE,         0x3B);
     LEDGER_INS(SECRET_KEY_ADD,                  0x3C);
     LEDGER_INS(SECRET_KEY_SUB,                  0x3E);
     LEDGER_INS(GENERATE_KEYPAIR,                0x40);
@@ -299,6 +298,7 @@ namespace hw {
     LEDGER_INS(GET_TX_PROOF,                    0xA0);
     LEDGER_INS(GEN_UNLOCK_SIGNATURE,            0xA2);
     LEDGER_INS(GEN_LNS_SIGNATURE,               0xA3);
+    LEDGER_INS(GEN_KEY_IMAGE_SIGNATURE,         0xA4);
 
     LEDGER_INS(GET_RESPONSE,                    0xc0);
 
