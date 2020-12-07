@@ -1894,15 +1894,6 @@ namespace hw {
     }
 
     bool device_ledger::clsag_hash(const rct::keyV &keydata, rct::key &hash) {
-        return hw::get_device("default").clsag_hash(keydata, hash);
-
-// Don't calculate this hash on the device: it's slow and c is public anyway.  If the wallet lies
-// about c, the tx signature won't be valid, so there's no point in slowing everything down by
-// calculating on the device.
-#if 0
-
-#define CLSAG_USE_INTERNAL_C
-
         auto locks = tools::unique_locks(device_locker, command_locker);
 
 #ifdef DEBUG_HWDEVICE
@@ -1920,7 +1911,6 @@ namespace hw {
         hw::ledger::check32("clsag_hash", "hash", hash_x.bytes, hash.bytes);
 #endif
         return true;
-#endif
     }
 
     bool device_ledger::clsag_sign(const rct::key &c, const rct::key &a, const rct::key &p, const rct::key &z, const rct::key &mu_P, const rct::key &mu_C, rct::key &s) {
@@ -1931,14 +1921,6 @@ namespace hw {
         debug_device->clsag_sign(c, hw::ledger::decrypt(a), hw::ledger::decrypt(p), z, mu_P, mu_C, s_x);
 #endif
 
-#ifndef CLSAG_USE_INTERNAL_C
-        {
-          int offset = set_command_header_noopt(INS_CLSAG, 3);
-          send_bytes(c.bytes, 32, offset);
-          finish_and_exchange(offset);
-        }
-#endif
-
         /*
         rct::key s0_p_mu_P;
         sc_mul(s0_p_mu_P.bytes,mu_P.bytes,p.bytes);
@@ -1947,7 +1929,7 @@ namespace hw {
         sc_mulsub(s.bytes,c.bytes,s0_add_z_mu_C.bytes,a.bytes);
         */
 
-        int offset = set_command_header_noopt(INS_CLSAG, 4);
+        int offset = set_command_header_noopt(INS_CLSAG, 3);
 
         send_secret(a.bytes, offset); //a
         send_secret(p.bytes, offset); //p
