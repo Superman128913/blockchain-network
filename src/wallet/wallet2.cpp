@@ -4459,9 +4459,8 @@ bool wallet2::load_keys_buf(const std::string& keys_buf, const epee::wipeable_st
     THROW_WALLET_EXCEPTION_IF(device_account_public_address != m_account.get_keys().m_account_address, error::wallet_internal_error,
             "Device wallet does not match wallet address. "
             "Device address: " + cryptonote::get_account_address_as_str(m_nettype, false, device_account_public_address) +
-            ", wallet address: " + m_account.get_public_address_str(m_nettype) +
-            ". Perhaps your device wallet is set to the wrong account index?");
-    LOG_PRINT_L0("Device inited...");
+            ", wallet address: " + m_account.get_public_address_str(m_nettype));
+    LOG_PRINT_L0("Device initialized...");
   } else if (key_on_device()) {
     THROW_WALLET_EXCEPTION(error::wallet_internal_error, "hardware device not supported");
   }
