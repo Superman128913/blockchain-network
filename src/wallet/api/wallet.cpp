@@ -1002,15 +1002,11 @@ std::vector<std::pair<std::string, uint32_t>>* WalletImpl::listCurrentStakes() c
 
     for (rpc::GET_SERVICE_NODES::response::entry const &node_info : response)
     {
-      for (const auto& contributor : node_info.contributors)
-      {
-        for (size_t i = 0; i < contributor.locked_contributions.size(); ++i)
+        for (const auto& contributor : node_info.contributors)
         {
-          stakes->push_back(std::make_pair(node_info.service_node_pubkey, contributor.amount));
+            stakes->push_back(std::make_pair(node_info.service_node_pubkey, contributor.amount));
         }
-      }
     }
-    
     return stakes;
 }
 

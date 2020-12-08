@@ -12942,7 +12942,7 @@ uint64_t wallet2::get_approximate_blockchain_height() const
 std::vector<rpc::GET_SERVICE_NODES::response::entry> wallet2::list_current_stakes()
 {
 
-  std::vector<rpc::GET_SERVICE_NODES::response::entry> service_node_states; 
+  std::vector<rpc::GET_SERVICE_NODES::response::entry> service_node_states;
 
   auto [success, all_nodes] = this->get_all_service_nodes();
   if (!success)
