@@ -56,21 +56,12 @@ namespace hw {
     /* ===                           Debug                              ==== */
     /* ===================================================================== */
 
-    static bool apdu_verbose = true;
+    namespace {
 
-    void set_apdu_verbose(bool verbose) {
-      apdu_verbose = verbose;
-    }
-
-#ifdef DEBUG_HWDEVICE
-    crypto::secret_key dbg_viewkey;
-    crypto::secret_key dbg_spendkey;
-#endif
+    bool apdu_verbose = true;
 
     #define LEDGER_STATUS(status) {status, #status##sv}
     constexpr std::pair<unsigned int, std::string_view> status_codes[] = {
-      LEDGER_STATUS(SW_WRONG_LENGTH),
-
       LEDGER_STATUS(SW_SECURITY_PIN_LOCKED),
       LEDGER_STATUS(SW_SECURITY_LOAD_KEY),
       LEDGER_STATUS(SW_SECURITY_COMMITMENT_CONTROL),
@@ -102,14 +93,26 @@ namespace hw {
       LEDGER_STATUS(SW_UNKNOWN),
     };
 
-    constexpr std::string_view status_string(unsigned int code)
+    std::string status_string(unsigned int code)
     {
       for (auto& [code_, str] : status_codes)
         if (code_ == code)
-          return str;
-      return "UNKNOWN"sv;
+          return std::string{str};
+      if ((code & 0xff00) == SW_WRONG_LENGTH)
+        return "SW_WRONG_LENGTH(" + std::to_string(code & 0xff) + ")";
+      return "UNKNOWN"s;
     }
 
+    } // anon namespace
+
+    void set_apdu_verbose(bool verbose) {
+      apdu_verbose = verbose;
+    }
+
+#ifdef DEBUG_HWDEVICE
+    crypto::secret_key dbg_viewkey;
+    crypto::secret_key dbg_spendkey;
+#endif
 
     /* ===================================================================== */
     /* ===                        hmacmap                               ==== */
