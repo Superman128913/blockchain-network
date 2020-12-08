@@ -54,36 +54,22 @@ namespace hw {
 
     
     #ifdef DEBUG_HWDEVICE
-    extern crypto::secret_key dbg_viewkey;
-    extern crypto::secret_key dbg_spendkey;
-
 
     void decrypt(char* buf, size_t len) {
       #if defined(IODUMMYCRYPT_HWDEVICE) || defined(IONOCRYPT_HWDEVICE)
-      size_t i;
-      if (len == 32) {
-        //view key?
-        for (i = 0; i<32; i++) {
-          if (buf[i] != 0) break;
-        }
-        if (i == 32) {
-          memmove(buf, hw::ledger::dbg_viewkey.data, 32);
-          return;
-        }
-        //spend key?
-        for (i = 0; i<32; i++) {
-          if (buf[i] != (char)0xff) break;
-        }
-        if (i == 32) {
-          memmove(buf, hw::ledger::dbg_spendkey.data, 32);
-          return;
-        }
+
+      if (len == 32 && memcmp(dummy_view_key, buf, 32) == 0) {
+        memmove(buf, hw::ledger::dbg_viewkey.data, 32);
+        return;
+      }
+      if (len == 32 && memcmp(dummy_spend_key, buf, 32) == 0) {
+        memmove(buf, hw::ledger::dbg_spendkey.data, 32);
+        return;
       }
       #if defined(IODUMMYCRYPT_HWDEVICE)
       //std decrypt: XOR.55h
-      for (i = 0; i<len;i++) {
-          buf[i] ^= 0x55;
-        }
+      for (size_t i = 0; i < len; i++)
+        buf[i] ^= 0x55;
       #endif
       #endif
     }
@@ -118,15 +104,6 @@ namespace hw {
        crypto::ec_scalar  x = res;
        decrypt((char*)x.data, 32);
        return x;
-    }
-
-    rct::keyV decrypt(const rct::keyV &keys) {
-        rct::keyV x ;
-        x.reserve(keys.size());
-        for (unsigned int j = 0; j<keys.size(); j++) {
-            x.push_back(decrypt(keys[j]));
-        }
-        return x;
     }
 
     static void check(const std::string &msg, const std::string &info, const char *h, const char *d, size_t len, bool crypted) {

@@ -255,7 +255,6 @@ namespace hw {
     static const uint8_t INS_##name = debug_record_ins(code, #name##sv)
 #endif
 
-    LEDGER_INS(NONE,                            0x00);
     LEDGER_INS(RESET,                           0x02);
 
     LEDGER_INS(GET_NETWORK,                     0x10);
@@ -265,7 +264,6 @@ namespace hw {
     LEDGER_INS(PUT_KEY,                         0x22);
     LEDGER_INS(GET_CHACHA8_PREKEY,              0x24);
     LEDGER_INS(VERIFY_KEY,                      0x26);
-    LEDGER_INS(MANAGE_SEEDWORDS,                0x28);
 
     LEDGER_INS(SECRET_KEY_TO_PUBLIC_KEY,        0x30);
     LEDGER_INS(GEN_KEY_DERIVATION,              0x32);
@@ -288,7 +286,7 @@ namespace hw {
     LEDGER_INS(SET_SIGNATURE_MODE,              0x72);
     LEDGER_INS(GET_ADDITIONAL_KEY,              0x74);
     LEDGER_INS(GET_TX_SECRET_KEY,               0x75);
-    LEDGER_INS(STEALTH,                         0x76);
+    LEDGER_INS(ENCRYPT_PAYMENT_ID,              0x76);
     LEDGER_INS(GEN_COMMITMENT_MASK,             0x77);
     LEDGER_INS(BLIND,                           0x78);
     LEDGER_INS(UNBLIND,                         0x7A);
@@ -413,13 +411,13 @@ namespace hw {
     }
 
     void device_ledger::send_bytes(const void* buf, size_t size, int& offset) {
-      CHECK_AND_ASSERT_THROW_MES(offset + 32 <= BUFFER_SEND_SIZE, "send_bytes: out of bounds write");
+      CHECK_AND_ASSERT_THROW_MES(offset + size <= BUFFER_SEND_SIZE, "send_bytes: out of bounds write");
       std::memmove(buffer_send+offset, buf, size);
       offset += size;
     }
 
     void device_ledger::receive_bytes(void* dest, size_t size, int& offset) {
-      CHECK_AND_ASSERT_THROW_MES(offset + 32 <= BUFFER_RECV_SIZE, "receive_bytes: out of bounds read");
+      CHECK_AND_ASSERT_THROW_MES(offset + size <= BUFFER_RECV_SIZE, "receive_bytes: out of bounds read");
       std::memmove(dest, buffer_recv+offset, size);
       offset += size;
     }
@@ -629,9 +627,7 @@ namespace hw {
         case TRANSACTION_CREATE_REAL:
         case TRANSACTION_CREATE_FAKE:
           offset = set_command_header_noopt(INS_SET_SIGNATURE_MODE, 1);
-          //account
           buffer_send[offset++] = mode;
-
 
           finish_and_exchange(offset);
 
@@ -666,17 +662,17 @@ namespace hw {
         return true;
     }
 
-    bool  device_ledger::get_secret_keys(crypto::secret_key &vkey , crypto::secret_key &skey) {
+    bool device_ledger::get_secret_keys(crypto::secret_key& vkey, crypto::secret_key& skey) {
         auto locks = tools::unique_locks(device_locker, command_locker);
 
         //secret key are represented as fake key on the wallet side
-        memset(vkey.data, 0x00, 32);
-        memset(skey.data, 0xFF, 32);
+        memcpy(vkey.data, dummy_view_key, 32);
+        memcpy(skey.data, dummy_spend_key, 32);
 
         //spcialkey, normal conf handled in decrypt
         send_simple(INS_GET_KEY, 0x02);
 
-        //View key is retrievied, if allowed, to speed up blockchain parsing
+        //View key is retrieved, if allowed, to speed up blockchain parsing
         receive_bytes(viewkey.data, 32);
         has_view_key = !is_fake_view_key(viewkey);
         MDEBUG((has_view_key ? "Have view key" : "Have no view key"));
@@ -691,7 +687,7 @@ namespace hw {
         return true;
     }
 
-    bool  device_ledger::generate_chacha_key(const cryptonote::account_keys &keys, crypto::chacha_key &key, uint64_t kdf_rounds) {
+    bool device_ledger::generate_chacha_key(const cryptonote::account_keys &keys, crypto::chacha_key &key, uint64_t kdf_rounds) {
         auto locks = tools::unique_locks(device_locker, command_locker);
 
 #ifdef DEBUG_HWDEVICE
@@ -1051,8 +1047,8 @@ namespace hw {
 #endif
 
       if (mode == TRANSACTION_PARSE && has_view_key) {
-        //A derivation is resquested in PASRE mode and we have the view key,
-        //so do that wihtout the device and return the derivation unencrypted.
+        //A derivation is requested in PARSE mode and we have the view key,
+        //so do that without the device and return the derivation unencrypted.
         MDEBUG( "generate_key_derivation  : PARSE mode with known viewkey");
         //Note derivation in PARSE mode can only happen with viewkey, so assert it!
         assert(is_fake_view_key(sec));
@@ -1251,7 +1247,7 @@ namespace hw {
 
         finish_and_exchange(offset);
 
-        //pub key
+        //key image
         receive_bytes(image.data, 32);
 
 #ifdef DEBUG_HWDEVICE
@@ -1507,7 +1503,7 @@ namespace hw {
         log_hexbuffer("encrypt_payment_id: [[OUT]] payment_id ", payment_id_x.data, 32);
 #endif
 
-        int offset = set_command_header_noopt(INS_STEALTH);
+        int offset = set_command_header_noopt(INS_ENCRYPT_PAYMENT_ID);
         send_bytes(public_key.data, 32, offset); // pub
         send_secret(secret_key.data, offset); //sec
         send_bytes(payment_id.data, 8, offset); //id
@@ -1770,18 +1766,7 @@ namespace hw {
         CHECK_AND_ASSERT_THROW_MES(finish_and_exchange(offset, true) == SW_OK, "Fee denied on device.");
 
         auto type = static_cast<rct::RCTType>(data[0]);
-
-        //pseudoOuts
-        if (type == rct::RCTType::Simple) {
-          for (size_t i = 0; i < inputs_size; i++) {
-            offset = set_command_header(INS_VALIDATE, 0x01, i+2);
-            buffer_send[offset++] = (i == inputs_size-1) ? 0x00 : 0x80; //options
-            send_bytes(&data[data_offset], 32, offset); //pseudoOut
-            data_offset += 32;
-
-            finish_and_exchange(offset);
-          }
-        }
+        CHECK_AND_ASSERT_THROW_MES(type == rct::RCTType::CLSAG, "non-CLSAG generation not supported");
 
         // ======  Aout, Bout, AKout, C, v, k ======
         size_t kv_offset = data_offset;
@@ -1796,10 +1781,8 @@ namespace hw {
             CHECK_AND_ASSERT_THROW_MES(found, "Pout not found");
           }
           offset = set_command_header(INS_VALIDATE, 0x02, i+1);
-          auto& options = buffer_send[offset++];
-          options = 0x00;
-          if (i < outputs_size-1)
-            options |= OPTION_MORE_DATA;
+          // options
+          buffer_send[offset++] = (i < outputs_size-1 ? OPTION_MORE_DATA : 0) | 0x02;
 
           buffer_send[offset++] = outKeys.is_subaddress; //is_subaddress
           buffer_send[offset++] = outKeys.is_change_address; //is_change_address
@@ -1808,17 +1791,10 @@ namespace hw {
           send_secret(outKeys.AKout.bytes, offset); //AKout
           send_bytes(&data[C_offset], 32, offset); //C
           C_offset += 32;
-          if (type ==rct::RCTType::Bulletproof2 || type == rct::RCTType::CLSAG) {
-            options |= 0x02;
-            send_bytes(crypto::null_hash.data, 32, offset); // k
-            send_bytes(&data[kv_offset], 8, offset); // v
-            kv_offset += 8;
-            send_bytes(crypto::null_hash.data, 24, offset); // v padding
-          } else {
-            // k, v
-            send_bytes(&data[kv_offset], 32+32, offset);
-            kv_offset += 32+32;
-          }
+          send_bytes(crypto::null_hash.data, 32, offset); // k
+          send_bytes(&data[kv_offset], 8, offset); // v
+          kv_offset += 8;
+          send_bytes(crypto::null_hash.data, 24, offset); // v padding
 
           // check transaction user input
           CHECK_AND_ASSERT_THROW_MES(finish_and_exchange(offset, true) == SW_OK, "Transaction denied on device.");

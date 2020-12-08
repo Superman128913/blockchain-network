@@ -329,13 +329,6 @@ namespace hw {
         bool close_tx() override;
 
     };
-
-
-    #ifdef DEBUG_HWDEVICE
-    extern crypto::secret_key dbg_viewkey;
-    extern crypto::secret_key dbg_spendkey;
-    #endif
-
     #endif  //WITH_DEVICE_LEDGER
   }
 
