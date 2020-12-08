@@ -8163,11 +8163,16 @@ wallet2::stake_result wallet2::check_stake_allowed(const crypto::public_key& sn_
   return result;
 }
 
-wallet2::stake_result wallet2::create_stake_tx(const crypto::public_key& service_node_key, const cryptonote::address_parse_info& addr_info, uint64_t amount, double amount_fraction, uint32_t priority, uint32_t subaddr_account, std::set<uint32_t> subaddr_indices)
+wallet2::stake_result wallet2::create_stake_tx(const crypto::public_key& service_node_key, uint64_t amount, double amount_fraction, uint32_t priority, std::set<uint32_t> subaddr_indices)
 {
   wallet2::stake_result result = {};
   result.status                = wallet2::stake_result_status::invalid;
 
+  cryptonote::address_parse_info addr_info = {};
+  addr_info.address = this->get_address();
+  //addr_info.address = this->get_account().get_keys().m_account_address;
+  //addr_info.is_subaddress = false;
+  
   try
   {
     result = check_stake_allowed(service_node_key, addr_info, amount, amount_fraction);
@@ -8208,12 +8213,6 @@ wallet2::stake_result wallet2::create_stake_tx(const crypto::public_key& service
   }
 
   constexpr uint64_t unlock_at_block = 0; // Infinite staking, no time lock
-  if (subaddr_account != 0)
-  {
-    result.msg = tr("Infinite staking does not allow staking from a subaddress");
-    result.status = stake_result_status::subaddress_disallowed;
-    return result;
-  }
 
   try
   {
@@ -8233,7 +8232,7 @@ wallet2::stake_result wallet2::create_stake_tx(const crypto::public_key& service
     }
 
     loki_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, txtype::stake, priority);
-    auto ptx_vector      = create_transactions_2(dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, unlock_at_block, priority, extra, subaddr_account, subaddr_indices, tx_params);
+    auto ptx_vector      = create_transactions_2(dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, unlock_at_block, priority, extra, 0, subaddr_indices, tx_params);
     if (ptx_vector.size() == 1)
     {
       result.status = stake_result_status::success;

@@ -1319,8 +1319,8 @@ private:
     /// Modifies the `amount` to maximum possible if too large, but rejects if insufficient.
     /// `fraction` is only used to determine the amount if specified zero.
     stake_result check_stake_allowed(const crypto::public_key& sn_key, const cryptonote::address_parse_info& addr_info, uint64_t& amount, double fraction = 0);
-    stake_result create_stake_tx    (const crypto::public_key& service_node_key, const cryptonote::address_parse_info& addr_info, uint64_t amount,
-                                     double amount_fraction = 0, uint32_t priority = 0, uint32_t subaddr_account = 0, std::set<uint32_t> subaddr_indices = {});
+    stake_result create_stake_tx    (const crypto::public_key& service_node_key, uint64_t amount,
+                                     double amount_fraction = 0, uint32_t priority = 0, std::set<uint32_t> subaddr_indices = {});
     enum struct register_service_node_result_status
     {
       invalid,

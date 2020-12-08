@@ -6150,12 +6150,10 @@ bool simple_wallet::stake(const std::vector<std::string> &args_)
     m_wallet->refresh(false);
     try
     {
-      address_parse_info info = {};
-      info.address            = m_wallet->get_address();
 
       time_t begin_construct_time = time(nullptr);
 
-      tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(service_node_key, info, amount, amount_fraction, priority, m_current_subaddress_account, subaddr_indices);
+      tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(service_node_key, amount, amount_fraction, priority, subaddr_indices);
       if (stake_result.status != tools::wallet2::stake_result_status::success)
       {
         fail_msg_writer() << stake_result.msg;
@@ -6166,6 +6164,8 @@ bool simple_wallet::stake(const std::vector<std::string> &args_)
         tools::msg_writer() << stake_result.msg;
 
       std::vector<tools::wallet2::pending_tx> ptx_vector = {stake_result.ptx};
+      cryptonote::address_parse_info info = {};
+      info.address = m_wallet->get_address();
       if (!sweep_main_internal(sweep_type_t::stake, ptx_vector, info, false /* don't blink */))
       {
         fail_msg_writer() << tr("Sending stake transaction failed");

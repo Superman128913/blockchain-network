@@ -2945,8 +2945,7 @@ namespace {
     if (!tools::hex_to_type(req.service_node_key, snode_key))
       throw wallet_rpc_error{error_code::WRONG_KEY, std::string("Unparsable service node key given: ") + req.service_node_key};
 
-    // NOTE(loki): Pre-emptively set subaddr_account to 0. We don't support onwards from Infinite Staking which is when this call was implemented.
-    tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(snode_key, addr_info, req.amount, 0 /*amount_fraction*/, req.priority, 0 /*subaddr_account*/, req.subaddr_indices);
+    tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(snode_key, req.amount, 0 /*amount_fraction*/, req.priority, req.subaddr_indices);
     if (stake_result.status != tools::wallet2::stake_result_status::success)
       throw wallet_rpc_error{error_code::TX_NOT_POSSIBLE, stake_result.msg};
 
