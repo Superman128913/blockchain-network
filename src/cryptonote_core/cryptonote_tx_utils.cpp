@@ -1036,10 +1036,10 @@ namespace cryptonote
      std::vector<crypto::secret_key> additional_tx_keys;
      std::vector<tx_destination_entry> destinations_copy = destinations;
 
-     rct::RCTConfig rct_config{
-       tx_params.hf_version < network_version_10_bulletproofs ? rct::RangeProofType::Borromean : rct::RangeProofType::PaddedBulletproof,
-       tx_params.hf_version >= HF_VERSION_CLSAG ? 3 : tx_params.hf_version >= HF_VERSION_SMALLER_BP ? 2 : 1
-     };
+     // Always construct CLSAG transactions.  They weren't actually acceptable before HF 16, but
+     // they are now for our fake networks (which we need to do because we no longer have pre-CLSAG
+     // tx generation code).
+     rct::RCTConfig rct_config{rct::RangeProofType::PaddedBulletproof, 3};
 
      return construct_tx_and_get_tx_key(sender_account_keys, subaddresses, sources, destinations_copy, change_addr, extra, tx, unlock_time, tx_key, additional_tx_keys, rct_config, NULL, tx_params);
   }

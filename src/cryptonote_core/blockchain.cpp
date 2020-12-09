@@ -3115,18 +3115,6 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
     }
   }
 
-  // Disallow CLSAGs before the CLSAG hardfork
-  if (hf_version < HF_VERSION_CLSAG) {
-    if (tx.version >= txversion::v4_tx_types && tx.is_transfer()) {
-      if (tx.rct_signatures.type == rct::RCTType::CLSAG)
-      {
-        MERROR_VER("Ringct type " << (unsigned)rct::RCTType::CLSAG << " is not allowed before v" << HF_VERSION_CLSAG);
-        tvc.m_invalid_output = true;
-        return false;
-      }
-    }
-  }
-
   // Require CLSAGs starting 10 blocks after the CLSAG-enabling hard fork (the 10 block buffer is to
   // allow staggling txes around fork time to still make it into a block).
   if (hf_version >= HF_VERSION_CLSAG
