@@ -448,9 +448,10 @@ bool loki_core_block_reward_unpenalized_pre_pulse::generate(std::vector<test_eve
 
   cryptonote::account_base dummy = gen.add_account();
   int constexpr NUM_TXS          = 60;
-  std::vector<cryptonote::transaction> txs(NUM_TXS);
-  for (int i = 0; i < NUM_TXS; i++)
-    txs[i] = gen.create_and_add_tx(gen.first_miner_, dummy.get_keys().m_account_address, MK_COINS(5));
+  std::vector<cryptonote::transaction> txs;
+  txs.reserve(NUM_TXS);
+  while (txs.size() < NUM_TXS)
+    txs.push_back(gen.create_and_add_tx(gen.first_miner_, dummy.get_keys().m_account_address, MK_COINS(5)));
 
   gen.create_and_add_next_block(txs);
   uint64_t unpenalized_block_reward     = cryptonote::block_reward_unpenalized_formula_v8(gen.height());
