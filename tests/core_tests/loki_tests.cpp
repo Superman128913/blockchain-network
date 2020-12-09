@@ -347,7 +347,7 @@ bool loki_checkpointing_service_node_checkpoint_from_votes::generate(std::vector
 
   // NOTE: Submit invalid vote using service node keys not in the quorum
   {
-    const cryptonote::keypair invalid_kp = cryptonote::keypair::generate(hw::get_device("default"));
+    const cryptonote::keypair invalid_kp{hw::get_device("default")};
     service_nodes::service_node_keys invalid_keys;
     invalid_keys.pub = invalid_kp.pub;
     invalid_keys.key = invalid_kp.sec;
@@ -500,7 +500,7 @@ bool loki_core_block_reward_unpenalized_post_pulse::generate(std::vector<test_ev
     }
 
     txs[i] = gen.create_registration_tx(gen.first_miner(),
-                                        cryptonote::keypair::generate(hw::get_device("default")),
+                                        cryptonote::keypair{hw::get_device("default")},
                                         STAKING_PORTIONS / 4, /*operator portions*/
                                         0,                    /*operator cut*/
                                         contributions,
@@ -2976,10 +2976,10 @@ bool loki_service_nodes_insufficient_contribution::generate(std::vector<test_eve
   gen.add_blocks_until_version(hard_forks.back().first);
   gen.add_mined_money_unlock_blocks();
 
-  uint64_t operator_portions                = STAKING_PORTIONS / 2;
-  uint64_t remaining_portions               = STAKING_PORTIONS - operator_portions;
-  cryptonote::keypair sn_keys               = cryptonote::keypair::generate(hw::get_device("default"));
-  cryptonote::transaction register_tx       = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_portions);
+  uint64_t operator_portions = STAKING_PORTIONS / 2;
+  uint64_t remaining_portions = STAKING_PORTIONS - operator_portions;
+  cryptonote::keypair sn_keys{hw::get_device("default")};
+  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_portions);
   gen.add_tx(register_tx);
   gen.create_and_add_next_block({register_tx});
 

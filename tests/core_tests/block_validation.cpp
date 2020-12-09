@@ -425,7 +425,7 @@ static bool construct_miner_tx_with_extra_output(cryptonote::transaction& tx,
                                                  uint64_t already_generated_coins,
                                                  const cryptonote::account_public_address& extra_address)
 {
-    keypair txkey = keypair::generate(hw::get_device("default"));
+    keypair txkey{hw::get_device("default")};
     add_tx_extra<tx_extra_pub_key>(tx, txkey.pub);
 
     keypair gov_key = get_deterministic_keypair_from_height(height);

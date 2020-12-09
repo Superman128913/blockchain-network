@@ -48,7 +48,7 @@ namespace
       m_tx.version = version;
       m_tx.unlock_time = unlock_time;
 
-      m_tx_key = keypair::generate(hw::get_device("default"));
+      m_tx_key = keypair{hw::get_device("default")};
       add_tx_extra<tx_extra_pub_key>(m_tx, m_tx_key.pub);
     }
 
@@ -304,7 +304,7 @@ bool gen_tx_no_inputs_no_outputs::generate(std::vector<test_event_entry>& events
 
   transaction tx = {};
   tx.version     = cryptonote::txversion::v2_ringct;
-  add_tx_extra<tx_extra_pub_key>(tx, keypair::generate(hw::get_device("default")).pub);
+  add_tx_extra<tx_extra_pub_key>(tx, keypair{hw::get_device("default")}.pub);
 
   DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(tx);
@@ -535,7 +535,7 @@ bool gen_tx_key_image_not_derive_from_tx_key::generate(std::vector<test_event_en
   txin_to_key& in_to_key        = var::get<txin_to_key>(tx.vin.front());
 
   // Use fake key image
-  keypair keys = keypair::generate(hw::get_device("default"));
+  keypair keys{hw::get_device("default")};
   key_image fake_key_image;
   crypto::generate_key_image(keys.pub, keys.sec, fake_key_image);
   in_to_key.k_image = fake_key_image;

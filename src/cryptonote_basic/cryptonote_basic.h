@@ -471,12 +471,18 @@ namespace cryptonote
     crypto::public_key pub;
     crypto::secret_key sec;
 
-    static inline keypair generate(hw::device &hwdev)
-    {
-      keypair k;
-      hwdev.generate_keys(k.pub, k.sec);
-      return k;
-    }
+    keypair() = default;
+
+    // Constructs from a copied public/secret key
+    keypair(const crypto::public_key& pub, const crypto::secret_key& sec) : pub{pub}, sec{sec} {}
+    // Default copy and move
+    keypair(const keypair&) = default;
+    keypair(keypair&&) = default;
+    keypair& operator=(const keypair&) = default;
+    keypair& operator=(keypair&&) = default;
+
+    // Constructs by generating a keypair via the given hardware device:
+    explicit keypair(hw::device& hwdev) { hwdev.generate_keys(pub, sec); }
   };
 
   using byte_and_output_fees = std::pair<uint64_t, uint64_t>;
