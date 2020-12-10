@@ -8624,9 +8624,14 @@ wallet2::request_stake_unlock_result wallet2::can_request_stake_unlock(const cry
       // key image unlock tx_extra data without versioning/replacing it, so we still send this 0,
       // but this will hopefully make it easier in the future to eliminate from the tx extra.
       unlock.nonce = tx_extra_tx_key_image_unlock::FAKE_NONCE;
-      if (!generate_signature_for_request_stake_unlock(unlock.key_image, unlock.signature))
-      {
-        result.msg = tr("Failed to generate signature to sign request. The key image: ") + contribution.key_image + (" doesn't belong to this wallet");
+      try {
+        if (!generate_signature_for_request_stake_unlock(unlock.key_image, unlock.signature))
+        {
+          result.msg = tr("Failed to generate signature to sign request. The key image: ") + contribution.key_image + tr(" doesn't belong to this wallet");
+          return result;
+        }
+      } catch (const std::exception& e) {
+        result.msg = tr("Failed to generate unlock signature: ") + std::string(e.what());
         return result;
       }
     }
