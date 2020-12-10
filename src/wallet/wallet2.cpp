@@ -8660,9 +8660,6 @@ static bool try_generate_lns_signature(wallet2 const &wallet, std::string const 
   std::optional<cryptonote::subaddress_index> index = wallet.get_subaddress_index(curr_owner_parsed.address);
   if (!index) return false;
 
-  auto& account = wallet.get_account();
-  auto& hwdev = account.get_device();
-
   auto sig_data = lns::tx_extra_signature(
       result.encrypted_value.to_view(),
       new_owner ? &result.owner : nullptr,
@@ -8670,6 +8667,9 @@ static bool try_generate_lns_signature(wallet2 const &wallet, std::string const 
       result.prev_txid);
   if (sig_data.empty()) return false;
 
+  auto& account = wallet.get_account();
+  auto& hwdev = account.get_device();
+  hw::mode_resetter rst{hwdev};
   hwdev.generate_lns_signature(sig_data, account.get_keys(), *index, result.signature.monero);
   result.signature.type = lns::generic_owner_sig_type::monero;
 
