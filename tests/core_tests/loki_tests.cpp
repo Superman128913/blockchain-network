@@ -767,15 +767,15 @@ bool loki_core_block_rewards_lrc6::generate(std::vector<test_event_entry>& event
 
 bool loki_core_test_deregister_preferred::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table(cryptonote::network_version_9_service_nodes);
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   const auto miner                 = gen.first_miner();
   const auto alice                 = gen.add_account();
 
   gen.add_blocks_until_version(hard_forks.back().first);
   gen.add_n_blocks(10); /// give miner some outputs to spend and unlock them
-  gen.add_mined_money_unlock_blocks();
   add_service_nodes(gen, 12);
+  gen.add_mined_money_unlock_blocks();
 
   /// generate high fee transactions with huge fees to fill up txpool entirely. This pushes all the
   /// way into the penalty buffer (i.e. produces a 600kB tx).  The junk data size here is quite
