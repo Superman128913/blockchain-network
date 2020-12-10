@@ -3579,60 +3579,70 @@ namespace service_nodes
   bool service_node_info::can_be_voted_on(uint64_t height) const
   {
     // If the SN expired and was reregistered since the height we'll be voting on it prematurely
-    if (!this->is_fully_funded() || this->registration_height >= height) return false;
-    if (this->is_decommissioned() && this->last_decommission_height >= height) return false;
-
-    if (this->is_active())
-    {
-      // NOTE: This cast is safe. The definition of is_active() is that active_since_height >= 0
-      assert(this->active_since_height >= 0);
-      if (static_cast<uint64_t>(this->active_since_height) >= height) return false;
+    if (!is_fully_funded()) {
+      MDEBUG("SN vote at height " << height << " invalid: not fully funded");
+      return false;
+    } else if (height <= registration_height) {
+      MDEBUG("SN vote at height " << height << " invalid: height <= reg height (" << registration_height << ")");
+      return false;
+    } else if (is_decommissioned() && height <= last_decommission_height) {
+      MDEBUG("SN vote at height " << height << " invalid: height <= last decomm height (" << last_decommission_height << ")");
+      return false;
+    } else if (is_active()) {
+      assert(active_since_height >= 0); // should be satisfied whenever is_active() is true
+      if (height <= static_cast<uint64_t>(active_since_height)) {
+        MDEBUG("SN vote at height " << height << " invalid: height <= active-since height (" << active_since_height << ")");
+        return false;
+      }
     }
 
+    MTRACE("SN vote at height " << height << " is valid.");
     return true;
   }
 
   bool service_node_info::can_transition_to_state(uint8_t hf_version, uint64_t height, new_state proposed_state) const
   {
-    if (hf_version >= cryptonote::network_version_13_enforce_checkpoints)
-    {
-      if (!can_be_voted_on(height))
+    if (hf_version >= cryptonote::network_version_13_enforce_checkpoints) {
+      if (!can_be_voted_on(height)) {
+        MDEBUG("SN state transition invalid: " << height << " is not a valid vote height");
         return false;
+      }
 
-      if (proposed_state == new_state::deregister)
-      {
-        if (height <= this->registration_height)
+      if (proposed_state == new_state::deregister) {
+        if (height <= registration_height) {
+          MDEBUG("SN deregister invalid: vote height (" << height << ") <= registration_height (" << registration_height << ")");
           return false;
-      }
-      else if (proposed_state == new_state::ip_change_penalty)
-      {
-        if (height <= this->last_ip_change_height)
+        }
+      } else if (proposed_state == new_state::ip_change_penalty) {
+        if (height <= last_ip_change_height) {
+          MDEBUG("SN ip change penality invalid: vote height (" << height << ") <= last_ip_change_height (" << last_ip_change_height << ")");
           return false;
+        }
       }
-
-      if (this->is_decommissioned())
-      {
-        return proposed_state != new_state::decommission && proposed_state != new_state::ip_change_penalty;
-      }
-
-      return (proposed_state != new_state::recommission);
-    }
-    else
-    {
-      if (proposed_state == new_state::deregister)
-      {
-        if (height < this->registration_height) return false;
-      }
-
-      if (this->is_decommissioned())
-      {
-        return proposed_state != new_state::decommission && proposed_state != new_state::ip_change_penalty;
-      }
-      else
-      {
-        return (proposed_state != new_state::recommission);
+    } else { // pre-HF13
+      if (proposed_state == new_state::deregister) {
+        if (height < registration_height) {
+          MDEBUG("SN deregister invalid: vote height (" << height << ") < registration_height (" << registration_height << ")");
+          return false;
+        }
       }
     }
+
+    if (is_decommissioned()) {
+      if (proposed_state == new_state::decommission) {
+        MDEBUG("SN decommission invalid: already decommissioned");
+        return false;
+      } else if (proposed_state == new_state::ip_change_penalty) {
+        MDEBUG("SN ip change penalty invalid: currently decommissioned");
+        return false;
+      }
+      return true; // recomm or dereg
+    } else if (proposed_state == new_state::recommission) {
+      MDEBUG("SN recommission invalid: not recommissioned");
+      return false;
+    }
+    MTRACE("SN state change is valid");
+    return true;
   }
 
   payout service_node_info_to_payout(crypto::public_key const &key, service_node_info const &info)
