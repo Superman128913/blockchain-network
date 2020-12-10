@@ -540,7 +540,7 @@ cryptonote::transaction oxen_chain_generator::create_state_change_tx(service_nod
     for (const auto voter_index : voters)
     {
       auto voter_keys = get_cached_keys(validator_service_nodes[voter_index]);
-      service_nodes::quorum_vote_t vote = service_nodes::make_state_change_vote(state_change_extra.block_height, voter_index, state_change_extra.service_node_index, state, voter_keys);
+      service_nodes::quorum_vote_t vote = service_nodes::make_state_change_vote(state_change_extra.block_height, voter_index, state_change_extra.service_node_index, state, 0, voter_keys);
       state_change_extra.votes.push_back({vote.signature, (uint32_t)voter_index});
     }
   }
@@ -550,7 +550,7 @@ cryptonote::transaction oxen_chain_generator::create_state_change_tx(service_nod
     {
       auto voter_keys = get_cached_keys(validator_service_nodes[i]);
 
-      service_nodes::quorum_vote_t vote = service_nodes::make_state_change_vote(state_change_extra.block_height, i, state_change_extra.service_node_index, state, voter_keys);
+      service_nodes::quorum_vote_t vote = service_nodes::make_state_change_vote(state_change_extra.block_height, i, state_change_extra.service_node_index, state, 0, voter_keys);
       state_change_extra.votes.push_back({vote.signature, (uint32_t)i});
     }
   }
