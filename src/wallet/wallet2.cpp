@@ -1908,7 +1908,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
     {
       hw::device &hwdev = m_account.get_device();
       std::unique_lock hwdev_lock{hwdev};
-      hw::reset_mode rst(hwdev);
+      hw::mode_resetter rst{hwdev};
 
       hwdev.set_mode(hw::device::TRANSACTION_PARSE);
       if (!hwdev.generate_key_derivation(tx_pub_key, keys.m_view_secret_key, derivation))
@@ -2777,7 +2777,7 @@ void wallet2::process_parsed_blocks(uint64_t start_height, const std::vector<cry
   waiter.wait(&tpool);
 
   hw::device &hwdev =  m_account.get_device();
-  hw::reset_mode rst(hwdev);
+  hw::mode_resetter rst{hwdev};
   hwdev.set_mode(hw::device::TRANSACTION_PARSE);
   const cryptonote::account_keys &keys = m_account.get_keys();
 
@@ -10795,7 +10795,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
   //ensure device is let in NONE mode in any case
   hw::device &hwdev = m_account.get_device();
   std::unique_lock hwdev_lock{hwdev};
-  hw::reset_mode rst(hwdev);  
+  hw::mode_resetter rst{hwdev};
 
   bool const is_lns_tx = (tx_params.tx_type == txtype::loki_name_system);
   auto original_dsts = dsts;
@@ -11499,7 +11499,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_from(const crypton
   //ensure device is let in NONE mode in any case
   hw::device &hwdev = m_account.get_device();
   std::unique_lock hwdev_lock{hwdev};
-  hw::reset_mode rst(hwdev);  
+  hw::mode_resetter rst{hwdev};
 
   uint64_t accumulated_fee, accumulated_outputs, accumulated_change;
   struct TX {

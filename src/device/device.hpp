@@ -261,10 +261,10 @@ namespace hw {
         device_mode mode;
     } ;
 
-    struct reset_mode {
+    struct mode_resetter {
         device& hwref;
-        reset_mode(hw::device& dev) : hwref(dev) { }
-        ~reset_mode() { hwref.set_mode(hw::device::NONE);}
+        mode_resetter(hw::device& dev) : hwref(dev) { }
+        ~mode_resetter() { hwref.set_mode(hw::device::NONE);}
     };
 
     class device_registry {
