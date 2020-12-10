@@ -28,6 +28,7 @@
 // 
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
+#include <iterator>
 #include <limits>
 #include <vector>
 #include <iostream>
@@ -39,6 +40,7 @@
 #include <fstream>
 
 #include "common/string_util.h"
+#include "common/varint.h"
 #include "epee/console_handler.h"
 #include "common/rules.h"
 
@@ -382,6 +384,20 @@ cryptonote::transaction loki_chain_generator::create_and_add_tx(const cryptonote
 {
   cryptonote::transaction t = create_tx(src, dest, amount, fee);
   loki_tx_builder(events_, t, db_.blocks.back().block, src, dest, amount, hf_version_).with_fee(fee).build();
+  add_tx(t, true /*can_be_added_to_blockchain*/, ""/*fail_msg*/, kept_by_block);
+  return t;
+}
+
+cryptonote::transaction loki_chain_generator::create_and_add_big_tx(
+        const cryptonote::account_base &src,
+        const cryptonote::account_public_address &dest,
+        uint64_t junk_size,
+        uint64_t amount,
+        uint64_t fee,
+        bool kept_by_block)
+{
+  cryptonote::transaction t = create_tx(src, dest, amount, fee);
+  loki_tx_builder(events_, t, db_.blocks.back().block, src, dest, amount, hf_version_).with_fee(fee).with_junk(junk_size).build();
   add_tx(t, true /*can_be_added_to_blockchain*/, ""/*fail_msg*/, kept_by_block);
   return t;
 }

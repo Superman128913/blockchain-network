@@ -1260,6 +1260,16 @@ inline bool do_replay_file(const std::string& filename)
 #define CHECK_NOT_EQ(v1, v2) CHECK_AND_ASSERT_MES(!(v1 == v2), false, "[" << perr_context << "] failed: \"" << QUOTEME(v1) << " != " << QUOTEME(v2) << "\", " << v1 << " == " << v2)
 #define MK_COINS(amount) (UINT64_C(amount) * COIN)
 
+static std::string make_junk() {
+  std::string junk;
+  junk.reserve(1024);
+  for (size_t i = 0; i < 256; i++)
+    junk += (char) i;
+  junk += junk;
+  junk += junk;
+  return junk;
+}
+
 //
 // NOTE: Loki
 //
@@ -1275,6 +1285,7 @@ class loki_tx_builder {
   uint64_t m_amount;
   uint64_t m_fee;
   uint64_t m_unlock_time;
+  uint64_t m_junk_size = 0;
   std::vector<uint8_t> m_extra;
   cryptonote::loki_construct_tx_params m_tx_params;
 
@@ -1321,12 +1332,19 @@ public:
     return std::move(*this);
   }
 
+  loki_tx_builder&& with_junk(size_t size) {
+    m_junk_size = size;
+    return std::move(*this);
+  }
+
   ~loki_tx_builder() {
     if (!m_finished) {
       std::cerr << "Tx building not finished\n";
       abort();
     }
   }
+
+  inline static const std::string junk1k = make_junk();
 
   bool build()
   {
@@ -1347,6 +1365,20 @@ public:
       // TODO(loki): Eww we still depend on monero land test code
       fill_tx_sources_and_destinations(
         m_events, m_head, m_from, m_to, m_amount, m_fee, nmix, sources, destinations, &change_amount);
+    }
+
+    if (m_junk_size > 0) {
+      std::string junk;
+      junk.reserve(m_junk_size + 10);
+      tools::write_varint(std::back_inserter(junk), m_junk_size);
+      m_junk_size += junk.size(); // we just added some bytes for the varint
+      std::string_view junk_piece{junk1k};
+      while (junk.size() < m_junk_size) {
+        if (junk.size() + junk_piece.size() > m_junk_size)
+          junk_piece = junk_piece.substr(0, m_junk_size - junk.size());
+        junk += junk_piece;
+      }
+      cryptonote::add_tagged_data_to_tx_extra(m_extra, cryptonote::TX_EXTRA_MYSTERIOUS_MINERGATE_TAG, junk);
     }
 
     cryptonote::tx_destination_entry change_addr{ change_amount, m_from.get_keys().m_account_address, false /*is_subaddr*/ };
@@ -1467,6 +1499,8 @@ struct loki_chain_generator
   cryptonote::transaction                              create_and_add_registration_tx(const cryptonote::account_base& src, const cryptonote::keypair& sn_keys = cryptonote::keypair{hw::get_device("default")}, bool kept_by_block = false);
   cryptonote::transaction                              create_and_add_staking_tx     (const crypto::public_key &pub_key, const cryptonote::account_base &src, uint64_t amount, bool kept_by_block = false);
   loki_blockchain_entry                               &create_and_add_next_block     (const std::vector<cryptonote::transaction>& txs = {}, cryptonote::checkpoint_t const *checkpoint = nullptr, bool can_be_added_to_blockchain = true, std::string const &fail_msg = {});
+  // Same as create_and_add_tx, but also adds 95kB of junk into tx_extra to bloat up the tx size.
+  cryptonote::transaction create_and_add_big_tx(const cryptonote::account_base& src, const cryptonote::account_public_address& dest, uint64_t amount, uint64_t junk_size = 95000, uint64_t fee = TESTS_DEFAULT_FEE, bool kept_by_block = false);
 
   // NOTE: Create transactions but don't add to events_
   cryptonote::transaction                              create_tx(const cryptonote::account_base &src, const cryptonote::account_public_address &dest, uint64_t amount, uint64_t fee) const;

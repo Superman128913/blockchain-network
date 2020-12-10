@@ -447,11 +447,11 @@ bool loki_core_block_reward_unpenalized_pre_pulse::generate(std::vector<test_eve
   gen.add_mined_money_unlock_blocks();
 
   cryptonote::account_base dummy = gen.add_account();
-  int constexpr NUM_TXS          = 60;
+  int constexpr NUM_TXS          = 4;
   std::vector<cryptonote::transaction> txs;
   txs.reserve(NUM_TXS);
   while (txs.size() < NUM_TXS)
-    txs.push_back(gen.create_and_add_tx(gen.first_miner_, dummy.get_keys().m_account_address, MK_COINS(5)));
+    txs.push_back(gen.create_and_add_big_tx(gen.first_miner_, dummy.get_keys().m_account_address, 95000, MK_COINS(5)));
 
   gen.create_and_add_next_block(txs);
   uint64_t unpenalized_block_reward     = cryptonote::block_reward_unpenalized_formula_v8(gen.height());
@@ -489,24 +489,10 @@ bool loki_core_block_reward_unpenalized_post_pulse::generate(std::vector<test_ev
   // Make big chunky TX's to trigger the block size penalty
   cryptonote::account_base dummy = gen.add_account();
   uint64_t tx_fee = 0;
-  std::vector<cryptonote::transaction> txs(150);
+  std::vector<cryptonote::transaction> txs(4);
   for (size_t i = 0; i < txs.size(); i++)
   {
-    std::array<loki_service_node_contribution, 3> contributions = {};
-    for (size_t i = 0; i < contributions.size(); i++)
-    {
-      loki_service_node_contribution &entry = contributions[i];
-      entry.contributor                     = gen.add_account().get_keys().m_account_address;
-      entry.portions                        = STAKING_PORTIONS / 4;
-    }
-
-    txs[i] = gen.create_registration_tx(gen.first_miner(),
-                                        cryptonote::keypair{hw::get_device("default")},
-                                        STAKING_PORTIONS / 4, /*operator portions*/
-                                        0,                    /*operator cut*/
-                                        contributions,
-                                        3);
-    gen.add_tx(txs[i], true /*can_be_added_to_blockchain*/, ""/*fail_msg*/, true /*kept_by_block*/);
+    txs[i] = gen.create_and_add_big_tx(gen.first_miner_, dummy.get_keys().m_account_address, 95000, MK_COINS(5), TESTS_DEFAULT_FEE * 5);
     tx_fee += txs[i].rct_signatures.txnFee;
   }
   gen.create_and_add_next_block(txs);
@@ -787,13 +773,18 @@ bool loki_core_test_deregister_preferred::generate(std::vector<test_event_entry>
   const auto alice                 = gen.add_account();
 
   gen.add_blocks_until_version(hard_forks.back().first);
-  gen.add_n_blocks(60); /// give miner some outputs to spend and unlock them
+  gen.add_n_blocks(10); /// give miner some outputs to spend and unlock them
   gen.add_mined_money_unlock_blocks();
   add_service_nodes(gen, 12);
 
-  /// generate transactions to fill up txpool entirely
-  for (auto i = 0u; i < 45; ++i) {
-    gen.create_and_add_tx(miner, alice.get_keys().m_account_address, MK_COINS(1), TESTS_DEFAULT_FEE * 100);
+  /// generate high fee transactions with huge fees to fill up txpool entirely. This pushes all the
+  /// way into the penalty buffer (i.e. produces a 600kB tx).  The junk data size here is quite
+  /// sensitive to tx changes: we need a value that makes the transaction *just* big enough so that
+  /// 6 transactions fit if no deregs are added, but when we add the deregs we can only fit 5.
+  /// Expect this test to break (and need some tweaking to the junk size here) on tx structure
+  /// changes.
+  for (size_t i = 0; i < 6; ++i) {
+    gen.create_and_add_big_tx(miner, alice.get_keys().m_account_address, 98450, MK_COINS(1), TESTS_DEFAULT_FEE * 100);
   }
 
   /// generate two deregisters
@@ -826,7 +817,8 @@ bool loki_core_test_deregister_preferred::generate(std::vector<test_event_entry>
         return mtx[tx_hash]->type == cryptonote::txtype::state_change;
       });
 
-    CHECK_TEST_CONDITION(tx_count > full_blk.tx_hashes.size()); /// test that there are more transactions in tx pool
+    CHECK_TEST_CONDITION(tx_count == 8);
+    CHECK_EQ(full_blk.tx_hashes.size(), 7);
     CHECK_EQ(deregister_count, 2);
     return true;
   });
