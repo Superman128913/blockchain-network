@@ -97,7 +97,7 @@ bool gen_uint_overflow_base::mark_last_valid_block(cryptonote::core& c, size_t e
 
 bool gen_uint_overflow_1::generate(std::vector<test_event_entry>& events) const
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);

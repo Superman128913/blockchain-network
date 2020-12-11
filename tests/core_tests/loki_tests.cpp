@@ -68,7 +68,7 @@ static void add_service_nodes(loki_chain_generator &gen, size_t count)
 // code path" again
 bool loki_checkpointing_alt_chain_handle_alt_blocks_at_tip::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);
@@ -127,7 +127,7 @@ bool loki_checkpointing_alt_chain_handle_alt_blocks_at_tip::generate(std::vector
 // NOTE: - Checks that a chain with a checkpoint but less PoW is preferred over a chain that is longer with more PoW but no checkpoints
 bool loki_checkpointing_alt_chain_more_service_node_checkpoints_less_pow_overtakes::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);
@@ -164,7 +164,7 @@ bool loki_checkpointing_alt_chain_more_service_node_checkpoints_less_pow_overtak
 // NOTE: - A chain that receives checkpointing votes sufficient to form a checkpoint should reorg back accordingly
 bool loki_checkpointing_alt_chain_receive_checkpoint_votes_should_reorg_back::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);
@@ -231,7 +231,7 @@ bool loki_checkpointing_alt_chain_receive_checkpoint_votes_should_reorg_back::ge
 
 bool loki_checkpointing_alt_chain_too_old_should_be_dropped::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   gen.add_blocks_until_version(hard_forks.back().first);
   gen.add_mined_money_unlock_blocks();
@@ -266,7 +266,7 @@ bool loki_checkpointing_alt_chain_too_old_should_be_dropped::generate(std::vecto
 // available checkpoint heights whilst maintaining equal heights with the main chain
 bool loki_checkpointing_alt_chain_with_increasing_service_node_checkpoints::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);
@@ -326,7 +326,7 @@ bool loki_checkpointing_alt_chain_with_increasing_service_node_checkpoints::gene
 //       - Checks invalid vote (signature or key) is not accepted due to not being part of the quorum
 bool loki_checkpointing_service_node_checkpoint_from_votes::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);
@@ -390,7 +390,7 @@ bool loki_checkpointing_service_node_checkpoint_from_votes::generate(std::vector
 //       - Checks you can add a block after the 1st checkpoint out of 2 checkpoints.
 bool loki_checkpointing_service_node_checkpoints_check_reorg_windows::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);
@@ -437,7 +437,7 @@ bool loki_checkpointing_service_node_checkpoints_check_reorg_windows::generate(s
 
 bool loki_core_block_reward_unpenalized_pre_pulse::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table(cryptonote::network_version_16_pulse - 1);
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table(cryptonote::network_version_16_pulse - 1);
   loki_chain_generator gen(events, hard_forks);
   gen.add_blocks_until_version(hard_forks.back().first);
 
@@ -477,7 +477,7 @@ bool loki_core_block_reward_unpenalized_pre_pulse::generate(std::vector<test_eve
 
 bool loki_core_block_reward_unpenalized_post_pulse::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table(cryptonote::network_version_count -1, 150 /*Proof Of Stake Delay*/);
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table(cryptonote::network_version_count -1, 150 /*Proof Of Stake Delay*/);
   loki_chain_generator gen(events, hard_forks);
 
   uint8_t const newest_hf = hard_forks.back().first;
@@ -526,7 +526,7 @@ bool loki_core_block_reward_unpenalized_post_pulse::generate(std::vector<test_ev
 
 bool loki_core_fee_burning::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   gen.add_blocks_until_version(hard_forks.back().first);
 
@@ -608,7 +608,7 @@ bool loki_core_fee_burning::generate(std::vector<test_event_entry>& events)
 
 bool loki_core_governance_batched_reward::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table(cryptonote::network_version_10_bulletproofs);
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table(cryptonote::network_version_10_bulletproofs);
 
   uint64_t hf10_height = 0;
   for (std::pair<uint8_t, uint64_t> hf_pair : hard_forks)
@@ -684,7 +684,7 @@ bool loki_core_governance_batched_reward::generate(std::vector<test_event_entry>
 bool loki_core_block_rewards_lrc6::generate(std::vector<test_event_entry>& events)
 {
   constexpr auto& network = cryptonote::get_config(cryptonote::FAKECHAIN);
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table(cryptonote::network_version_15_lns);
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table(cryptonote::network_version_15_lns);
   hard_forks.emplace_back(cryptonote::network_version_16_pulse, hard_forks.back().second + network.GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS + 10);
   hard_forks.emplace_back(cryptonote::network_version_17, hard_forks.back().second + network.GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS);
   loki_chain_generator batched_governance_generator(events, hard_forks);
@@ -767,7 +767,7 @@ bool loki_core_block_rewards_lrc6::generate(std::vector<test_event_entry>& event
 
 bool loki_core_test_deregister_preferred::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   const auto miner                 = gen.first_miner();
   const auto alice                 = gen.add_account();
@@ -830,7 +830,7 @@ bool loki_core_test_deregister_preferred::generate(std::vector<test_event_entry>
 // to test), they don't get deregistered.
 bool loki_core_test_deregister_safety_buffer::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   const auto miner = gen.first_miner();
 
@@ -879,7 +879,7 @@ bool loki_core_test_deregister_safety_buffer::generate(std::vector<test_event_en
 // Daemon A accepts the block without X. Now X is too old and should not be added in future blocks.
 bool loki_core_test_deregister_too_old::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   gen.add_blocks_until_version(hard_forks.back().first);
 
@@ -905,7 +905,7 @@ bool loki_core_test_deregister_too_old::generate(std::vector<test_event_entry>& 
 
 bool loki_core_test_deregister_zero_fee::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);
@@ -930,7 +930,7 @@ bool loki_core_test_deregister_zero_fee::generate(std::vector<test_event_entry> 
 // those sitting on Chain 1 should not have problems switching over.
 bool loki_core_test_deregister_on_split::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);
@@ -990,7 +990,7 @@ bool loki_core_test_deregister_on_split::generate(std::vector<test_event_entry> 
 
 bool loki_core_test_state_change_ip_penalty_disallow_dupes::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);
@@ -1052,7 +1052,7 @@ static bool verify_lns_mapping_record(char const *perr_context,
 
 bool loki_name_system_disallow_reserved_type::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
@@ -1104,7 +1104,7 @@ uint64_t lokinet_expiry(lns::mapping_type type) {
 
 bool loki_name_system_expiration::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   cryptonote::account_base miner = gen.first_miner_;
 
@@ -1176,7 +1176,7 @@ bool loki_name_system_expiration::generate(std::vector<test_event_entry> &events
 
 bool loki_name_system_get_mappings_by_owner::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
@@ -1293,7 +1293,7 @@ bool loki_name_system_get_mappings_by_owner::generate(std::vector<test_event_ent
 
 bool loki_name_system_get_mappings_by_owners::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
@@ -1363,7 +1363,7 @@ bool loki_name_system_get_mappings_by_owners::generate(std::vector<test_event_en
 
 bool loki_name_system_get_mappings::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
@@ -1405,7 +1405,7 @@ bool loki_name_system_get_mappings::generate(std::vector<test_event_entry> &even
 
 bool loki_name_system_handles_duplicate_in_lns_db::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
@@ -1482,7 +1482,7 @@ bool loki_name_system_handles_duplicate_in_lns_db::generate(std::vector<test_eve
 
 bool loki_name_system_handles_duplicate_in_tx_pool::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
@@ -1516,7 +1516,7 @@ bool loki_name_system_handles_duplicate_in_tx_pool::generate(std::vector<test_ev
 
 bool loki_name_system_invalid_tx_extra_params::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
@@ -1647,7 +1647,7 @@ bool loki_name_system_invalid_tx_extra_params::generate(std::vector<test_event_e
 
 bool loki_name_system_large_reorg::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base const miner = gen.first_miner_;
@@ -1857,7 +1857,7 @@ bool loki_name_system_large_reorg::generate(std::vector<test_event_entry> &event
 
 bool loki_name_system_name_renewal::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   cryptonote::account_base miner = gen.first_miner_;
 
@@ -1940,7 +1940,7 @@ bool loki_name_system_name_renewal::generate(std::vector<test_event_entry> &even
 
 bool loki_name_system_name_value_max_lengths::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
@@ -2010,7 +2010,7 @@ bool loki_name_system_name_value_max_lengths::generate(std::vector<test_event_en
 
 bool loki_name_system_update_mapping_after_expiry_fails::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   cryptonote::account_base miner = gen.first_miner_;
 
@@ -2064,7 +2064,7 @@ uint8_t loki_name_system_update_mapping::hf() { return cryptonote::network_versi
 uint8_t loki_name_system_update_mapping_argon2::hf() { return cryptonote::network_version_15_lns; }
 bool loki_name_system_update_mapping::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table(hf());
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table(hf());
   loki_chain_generator gen(events, hard_forks);
   gen.add_blocks_until_version(hard_forks.back().first);
   gen.add_mined_money_unlock_blocks();
@@ -2143,7 +2143,7 @@ lns::generic_signature lns_monero_signature(const crypto::hash& h, const crypto:
 
 bool loki_name_system_update_mapping_multiple_owners::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   gen.add_blocks_until_version(hard_forks.back().first);
   gen.add_n_blocks(10); /// generate some outputs and unlock them
@@ -2407,7 +2407,7 @@ bool loki_name_system_update_mapping_multiple_owners::generate(std::vector<test_
 
 bool loki_name_system_update_mapping_non_existent_name_fails::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   gen.add_blocks_until_version(hard_forks.back().first);
   gen.add_mined_money_unlock_blocks();
@@ -2422,7 +2422,7 @@ bool loki_name_system_update_mapping_non_existent_name_fails::generate(std::vect
 
 bool loki_name_system_update_mapping_invalid_signature::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   gen.add_blocks_until_version(hard_forks.back().first);
   gen.add_mined_money_unlock_blocks();
@@ -2444,7 +2444,7 @@ bool loki_name_system_update_mapping_invalid_signature::generate(std::vector<tes
 
 bool loki_name_system_update_mapping_replay::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   gen.add_blocks_until_version(hard_forks.back().first);
   gen.add_mined_money_unlock_blocks();
@@ -2496,7 +2496,7 @@ bool loki_name_system_update_mapping_replay::generate(std::vector<test_event_ent
 
 bool loki_name_system_wrong_burn::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   cryptonote::account_base miner = gen.first_miner_;
   gen.add_blocks_until_version(hard_forks.back().first);
@@ -2552,7 +2552,7 @@ bool loki_name_system_wrong_burn::generate(std::vector<test_event_entry> &events
 
 bool loki_name_system_wrong_version::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
@@ -2590,7 +2590,7 @@ bool loki_name_system_wrong_version::generate(std::vector<test_event_entry> &eve
 // NOTE: Generate forked block, check that alternative quorums are generated and accessible
 bool loki_service_nodes_alt_quorums::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);
@@ -2638,7 +2638,7 @@ bool loki_service_nodes_alt_quorums::generate(std::vector<test_event_entry>& eve
 
 bool loki_service_nodes_checkpoint_quorum_size::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);
@@ -2678,7 +2678,7 @@ bool loki_service_nodes_checkpoint_quorum_size::generate(std::vector<test_event_
 
 bool loki_service_nodes_gen_nodes::generate(std::vector<test_event_entry> &events)
 {
-  const std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  const std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   const auto miner                      = gen.first_miner();
   const auto alice                      = gen.add_account();
@@ -2729,7 +2729,7 @@ static bool contains(const std::vector<sn_info_t>& infos, const crypto::public_k
 
 bool loki_service_nodes_test_rollback::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table(cryptonote::network_version_9_service_nodes);
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table(cryptonote::network_version_9_service_nodes);
   loki_chain_generator gen(events, hard_forks);
   gen.add_blocks_until_version(hard_forks.back().first);
   gen.add_n_blocks(20); /// generate some outputs and unlock them
@@ -2935,7 +2935,7 @@ bool loki_service_nodes_test_swarms_basic::generate(std::vector<test_event_entry
 
 bool loki_service_nodes_insufficient_contribution::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);
@@ -2967,7 +2967,7 @@ bool loki_service_nodes_insufficient_contribution::generate(std::vector<test_eve
 
 static loki_chain_generator setup_pulse_tests(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator result(events, hard_forks);
 
   result.add_blocks_until_version(hard_forks.back().first);
@@ -3139,7 +3139,7 @@ bool loki_pulse_reject_miner_block::generate(std::vector<test_event_entry> &even
 
 bool loki_pulse_generate_blocks::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);
@@ -3163,7 +3163,7 @@ bool loki_pulse_generate_blocks::generate(std::vector<test_event_entry> &events)
 
 bool loki_pulse_fallback_to_pow_and_back::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);
@@ -3211,7 +3211,7 @@ bool loki_pulse_fallback_to_pow_and_back::generate(std::vector<test_event_entry>
 
 bool loki_pulse_chain_split::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);
@@ -3256,7 +3256,7 @@ bool loki_pulse_chain_split::generate(std::vector<test_event_entry> &events)
 // Pulse chain weight to switch over.
 bool loki_pulse_chain_split_with_no_checkpoints::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().first);
