@@ -71,16 +71,19 @@ void loki_register_callback(std::vector<test_event_entry> &events,
 }
 
 std::vector<std::pair<uint8_t, uint64_t>>
-loki_generate_sequential_hard_fork_table(uint8_t max_hf_version, uint64_t pos_delay)
+loki_generate_sequential_hard_fork_table(uint8_t max_hf_version, uint64_t pos_delay, uint8_t start_hf_version)
 {
-  assert(max_hf_version < cryptonote::network_version_count);
-  std::vector<std::pair<uint8_t, uint64_t>> result = {};
-  uint64_t version_height = 0;
+  if (!start_hf_version) start_hf_version = std::min<uint8_t>(cryptonote::network_version_14_blink, max_hf_version);
+  assert(start_hf_version <= max_hf_version && max_hf_version < cryptonote::network_version_count);
+  // We always need block 0 == v7 for the genesis block:
+  std::vector<std::pair<uint8_t, uint64_t>> result{{cryptonote::network_version_7, 0}};
+  uint64_t version_height = 1;
+  if (start_hf_version == cryptonote::network_version_7) start_hf_version++;
 
   // HF15 reduces and HF16 eliminates miner block rewards, so we need to ensure we have enough
   // pre-HF15 blocks to generate enough LOKI for tests:
-  bool delayed = false;
-  for (uint8_t version = cryptonote::network_version_7; version <= max_hf_version; version++)
+  bool delayed = start_hf_version >= cryptonote::network_version_16_pulse;
+  for (uint8_t version = start_hf_version; version <= max_hf_version; version++)
   {
     if (version >= cryptonote::network_version_15_lns && !delayed)
     {
@@ -327,9 +330,7 @@ void loki_chain_generator::add_transfer_unlock_blocks()
 
 void loki_chain_generator::add_tx(cryptonote::transaction const &tx, bool can_be_added_to_blockchain, std::string const &fail_msg, bool kept_by_block)
 {
-  loki_transaction tx_entry                       = {tx, kept_by_block};
-  loki_blockchain_addable<loki_transaction> entry = {std::move(tx_entry), can_be_added_to_blockchain, fail_msg};
-  events_.push_back(entry);
+  events_.emplace_back(loki_blockchain_addable<loki_transaction>{{tx, kept_by_block}, can_be_added_to_blockchain, fail_msg});
 }
 
 cryptonote::transaction

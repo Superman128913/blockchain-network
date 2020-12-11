@@ -826,18 +826,18 @@ bool loki_core_test_deregister_preferred::generate(std::vector<test_event_entry>
 }
 
 // Test if a person registers onto the network and they get included in the nodes to test (i.e. heights 0, 5, 10). If
-// they get dereigstered in the nodes to test, height 5, and rejoin the network before height 10 (and are in the nodes
+// they get deregistered in the nodes to test, height 5, and rejoin the network before height 10 (and are in the nodes
 // to test), they don't get deregistered.
 bool loki_core_test_deregister_safety_buffer::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table(cryptonote::network_version_9_service_nodes);
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   const auto miner = gen.first_miner();
 
   gen.add_blocks_until_version(hard_forks.back().first);
-  gen.add_n_blocks(40); /// give miner some outputs to spend and unlock them
   gen.add_mined_money_unlock_blocks();
   add_service_nodes(gen, service_nodes::STATE_CHANGE_QUORUM_SIZE * 2 + 1);
+  gen.add_n_blocks(1);
 
   const auto height_a                      = gen.height();
   std::vector<crypto::public_key> quorum_a = gen.quorum(height_a).obligations->workers;
@@ -879,7 +879,7 @@ bool loki_core_test_deregister_safety_buffer::generate(std::vector<test_event_en
 // Daemon A accepts the block without X. Now X is too old and should not be added in future blocks.
 bool loki_core_test_deregister_too_old::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table(cryptonote::network_version_9_service_nodes);
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   gen.add_blocks_until_version(hard_forks.back().first);
 
@@ -887,6 +887,7 @@ bool loki_core_test_deregister_too_old::generate(std::vector<test_event_entry>& 
   gen.add_n_blocks(20);
   gen.add_mined_money_unlock_blocks();
   add_service_nodes(gen, 11);
+  gen.add_n_blocks(1);
 
   const auto pk       = gen.top_quorum().obligations->workers[0];
   const auto dereg_tx = gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, pk);
@@ -2677,19 +2678,17 @@ bool loki_service_nodes_checkpoint_quorum_size::generate(std::vector<test_event_
 
 bool loki_service_nodes_gen_nodes::generate(std::vector<test_event_entry> &events)
 {
-  const std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table(cryptonote::network_version_9_service_nodes);
+  const std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_sequential_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   const auto miner                      = gen.first_miner();
   const auto alice                      = gen.add_account();
   size_t alice_account_base_event_index = gen.event_index();
 
   gen.add_blocks_until_version(hard_forks.back().first);
-  gen.add_n_blocks(10);
-  gen.add_mined_money_unlock_blocks();
 
   const auto tx0 = gen.create_and_add_tx(miner, alice.get_keys().m_account_address, MK_COINS(101));
   gen.create_and_add_next_block({tx0});
-  gen.add_mined_money_unlock_blocks();
+  gen.add_transfer_unlock_blocks();
 
   const auto reg_tx = gen.create_and_add_registration_tx(alice);
   gen.create_and_add_next_block({reg_tx});
@@ -2698,52 +2697,25 @@ bool loki_service_nodes_gen_nodes::generate(std::vector<test_event_entry> &event
   {
     DEFINE_TESTS_ERROR_CONTEXT("gen_service_nodes::check_registered");
     std::vector<cryptonote::block> blocks;
-    size_t count = 15 + (2 * CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW);
-    bool r       = c.get_blocks((uint64_t)0, count, blocks);
+    bool r = c.get_blocks((uint64_t)0, (uint64_t)-1, blocks);
     CHECK_TEST_CONDITION(r);
     std::vector<cryptonote::block> chain;
     map_hash2tx_t mtx;
     r = find_block_chain(events, chain, mtx, cryptonote::get_block_hash(blocks.back()));
     CHECK_TEST_CONDITION(r);
 
-    // Expect the change to have unlock time of 0, and we get that back immediately ~0.8 loki
-    // 101 (balance) - 100 (stake) - 0.2 (test fee) = 0.8 loki
-    const uint64_t unlocked_balance    = get_unlocked_balance(alice, blocks, mtx);
-    const uint64_t staking_requirement = MK_COINS(100);
+    // This "get_unlocked_balance" check only checks time locks but not locked stakes.  So we expect
+    // to have lost 0.2 from the fee and the stake be treated as "unlocked", though it isn't.
+    const uint64_t unlocked_balance = get_unlocked_balance(alice, blocks, mtx);
 
-    CHECK_EQ(MK_COINS(101) - TESTS_DEFAULT_FEE - staking_requirement, unlocked_balance);
+    CHECK_EQ(MK_COINS(101) - TESTS_DEFAULT_FEE, unlocked_balance);
 
     /// check that alice is registered
     const auto info_v = c.get_service_node_list_state({});
-    CHECK_EQ(info_v.empty(), false);
+    CHECK_EQ(info_v.size(), 1);
     return true;
   });
 
-  for (auto i = 0u; i < service_nodes::staking_num_lock_blocks(cryptonote::FAKECHAIN); ++i)
-    gen.create_and_add_next_block();
-
-  loki_register_callback(events, "check_expired", [&events, alice](cryptonote::core &c, size_t ev_index)
-  {
-    DEFINE_TESTS_ERROR_CONTEXT("check_expired");
-    const auto stake_lock_time = service_nodes::staking_num_lock_blocks(cryptonote::FAKECHAIN);
-
-    std::vector<cryptonote::block> blocks;
-    size_t count = 15 + (2 * CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW) + stake_lock_time;
-    bool r = c.get_blocks((uint64_t)0, count, blocks);
-    CHECK_TEST_CONDITION(r);
-    std::vector<cryptonote::block> chain;
-    map_hash2tx_t mtx;
-    r = find_block_chain(events, chain, mtx, cryptonote::get_block_hash(blocks.back()));
-    CHECK_TEST_CONDITION(r);
-
-    /// check that alice's registration expired
-    const auto info_v = c.get_service_node_list_state({});
-    CHECK_EQ(info_v.empty(), true);
-
-    /// check that alice received some service node rewards (TODO: check the balance precisely)
-    CHECK_TEST_CONDITION(get_balance(alice, blocks, mtx) > MK_COINS(101) - TESTS_DEFAULT_FEE);
-    return true;
-  });
   return true;
 }
 
