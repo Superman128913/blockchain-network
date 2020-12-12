@@ -2474,17 +2474,16 @@ PendingTransaction* WalletImpl::stakePending(const std::string& sn_key_str, cons
 
 StakeUnlockResult* WalletImpl::canRequestStakeUnlock(const std::string &sn_key)
 {
-    tools::wallet2::request_stake_unlock_result res = {};
-
     crypto::public_key snode_key;
     if (!tools::hex_to_type(sn_key, snode_key))
     {
+      tools::wallet2::request_stake_unlock_result res{};
       res.success = false;
       res.msg = "Failed to Parse Service Node Key";
-      return new StakeUnlockResultImpl(res);
+      return new StakeUnlockResultImpl(*this, res);
     }
 
-    return new StakeUnlockResultImpl(m_wallet->can_request_stake_unlock(snode_key));
+    return new StakeUnlockResultImpl(*this, m_wallet->can_request_stake_unlock(snode_key));
 }
 
 StakeUnlockResult* WalletImpl::requestStakeUnlock(const std::string &sn_key)
@@ -2496,7 +2495,7 @@ StakeUnlockResult* WalletImpl::requestStakeUnlock(const std::string &sn_key)
     {
       res.success = false;
       res.msg = "Failed to Parse Service Node Key";
-      return new StakeUnlockResultImpl(res);
+      return new StakeUnlockResultImpl(*this, res);
     }
     tools::wallet2::request_stake_unlock_result unlock_result = m_wallet->can_request_stake_unlock(snode_key);
     if (unlock_result.success)
@@ -2509,17 +2508,17 @@ StakeUnlockResult* WalletImpl::requestStakeUnlock(const std::string &sn_key)
       {
         res.success = false;
         res.msg = "Failed to commit tx.";
-        return new StakeUnlockResultImpl(res);
+        return new StakeUnlockResultImpl(*this, res);
       }
     }
     else
     {
       res.success = false;
       res.msg = tr("Cannot request stake unlock: " + unlock_result.msg);
-      return new StakeUnlockResultImpl(res);
+      return new StakeUnlockResultImpl(*this, res);
     }
 
-    return new StakeUnlockResultImpl(unlock_result);
+    return new StakeUnlockResultImpl(*this, unlock_result);
 }
 
 uint64_t WalletImpl::coldKeyImageSync(uint64_t &spent, uint64_t &unspent)

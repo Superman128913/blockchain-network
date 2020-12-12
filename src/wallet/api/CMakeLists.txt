@@ -35,6 +35,7 @@ add_library(wallet_api
   pending_transaction.cpp
   utils.cpp
   address_book.cpp
+  stake_unlock_result.cpp
   subaddress.cpp
   subaddress_account.cpp
   unsigned_transaction.cpp)
