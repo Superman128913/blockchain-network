@@ -27,9 +27,6 @@ uint64_t get_staking_requirement(cryptonote::network_type m_nettype, uint64_t he
 
   if (hf_version >= cryptonote::network_version_13_enforce_checkpoints)
   {
-    // TODO: after HF16 we can remove excess elements here: we need to keep the first one higher
-    // than the HF16 fork height, but can delete everything above that (which probably will mean
-    // removing 688244 and above).
     constexpr int64_t heights[] = {
         385824,
         429024,
@@ -38,12 +35,6 @@ uint64_t get_staking_requirement(cryptonote::network_type m_nettype, uint64_t he
         558624,
         601824,
         645024,
-        688224,
-        731424,
-        774624,
-        817824,
-        861024,
-        1000000,
     };
 
     constexpr int64_t lsr[] = {
@@ -54,12 +45,6 @@ uint64_t get_staking_requirement(cryptonote::network_type m_nettype, uint64_t he
         17166'159862153,
         16719'282221956,
         16364'595203882,
-        16083'079931076,
-        15859'641110978,
-        15682'297601941,
-        15541'539965538,
-        15429'820555489,
-        15000'000000000,
     };
 
     assert(static_cast<int64_t>(height) >= heights[0]);
