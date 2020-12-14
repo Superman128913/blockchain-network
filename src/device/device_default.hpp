@@ -144,7 +144,7 @@ namespace hw {
             bool clsag_hash(const rct::keyV &data, rct::key &hash) override;
             bool clsag_sign(const rct::key &c, const rct::key &a, const rct::key &p, const rct::key &z, const rct::key &mu_P, const rct::key &mu_C, rct::key &s) override;
 
-            bool add_tx_secret_key_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::secret_key& key) override;
+            bool update_staking_tx_secret_key(crypto::secret_key& key) override;
 
             bool  close_tx(void) override;
         };

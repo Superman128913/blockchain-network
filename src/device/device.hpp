@@ -243,9 +243,11 @@ namespace hw {
         virtual bool clsag_hash(const rct::keyV &data, rct::key &hash) = 0;
         virtual bool clsag_sign(const rct::key &c, const rct::key &a, const rct::key &p, const rct::key &z, const rct::key &mu_P, const rct::key &mu_C, rct::key &s) = 0;
 
-        // Retrieves the tx secret key from the device.  `key` will be whatever we got back from the
-        // device, but for hardware devices that value may be encrypted or null.
-        virtual bool add_tx_secret_key_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::secret_key& key) = 0;
+        // Retrieves the tx secret key from the device; this should only be called for staking
+        // transactions.  `key` will be whatever we got back from the device, but for hardware
+        // devices that value may be encrypted or null; this call should update it to the actual
+        // secret key value, if necessary.
+        virtual bool update_staking_tx_secret_key(crypto::secret_key& key) = 0;
 
         virtual bool  close_tx(void) = 0;
 

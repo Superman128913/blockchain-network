@@ -638,8 +638,11 @@ namespace cryptonote
     crypto::public_key txkey_pub;
 
     if (tx.type == txtype::stake) {
-      bool added = hwdev.add_tx_secret_key_to_tx_extra(tx.extra, tx_key);
+      crypto::secret_key tx_sk{tx_key};
+      bool added = hwdev.update_staking_tx_secret_key(tx_sk);
       CHECK_AND_NO_ASSERT_MES(added, false, "Failed to add tx secret key to stake transaction");
+
+      cryptonote::add_tx_secret_key_to_tx_extra(tx.extra, tx_sk);
     }
 
     // if we have a stealth payment id, find it and encrypt it with the tx key now

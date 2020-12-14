@@ -432,8 +432,7 @@ namespace hw {
             return true;
         }
 
-        bool device_default::add_tx_secret_key_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::secret_key& key) {
-            cryptonote::add_tx_secret_key_to_tx_extra(tx_extra, key);
+        bool device_default::update_staking_tx_secret_key([[maybe_unused]] crypto::secret_key& key) {
             return true;
         }
 

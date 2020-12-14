@@ -1927,15 +1927,13 @@ namespace hw {
         return true;
     }
 
-    bool device_ledger::add_tx_secret_key_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::secret_key&) {
+    bool device_ledger::update_staking_tx_secret_key(crypto::secret_key& key) {
         auto locks = tools::unique_locks(device_locker, command_locker);
 
         // This will fail if this isn't an open stake tx.
         send_simple(INS_GET_TX_SECRET_KEY);
-        crypto::secret_key key; // Don't need to use the one passed in, the ledger has it stored already in internal state
+        // The ledger provides us with the (unencrypted) tx secret key if we're allowed to have it
         receive_bytes(key.data, 32);
-
-        cryptonote::add_tx_secret_key_to_tx_extra(tx_extra, key);
 
         return true;
     }
