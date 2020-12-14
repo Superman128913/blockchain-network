@@ -293,19 +293,33 @@ bool gen_double_spend_in_different_chains::generate(std::vector<test_event_entry
   uint64_t amount = MK_COINS(10);
   cryptonote::account_base const &miner = gen.first_miner_;
   cryptonote::account_base bob          = gen.add_account();
+  // These two transactions are meant to conflict:
   cryptonote::transaction tx_1          = gen.create_tx(miner, bob.get_keys().m_account_address, amount, TESTS_DEFAULT_FEE);
   cryptonote::transaction tx_2          = gen.create_tx(miner, bob.get_keys().m_account_address, amount, TESTS_DEFAULT_FEE);
 
+  // Create a fork:
   auto fork = gen;
+
+  // Add one tx to chain 1:
+  fork.add_event_msg("Add original tx to main chain");
   gen.add_tx(tx_1, true /*can_be_added_to_blockchain*/, "", true /*kept_by_block*/);
-  fork.add_tx(tx_2, true /*can_be_added_to_blockchain*/, "", true /*kept_by_block*/);
   gen.create_and_add_next_block({tx_1});
+
+  auto tx1_hash = get_transaction_hash(tx_1);
+
+  // Add the other to chain 2, and then put another block so that it is longer and we reorg:
+  fork.add_event_msg("Add double spend tx to alt chain");
+  fork.add_tx(tx_2, true /*can_be_added_to_blockchain*/, "", true /*kept_by_block*/);
   fork.create_and_add_next_block({tx_2});
   fork.add_event_msg("Add new block to fork to cause a reorg to the alt chain with a double spending transaction");
   fork.create_and_add_next_block();
+  // Add some more just to make sure the double-spend tx doesn't get mined
+  fork.create_and_add_next_block();
+  fork.create_and_add_next_block();
+
   crypto::hash block_hash = cryptonote::get_block_hash(fork.top().block);
 
-  loki_register_callback(events, "check_top_block", [block_hash](cryptonote::core &c, size_t ev_index)
+  loki_register_callback(events, "check_top_block", [block_hash, tx1_hash](cryptonote::core &c, size_t ev_index)
   {
     DEFINE_TESTS_ERROR_CONTEXT("check_txpool");
     uint64_t top_height;
@@ -313,9 +327,10 @@ bool gen_double_spend_in_different_chains::generate(std::vector<test_event_entry
     c.get_blockchain_top(top_height, top_hash);
     CHECK_EQ(top_hash, block_hash);
 
-    // TODO(loki): This is questionable behaviour, currently we keep alt chains even after switching over
-    CHECK_EQ(c.get_pool().get_transactions_count(), 1);
-    CHECK_EQ(c.get_alternative_blocks_count(), 1);
+    std::vector<transaction> mempool;
+    c.get_pool().get_transactions(mempool);
+    CHECK_EQ(mempool.size(), 1);
+    CHECK_EQ(get_transaction_hash(mempool[0]), tx1_hash);
     return true;
   });
   return true;
