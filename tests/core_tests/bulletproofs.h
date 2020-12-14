@@ -134,11 +134,6 @@ struct gen_bp_tx_invalid_wrong_amount : public gen_bp_tx_validation_base
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_bp_tx_invalid_borromean_type : public gen_bp_tx_validation_base
-{
-  bool generate(std::vector<test_event_entry>& events) const;
-};
-
 struct gen_rct2_tx_clsag_malleability : public gen_bp_tx_validation_base
 {
   bool generate(std::vector<test_event_entry>& events) const;

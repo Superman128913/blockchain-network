@@ -417,16 +417,6 @@ bool gen_bp_tx_invalid_wrong_amount::generate(std::vector<test_event_entry>& eve
   });
 }
 
-bool gen_bp_tx_invalid_borromean_type::generate(std::vector<test_event_entry>& events) const
-{
-  DEFINE_TESTS_ERROR_CONTEXT("gen_bp_tx_invalid_borromean_type");
-  const uint64_t amounts_paid[] = {5, 5, (uint64_t)-1};
-  const rct::RCTConfig rct_config[] = { { rct::RangeProofType::Borromean, 0 } };
-  return generate_with(events, 1, amounts_paid, false, rct_config, HF_VERSION_CLSAG-1, NULL, [&](cryptonote::transaction &tx, size_t tx_idx){
-    return true;
-  });
-}
-
 bool gen_rct2_tx_clsag_malleability::generate(std::vector<test_event_entry>& events) const
 {
   DEFINE_TESTS_ERROR_CONTEXT("gen_rct_tx_clsag_malleability");

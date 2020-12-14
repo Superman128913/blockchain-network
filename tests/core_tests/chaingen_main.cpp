@@ -251,7 +251,6 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_bp_txs_valid_2_and_2);
     GENERATE_AND_PLAY(gen_bp_txs_valid_2_and_3_and_2_and_4);
     GENERATE_AND_PLAY(gen_bp_tx_invalid_wrong_amount);
-    GENERATE_AND_PLAY(gen_bp_tx_invalid_borromean_type);
 
     GENERATE_AND_PLAY(gen_rct2_tx_clsag_malleability);
 
