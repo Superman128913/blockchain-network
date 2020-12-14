@@ -33,6 +33,7 @@
 #define LOKI_MINUTES(val) val * 60
 
 #include <cstddef>
+#include <utility>
 
 #define LOKI_RPC_DOC_INTROSPECT
 namespace loki
@@ -51,6 +52,11 @@ public:
   void invoke() { lambda(); cancelled = true; } // Invoke early instead of at destruction
   void cancel() { cancelled = true; } // Cancel invocation at destruction
   ~deferred() { if (!cancelled) lambda(); }
+
+  deferred(deferred<lambda_t>&& d) : lambda{std::move(d.lambda)}, cancelled{d.cancelled} { d.cancel(); }
+  deferred& operator=(deferred<lambda_t>&& d) { lambda = std::move(d.lambda); cancelled = d.cancelled; d.cancel(); return *this; }
+  deferred(const deferred<lambda_t>&) = delete;
+  deferred& operator=(const deferred<lambda_t>&) = delete;
 };
 
 template <typename lambda_t>
