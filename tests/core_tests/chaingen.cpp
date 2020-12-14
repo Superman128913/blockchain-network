@@ -77,13 +77,11 @@ loki_generate_hard_fork_table(uint8_t hf_version, uint64_t pos_delay)
   // We always need block 0 == v7 for the genesis block:
   std::vector<std::pair<uint8_t, uint64_t>> result{{cryptonote::network_version_7, 0}};
   uint64_t version_height = 1;
-  bool delayed = false;
   // HF15 reduces and HF16+ eliminates miner block rewards, so we need to ensure we have enough
   // HF14 blocks to generate enough LOKI for tests:
   if (hf_version > cryptonote::network_version_14_blink) {
       result.emplace_back(cryptonote::network_version_14_blink, version_height);
       version_height += pos_delay;
-      delayed = true;
   }
 
   result.emplace_back(hf_version, version_height);

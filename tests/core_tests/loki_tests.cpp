@@ -2678,13 +2678,15 @@ bool loki_service_nodes_checkpoint_quorum_size::generate(std::vector<test_event_
 
 bool loki_service_nodes_gen_nodes::generate(std::vector<test_event_entry> &events)
 {
-  const std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
+  const std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table(cryptonote::network_version_9_service_nodes);
   loki_chain_generator gen(events, hard_forks);
   const auto miner                      = gen.first_miner();
   const auto alice                      = gen.add_account();
   size_t alice_account_base_event_index = gen.event_index();
 
   gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_n_blocks(10);
+  gen.add_mined_money_unlock_blocks();
 
   const auto tx0 = gen.create_and_add_tx(miner, alice.get_keys().m_account_address, MK_COINS(101));
   gen.create_and_add_next_block({tx0});
@@ -2704,11 +2706,12 @@ bool loki_service_nodes_gen_nodes::generate(std::vector<test_event_entry> &event
     r = find_block_chain(events, chain, mtx, cryptonote::get_block_hash(blocks.back()));
     CHECK_TEST_CONDITION(r);
 
-    // This "get_unlocked_balance" check only checks time locks but not locked stakes.  So we expect
-    // to have lost 0.2 from the fee and the stake be treated as "unlocked", though it isn't.
-    const uint64_t unlocked_balance = get_unlocked_balance(alice, blocks, mtx);
+    // Expect the change to have unlock time of 0, and we get that back immediately ~0.8 loki
+    // 101 (balance) - 100 (stake) - 0.2 (test fee) = 0.8 loki
+    const uint64_t unlocked_balance    = get_unlocked_balance(alice, blocks, mtx);
+    const uint64_t staking_requirement = MK_COINS(100);
 
-    CHECK_EQ(MK_COINS(101) - TESTS_DEFAULT_FEE, unlocked_balance);
+    CHECK_EQ(MK_COINS(101) - TESTS_DEFAULT_FEE - staking_requirement, unlocked_balance);
 
     /// check that alice is registered
     const auto info_v = c.get_service_node_list_state({});
@@ -2716,6 +2719,31 @@ bool loki_service_nodes_gen_nodes::generate(std::vector<test_event_entry> &event
     return true;
   });
 
+  for (auto i = 0u; i < service_nodes::staking_num_lock_blocks(cryptonote::FAKECHAIN); ++i)
+    gen.create_and_add_next_block();
+
+  loki_register_callback(events, "check_expired", [&events, alice](cryptonote::core &c, size_t ev_index)
+  {
+    DEFINE_TESTS_ERROR_CONTEXT("check_expired");
+    const auto stake_lock_time = service_nodes::staking_num_lock_blocks(cryptonote::FAKECHAIN);
+
+    std::vector<cryptonote::block> blocks;
+    size_t count = 15 + (2 * CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW) + stake_lock_time;
+    bool r = c.get_blocks((uint64_t)0, count, blocks);
+    CHECK_TEST_CONDITION(r);
+    std::vector<cryptonote::block> chain;
+    map_hash2tx_t mtx;
+    r = find_block_chain(events, chain, mtx, cryptonote::get_block_hash(blocks.back()));
+    CHECK_TEST_CONDITION(r);
+
+    /// check that alice's registration expired
+    const auto info_v = c.get_service_node_list_state({});
+    CHECK_EQ(info_v.empty(), true);
+
+    /// check that alice received some service node rewards (TODO: check the balance precisely)
+    CHECK_TEST_CONDITION(get_balance(alice, blocks, mtx) > MK_COINS(101) - TESTS_DEFAULT_FEE);
+    return true;
+  });
   return true;
 }
 
@@ -2729,11 +2757,9 @@ static bool contains(const std::vector<sn_info_t>& infos, const crypto::public_k
 
 bool loki_service_nodes_test_rollback::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table(cryptonote::network_version_9_service_nodes);
+  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = loki_generate_hard_fork_table();
   loki_chain_generator gen(events, hard_forks);
   gen.add_blocks_until_version(hard_forks.back().first);
-  gen.add_n_blocks(20); /// generate some outputs and unlock them
-  gen.add_mined_money_unlock_blocks();
   add_service_nodes(gen, 11);
 
   gen.add_n_blocks(5);   /// create a few blocks with active service nodes
@@ -2745,15 +2771,17 @@ bool loki_service_nodes_test_rollback::generate(std::vector<test_event_entry>& e
   size_t deregister_index = gen.event_index();
   gen.create_and_add_next_block({dereg_tx});
 
+  size_t reg_evnt_idx;
   /// create a new service node (B) in the next block
   {
     const auto tx = gen.create_and_add_registration_tx(gen.first_miner());
+    reg_evnt_idx = gen.event_index();
     gen.create_and_add_next_block({tx});
   }
 
   fork.add_n_blocks(3); /// create blocks on the alt chain and trigger chain switch
   fork.add_n_blocks(15); // create a few more blocks to test winner selection
-  loki_register_callback(events, "test_registrations", [&events, deregister_index](cryptonote::core &c, size_t ev_index)
+  loki_register_callback(events, "test_registrations", [&events, deregister_index, reg_evnt_idx](cryptonote::core &c, size_t ev_index)
   {
     DEFINE_TESTS_ERROR_CONTEXT("test_registrations");
     const auto sn_list = c.get_service_node_list_state({});
@@ -2781,7 +2809,6 @@ bool loki_service_nodes_test_rollback::generate(std::vector<test_event_entry>& e
     /// Test that node B is not registered
     {
       /// obtain public key of node B
-      constexpr size_t reg_evnt_idx = 73;
       const auto event_b = events.at(reg_evnt_idx);
       CHECK_TEST_CONDITION(std::holds_alternative<loki_blockchain_addable<loki_transaction>>(event_b));
       const auto reg_tx = var::get<loki_blockchain_addable<loki_transaction>>(event_b);

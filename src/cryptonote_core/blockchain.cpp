@@ -35,6 +35,7 @@
 
 #include "common/rules.h"
 #include "common/hex.h"
+#include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 #include "cryptonote_core/cryptonote_tx_utils.h"
 #include "ringct/rctTypes.h"
@@ -3059,6 +3060,11 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
     }
   }
 
+  // Test suite hack: allow some tests to violate these restrictions (necessary when old HF rules
+  // are specifically required because older TX types can't be constructed anymore).
+  if (hack::test_suite_permissive_txes)
+    return true;
+
   // from v10, allow bulletproofs
   const uint8_t hf_version = m_hardfork->get_current_version();
   if (hf_version < network_version_10_bulletproofs) {
@@ -3109,6 +3115,18 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
       if (tx.rct_signatures.type == rct::RCTType::Bulletproof)
       {
         MERROR_VER("Ringct type " << (unsigned)rct::RCTType::Bulletproof << " is not allowed from v" << (HF_VERSION_SMALLER_BP + 1));
+        tvc.m_invalid_output = true;
+        return false;
+      }
+    }
+  }
+
+  // Disallow CLSAGs before the CLSAG hardfork
+  if (hf_version < HF_VERSION_CLSAG) {
+    if (tx.version >= txversion::v4_tx_types && tx.is_transfer()) {
+      if (tx.rct_signatures.type == rct::RCTType::CLSAG)
+      {
+        MERROR_VER("Ringct type " << (unsigned)rct::RCTType::CLSAG << " is not allowed before v" << HF_VERSION_CLSAG);
         tvc.m_invalid_output = true;
         return false;
       }
@@ -3511,7 +3529,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     {
       for (const rct::Bulletproof &proof: rv.p.bulletproofs)
       {
-        if (proof.V.size() > 1)
+        if (proof.V.size() > 1 && !hack::test_suite_permissive_txes)
         {
           MERROR_VER("Multi output bulletproofs are invalid before v10");
           return false;

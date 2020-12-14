@@ -177,7 +177,7 @@ namespace cryptonote
     static char const* type_to_string(txtype type);
 
     static constexpr txversion get_min_version_for_hf(uint8_t hf_version);
-    static constexpr txversion get_max_version_for_hf(uint8_t hf_version);
+    static           txversion get_max_version_for_hf(uint8_t hf_version);
     static constexpr txtype    get_max_type_for_hf   (uint8_t hf_version);
 
     // tx information
@@ -495,13 +495,19 @@ namespace cryptonote
     return txversion::v4_tx_types;
   }
 
-  constexpr txversion transaction_prefix::get_max_version_for_hf(uint8_t hf_version)
-  {
-    if (hf_version >= cryptonote::network_version_7 && hf_version <= cryptonote::network_version_8)
-      return txversion::v2_ringct;
+  // Used in the test suite to disable the older max version values below so that some test suite
+  // tests can still use particular hard forks without needing to actually generate pre-v4 txes.
+  namespace hack { inline bool test_suite_permissive_txes = false; }
 
-    if (hf_version >= cryptonote::network_version_9_service_nodes && hf_version <= cryptonote::network_version_10_bulletproofs)
-      return txversion::v3_per_output_unlock_times;
+  inline txversion transaction_prefix::get_max_version_for_hf(uint8_t hf_version)
+  {
+    if (!hack::test_suite_permissive_txes) {
+      if (hf_version >= cryptonote::network_version_7 && hf_version <= cryptonote::network_version_8)
+        return txversion::v2_ringct;
+
+      if (hf_version >= cryptonote::network_version_9_service_nodes && hf_version <= cryptonote::network_version_10_bulletproofs)
+        return txversion::v3_per_output_unlock_times;
+    }
 
     return txversion::v4_tx_types;
   }
