@@ -13111,20 +13111,20 @@ void wallet2::set_account_tag_description(const std::string& tag, const std::str
 
 std::string wallet2::sign(std::string_view data, cryptonote::subaddress_index index) const
 {
+  if (m_watch_only)
+    throw std::logic_error{"Unable to sign with a watch-only wallet"};
+
   crypto::hash hash;
   crypto::cn_fast_hash(data.data(), data.size(), hash);
   const cryptonote::account_keys &keys = m_account.get_keys();
   crypto::signature signature;
-  crypto::secret_key skey;
+  crypto::secret_key skey = keys.m_spend_secret_key;
+
   crypto::public_key pkey;
   if (index.is_zero())
-  {
-    skey = keys.m_spend_secret_key;
     pkey = keys.m_account_address.m_spend_public_key;
-  }
   else
   {
-    skey = keys.m_spend_secret_key;
     crypto::secret_key m = m_account.get_device().get_subaddress_secret_key(keys.m_view_secret_key, index);
     sc_add((unsigned char*)&skey, (unsigned char*)&m, (unsigned char*)&skey);
     secret_key_to_public_key(skey, pkey);
@@ -13135,7 +13135,7 @@ std::string wallet2::sign(std::string_view data, cryptonote::subaddress_index in
   return result;
 }
 
-bool wallet2::verify(std::string_view data, const cryptonote::account_public_address &address, std::string_view signature) const
+bool wallet2::verify(std::string_view data, const cryptonote::account_public_address &address, std::string_view signature)
 {
   if (!tools::starts_with(signature, SIG_MAGIC)) {
     LOG_PRINT_L0("Signature header check error");

@@ -1695,6 +1695,9 @@ namespace tools
   SIGN::response wallet_rpc_server::invoke(SIGN::request&& req)
   {
     require_open();
+    if (m_wallet->watch_only())
+      throw wallet_rpc_error{error_code::WATCH_ONLY, "Unable to sign a value using a watch-only wallet."};
+
     SIGN::response res{};
 
     res.signature = m_wallet->sign(req.data, {req.account_index, req.address_index});
