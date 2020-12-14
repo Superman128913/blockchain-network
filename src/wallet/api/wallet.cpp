@@ -681,7 +681,7 @@ bool WalletImpl::recoverFromDevice(std::string_view path_, const std::string &pa
     m_recoveringFromDevice = true;
     try
     {
-        m_wallet->restore(path, password, device_name);
+        m_wallet->restore_from_device(path, password, device_name);
         LOG_PRINT_L1("Generated new wallet from device: " + device_name);
     }
     catch (const std::exception& e) {
