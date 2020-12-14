@@ -639,64 +639,32 @@ std::optional<uint64_t> expiry_blocks(cryptonote::network_type nettype, mapping_
   return result;
 }
 
-static uint8_t *memcpy_helper(uint8_t *dest, void const *src, size_t size)
+static void append_owner(std::string& buffer, const lns::generic_owner* owner)
 {
-  std::memcpy(dest, src, size);
-  return dest + size;
-}
-
-static uint8_t *memcpy_generic_owner_helper(uint8_t *dest, lns::generic_owner const *owner)
-{
-  if (!owner) return dest;
-
-  uint8_t *result = memcpy_helper(dest, reinterpret_cast<uint8_t const *>(&owner->type), sizeof(owner->type));
-  void const *src = &owner->wallet.address;
-  size_t src_len  = sizeof(owner->wallet.address);
-  if (owner->type == lns::generic_owner_sig_type::ed25519)
-  {
-    src     = &owner->ed25519;
-    src_len = sizeof(owner->ed25519);
+  if (owner) {
+    buffer += static_cast<char>(owner->type);
+    buffer += owner->type == lns::generic_owner_sig_type::ed25519
+        ? tools::view_guts(owner->ed25519)
+        : tools::view_guts(owner->wallet.address);
   }
-
-  result = memcpy_helper(result, src, src_len);
-  return result;
 }
 
-crypto::hash tx_extra_signature_hash(std::string_view value, lns::generic_owner const *owner, lns::generic_owner const *backup_owner, crypto::hash const &prev_txid)
+std::string tx_extra_signature(std::string_view value, lns::generic_owner const *owner, lns::generic_owner const *backup_owner, crypto::hash const &prev_txid)
 {
   static_assert(sizeof(crypto::hash) == crypto_generichash_BYTES, "Using libsodium generichash for signature hash, require we fit into crypto::hash");
-  crypto::hash result = {};
   if (value.size() > mapping_value::BUFFER_SIZE)
   {
     MERROR("Unexpected value len=" << value.size() << " greater than the expected capacity=" << mapping_value::BUFFER_SIZE);
-    return result;
+    return ""s;
   }
 
-  uint8_t buffer[mapping_value::BUFFER_SIZE + sizeof(*owner) + sizeof(*backup_owner) + sizeof(prev_txid)] = {};
-  uint8_t *ptr = memcpy_helper(buffer, value.data(), value.size());
-  ptr          = memcpy_generic_owner_helper(ptr, owner);
-  ptr          = memcpy_generic_owner_helper(ptr, backup_owner);
-  ptr          = memcpy_helper(ptr, prev_txid.data, sizeof(prev_txid));
+  std::string result;
+  result.reserve(mapping_value::BUFFER_SIZE + sizeof(*owner) + sizeof(*backup_owner) + sizeof(prev_txid));
+  result += value;
+  append_owner(result, owner);
+  append_owner(result, backup_owner);
+  result += tools::view_guts(prev_txid);
 
-  if (ptr > (buffer + sizeof(buffer)))
-  {
-    assert(ptr < buffer + sizeof(buffer));
-    MERROR("Unexpected buffer overflow");
-    return {};
-  }
-
-  size_t buffer_len  = ptr - buffer;
-  static_assert(sizeof(owner->type) == sizeof(char), "Require byte alignment to avoid unaligned access exceptions");
-
-  crypto_generichash(reinterpret_cast<unsigned char *>(result.data), sizeof(result), buffer, buffer_len, NULL /*key*/, 0 /*key_len*/);
-  return result;
-}
-
-lns::generic_signature make_monero_signature(crypto::hash const &hash, crypto::public_key const &pkey, crypto::secret_key const &skey)
-{
-  lns::generic_signature result = {};
-  result.type                   = lns::generic_owner_sig_type::monero;
-  generate_signature(hash, pkey, skey, result.monero);
   return result;
 }
 
@@ -1091,21 +1059,21 @@ static bool validate_against_previous_mapping(lns::name_system_db &lns_db, uint6
       return false;
 
     // Validate signature
-    {
-      crypto::hash hash = tx_extra_signature_hash(lns_extra.encrypted_value,
-                                                  lns_extra.field_is_set(lns::extra_field::owner) ? &lns_extra.owner : nullptr,
-                                                  lns_extra.field_is_set(lns::extra_field::backup_owner) ? &lns_extra.backup_owner : nullptr,
-                                                  expected_prev_txid);
-      if (check_condition(!hash, reason, tx, ", ", lns_extra_string(lns_db.network_type(), lns_extra), " unexpectedly failed to generate signature hash, please inform the Loki developers"))
-        return false;
+    auto data = tx_extra_signature(
+        lns_extra.encrypted_value,
+        lns_extra.field_is_set(lns::extra_field::owner) ? &lns_extra.owner : nullptr,
+        lns_extra.field_is_set(lns::extra_field::backup_owner) ? &lns_extra.backup_owner : nullptr,
+        expected_prev_txid);
+    if (check_condition(data.empty(), reason, tx, ", ", lns_extra_string(lns_db.network_type(), lns_extra), " unexpectedly failed to generate signature, please inform the Loki developers"))
+      return false;
 
-      if (check_condition(!verify_lns_signature(hash, lns_extra.signature, mapping.owner) &&
-                          !verify_lns_signature(hash, lns_extra.signature, mapping.backup_owner), reason,
-                          tx, ", ", lns_extra_string(lns_db.network_type(), lns_extra), " failed to verify signature for LNS update, current owner=", mapping.owner.to_string(lns_db.network_type()), ", backup owner=", mapping.backup_owner.to_string(lns_db.network_type())))
-      {
-        return false;
-      }
-    }
+    crypto::hash hash;
+    crypto_generichash(reinterpret_cast<unsigned char*>(hash.data), sizeof(hash), reinterpret_cast<const unsigned char*>(data.data()), data.size(), nullptr /*key*/, 0 /*key_len*/);
+
+    if (check_condition(!verify_lns_signature(hash, lns_extra.signature, mapping.owner) &&
+                        !verify_lns_signature(hash, lns_extra.signature, mapping.backup_owner), reason,
+                        tx, ", ", lns_extra_string(lns_db.network_type(), lns_extra), " failed to verify signature for LNS update, current owner=", mapping.owner.to_string(lns_db.network_type()), ", backup owner=", mapping.backup_owner.to_string(lns_db.network_type())))
+      return false;
   }
   else if (lns_extra.is_buying())
   {

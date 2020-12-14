@@ -42,6 +42,7 @@
 #include <lokimq/base64.h>
 #include "common/password.h"
 #include "common/string_util.h"
+#include "cryptonote_basic/tx_extra.h"
 #include "cryptonote_core/loki_name_system.h"
 #include "common/rules.h"
 #include "cryptonote_config.h"
@@ -1684,15 +1685,15 @@ static uint64_t decodeRct(const rct::rctSig & rv, const crypto::key_derivation &
   {
     switch (rv.type)
     {
-    case rct::RCTTypeSimple:
-    case rct::RCTTypeBulletproof:
-    case rct::RCTTypeBulletproof2:
-    case rct::RCTTypeCLSAG:
+    case rct::RCTType::Simple:
+    case rct::RCTType::Bulletproof:
+    case rct::RCTType::Bulletproof2:
+    case rct::RCTType::CLSAG:
       return rct::decodeRctSimple(rv, rct::sk2rct(scalar1), i, mask, hwdev);
-    case rct::RCTTypeFull:
+    case rct::RCTType::Full:
       return rct::decodeRct(rv, rct::sk2rct(scalar1), i, mask, hwdev);
     default:
-      LOG_ERROR(__func__ << ": Unsupported rct type: " << rv.type);
+      LOG_ERROR(__func__ << ": Unsupported rct type: " << (int)rv.type);
       return 0;
     }
   }
@@ -1907,7 +1908,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
     {
       hw::device &hwdev = m_account.get_device();
       std::unique_lock hwdev_lock{hwdev};
-      hw::reset_mode rst(hwdev);
+      hw::mode_resetter rst{hwdev};
 
       hwdev.set_mode(hw::device::TRANSACTION_PARSE);
       if (!hwdev.generate_key_derivation(tx_pub_key, keys.m_view_secret_key, derivation))
@@ -2776,7 +2777,7 @@ void wallet2::process_parsed_blocks(uint64_t start_height, const std::vector<cry
   waiter.wait(&tpool);
 
   hw::device &hwdev =  m_account.get_device();
-  hw::reset_mode rst(hwdev);
+  hw::mode_resetter rst{hwdev};
   hwdev.set_mode(hw::device::TRANSACTION_PARSE);
   const cryptonote::account_keys &keys = m_account.get_keys();
 
@@ -4455,10 +4456,11 @@ bool wallet2::load_keys_buf(const std::string& keys_buf, const epee::wipeable_st
 
     account_public_address device_account_public_address;
     THROW_WALLET_EXCEPTION_IF(!hwdev.get_public_address(device_account_public_address), error::wallet_internal_error, "Cannot get a device address");
-    THROW_WALLET_EXCEPTION_IF(device_account_public_address != m_account.get_keys().m_account_address, error::wallet_internal_error, "Device wallet does not match wallet address. "
-                                                                                                                                     "Device address: " + cryptonote::get_account_address_as_str(m_nettype, false, device_account_public_address) +
-                                                                                                                                     ", wallet address: " + m_account.get_public_address_str(m_nettype));
-    LOG_PRINT_L0("Device inited...");
+    THROW_WALLET_EXCEPTION_IF(device_account_public_address != m_account.get_keys().m_account_address, error::wallet_internal_error,
+            "Device wallet does not match wallet address. "
+            "Device address: " + cryptonote::get_account_address_as_str(m_nettype, false, device_account_public_address) +
+            ", wallet address: " + m_account.get_public_address_str(m_nettype));
+    LOG_PRINT_L0("Device initialized...");
   } else if (key_on_device()) {
     THROW_WALLET_EXCEPTION(error::wallet_internal_error, "hardware device not supported");
   }
@@ -4935,13 +4937,8 @@ void wallet2::generate(const fs::path& wallet_, const epee::wipeable_string& pas
     store();
 }
 
-/*!
-* \brief Creates a wallet from a device
-* \param  wallet_        Name of wallet file
-* \param  password       Password of wallet file
-* \param  device_name    device string address
-*/
-void wallet2::restore(const fs::path& wallet_, const epee::wipeable_string& password, const std::string &device_name, bool create_address_file)
+void wallet2::restore_from_device(const fs::path& wallet_, const epee::wipeable_string& password, const std::string &device_name,
+    bool create_address_file, std::optional<std::string> hwdev_label, std::function<void(std::string msg)> progress_callback)
 {
   clear();
   prepare_file_names(wallet_);
@@ -4961,6 +4958,8 @@ void wallet2::restore(const fs::path& wallet_, const epee::wipeable_string& pass
   m_account.create_from_device(hwdev);
   init_type(m_account.get_device().get_type());
   setup_keys(password);
+  if (progress_callback)
+    progress_callback(tr("Retrieved wallet address from device: ") + m_account.get_public_address_str(m_nettype));
   m_device_name = device_name;
 
   create_keys_file(wallet_, false, password, m_nettype != MAINNET || create_address_file);
@@ -4970,6 +4969,14 @@ void wallet2::restore(const fs::path& wallet_, const epee::wipeable_string& pass
     m_subaddress_lookahead_major = 5;
     m_subaddress_lookahead_minor = 20;
   }
+  if (hwdev_label) {
+    fs::path hwdev_txt = m_wallet_file;
+    hwdev_txt += ".hwdev.txt";
+    if (!save_to_file(hwdev_txt, *hwdev_label, true))
+      MERROR("failed to write .hwdev.txt comment file");
+  }
+  if (progress_callback)
+    progress_callback(tr("Setting up account and subaddresses"));
   setup_new_blockchain();
   if (!wallet_.empty()) {
     store();
@@ -4989,6 +4996,7 @@ std::string wallet2::make_multisig(const epee::wipeable_string &password,
   std::vector<crypto::secret_key> multisig_keys;
   rct::key spend_pkey = rct::identity();
   rct::key spend_skey;
+  LOKI_DEFER { memwipe(&spend_skey, sizeof(spend_skey)); };
   std::vector<crypto::public_key> multisig_signers;
 
   // decrypt keys
@@ -6964,7 +6972,7 @@ void wallet2::commit_tx(pending_tx& ptx, bool blink)
 
   // tx generated, get rid of used k values
   for (size_t idx: ptx.selected_transfers)
-    m_transfers[idx].m_multisig_k.clear();
+    memwipe(m_transfers[idx].m_multisig_k.data(), m_transfers[idx].m_multisig_k.size() * sizeof(m_transfers[idx].m_multisig_k[0]));
 
   //fee includes dust if dust policy specified it.
   LOG_PRINT_L1("Transaction successfully " << (blink ? "blinked. " : "sent. ") << txid
@@ -7405,13 +7413,13 @@ std::string wallet2::save_multisig_tx(multisig_tx_set txs)
   // txes generated, get rid of used k values
   for (size_t n = 0; n < txs.m_ptx.size(); ++n)
     for (size_t idx: txs.m_ptx[n].construction_data.selected_transfers)
-      m_transfers[idx].m_multisig_k.clear();
+      memwipe(m_transfers[idx].m_multisig_k.data(), m_transfers[idx].m_multisig_k.size() * sizeof(m_transfers[idx].m_multisig_k[0]));
 
   // zero out some data we don't want to share
   for (auto &ptx: txs.m_ptx)
   {
     for (auto &e: ptx.construction_data.sources)
-      e.multisig_kLRki.k = rct::zero();
+      memwipe(&e.multisig_kLRki.k, sizeof(e.multisig_kLRki.k));
   }
 
   for (auto &ptx: txs.m_ptx)
@@ -7621,10 +7629,16 @@ bool wallet2::sign_multisig_tx(multisig_tx_set &exported_txs, std::vector<crypto
         ptx.tx.rct_signatures = sig.sigs;
 
         rct::keyV k;
+        rct::key skey = rct::zero();
+        LOKI_DEFER {
+          memwipe(k.data(), k.size() * sizeof(rct::key));
+          memwipe(&skey, sizeof(skey));
+        };
+
+        k.reserve(sd.selected_transfers.size());
         for (size_t idx: sd.selected_transfers)
           k.push_back(get_multisig_k(idx, sig.used_L));
 
-        rct::key skey = rct::zero();
         for (const auto &msk: get_account().get_multisig_keys())
         {
           crypto::public_key pmsk = get_multisig_signing_public_key(msk);
@@ -7672,7 +7686,7 @@ bool wallet2::sign_multisig_tx(multisig_tx_set &exported_txs, std::vector<crypto
   // txes generated, get rid of used k values
   for (size_t n = 0; n < exported_txs.m_ptx.size(); ++n)
     for (size_t idx: exported_txs.m_ptx[n].construction_data.selected_transfers)
-      m_transfers[idx].m_multisig_k.clear();
+      memwipe(m_transfers[idx].m_multisig_k.data(), m_transfers[idx].m_multisig_k.size() * sizeof(m_transfers[idx].m_multisig_k[0]));
 
   exported_txs.m_signers.insert(get_multisig_signer_public_key());
 
@@ -8602,9 +8616,21 @@ wallet2::request_stake_unlock_result wallet2::can_request_stake_unlock(const cry
         return result;
       }
 
-      if (!generate_signature_for_request_stake_unlock(unlock.key_image, unlock.signature, unlock.nonce))
-      {
-        result.msg = tr("Failed to generate signature to sign request. The key image: ") + contribution.key_image + (" doesn't belong to this wallet");
+      // We used to use a 32-byte time value concatenated to itself 8 times as a message hash, but
+      // that accomplishes nothing (there is no point in using a nonce in the message itself: a
+      // signature already has its own nonce), so now we just sign with a null hash and always send
+      // out a nonce value of 0.  The nonce value, unfortunately, can't be easily removed from the
+      // key image unlock tx_extra data without versioning/replacing it, so we still send this 0,
+      // but this will hopefully make it easier in the future to eliminate from the tx extra.
+      unlock.nonce = tx_extra_tx_key_image_unlock::FAKE_NONCE;
+      try {
+        if (!generate_signature_for_request_stake_unlock(unlock.key_image, unlock.signature))
+        {
+          result.msg = tr("Failed to generate signature to sign request. The key image: ") + contribution.key_image + tr(" doesn't belong to this wallet");
+          return result;
+        }
+      } catch (const std::exception& e) {
+        result.msg = tr("Failed to generate unlock signature: ") + std::string(e.what());
         return result;
       }
     }
@@ -8638,24 +8664,19 @@ static bool try_generate_lns_signature(wallet2 const &wallet, std::string const 
   std::optional<cryptonote::subaddress_index> index = wallet.get_subaddress_index(curr_owner_parsed.address);
   if (!index) return false;
 
-  // TODO(doyle): Taken from wallet2.cpp::get_reserve_proof
-  crypto::secret_key skey = wallet.get_account().get_keys().m_spend_secret_key;
-  if (!index->is_zero())
-  {
-    crypto::secret_key m = wallet.get_account().get_device().get_subaddress_secret_key(wallet.get_account().get_keys().m_view_secret_key, *index);
-    crypto::secret_key tmp = skey;
-    sc_add((unsigned char*)&skey, (unsigned char*)&m, (unsigned char*)&tmp);
-  }
+  auto sig_data = lns::tx_extra_signature(
+      result.encrypted_value.to_view(),
+      new_owner ? &result.owner : nullptr,
+      new_backup_owner ? &result.backup_owner : nullptr,
+      result.prev_txid);
+  if (sig_data.empty()) return false;
 
-  crypto::public_key pkey;
-  crypto::secret_key_to_public_key(skey, pkey);
+  auto& account = wallet.get_account();
+  auto& hwdev = account.get_device();
+  hw::mode_resetter rst{hwdev};
+  hwdev.generate_lns_signature(sig_data, account.get_keys(), *index, result.signature.monero);
+  result.signature.type = lns::generic_owner_sig_type::monero;
 
-  crypto::hash hash = lns::tx_extra_signature_hash(result.encrypted_value.to_view(),
-                                                   new_owner ? &result.owner : nullptr,
-                                                   new_backup_owner ? &result.backup_owner : nullptr,
-                                                   result.prev_txid);
-  if (!hash) return false;
-  result.signature = lns::make_monero_signature(hash, pkey, skey);
   return true;
 }
 
@@ -10026,7 +10047,20 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
   rct::multisig_out msout;
   LOG_PRINT_L2("constructing tx");
   auto sources_copy = sources;
-  bool r = cryptonote::construct_tx_and_get_tx_key(m_account.get_keys(), m_subaddresses, sources, splitted_dsts, change_dts, extra, tx, unlock_time, tx_key, additional_tx_keys, rct_config, m_multisig ? &msout : NULL, tx_params);
+  bool r = cryptonote::construct_tx_and_get_tx_key(
+      m_account.get_keys(),
+      m_subaddresses,
+      sources,
+      splitted_dsts,
+      change_dts,
+      extra,
+      tx,
+      unlock_time,
+      tx_key,
+      additional_tx_keys,
+      rct_config,
+      m_multisig ? &msout : nullptr,
+      tx_params);
 
   LOG_PRINT_L2("constructed tx, r="<<r);
   THROW_WALLET_EXCEPTION_IF(!r, error::tx_not_constructed, sources, dsts, unlock_time, m_nettype);
@@ -10132,7 +10166,7 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
   ptx.construction_data.tx_type = tx_params.tx_type;
   ptx.construction_data.hf_version = tx_params.hf_version;
   ptx.construction_data.rct_config = {
-    tx.rct_signatures.p.bulletproofs.empty() ? rct::RangeProofBorromean : rct::RangeProofPaddedBulletproof,
+    tx.rct_signatures.p.bulletproofs.empty() ? rct::RangeProofType::Borromean : rct::RangeProofType::PaddedBulletproof,
     use_fork_rules(HF_VERSION_CLSAG, 0) ? 3 : 2
   };
   ptx.construction_data.dests = dsts;
@@ -10765,7 +10799,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
   //ensure device is let in NONE mode in any case
   hw::device &hwdev = m_account.get_device();
   std::unique_lock hwdev_lock{hwdev};
-  hw::reset_mode rst(hwdev);  
+  hw::mode_resetter rst{hwdev};
 
   bool const is_lns_tx = (tx_params.tx_type == txtype::loki_name_system);
   auto original_dsts = dsts;
@@ -10826,7 +10860,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
   uint64_t needed_fee, available_for_fee = 0;
   uint64_t upper_transaction_weight_limit = get_upper_transaction_weight_limit();
   const bool clsag = use_fork_rules(HF_VERSION_CLSAG, 0);
-  const rct::RCTConfig rct_config{rct::RangeProofPaddedBulletproof, clsag ? 3 : 2};
+  const rct::RCTConfig rct_config{rct::RangeProofType::PaddedBulletproof, clsag ? 3 : 2};
 
   const auto base_fee = get_base_fees();
   const uint64_t fee_percent = get_fee_percent(priority, tx_params.tx_type);
@@ -11469,7 +11503,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_from(const crypton
   //ensure device is let in NONE mode in any case
   hw::device &hwdev = m_account.get_device();
   std::unique_lock hwdev_lock{hwdev};
-  hw::reset_mode rst(hwdev);  
+  hw::mode_resetter rst{hwdev};
 
   uint64_t accumulated_fee, accumulated_outputs, accumulated_change;
   struct TX {
@@ -11489,7 +11523,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_from(const crypton
   std::vector<std::vector<get_outs_entry>> outs;
 
   const bool clsag = use_fork_rules(HF_VERSION_CLSAG, 0);
-  const rct::RCTConfig rct_config { rct::RangeProofPaddedBulletproof, clsag ? 3 : 2 };
+  const rct::RCTConfig rct_config { rct::RangeProofType::PaddedBulletproof, clsag ? 3 : 2 };
   const auto base_fee = get_base_fees();
   const uint64_t fee_percent = get_fee_percent(priority, tx_type);
   const uint64_t fee_quantization_mask = get_fee_quantization_mask();
@@ -12142,8 +12176,9 @@ std::string wallet2::get_spend_proof(const crypto::hash &txid, std::string_view 
       std::to_string(res.outs.size()) + ", expected " +  std::to_string(ring_size));
 
     // copy pubkey pointers
-    std::vector<const crypto::public_key *> p_output_keys;
-    for (const auto& out : res.outs)
+    std::vector<const crypto::public_key*> p_output_keys;
+    p_output_keys.reserve(res.outs.size());
+    for (auto& out : res.outs)
       p_output_keys.push_back(&out.key);
 
     // figure out real output index and secret key
@@ -12159,9 +12194,7 @@ std::string wallet2::get_spend_proof(const crypto::hash &txid, std::string_view 
     THROW_WALLET_EXCEPTION_IF(sec_index >= ring_size, error::wallet_internal_error, "secret index not found");
 
     // generate ring sig for this input
-    signatures.push_back(std::vector<crypto::signature>());
-    std::vector<crypto::signature>& sigs = signatures.back();
-    sigs.resize(in_key->key_offsets.size());
+    auto& sigs = signatures.emplace_back(in_key->key_offsets.size());
     crypto::generate_ring_signature(sig_prefix_hash, in_key->k_image, p_output_keys, in_ephemeral.sec, sec_index, sigs.data());
   }
 
@@ -12305,7 +12338,7 @@ void wallet2::check_tx_key_helper(const cryptonote::transaction &tx, const crypt
     if (found)
     {
       uint64_t amount;
-      if (tx.version == txversion::v1 || tx.rct_signatures.type == rct::RCTTypeNull)
+      if (tx.version == txversion::v1 || tx.rct_signatures.type == rct::RCTType::Null)
       {
         amount = tx.vout[n].amount;
       }
@@ -12314,7 +12347,7 @@ void wallet2::check_tx_key_helper(const cryptonote::transaction &tx, const crypt
         crypto::secret_key scalar1;
         crypto::derivation_to_scalar(found_derivation, n, scalar1);
         rct::ecdhTuple ecdh_info = tx.rct_signatures.ecdhInfo[n];
-        rct::ecdhDecode(ecdh_info, rct::sk2rct(scalar1), tools::equals_any(tx.rct_signatures.type, rct::RCTTypeBulletproof2, rct::RCTTypeCLSAG));
+        rct::ecdhDecode(ecdh_info, rct::sk2rct(scalar1), tools::equals_any(tx.rct_signatures.type, rct::RCTType::Bulletproof2, rct::RCTType::CLSAG));
         const rct::key C = tx.rct_signatures.outPk[n].mask;
         rct::key Ctmp;
         THROW_WALLET_EXCEPTION_IF(sc_check(ecdh_info.mask.bytes) != 0, error::wallet_internal_error, "Bad ECDH input mask");
@@ -12706,8 +12739,7 @@ std::string wallet2::get_reserve_proof(const std::optional<std::pair<uint32_t, u
     THROW_WALLET_EXCEPTION_IF(ephemeral.pub != td.get_public_key(), error::wallet_internal_error, "Derived public key doesn't agree with the stored one");
 
     // generate signature for key image
-    const std::vector<const crypto::public_key*> pubs = { &ephemeral.pub };
-    crypto::generate_ring_signature(prefix_hash, td.m_key_image, &pubs[0], 1, ephemeral.sec, 0, &proof.key_image_sig);
+    crypto::generate_key_image_signature(td.m_key_image, ephemeral.pub, ephemeral.sec, proof.key_image_sig);
   }
 
   // collect all subaddress spend keys that received those outputs and generate their signatures
@@ -12850,8 +12882,7 @@ bool wallet2::check_reserve_proof(const cryptonote::account_public_address &addr
       return false;
 
     // check signature for key image
-    const std::vector<const crypto::public_key*> pubs = { &out_key->key };
-    ok = crypto::check_ring_signature(prefix_hash, proof.key_image, &pubs[0], 1, &proof.key_image_sig);
+    ok = crypto::check_key_image_signature(proof.key_image, out_key->key, proof.key_image_sig);
     if (!ok)
       return false;
 
@@ -12871,7 +12902,7 @@ bool wallet2::check_reserve_proof(const cryptonote::account_public_address &addr
       crypto::secret_key shared_secret;
       crypto::derivation_to_scalar(derivation, proof.index_in_tx, shared_secret);
       rct::ecdhTuple ecdh_info = tx.rct_signatures.ecdhInfo[proof.index_in_tx];
-      rct::ecdhDecode(ecdh_info, rct::sk2rct(shared_secret), tools::equals_any(tx.rct_signatures.type, rct::RCTTypeBulletproof2, rct::RCTTypeCLSAG));
+      rct::ecdhDecode(ecdh_info, rct::sk2rct(shared_secret), tools::equals_any(tx.rct_signatures.type, rct::RCTType::Bulletproof2, rct::RCTType::CLSAG));
       amount = rct::h2d(ecdh_info.amount);
     }
     total += amount;
@@ -13310,13 +13341,9 @@ std::pair<size_t, std::vector<std::pair<crypto::key_image, crypto::signature>>> 
         error::wallet_internal_error, "key_image generated ephemeral public key not matched with output_key");
 
     // sign the key image with the output secret key
-    crypto::signature signature;
-    std::vector<const crypto::public_key*> key_ptrs;
-    key_ptrs.push_back(&pkey);
-
-    crypto::generate_ring_signature((const crypto::hash&)td.m_key_image, td.m_key_image, key_ptrs, in_ephemeral.sec, 0, &signature);
-
-    ski.push_back(std::make_pair(td.m_key_image, signature));
+    auto& ki_s = ski.emplace_back();
+    ki_s.first = td.m_key_image;
+    crypto::generate_key_image_signature(ki_s.first, pkey, in_ephemeral.sec, ki_s.second);
   }
   return std::make_pair(offset, ski);
 }
@@ -13414,13 +13441,11 @@ uint64_t wallet2::import_key_images(const std::vector<std::pair<crypto::key_imag
     const cryptonote::tx_out &out = td.m_tx.vout[td.m_internal_output_index];
     THROW_WALLET_EXCEPTION_IF(!std::holds_alternative<txout_to_key>(out.target), error::wallet_internal_error,
       "Non txout_to_key output found");
-    const auto pkey = var::get<cryptonote::txout_to_key>(out.target).key;
+    const auto& pkey = var::get<cryptonote::txout_to_key>(out.target).key;
 
     std::string const key_image_str = tools::type_to_hex(key_image);
     if (!td.m_key_image_known || !(key_image == td.m_key_image))
     {
-      std::vector<const crypto::public_key*> pkeys;
-      pkeys.push_back(&pkey);
       THROW_WALLET_EXCEPTION_IF(!(rct::scalarmultKey(rct::ki2rct(key_image), rct::curveOrder()) == rct::identity()),
           error::wallet_internal_error, "Key image out of validity domain: input " + std::to_string(n + offset) + "/"
           + std::to_string(signed_key_images.size()) + ", key image " + key_image_str);
@@ -13434,10 +13459,10 @@ uint64_t wallet2::import_key_images(const std::vector<std::pair<crypto::key_imag
       // for that block, export_key_images will fail temporarily until the
       // block is commited and the wallets sorts its transfers into a finalized
       // canonical ordering.
-      THROW_WALLET_EXCEPTION_IF(!crypto::check_ring_signature((const crypto::hash&)key_image, key_image, pkeys, &signature),
+      THROW_WALLET_EXCEPTION_IF(!crypto::check_key_image_signature(key_image, pkey, signature),
           error::signature_check_failed, std::to_string(n + offset) + "/"
           + std::to_string(signed_key_images.size()) + ", key image " + key_image_str
-          + ", signature " + tools::type_to_hex(signature) + ", pubkey " + tools::type_to_hex(*pkeys[0]));
+          + ", signature " + tools::type_to_hex(signature) + ", pubkey " + tools::type_to_hex(pkey));
     }
     req.key_images.push_back(key_image_str);
   }
@@ -14050,7 +14075,7 @@ cryptonote::blobdata wallet2::export_multisig()
   {
     transfer_details &td = m_transfers[n];
     crypto::key_image ki;
-    td.m_multisig_k.clear();
+    memwipe(td.m_multisig_k.data(), td.m_multisig_k.size() * sizeof(td.m_multisig_k[0]));
     info[n].m_LR.clear();
     info[n].m_partial_key_images.clear();
 
@@ -14160,6 +14185,10 @@ size_t wallet2::import_multisig(std::vector<cryptonote::blobdata> blobs)
   CHECK_AND_ASSERT_THROW_MES(info.size() + 1 <= m_multisig_signers.size() && info.size() + 1 >= m_multisig_threshold, "Wrong number of multisig sources");
 
   std::vector<std::vector<rct::key>> k;
+  LOKI_DEFER {
+    for (auto& kv : k)
+      memwipe(kv.data(), kv.size() * sizeof(rct::key));
+  };
   k.reserve(m_transfers.size());
   for (const auto &td: m_transfers)
     k.push_back(td.m_multisig_k);
@@ -14563,44 +14592,50 @@ bool wallet2::contains_key_image(const crypto::key_image& key_image) const {
   return result;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::generate_signature_for_request_stake_unlock(crypto::key_image const &key_image, crypto::signature &signature, uint32_t &nonce) const
+bool wallet2::generate_signature_for_request_stake_unlock(const crypto::key_image& key_image, crypto::signature& signature) const
 {
-  const auto &key_image_it = m_key_images.find(key_image);
+  auto key_image_it = m_key_images.find(key_image);
   if (key_image_it == m_key_images.end())
     return false;
 
-  size_t transfer_details_index = key_image_it->second;
-  transfer_details const &td    = m_transfers[transfer_details_index];
-  cryptonote::keypair in_ephemeral;
+  const auto& td = m_transfers[key_image_it->second];
+
+  // get ephemeral public key
+  const auto& target = td.m_tx.vout[td.m_internal_output_index].target;
+  THROW_WALLET_EXCEPTION_IF(!std::holds_alternative<txout_to_key>(target), error::wallet_internal_error, "Output is not txout_to_key");
+  const auto& pkey = var::get<cryptonote::txout_to_key>(target).key;
+
+  crypto::public_key tx_pub_key;
+  if (!try_get_tx_pub_key_using_td(td, tx_pub_key))
   {
-    // get ephemeral public key
-    const cryptonote::tx_out &out = td.m_tx.vout[td.m_internal_output_index];
-    THROW_WALLET_EXCEPTION_IF(!std::holds_alternative<txout_to_key>(out.target), error::wallet_internal_error, "Output is not txout_to_key");
-    const cryptonote::txout_to_key &o = var::get<cryptonote::txout_to_key>(out.target);
-    const crypto::public_key pkey = o.key;
-
-    crypto::public_key tx_pub_key;
-    if (!try_get_tx_pub_key_using_td(td, tx_pub_key))
-    {
-      // TODO(doyle): TODO(loki): Fallback to old get tx pub key method for
-      // incase for now. But we need to go find out why we can't just use
-      // td.m_pk_index for everything? If we were able to decode the output
-      // using that, why not use it for everthing?
-      tx_pub_key = get_tx_pub_key_from_received_outs(td);
-    }
-    const std::vector<crypto::public_key> additional_tx_pub_keys = get_additional_tx_pub_keys_from_extra(td.m_tx);
-
-    // generate ephemeral secret key
-    crypto::key_image ki;
-    bool r = cryptonote::generate_key_image_helper(m_account.get_keys(), m_subaddresses, pkey, tx_pub_key, additional_tx_pub_keys, td.m_internal_output_index, in_ephemeral, ki, m_account.get_device());
-    THROW_WALLET_EXCEPTION_IF(!r, error::wallet_internal_error, "Failed to generate key image");
-    THROW_WALLET_EXCEPTION_IF(td.m_key_image_known && !td.m_key_image_partial && ki != td.m_key_image, error::wallet_internal_error, "key_image generated not matched with cached key image");
-    THROW_WALLET_EXCEPTION_IF(in_ephemeral.pub != pkey, error::wallet_internal_error, "key_image generated ephemeral public key not matched with output_key");
+    // TODO(doyle): TODO(loki): Fallback to old get tx pub key method for
+    // incase for now. But we need to go find out why we can't just use
+    // td.m_pk_index for everything? If we were able to decode the output
+    // using that, why not use it for everthing?
+    tx_pub_key = get_tx_pub_key_from_received_outs(td);
   }
 
-  nonce = static_cast<uint32_t>(time(nullptr));
-  crypto::hash hash = service_nodes::generate_request_stake_unlock_hash(nonce);
-  crypto::generate_signature(hash, in_ephemeral.pub, in_ephemeral.sec, signature);
+  // generate ephemeral secret key
+  auto& hwdev = m_account.get_device();
+  cryptonote::keypair in_ephemeral;
+  crypto::key_image ki;
+  bool r = cryptonote::generate_key_image_helper(
+      m_account.get_keys(),
+      m_subaddresses,
+      pkey,
+      tx_pub_key,
+      get_additional_tx_pub_keys_from_extra(td.m_tx),
+      td.m_internal_output_index,
+      in_ephemeral,
+      ki,
+      hwdev);
+  THROW_WALLET_EXCEPTION_IF(!r, error::wallet_internal_error, "Failed to generate key image");
+  THROW_WALLET_EXCEPTION_IF(td.m_key_image_known && !td.m_key_image_partial && ki != td.m_key_image, error::wallet_internal_error, "key_image generated not matched with cached key image");
+  THROW_WALLET_EXCEPTION_IF(in_ephemeral.pub != pkey, error::wallet_internal_error, "key_image generated ephemeral public key not matched with output_key");
+
+  THROW_WALLET_EXCEPTION_IF(
+      !hwdev.generate_unlock_signature(in_ephemeral.pub, in_ephemeral.sec, signature),
+      error::wallet_internal_error, "Hardware device failed to sign the unlock request");
   return true;
 }
 //----------------------------------------------------------------------------------------------------

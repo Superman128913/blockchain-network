@@ -273,7 +273,7 @@ namespace cryptonote
     tx.type    = txtype::standard;
     tx.version = transaction::get_max_version_for_hf(hard_fork_version);
 
-    keypair const txkey   = keypair::generate(hw::get_device("default"));
+    keypair const txkey{hw::get_device("default")};
     keypair const gov_key = get_deterministic_keypair_from_height(height); // NOTE: Always need since we use same key for service node
 
     // NOTE: TX Extra
@@ -621,9 +621,12 @@ namespace cryptonote
     }
 
     tx.version = transaction::get_max_version_for_hf(tx_params.hf_version);
-    tx.type    = tx_params.tx_type;
-    if (tx.version <= txversion::v2_ringct)
-      tx.unlock_time = unlock_time;
+    CHECK_AND_ASSERT_MES(tx.version >= txversion::v4_tx_types, false, "Cannot construct pre-v4 transactions");
+    CHECK_AND_ASSERT_MES(rct_config.range_proof_type == rct::RangeProofType::PaddedBulletproof &&
+            (rct_config.bp_version == 0 || rct_config.bp_version >= 3),
+            false, "Cannot construct pre-CLSAG transactions");
+
+    tx.type = tx_params.tx_type;
 
     if (tx_params.burn_percent)
     {
@@ -631,17 +634,16 @@ namespace cryptonote
       return false;
     }
 
-    if (tx_params.burn_fixed && tx_params.hf_version < cryptonote::network_version_14_blink)
-    {
-      LOG_ERROR("cannot construct tx: burn can not be specified before hard fork 14");
-      return false;
-    }
-
     tx.extra = extra;
     crypto::public_key txkey_pub;
 
-    if (tx.type == txtype::stake)
-      add_tx_secret_key_to_tx_extra(tx.extra, tx_key);
+    if (tx.type == txtype::stake) {
+      crypto::secret_key tx_sk{tx_key};
+      bool added = hwdev.update_staking_tx_secret_key(tx_sk);
+      CHECK_AND_NO_ASSERT_MES(added, false, "Failed to add tx secret key to stake transaction");
+
+      cryptonote::add_tx_secret_key_to_tx_extra(tx.extra, tx_sk);
+    }
 
     // if we have a stealth payment id, find it and encrypt it with the tx key now
     std::vector<tx_extra_field> tx_extra_fields;
@@ -829,7 +831,6 @@ namespace cryptonote
     bool found_change_already = false;
     for(const tx_destination_entry& dst_entr: destinations)
     {
-      CHECK_AND_ASSERT_MES(dst_entr.amount > 0 || tx.version >= txversion::v2_ringct, false, "Destination with wrong amount: " << dst_entr.amount);
       crypto::public_key out_eph_public_key;
 
       bool this_dst_is_change_addr = false;
@@ -838,7 +839,7 @@ namespace cryptonote
                                            need_additional_txkeys, additional_tx_keys,
                                            additional_tx_public_keys, amount_keys, out_eph_public_key);
 
-      if (tx.version >= txversion::v3_per_output_unlock_times)
+      // Per-output unlock times:
       {
         if (change_addr && *change_addr == dst_entr && this_dst_is_change_addr && !found_change_already)
         {
@@ -859,18 +860,15 @@ namespace cryptonote
 
         if (!(change_addr && *change_addr == dst_entr))
         {
-          tx_extra_tx_key_image_proofs::proof proof = {};
-          keypair                ephemeral_keys = {};
-          const subaddress_index zeroth_address = {};
+          auto& proof = key_image_proofs.proofs.emplace_back();
+          keypair ephemeral_keys{};
           if(!generate_key_image_helper(sender_account_keys, subaddresses, out_eph_public_key, txkey_pub, additional_tx_public_keys, output_index, ephemeral_keys, proof.key_image, hwdev))
           {
             LOG_ERROR("Key image generation failed for staking TX!");
             return false;
           }
 
-          crypto::public_key const *out_eph_public_key_ptr = &out_eph_public_key;
-          crypto::generate_ring_signature((const crypto::hash&)proof.key_image, proof.key_image, &out_eph_public_key_ptr, 1, ephemeral_keys.sec, 0, &proof.signature);
-          key_image_proofs.proofs.push_back(proof);
+          hwdev.generate_key_image_signature(proof.key_image, out_eph_public_key, ephemeral_keys.sec, proof.signature);
         }
       }
 
@@ -924,169 +922,82 @@ namespace cryptonote
       MDEBUG("Null secret key, skipping signatures");
     }
 
-    if (tx.version == txversion::v1)
+    uint64_t amount_in = 0, amount_out = 0;
+    rct::ctkeyV inSk;
+    inSk.reserve(sources.size());
+    // mixRing indexing is done the other way round for simple
+    rct::ctkeyM mixRing(sources.size());
+    rct::keyV dest_keys;
+    std::vector<uint64_t> inamounts, outamounts;
+    std::vector<unsigned int> index;
+    std::vector<rct::multisig_kLRki> kLRki;
+    for (size_t i = 0; i < sources.size(); ++i)
     {
-      //generate ring signatures
-      crypto::hash tx_prefix_hash;
-      get_transaction_prefix_hash(tx, tx_prefix_hash);
-
-      std::stringstream ss_ring_s;
-      size_t i = 0;
-      for(const tx_source_entry& src_entr:  sources)
+      rct::ctkey ctkey;
+      amount_in += sources[i].amount;
+      inamounts.push_back(sources[i].amount);
+      index.push_back(sources[i].real_output);
+      // inSk: (secret key, mask)
+      ctkey.dest = rct::sk2rct(in_contexts[i].in_ephemeral.sec);
+      ctkey.mask = sources[i].mask;
+      inSk.push_back(ctkey);
+      memwipe(&ctkey, sizeof(rct::ctkey));
+      // inPk: (public key, commitment)
+      // will be done when filling in mixRing
+      if (msout)
       {
-        ss_ring_s << "pub_keys:\n";
-        std::vector<const crypto::public_key*> keys_ptrs;
-        std::vector<crypto::public_key> keys(src_entr.outputs.size());
-        size_t ii = 0;
-        for(const tx_source_entry::output_entry& o: src_entr.outputs)
-        {
-          keys[ii] = rct2pk(o.second.dest);
-          keys_ptrs.push_back(&keys[ii]);
-          ss_ring_s << o.second.dest << "\n";
-          ++ii;
-        }
-
-        tx.signatures.push_back(std::vector<crypto::signature>());
-        std::vector<crypto::signature>& sigs = tx.signatures.back();
-        sigs.resize(src_entr.outputs.size());
-        if (!zero_secret_key)
-          crypto::generate_ring_signature(tx_prefix_hash, var::get<txin_to_key>(tx.vin[i]).k_image, keys_ptrs, in_contexts[i].in_ephemeral.sec, src_entr.real_output, sigs.data());
-        ss_ring_s << "signatures:\n";
-        std::for_each(sigs.begin(), sigs.end(), [&](const crypto::signature& s){ss_ring_s << s << "\n";});
-        ss_ring_s << "prefix_hash:" << tx_prefix_hash << "\nin_ephemeral_key: " << in_contexts[i].in_ephemeral.sec << "\nreal_output: " << src_entr.real_output << "\n";
-        i++;
+        kLRki.push_back(sources[i].multisig_kLRki);
       }
-
-      MCINFO("construct_tx", "transaction_created: " << get_transaction_hash(tx) << "\n" << obj_to_json_str(tx) << "\n" << ss_ring_s.str());
     }
-    else
+    for (size_t i = 0; i < tx.vout.size(); ++i)
     {
-      size_t n_total_outs = sources[0].outputs.size(); // only for non-simple rct
-
-      // the non-simple version is slightly smaller, but assumes all real inputs
-      // are on the same index, so can only be used if there just one ring.
-      bool use_simple_rct = sources.size() > 1 || rct_config.range_proof_type != rct::RangeProofBorromean;
-
-      if (!use_simple_rct)
-      {
-        // non simple ringct requires all real inputs to be at the same index for all inputs
-        for(const tx_source_entry& src_entr:  sources)
-        {
-          if(src_entr.real_output != sources.begin()->real_output)
-          {
-            LOG_ERROR("All inputs must have the same index for non-simple ringct");
-            return false;
-          }
-        }
-
-        // enforce same mixin for all outputs
-        for (size_t i = 1; i < sources.size(); ++i) {
-          if (n_total_outs != sources[i].outputs.size()) {
-            LOG_ERROR("Non-simple ringct transaction has varying ring size");
-            return false;
-          }
-        }
-      }
-
-      uint64_t amount_in = 0, amount_out = 0;
-      rct::ctkeyV inSk;
-      inSk.reserve(sources.size());
-      // mixRing indexing is done the other way round for simple
-      rct::ctkeyM mixRing(use_simple_rct ? sources.size() : n_total_outs);
-      rct::keyV destinations;
-      std::vector<uint64_t> inamounts, outamounts;
-      std::vector<unsigned int> index;
-      std::vector<rct::multisig_kLRki> kLRki;
-      for (size_t i = 0; i < sources.size(); ++i)
-      {
-        rct::ctkey ctkey;
-        amount_in += sources[i].amount;
-        inamounts.push_back(sources[i].amount);
-        index.push_back(sources[i].real_output);
-        // inSk: (secret key, mask)
-        ctkey.dest = rct::sk2rct(in_contexts[i].in_ephemeral.sec);
-        ctkey.mask = sources[i].mask;
-        inSk.push_back(ctkey);
-        memwipe(&ctkey, sizeof(rct::ctkey));
-        // inPk: (public key, commitment)
-        // will be done when filling in mixRing
-        if (msout)
-        {
-          kLRki.push_back(sources[i].multisig_kLRki);
-        }
-      }
-      for (size_t i = 0; i < tx.vout.size(); ++i)
-      {
-        destinations.push_back(rct::pk2rct(var::get<txout_to_key>(tx.vout[i].target).key));
-        outamounts.push_back(tx.vout[i].amount);
-        amount_out += tx.vout[i].amount;
-      }
-
-      if (use_simple_rct)
-      {
-        // mixRing indexing is done the other way round for simple
-        for (size_t i = 0; i < sources.size(); ++i)
-        {
-          mixRing[i].resize(sources[i].outputs.size());
-          for (size_t n = 0; n < sources[i].outputs.size(); ++n)
-          {
-            mixRing[i][n] = sources[i].outputs[n].second;
-          }
-        }
-      }
-      else
-      {
-        for (size_t i = 0; i < n_total_outs; ++i) // same index assumption
-        {
-          mixRing[i].resize(sources.size());
-          for (size_t n = 0; n < sources.size(); ++n)
-          {
-            mixRing[i][n] = sources[n].outputs[i].second;
-          }
-        }
-      }
-
-      // fee
-      if (!use_simple_rct && amount_in > amount_out)
-        outamounts.push_back(amount_in - amount_out);
-
-      if (tx_params.burn_fixed)
-      {
-        if (amount_in < amount_out + tx_params.burn_fixed)
-        {
-          LOG_ERROR("invalid burn amount: tx does not have enough unspent funds available; amount_in: " << std::to_string(amount_in) << "; amount_out + tx_params.burn_fixed: " << std::to_string(amount_out) << " + " << std::to_string(tx_params.burn_fixed));
-          return false;
-        }
-        remove_field_from_tx_extra<tx_extra_burn>(tx.extra); // doesn't have to be present (but the wallet puts a dummy here as a safety to avoid growing the tx)
-        if (!add_burned_amount_to_tx_extra(tx.extra, tx_params.burn_fixed))
-        {
-          LOG_ERROR("failed to add burn amount to tx extra");
-          return false;
-        }
-      }
-
-      // zero out all amounts to mask rct outputs, real amounts are now encrypted
-      for (size_t i = 0; i < tx.vin.size(); ++i)
-      {
-        if (sources[i].rct)
-          var::get<txin_to_key>(tx.vin[i]).amount = 0;
-      }
-      for (size_t i = 0; i < tx.vout.size(); ++i)
-        tx.vout[i].amount = 0;
-
-      crypto::hash tx_prefix_hash;
-      get_transaction_prefix_hash(tx, tx_prefix_hash, hwdev);
-      rct::ctkeyV outSk;
-      if (use_simple_rct)
-        tx.rct_signatures = rct::genRctSimple(rct::hash2rct(tx_prefix_hash), inSk, destinations, inamounts, outamounts, amount_in - amount_out, mixRing, amount_keys, msout ? &kLRki : NULL, msout, index, outSk, rct_config, hwdev);
-      else
-        tx.rct_signatures = rct::genRct(rct::hash2rct(tx_prefix_hash), inSk, destinations, outamounts, mixRing, amount_keys, msout ? &kLRki[0] : NULL, msout, sources[0].real_output, outSk, rct_config, hwdev); // same index assumption
-      memwipe(inSk.data(), inSk.size() * sizeof(rct::ctkey));
-
-      CHECK_AND_ASSERT_MES(tx.vout.size() == outSk.size(), false, "outSk size does not match vout");
-
-      MCINFO("construct_tx", "transaction_created: " << get_transaction_hash(tx) << "\n" << obj_to_json_str(tx) << "\n");
+      dest_keys.push_back(rct::pk2rct(var::get<txout_to_key>(tx.vout[i].target).key));
+      outamounts.push_back(tx.vout[i].amount);
+      amount_out += tx.vout[i].amount;
     }
+
+    for (size_t i = 0; i < sources.size(); ++i)
+    {
+      mixRing[i].resize(sources[i].outputs.size());
+      for (size_t n = 0; n < sources[i].outputs.size(); ++n)
+      {
+        mixRing[i][n] = sources[i].outputs[n].second;
+      }
+    }
+
+    if (tx_params.burn_fixed)
+    {
+      if (amount_in < amount_out + tx_params.burn_fixed)
+      {
+        LOG_ERROR("invalid burn amount: tx does not have enough unspent funds available; amount_in: " << std::to_string(amount_in) << "; amount_out + tx_params.burn_fixed: " << std::to_string(amount_out) << " + " << std::to_string(tx_params.burn_fixed));
+        return false;
+      }
+      remove_field_from_tx_extra<tx_extra_burn>(tx.extra); // doesn't have to be present (but the wallet puts a dummy here as a safety to avoid growing the tx)
+      if (!add_burned_amount_to_tx_extra(tx.extra, tx_params.burn_fixed))
+      {
+        LOG_ERROR("failed to add burn amount to tx extra");
+        return false;
+      }
+    }
+
+    // zero out all amounts to mask rct outputs, real amounts are now encrypted
+    for (size_t i = 0; i < tx.vin.size(); ++i)
+    {
+      if (sources[i].rct)
+        var::get<txin_to_key>(tx.vin[i]).amount = 0;
+    }
+    for (size_t i = 0; i < tx.vout.size(); ++i)
+      tx.vout[i].amount = 0;
+
+    crypto::hash tx_prefix_hash;
+    get_transaction_prefix_hash(tx, tx_prefix_hash, hwdev);
+    rct::ctkeyV outSk;
+    tx.rct_signatures = rct::genRctSimple(rct::hash2rct(tx_prefix_hash), inSk, dest_keys, inamounts, outamounts, amount_in - amount_out, mixRing, amount_keys, msout ? &kLRki : NULL, msout, index, outSk, rct_config, hwdev);
+    memwipe(inSk.data(), inSk.size() * sizeof(rct::ctkey));
+
+    CHECK_AND_ASSERT_MES(tx.vout.size() == outSk.size(), false, "outSk size does not match vout");
+
+    MCINFO("construct_tx", "transaction_created: " << get_transaction_hash(tx) << "\n" << obj_to_json_str(tx) << "\n");
 
     tx.invalidate_hashes();
 
@@ -1096,7 +1007,7 @@ namespace cryptonote
   bool construct_tx_and_get_tx_key(const account_keys& sender_account_keys, const std::unordered_map<crypto::public_key, subaddress_index>& subaddresses, std::vector<tx_source_entry>& sources, std::vector<tx_destination_entry>& destinations, const std::optional<cryptonote::tx_destination_entry>& change_addr, const std::vector<uint8_t> &extra, transaction& tx, uint64_t unlock_time, crypto::secret_key &tx_key, std::vector<crypto::secret_key> &additional_tx_keys, const rct::RCTConfig &rct_config, rct::multisig_out *msout, loki_construct_tx_params const &tx_params)
   {
     hw::device &hwdev = sender_account_keys.get_device();
-    hwdev.open_tx(tx_key);
+    hwdev.open_tx(tx_key, transaction::get_max_version_for_hf(tx_params.hf_version), tx_params.tx_type);
     try {
       // figure out if we need to make additional tx pubkeys
       size_t num_stdaddresses = 0;
@@ -1108,7 +1019,7 @@ namespace cryptonote
       {
         additional_tx_keys.clear();
         for (const auto &d: destinations)
-          additional_tx_keys.push_back(keypair::generate(sender_account_keys.get_device()).sec);
+          additional_tx_keys.push_back(keypair{sender_account_keys.get_device()}.sec);
       }
 
       bool r = construct_tx_with_tx_key(sender_account_keys, subaddresses, sources, destinations, change_addr, extra, tx, unlock_time, tx_key, additional_tx_keys, rct_config, msout, true /*shuffle_outs*/, tx_params);
@@ -1128,10 +1039,10 @@ namespace cryptonote
      std::vector<crypto::secret_key> additional_tx_keys;
      std::vector<tx_destination_entry> destinations_copy = destinations;
 
-     rct::RCTConfig rct_config{
-       tx_params.hf_version < network_version_10_bulletproofs ? rct::RangeProofBorromean : rct::RangeProofPaddedBulletproof,
-       tx_params.hf_version >= HF_VERSION_CLSAG ? 3 : tx_params.hf_version >= HF_VERSION_SMALLER_BP ? 2 : 1
-     };
+     // Always construct CLSAG transactions.  They weren't actually acceptable before HF 16, but
+     // they are now for our fake networks (which we need to do because we no longer have pre-CLSAG
+     // tx generation code).
+     rct::RCTConfig rct_config{rct::RangeProofType::PaddedBulletproof, 3};
 
      return construct_tx_and_get_tx_key(sender_account_keys, subaddresses, sources, destinations_copy, change_addr, extra, tx, unlock_time, tx_key, additional_tx_keys, rct_config, NULL, tx_params);
   }

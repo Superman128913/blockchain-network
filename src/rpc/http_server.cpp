@@ -581,7 +581,7 @@ namespace cryptonote::rpc {
       throw std::logic_error{"Cannot call http_server::start() more than once"};
 
     auto net = m_server.nettype();
-    m_server_header = "lokid/"s + (m_restricted ? std::to_string(LOKI_VERSION[0]) : LOKI_VERSION_FULL)
+    m_server_header = "lokid/"s + (m_restricted ? std::to_string(LOKI_VERSION[0]) : std::string{LOKI_VERSION_FULL})
       + (net == MAINNET ? " mainnet" : net == TESTNET ? " testnet" : net == DEVNET ? " devnet" : net == FAKECHAIN ? " fakenet" : " unknown net");
 
     m_startup_promise.set_value(true);

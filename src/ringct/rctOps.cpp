@@ -251,7 +251,7 @@ namespace rct {
 
     //generates a random scalar which can be used as a secret key or mask
     void skGen(key &sk) {
-        random32_unbiased(sk.bytes);
+        random_scalar(sk.bytes);
     }
 
     //generates a random scalar which can be used as a secret key or mask

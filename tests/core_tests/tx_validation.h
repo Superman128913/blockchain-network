@@ -74,11 +74,6 @@ private:
   size_t m_invalid_block_index;
 };
 
-struct gen_tx_big_version : public get_tx_validation_base
-{
-  bool generate(std::vector<test_event_entry>& events) const;
-};
-
 struct gen_tx_unlock_time : public get_tx_validation_base
 {
   bool generate(std::vector<test_event_entry>& events) const;

@@ -54,6 +54,9 @@ int main(int argc, char* argv[])
   tools::on_startup();
   epee::string_tools::set_module_name_and_folder(argv[0]);
 
+  // Bypass tx version checks for core tests:
+  cryptonote::hack::test_suite_permissive_txes = true;
+
   //set up logging options
   mlog_configure(mlog_get_default_log_path("core_tests.log"), true);
   
@@ -207,7 +210,6 @@ int main(int argc, char* argv[])
     // as well because they special case and run under very different code
     // paths from the regular tx path
     // Transaction verification tests
-    GENERATE_AND_PLAY(gen_tx_big_version);
     GENERATE_AND_PLAY(gen_tx_unlock_time);
     GENERATE_AND_PLAY(gen_tx_input_is_not_txin_to_key);
     GENERATE_AND_PLAY(gen_tx_no_inputs_no_outputs);
@@ -243,21 +245,12 @@ int main(int argc, char* argv[])
 
     GENERATE_AND_PLAY(gen_bp_tx_valid_1_old);
     GENERATE_AND_PLAY(gen_bp_tx_invalid_1_new);
-    GENERATE_AND_PLAY(gen_bp_tx_invalid_1_1);
     GENERATE_AND_PLAY(gen_bp_tx_valid_2);
     GENERATE_AND_PLAY(gen_bp_tx_valid_3);
     GENERATE_AND_PLAY(gen_bp_tx_valid_16);
-    GENERATE_AND_PLAY(gen_bp_tx_invalid_4_2_1);
-    GENERATE_AND_PLAY(gen_bp_tx_invalid_16_16);
     GENERATE_AND_PLAY(gen_bp_txs_valid_2_and_2);
-    GENERATE_AND_PLAY(gen_bp_txs_invalid_2_and_8_2_and_16_16_1);
     GENERATE_AND_PLAY(gen_bp_txs_valid_2_and_3_and_2_and_4);
-    GENERATE_AND_PLAY(gen_bp_tx_invalid_not_enough_proofs);
-    GENERATE_AND_PLAY(gen_bp_tx_invalid_empty_proofs);
-    GENERATE_AND_PLAY(gen_bp_tx_invalid_too_many_proofs);
     GENERATE_AND_PLAY(gen_bp_tx_invalid_wrong_amount);
-    GENERATE_AND_PLAY(gen_bp_tx_invalid_borromean_type);
-    GENERATE_AND_PLAY(gen_bp_tx_invalid_bulletproof2_type);
 
     GENERATE_AND_PLAY(gen_rct2_tx_clsag_malleability);
 

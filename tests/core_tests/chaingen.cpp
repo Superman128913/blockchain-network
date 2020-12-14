@@ -28,6 +28,7 @@
 // 
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
+#include <iterator>
 #include <limits>
 #include <vector>
 #include <iostream>
@@ -39,6 +40,7 @@
 #include <fstream>
 
 #include "common/string_util.h"
+#include "common/varint.h"
 #include "epee/console_handler.h"
 #include "common/rules.h"
 
@@ -69,24 +71,20 @@ void loki_register_callback(std::vector<test_event_entry> &events,
 }
 
 std::vector<std::pair<uint8_t, uint64_t>>
-loki_generate_sequential_hard_fork_table(uint8_t max_hf_version, uint64_t pos_delay)
+loki_generate_hard_fork_table(uint8_t hf_version, uint64_t pos_delay)
 {
-  assert(max_hf_version < cryptonote::network_version_count);
-  std::vector<std::pair<uint8_t, uint64_t>> result = {};
-  uint64_t version_height = 0;
-
-  // HF15 reduces and HF16 eliminates miner block rewards, so we need to ensure we have enough
-  // pre-HF15 blocks to generate enough LOKI for tests:
-  bool delayed = false;
-  for (uint8_t version = cryptonote::network_version_7; version <= max_hf_version; version++)
-  {
-    if (version >= cryptonote::network_version_15_lns && !delayed)
-    {
+  assert(hf_version < cryptonote::network_version_count);
+  // We always need block 0 == v7 for the genesis block:
+  std::vector<std::pair<uint8_t, uint64_t>> result{{cryptonote::network_version_7, 0}};
+  uint64_t version_height = 1;
+  // HF15 reduces and HF16+ eliminates miner block rewards, so we need to ensure we have enough
+  // HF14 blocks to generate enough LOKI for tests:
+  if (hf_version > cryptonote::network_version_14_blink) {
+      result.emplace_back(cryptonote::network_version_14_blink, version_height);
       version_height += pos_delay;
-      delayed = true;
-    }
-    result.emplace_back(version, version_height++);
   }
+
+  result.emplace_back(hf_version, version_height);
   return result;
 }
 
@@ -325,9 +323,7 @@ void loki_chain_generator::add_transfer_unlock_blocks()
 
 void loki_chain_generator::add_tx(cryptonote::transaction const &tx, bool can_be_added_to_blockchain, std::string const &fail_msg, bool kept_by_block)
 {
-  loki_transaction tx_entry                       = {tx, kept_by_block};
-  loki_blockchain_addable<loki_transaction> entry = {std::move(tx_entry), can_be_added_to_blockchain, fail_msg};
-  events_.push_back(entry);
+  events_.emplace_back(loki_blockchain_addable<loki_transaction>{{tx, kept_by_block}, can_be_added_to_blockchain, fail_msg});
 }
 
 cryptonote::transaction
@@ -382,6 +378,20 @@ cryptonote::transaction loki_chain_generator::create_and_add_tx(const cryptonote
 {
   cryptonote::transaction t = create_tx(src, dest, amount, fee);
   loki_tx_builder(events_, t, db_.blocks.back().block, src, dest, amount, hf_version_).with_fee(fee).build();
+  add_tx(t, true /*can_be_added_to_blockchain*/, ""/*fail_msg*/, kept_by_block);
+  return t;
+}
+
+cryptonote::transaction loki_chain_generator::create_and_add_big_tx(
+        const cryptonote::account_base &src,
+        const cryptonote::account_public_address &dest,
+        uint64_t junk_size,
+        uint64_t amount,
+        uint64_t fee,
+        bool kept_by_block)
+{
+  cryptonote::transaction t = create_tx(src, dest, amount, fee);
+  loki_tx_builder(events_, t, db_.blocks.back().block, src, dest, amount, hf_version_).with_fee(fee).with_junk(junk_size).build();
   add_tx(t, true /*can_be_added_to_blockchain*/, ""/*fail_msg*/, kept_by_block);
   return t;
 }
@@ -664,8 +674,12 @@ cryptonote::transaction loki_chain_generator::create_loki_name_system_tx_update(
   if (!signature)
   {
     signature = &signature_;
-    crypto::hash hash = lns::tx_extra_signature_hash(encrypted_value.to_view(), owner, backup_owner, prev_txid);
-    *signature = lns::make_monero_signature(hash, src.get_keys().m_account_address.m_spend_public_key, src.get_keys().m_spend_secret_key);
+    auto data = lns::tx_extra_signature(encrypted_value.to_view(), owner, backup_owner, prev_txid);
+    crypto::hash hash{};
+    if (!data.empty())
+        crypto_generichash(reinterpret_cast<unsigned char*>(hash.data), sizeof(hash), reinterpret_cast<const unsigned char*>(data.data()), data.size(), nullptr, 0);
+    generate_signature(hash, src.get_keys().m_account_address.m_spend_public_key, src.get_keys().m_spend_secret_key, signature->monero);
+    signature->type = lns::generic_owner_sig_type::monero;
   }
 
   std::vector<uint8_t> extra;
@@ -1485,12 +1499,12 @@ uint64_t get_amount(const cryptonote::account_base& account, const cryptonote::t
   {
     if (rct::is_rct_simple(tx.rct_signatures.type))
       money_transferred = rct::decodeRctSimple(tx.rct_signatures, rct::sk2rct(scalar1), i, mask, hwdev);
-    else if (tx.rct_signatures.type == rct::RCTTypeFull)
+    else if (tx.rct_signatures.type == rct::RCTType::Full)
       money_transferred = rct::decodeRct(tx.rct_signatures, rct::sk2rct(scalar1), i, hwdev);
-    else if (tx.rct_signatures.type == rct::RCTTypeNull)
+    else if (tx.rct_signatures.type == rct::RCTType::Null)
       money_transferred = tx.vout[i].amount;
     else {
-      LOG_PRINT_L0(__func__ << ": Unsupported rct type: " << +tx.rct_signatures.type);
+      LOG_PRINT_L0(__func__ << ": Unsupported rct type: " << (int)tx.rct_signatures.type);
       return 0;
     }
   }
@@ -1715,7 +1729,7 @@ bool fill_tx_sources(std::vector<cryptonote::tx_source_entry>& sources, const st
             {
                 rct::decodeRctSimple(tx.rct_signatures, rct::sk2rct(amount_key), oi.out_no, ts.mask, hw::get_device("default"));
             }
-            else if (tx.rct_signatures.type == rct::RCTTypeFull)
+            else if (tx.rct_signatures.type == rct::RCTType::Full)
             {
                 rct::decodeRct(tx.rct_signatures, rct::sk2rct(amount_key), oi.out_no, ts.mask, hw::get_device("default"));
             }

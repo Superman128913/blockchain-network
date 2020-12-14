@@ -121,7 +121,7 @@ TEST(loki_name_system, value_encrypt_and_decrypt)
     auto mval = value;
     ASSERT_TRUE(mval.encrypt(name_copy));
 
-    name_copy[0] = 'Z';
+    name_copy[0] = 'z';
     ASSERT_FALSE(mval.decrypt(name_copy, type));
   }
 }

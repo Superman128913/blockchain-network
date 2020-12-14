@@ -35,6 +35,7 @@
 
 #include "common/rules.h"
 #include "common/hex.h"
+#include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 #include "cryptonote_core/cryptonote_tx_utils.h"
 #include "ringct/rctTypes.h"
@@ -1300,7 +1301,7 @@ bool Blockchain::prevalidate_miner_transaction(const block& b, uint64_t height, 
   }
 
   if (hf_version >= HF_VERSION_REJECT_SIGS_IN_COINBASE) // Enforce empty rct signatures for miner transactions,
-    CHECK_AND_ASSERT_MES(b.miner_tx.rct_signatures.type == rct::RCTTypeNull, false, "RingCT signatures not allowed in coinbase transactions");
+    CHECK_AND_ASSERT_MES(b.miner_tx.rct_signatures.type == rct::RCTType::Null, false, "RingCT signatures not allowed in coinbase transactions");
 
   //check outs overflow
   //NOTE: not entirely sure this is necessary, given that this function is
@@ -3059,6 +3060,11 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
     }
   }
 
+  // Test suite hack: allow some tests to violate these restrictions (necessary when old HF rules
+  // are specifically required because older TX types can't be constructed anymore).
+  if (hack::test_suite_permissive_txes)
+    return true;
+
   // from v10, allow bulletproofs
   const uint8_t hf_version = m_hardfork->get_current_version();
   if (hf_version < network_version_10_bulletproofs) {
@@ -3095,9 +3101,9 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
   }
 
   if (hf_version < HF_VERSION_SMALLER_BP) {
-    if (tx.rct_signatures.type == rct::RCTTypeBulletproof2)
+    if (tx.rct_signatures.type == rct::RCTType::Bulletproof2)
     {
-      MERROR_VER("Ringct type " << (unsigned)rct::RCTTypeBulletproof2 << " is not allowed before v" << HF_VERSION_SMALLER_BP);
+      MERROR_VER("Ringct type " << (unsigned)rct::RCTType::Bulletproof2 << " is not allowed before v" << HF_VERSION_SMALLER_BP);
       tvc.m_invalid_output = true;
       return false;
     }
@@ -3106,9 +3112,9 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
   if (hf_version > HF_VERSION_SMALLER_BP) {
     if (tx.version >= txversion::v4_tx_types && tx.is_transfer())
     {
-      if (tx.rct_signatures.type == rct::RCTTypeBulletproof)
+      if (tx.rct_signatures.type == rct::RCTType::Bulletproof)
       {
-        MERROR_VER("Ringct type " << (unsigned)rct::RCTTypeBulletproof << " is not allowed from v" << (HF_VERSION_SMALLER_BP + 1));
+        MERROR_VER("Ringct type " << (unsigned)rct::RCTType::Bulletproof << " is not allowed from v" << (HF_VERSION_SMALLER_BP + 1));
         tvc.m_invalid_output = true;
         return false;
       }
@@ -3118,9 +3124,9 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
   // Disallow CLSAGs before the CLSAG hardfork
   if (hf_version < HF_VERSION_CLSAG) {
     if (tx.version >= txversion::v4_tx_types && tx.is_transfer()) {
-      if (tx.rct_signatures.type == rct::RCTTypeCLSAG)
+      if (tx.rct_signatures.type == rct::RCTType::CLSAG)
       {
-        MERROR_VER("Ringct type " << (unsigned)rct::RCTTypeCLSAG << " is not allowed before v" << HF_VERSION_CLSAG);
+        MERROR_VER("Ringct type " << (unsigned)rct::RCTType::CLSAG << " is not allowed before v" << HF_VERSION_CLSAG);
         tvc.m_invalid_output = true;
         return false;
       }
@@ -3130,7 +3136,7 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
   // Require CLSAGs starting 10 blocks after the CLSAG-enabling hard fork (the 10 block buffer is to
   // allow staggling txes around fork time to still make it into a block).
   if (hf_version >= HF_VERSION_CLSAG
-      && tx.rct_signatures.type < rct::RCTTypeCLSAG
+      && tx.rct_signatures.type < rct::RCTType::CLSAG
       && tx.version >= txversion::v4_tx_types && tx.is_transfer()
       && (hf_version > HF_VERSION_CLSAG || get_current_blockchain_height() >= 10 + m_hardfork->get_earliest_ideal_height_for_version(HF_VERSION_CLSAG)))
   {
@@ -3164,7 +3170,7 @@ bool Blockchain::expand_transaction_2(transaction &tx, const crypto::hash &tx_pr
   rv.message = rct::hash2rct(tx_prefix_hash);
 
   // mixRing - full and simple store it in opposite ways
-  if (rv.type == rct::RCTTypeFull)
+  if (rv.type == rct::RCTType::Full)
   {
     CHECK_AND_ASSERT_MES(!pubkeys.empty() && !pubkeys[0].empty(), false, "empty pubkeys");
     rv.mixRing.resize(pubkeys[0].size());
@@ -3179,7 +3185,7 @@ bool Blockchain::expand_transaction_2(transaction &tx, const crypto::hash &tx_pr
       }
     }
   }
-  else if (tools::equals_any(rv.type, rct::RCTTypeSimple, rct::RCTTypeBulletproof, rct::RCTTypeBulletproof2, rct::RCTTypeCLSAG))
+  else if (tools::equals_any(rv.type, rct::RCTType::Simple, rct::RCTType::Bulletproof, rct::RCTType::Bulletproof2, rct::RCTType::CLSAG))
   {
     CHECK_AND_ASSERT_MES(!pubkeys.empty() && !pubkeys[0].empty(), false, "empty pubkeys");
     rv.mixRing.resize(pubkeys.size());
@@ -3192,28 +3198,20 @@ bool Blockchain::expand_transaction_2(transaction &tx, const crypto::hash &tx_pr
       }
     }
   }
-  else if (rv.type == rct::RCTTypeCLSAG)
-  {
-    CHECK_AND_ASSERT_MES(rv.p.CLSAGs.size() == tx.vin.size(), false, "Bad CLSAGs size");
-    for (size_t n = 0; n < tx.vin.size(); ++n)
-    {
-      rv.p.CLSAGs[n].I = rct::ki2rct(var::get<txin_to_key>(tx.vin[n]).k_image);
-    }
-  }
   else
   {
-    CHECK_AND_ASSERT_MES(false, false, "Unsupported rct tx type: " + std::to_string(rv.type));
+    CHECK_AND_ASSERT_MES(false, false, "Unsupported rct tx type: " + std::to_string(std::underlying_type_t<rct::RCTType>(rv.type)));
   }
 
   // II
-  if (rv.type == rct::RCTTypeFull)
+  if (rv.type == rct::RCTType::Full)
   {
     rv.p.MGs.resize(1);
     rv.p.MGs[0].II.resize(tx.vin.size());
     for (size_t n = 0; n < tx.vin.size(); ++n)
       rv.p.MGs[0].II[n] = rct::ki2rct(var::get<txin_to_key>(tx.vin[n]).k_image);
   }
-  else if (tools::equals_any(rv.type, rct::RCTTypeSimple, rct::RCTTypeBulletproof, rct::RCTTypeBulletproof2))
+  else if (tools::equals_any(rv.type, rct::RCTType::Simple, rct::RCTType::Bulletproof, rct::RCTType::Bulletproof2))
   {
     CHECK_AND_ASSERT_MES(rv.p.MGs.size() == tx.vin.size(), false, "Bad MGs size");
     for (size_t n = 0; n < tx.vin.size(); ++n)
@@ -3222,7 +3220,7 @@ bool Blockchain::expand_transaction_2(transaction &tx, const crypto::hash &tx_pr
       rv.p.MGs[n].II[0] = rct::ki2rct(var::get<txin_to_key>(tx.vin[n]).k_image);
     }
   }
-  else if (rv.type == rct::RCTTypeCLSAG)
+  else if (rv.type == rct::RCTType::CLSAG)
   {
     if (!tx.pruned)
     {
@@ -3235,7 +3233,7 @@ bool Blockchain::expand_transaction_2(transaction &tx, const crypto::hash &tx_pr
   }
   else
   {
-    CHECK_AND_ASSERT_MES(false, false, "Unsupported rct tx type: " + std::to_string(rv.type));
+    CHECK_AND_ASSERT_MES(false, false, "Unsupported rct tx type: " + std::to_string(static_cast<std::underlying_type_t<rct::RCTType>>(rv.type)));
   }
 
   // outPk was already done by handle_incoming_tx
@@ -3391,15 +3389,15 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     const rct::rctSig &rv = tx.rct_signatures;
     switch (rv.type)
     {
-    case rct::RCTTypeNull: {
+    case rct::RCTType::Null: {
       // we only accept no signatures for coinbase txes
       MERROR_VER("Null rct signature on non-coinbase tx");
       return false;
     }
-    case rct::RCTTypeSimple:
-    case rct::RCTTypeBulletproof:
-    case rct::RCTTypeBulletproof2:
-    case rct::RCTTypeCLSAG:
+    case rct::RCTType::Simple:
+    case rct::RCTType::Bulletproof:
+    case rct::RCTType::Bulletproof2:
+    case rct::RCTType::CLSAG:
     {
       // check all this, either reconstructed (so should really pass), or not
       {
@@ -3435,7 +3433,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         }
       }
 
-      const size_t n_sigs = rv.type == rct::RCTTypeCLSAG ? rv.p.CLSAGs.size() : rv.p.MGs.size();
+      const size_t n_sigs = rv.type == rct::RCTType::CLSAG ? rv.p.CLSAGs.size() : rv.p.MGs.size();
       if (n_sigs != tx.vin.size())
       {
         MERROR_VER("Failed to check ringct signatures: mismatched MGs/vin sizes");
@@ -3444,7 +3442,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       for (size_t n = 0; n < tx.vin.size(); ++n)
       {
         bool error;
-        if (rv.type == rct::RCTTypeCLSAG)
+        if (rv.type == rct::RCTType::CLSAG)
           error = memcmp(&var::get<txin_to_key>(tx.vin[n]).k_image, &rv.p.CLSAGs[n].I, 32);
         else
           error = rv.p.MGs[n].II.empty() || memcmp(&var::get<txin_to_key>(tx.vin[n]).k_image, &rv.p.MGs[n].II[0], 32);
@@ -3462,7 +3460,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       }
       break;
     }
-    case rct::RCTTypeFull:
+    case rct::RCTType::Full:
     {
       // check all this, either reconstructed (so should really pass), or not
       {
@@ -3522,7 +3520,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       break;
     }
     default:
-      MERROR_VER(__func__ << ": Unsupported rct type: " << rv.type);
+      MERROR_VER(__func__ << ": Unsupported rct type: " << (int)rv.type);
       return false;
     }
 
@@ -3531,7 +3529,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     {
       for (const rct::Bulletproof &proof: rv.p.bulletproofs)
       {
-        if (proof.V.size() > 1)
+        if (proof.V.size() > 1 && !hack::test_suite_permissive_txes)
         {
           MERROR_VER("Multi output bulletproofs are invalid before v10");
           return false;
@@ -3602,10 +3600,10 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         return hf_version < cryptonote::network_version_12_checkpointing; // NOTE: Used to be allowed pre HF12.
       }
 
-      service_nodes::service_node_info const &service_node_info = *service_node_array[0].info;
+      const auto& service_node_info = *service_node_array[0].info;
       if (!service_node_info.can_transition_to_state(hf_version, state_change.block_height, state_change.state))
       {
-        MERROR_VER("State change trying to vote Service Node into the same state it already is in, (aka double spend)");
+        MERROR_VER("State change trying to vote Service Node into the same state it invalid (expired, already applied, or impossible)");
         tvc.m_double_spend = true;
         return false;
       }
@@ -3628,8 +3626,8 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         return false;
       }
 
-      crypto::hash const hash = service_nodes::generate_request_stake_unlock_hash(unlock.nonce);
-      if (!crypto::check_signature(hash, contribution.key_image_pub_key, unlock.signature))
+      if (!crypto::check_signature(service_nodes::generate_request_stake_unlock_hash(unlock.nonce),
+                  contribution.key_image_pub_key, unlock.signature))
       {
         MERROR("Could not verify key image unlock transaction signature for tx: " << get_transaction_hash(tx));
         return false;

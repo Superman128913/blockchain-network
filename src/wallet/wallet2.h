@@ -519,13 +519,18 @@ private:
       const cryptonote::account_public_address &account_public_address,
       const crypto::secret_key& viewkey = crypto::secret_key(), bool create_address_file = true);
     /*!
-     * \brief Restore a wallet hold by an HW.
+     * \brief Restore a wallet from a hardware device
      * \param  wallet_        Name of wallet file
      * \param  password       Password of wallet file
      * \param  device_name    name of HW to use
      * \param  create_address_file     Whether to create an address file
+     * \param  hwdev_label    if non-nullopt, create a [wallet].hwdev.txt containing the
+     *                        specified string content (which can be empty).  Used to identify
+     *                        a hardware-backed wallet file with an optional comment.
+     * \param  status_callback callback to invoke with progress messages to display to the user
      */
-    void restore(const fs::path& wallet_, const epee::wipeable_string& password, const std::string &device_name, bool create_address_file = true);
+    void restore_from_device(const fs::path& wallet_, const epee::wipeable_string& password, const std::string &device_name,
+            bool create_address_file = false, std::optional<std::string> hwdev_label = std::nullopt, std::function<void(std::string msg)> status_callback = {});
 
     /*!
      * \brief Creates a multisig wallet
@@ -695,7 +700,7 @@ private:
     std::pair<size_t, size_t> get_subaddress_lookahead() const { return {m_subaddress_lookahead_major, m_subaddress_lookahead_minor}; }
     bool contains_address(const cryptonote::account_public_address& address) const;
     bool contains_key_image(const crypto::key_image& key_image) const;
-    bool generate_signature_for_request_stake_unlock(crypto::key_image const &key_image, crypto::signature &signature, uint32_t &nonce) const;
+    bool generate_signature_for_request_stake_unlock(crypto::key_image const &key_image, crypto::signature &signature) const;
     /*!
      * \brief Tells if the wallet file is deprecated.
      */

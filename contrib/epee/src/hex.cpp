@@ -75,13 +75,6 @@ namespace epee
     write_hex(std::ostreambuf_iterator<char>{out}, src);
   }
 
-  void to_hex::formatted(std::ostream& out, const span<const std::uint8_t> src)
-  {
-    out.put('<');
-    buffer(out, src);
-    out.put('>');
-  }
-
   void to_hex::buffer_unchecked(char* out, const span<const std::uint8_t> src) noexcept
   {
     return write_hex(out, src);

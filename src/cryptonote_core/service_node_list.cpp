@@ -386,18 +386,18 @@ namespace service_nodes
     {
       switch (tx.rct_signatures.type)
       {
-      case rct::RCTTypeSimple:
-      case rct::RCTTypeBulletproof:
-      case rct::RCTTypeBulletproof2:
-      case rct::RCTTypeCLSAG:
-        money_transferred = rct::decodeRctSimple(tx.rct_signatures, rct::sk2rct(scalar1), i, mask, hwdev);
-        break;
-      case rct::RCTTypeFull:
-        money_transferred = rct::decodeRct(tx.rct_signatures, rct::sk2rct(scalar1), i, mask, hwdev);
-        break;
-      default:
-        LOG_PRINT_L0(__func__ << ": Unsupported rct type: " << (int)tx.rct_signatures.type);
-        return 0;
+          case rct::RCTType::Simple:
+          case rct::RCTType::Bulletproof:
+          case rct::RCTType::Bulletproof2:
+          case rct::RCTType::CLSAG:
+              money_transferred = rct::decodeRctSimple(tx.rct_signatures, rct::sk2rct(scalar1), i, mask, hwdev);
+              break;
+          case rct::RCTType::Full:
+              money_transferred = rct::decodeRct(tx.rct_signatures, rct::sk2rct(scalar1), i, mask, hwdev);
+              break;
+          default:
+              LOG_PRINT_L0(__func__ << ": Unsupported rct type: " << (int)tx.rct_signatures.type);
+              return 0;
       }
     }
     catch (const std::exception &e)
@@ -538,10 +538,9 @@ namespace service_nodes
         // The signer can try falsify the key image, but the equation used to
         // construct the key image is re-derived by the verifier, false key
         // images will not match the re-derived key image.
-        crypto::public_key const *ephemeral_pub_key_ptr = &ephemeral_pub_key;
         for (auto proof = key_image_proofs.proofs.begin(); proof != key_image_proofs.proofs.end(); proof++)
         {
-          if (!crypto::check_ring_signature((const crypto::hash &)(proof->key_image), proof->key_image, &ephemeral_pub_key_ptr, 1, &proof->signature))
+          if (!crypto::check_key_image_signature(proof->key_image, ephemeral_pub_key, proof->signature))
             continue;
 
           contribution->locked_contributions.emplace_back(service_node_info::contribution_t::version_t::v0, ephemeral_pub_key, proof->key_image, transferred);
@@ -835,8 +834,8 @@ namespace service_nodes
       if (cit != contributor.locked_contributions.end())
       {
         // NOTE(loki): This should be checked in blockchain check_tx_inputs already
-        crypto::hash const hash = service_nodes::generate_request_stake_unlock_hash(unlock.nonce);
-        if (crypto::check_signature(hash, cit->key_image_pub_key, unlock.signature))
+        if (crypto::check_signature(service_nodes::generate_request_stake_unlock_hash(unlock.nonce),
+                    cit->key_image_pub_key, unlock.signature))
         {
           duplicate_info(it->second).requested_unlock_height = unlock_height;
           return true;
@@ -3580,60 +3579,70 @@ namespace service_nodes
   bool service_node_info::can_be_voted_on(uint64_t height) const
   {
     // If the SN expired and was reregistered since the height we'll be voting on it prematurely
-    if (!this->is_fully_funded() || this->registration_height >= height) return false;
-    if (this->is_decommissioned() && this->last_decommission_height >= height) return false;
-
-    if (this->is_active())
-    {
-      // NOTE: This cast is safe. The definition of is_active() is that active_since_height >= 0
-      assert(this->active_since_height >= 0);
-      if (static_cast<uint64_t>(this->active_since_height) >= height) return false;
+    if (!is_fully_funded()) {
+      MDEBUG("SN vote at height " << height << " invalid: not fully funded");
+      return false;
+    } else if (height <= registration_height) {
+      MDEBUG("SN vote at height " << height << " invalid: height <= reg height (" << registration_height << ")");
+      return false;
+    } else if (is_decommissioned() && height <= last_decommission_height) {
+      MDEBUG("SN vote at height " << height << " invalid: height <= last decomm height (" << last_decommission_height << ")");
+      return false;
+    } else if (is_active()) {
+      assert(active_since_height >= 0); // should be satisfied whenever is_active() is true
+      if (height <= static_cast<uint64_t>(active_since_height)) {
+        MDEBUG("SN vote at height " << height << " invalid: height <= active-since height (" << active_since_height << ")");
+        return false;
+      }
     }
 
+    MTRACE("SN vote at height " << height << " is valid.");
     return true;
   }
 
   bool service_node_info::can_transition_to_state(uint8_t hf_version, uint64_t height, new_state proposed_state) const
   {
-    if (hf_version >= cryptonote::network_version_13_enforce_checkpoints)
-    {
-      if (!can_be_voted_on(height))
+    if (hf_version >= cryptonote::network_version_13_enforce_checkpoints) {
+      if (!can_be_voted_on(height)) {
+        MDEBUG("SN state transition invalid: " << height << " is not a valid vote height");
         return false;
+      }
 
-      if (proposed_state == new_state::deregister)
-      {
-        if (height <= this->registration_height)
+      if (proposed_state == new_state::deregister) {
+        if (height <= registration_height) {
+          MDEBUG("SN deregister invalid: vote height (" << height << ") <= registration_height (" << registration_height << ")");
           return false;
-      }
-      else if (proposed_state == new_state::ip_change_penalty)
-      {
-        if (height <= this->last_ip_change_height)
+        }
+      } else if (proposed_state == new_state::ip_change_penalty) {
+        if (height <= last_ip_change_height) {
+          MDEBUG("SN ip change penality invalid: vote height (" << height << ") <= last_ip_change_height (" << last_ip_change_height << ")");
           return false;
+        }
       }
-
-      if (this->is_decommissioned())
-      {
-        return proposed_state != new_state::decommission && proposed_state != new_state::ip_change_penalty;
-      }
-
-      return (proposed_state != new_state::recommission);
-    }
-    else
-    {
-      if (proposed_state == new_state::deregister)
-      {
-        if (height < this->registration_height) return false;
-      }
-
-      if (this->is_decommissioned())
-      {
-        return proposed_state != new_state::decommission && proposed_state != new_state::ip_change_penalty;
-      }
-      else
-      {
-        return (proposed_state != new_state::recommission);
+    } else { // pre-HF13
+      if (proposed_state == new_state::deregister) {
+        if (height < registration_height) {
+          MDEBUG("SN deregister invalid: vote height (" << height << ") < registration_height (" << registration_height << ")");
+          return false;
+        }
       }
     }
+
+    if (is_decommissioned()) {
+      if (proposed_state == new_state::decommission) {
+        MDEBUG("SN decommission invalid: already decommissioned");
+        return false;
+      } else if (proposed_state == new_state::ip_change_penalty) {
+        MDEBUG("SN ip change penalty invalid: currently decommissioned");
+        return false;
+      }
+      return true; // recomm or dereg
+    } else if (proposed_state == new_state::recommission) {
+      MDEBUG("SN recommission invalid: not recommissioned");
+      return false;
+    }
+    MTRACE("SN state change is valid");
+    return true;
   }
 
   payout service_node_info_to_payout(crypto::public_key const &key, service_node_info const &info)

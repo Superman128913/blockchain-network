@@ -104,11 +104,6 @@ struct gen_bp_tx_invalid_1_new : public gen_bp_tx_validation_base
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_bp_tx_invalid_1_1 : public gen_bp_tx_validation_base
-{
-  bool generate(std::vector<test_event_entry>& events) const;
-};
-
 struct gen_bp_tx_valid_2 : public gen_bp_tx_validation_base
 {
   bool generate(std::vector<test_event_entry>& events) const;
@@ -124,22 +119,7 @@ struct gen_bp_tx_valid_16 : public gen_bp_tx_validation_base
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_bp_tx_invalid_4_2_1 : public gen_bp_tx_validation_base
-{
-  bool generate(std::vector<test_event_entry>& events) const;
-};
-
-struct gen_bp_tx_invalid_16_16 : public gen_bp_tx_validation_base
-{
-  bool generate(std::vector<test_event_entry>& events) const;
-};
-
 struct gen_bp_txs_valid_2_and_2 : public gen_bp_tx_validation_base
-{
-  bool generate(std::vector<test_event_entry>& events) const;
-};
-
-struct gen_bp_txs_invalid_2_and_8_2_and_16_16_1 : public gen_bp_tx_validation_base
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
@@ -149,32 +129,7 @@ struct gen_bp_txs_valid_2_and_3_and_2_and_4 : public gen_bp_tx_validation_base
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_bp_tx_invalid_not_enough_proofs : public gen_bp_tx_validation_base
-{
-  bool generate(std::vector<test_event_entry>& events) const;
-};
-
-struct gen_bp_tx_invalid_empty_proofs : public gen_bp_tx_validation_base
-{
-  bool generate(std::vector<test_event_entry>& events) const;
-};
-
-struct gen_bp_tx_invalid_too_many_proofs : public gen_bp_tx_validation_base
-{
-  bool generate(std::vector<test_event_entry>& events) const;
-};
-
 struct gen_bp_tx_invalid_wrong_amount : public gen_bp_tx_validation_base
-{
-  bool generate(std::vector<test_event_entry>& events) const;
-};
-
-struct gen_bp_tx_invalid_borromean_type : public gen_bp_tx_validation_base
-{
-  bool generate(std::vector<test_event_entry>& events) const;
-};
-
-struct gen_bp_tx_invalid_bulletproof2_type : public gen_bp_tx_validation_base
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
