@@ -217,7 +217,21 @@ namespace cryptonote
     transaction_prefix() { set_null(); }
     void set_null();
 
-    uint64_t get_unlock_time(size_t out_index) const;
+    // This function is inlined because device_ledger code needs to call it, but doesn't link
+    // against cryptonote_basic.
+    uint64_t get_unlock_time(size_t out_index) const {
+      if (version >= txversion::v3_per_output_unlock_times)
+      {
+        if (out_index >= output_unlock_times.size())
+        {
+          LOG_ERROR("Tried to get unlock time of a v3 transaction with missing output unlock time");
+          return unlock_time;
+        }
+        return output_unlock_times[out_index];
+      }
+      return unlock_time;
+    }
+
   };
 
   class transaction final : public transaction_prefix
