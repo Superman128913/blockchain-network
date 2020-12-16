@@ -1214,6 +1214,7 @@ private:
     uint64_t get_blockchain_height_by_date(uint16_t year, uint8_t month, uint8_t day);    // 1<=month<=12, 1<=day<=31
 
     bool is_synced() const;
+    bool is_close_to_synced() const;
 
     uint64_t get_fee_percent(uint32_t priority, cryptonote::txtype type) const;
     cryptonote::byte_and_output_fees get_base_fees() const;
