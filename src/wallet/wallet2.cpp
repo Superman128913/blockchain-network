@@ -8345,7 +8345,7 @@ wallet2::register_service_node_result wallet2::create_register_service_node_tx(c
         return result;
       }
 
-      if (!is_synced())
+      if (!is_close_to_synced())
       {
         result.status = register_service_node_result_status::wallet_not_synced;
         result.msg    = tr("Wallet is not synced. Please synchronise your wallet to the blockchain");
@@ -14568,6 +14568,14 @@ bool wallet2::is_synced() const
   if (!m_node_rpc_proxy.get_height(height))
     return false;
   return get_blockchain_current_height() >= height;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::is_close_to_synced() const
+{
+  uint64_t height;
+  if (!m_node_rpc_proxy.get_height(height))
+    return false;
+  return get_blockchain_current_height() >= height-1;
 }
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::get_segregation_fork_height() const
