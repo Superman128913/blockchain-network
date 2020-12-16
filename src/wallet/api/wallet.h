@@ -129,7 +129,7 @@ public:
     std::string getSubaddressLabel(uint32_t accountIndex, uint32_t addressIndex) const override;
     void setSubaddressLabel(uint32_t accountIndex, uint32_t addressIndex, const std::string &label) override;
 
-    PendingTransaction* stakePending(const std::string& service_node_key, const std::string& amount, std::string& error_msg) override;
+    PendingTransaction* stakePending(const std::string& service_node_key, const uint64_t& amount) override;
 
     StakeUnlockResult* canRequestStakeUnlock(const std::string &sn_key) override;
 

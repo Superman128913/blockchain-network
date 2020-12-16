@@ -2438,34 +2438,28 @@ bool WalletImpl::isKeysFileLocked()
     return m_wallet->is_keys_file_locked();
 }
 
-PendingTransaction* WalletImpl::stakePending(const std::string& sn_key_str, const std::string& amount_str, std::string& error_msg)
+PendingTransaction* WalletImpl::stakePending(const std::string& sn_key_str, const uint64_t& amount)
 {
+  /// Note(maxim): need to be careful to call `WalletImpl::disposeTransaction` when it is no longer needed
+  PendingTransactionImpl * transaction = new PendingTransactionImpl(*this);
+  std::string error_msg;
+
   crypto::public_key sn_key;
   if (!tools::hex_to_type(sn_key_str, sn_key))
   {
     error_msg = "Failed to parse service node pubkey";
     LOG_ERROR(error_msg);
-    return nullptr;
+    transaction->setError(error_msg);
+    return transaction;
   }
-
-  uint64_t amount;
-  if (!cryptonote::parse_amount(amount, amount_str))
-  {
-      std::stringstream str;
-    str << boost::format("Incorrect amount: %1%, expected a nubmber from %2% to %3%") % amount_str % print_money(1) % print_money(std::numeric_limits<uint64_t>::max());
-    error_msg = str.str();
-    LOG_ERROR(error_msg);
-    return nullptr;
-  }
-
-  /// Note(maxim): need to be careful to call `WalletImpl::disposeTransaction` when it is no longer needed
-  PendingTransactionImpl * transaction = new PendingTransactionImpl(*this);
 
   tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(sn_key, amount);
   if (stake_result.status != tools::wallet2::stake_result_status::success)
   {
     error_msg = "Failed to create a stake transaction: " + stake_result.msg;
-    return nullptr;
+    LOG_ERROR(error_msg);
+    transaction->setError(error_msg);
+    return transaction;
   }
 
   transaction->m_pending_tx = {stake_result.ptx};
