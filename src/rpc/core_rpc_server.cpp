@@ -3267,7 +3267,7 @@ namespace cryptonote { namespace rpc {
   }
 
   namespace {
-    struct version_printer { const std::array<int, 3> &v; };
+    struct version_printer { const std::array<uint16_t, 3> &v; };
     std::ostream &operator<<(std::ostream &o, const version_printer &vp) { return o << vp.v[0] << '.' << vp.v[1] << '.' << vp.v[2]; }
 
     // Handles a ping.  Returns true if the ping was significant (i.e. first ping after startup, or
@@ -3275,7 +3275,7 @@ namespace cryptonote { namespace rpc {
     // argument: true if this ping should trigger an immediate proof send (i.e. first ping after
     // startup or after a ping expiry), false for an ordinary ping.
     template <typename RPC, typename Success>
-    auto handle_ping(std::array<int, 3> cur_version, std::array<int, 3> required, const char* name, std::atomic<std::time_t>& update, time_t lifetime, Success success)
+    auto handle_ping(std::array<uint16_t, 3> cur_version, std::array<uint16_t, 3> required, const char* name, std::atomic<std::time_t>& update, time_t lifetime, Success success)
     {
       typename RPC::response res{};
       if (cur_version < required) {
@@ -3314,7 +3314,7 @@ namespace cryptonote { namespace rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   LOKINET_PING::response core_rpc_server::invoke(LOKINET_PING::request&& req, rpc_context context)
   {
-    std::copy(req.version.begin(),req.version.end(),m_core.lokinet_version.begin());
+    m_core.lokinet_version = req.version;
     return handle_ping<LOKINET_PING>(
         req.version, service_nodes::MIN_LOKINET_VERSION,
         "Lokinet", m_core.m_last_lokinet_ping, LOKINET_PING_LIFETIME,

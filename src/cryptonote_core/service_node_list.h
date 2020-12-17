@@ -34,9 +34,12 @@
 #include "serialization/serialization.h"
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 #include "cryptonote_core/service_node_rules.h"
+#include "cryptonote_core/uptime_proof.h"
 #include "cryptonote_core/service_node_voting.h"
 #include "cryptonote_core/service_node_quorum_cop.h"
 #include "common/util.h"
+
+#include <lokimq/bt_serialize.h>
 
 namespace cryptonote
 {
@@ -44,6 +47,11 @@ class Blockchain;
 class BlockchainDB;
 struct checkpoint_t;
 }; // namespace cryptonote
+
+namespace uptime_proof
+{
+  class Proof;
+}
 
 namespace service_nodes
 {
@@ -511,14 +519,22 @@ namespace service_nodes
     void set_quorum_history_storage(uint64_t hist_size); // 0 = none (default), 1 = unlimited, N = # of blocks
     bool store();
 
+    //TODO: remove after HF17
+    crypto::hash hash_uptime_proof(const cryptonote::NOTIFY_UPTIME_PROOF::request &proof) const;
+
     /// Record public ip and storage port and add them to the service node list
+    //TODO: remove after HF17
     cryptonote::NOTIFY_UPTIME_PROOF::request generate_uptime_proof(uint32_t public_ip,
                                                                    uint16_t storage_port,
                                                                    uint16_t storage_lmq_port,
-                                                                   std::array<uint16_t, 3> ss_version,
-                                                                   uint16_t quorumnet_port,
-                                                                   std::array<uint16_t, 3> lokinet_version) const;
+                                                                   uint16_t quorumnet_port) const;
+    
+    uptime_proof::Proof generate_uptime_proof(uint32_t public_ip, uint16_t storage_port, uint16_t storage_lmq_port, std::array<uint16_t, 3> ss_version, uint16_t quorumnet_port, std::array<uint16_t, 3> lokinet_version) const;
+
+    //TODO: remove after HF17
     bool handle_uptime_proof(cryptonote::NOTIFY_UPTIME_PROOF::request const &proof, bool &my_uptime_proof_confirmation, crypto::x25519_public_key &x25519_pkey);
+
+    bool handle_btencoded_uptime_proof(const uptime_proof::Proof &proof, bool &my_uptime_proof_confirmation, crypto::x25519_public_key &x25519_pkey);
 
     void record_checkpoint_participation(crypto::public_key const &pubkey, uint64_t height, bool participated);
 

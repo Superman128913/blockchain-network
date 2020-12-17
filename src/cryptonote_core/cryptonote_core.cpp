@@ -49,6 +49,7 @@ extern "C" {
 #include <sqlite3.h>
 
 #include "cryptonote_core.h"
+#include "uptime_proof.h"
 #include "common/file.h"
 #include "common/sha256sum.h"
 #include "common/threadpool.h"
@@ -1930,10 +1931,21 @@ namespace cryptonote
     if (!m_service_node)
       return true;
 
-    NOTIFY_UPTIME_PROOF::request req = m_service_node_list.generate_uptime_proof(m_sn_public_ip, m_storage_port, m_storage_lmq_port, ss_version, m_quorumnet_port, lokinet_version);
-
     cryptonote_connection_context fake_context{};
-    bool relayed = get_protocol()->relay_uptime_proof(req, fake_context);
+    bool relayed;
+    auto height = get_current_blockchain_height();
+    auto hf_version = get_hard_fork_version(height);
+    //TODO: remove after HF17
+    if (hf_version < HF_VERSION_PROOF_BTENC) {
+      MGINFO("Generating Uptime Proof");
+      NOTIFY_UPTIME_PROOF::request req = m_service_node_list.generate_uptime_proof(m_sn_public_ip, m_storage_port, m_storage_lmq_port, m_quorumnet_port);
+      relayed = get_protocol()->relay_uptime_proof(req, fake_context);
+    } else {
+      MGINFO("Generating BT-Encoded Uptime Proof");
+      auto proof = m_service_node_list.generate_uptime_proof(m_sn_public_ip, m_storage_port, m_storage_lmq_port, ss_version, m_quorumnet_port, lokinet_version);
+      NOTIFY_BTENCODED_UPTIME_PROOF::request req = proof.generate_request();
+      relayed = get_protocol()->relay_btencoded_uptime_proof(req, fake_context);
+    }
     if (relayed)
       MGINFO("Submitted uptime-proof for Service Node (yours): " << m_service_keys.pub);
 
@@ -1944,6 +1956,22 @@ namespace cryptonote
   {
     crypto::x25519_public_key pkey = {};
     bool result = m_service_node_list.handle_uptime_proof(proof, my_uptime_proof_confirmation, pkey);
+    if (result && m_service_node_list.is_service_node(proof.pubkey, true /*require_active*/) && pkey)
+    {
+      oxenmq::pubkey_set added;
+      added.insert(tools::copy_guts(pkey));
+      m_lmq->update_active_sns(added, {} /*removed*/);
+    }
+    return result;
+  }
+  //-----------------------------------------------------------------------------------------------
+  bool core::handle_btencoded_uptime_proof(const NOTIFY_BTENCODED_UPTIME_PROOF::request &req, bool &my_uptime_proof_confirmation)
+  {
+    crypto::x25519_public_key pkey = {};
+    auto proof = uptime_proof::Proof(req.proof);
+    proof.sig = tools::make_from_guts<crypto::signature>(req.sig);
+    proof.sig_ed25519 = tools::make_from_guts<crypto::ed25519_signature>(req.ed_sig);
+    bool result = m_service_node_list.handle_btencoded_uptime_proof(proof, my_uptime_proof_confirmation, pkey);
     if (result && m_service_node_list.is_service_node(proof.pubkey, true /*require_active*/) && pkey)
     {
       oxenmq::pubkey_set added;

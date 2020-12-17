@@ -252,8 +252,6 @@ namespace cryptonote
     struct request
     {
       std::array<uint16_t, 3> snode_version;
-      std::array<uint16_t, 3> storage_version;
-      std::array<uint16_t, 3> lokinet_version;
 
       uint64_t timestamp;
       crypto::public_key pubkey;
@@ -264,6 +262,25 @@ namespace cryptonote
       uint16_t storage_port;
       uint16_t storage_lmq_port;
       uint16_t qnet_port;
+
+      KV_MAP_SERIALIZABLE
+    };
+  };
+
+  /************************************************************************/
+  /*                                                                      */
+  /************************************************************************/
+  struct NOTIFY_BTENCODED_UPTIME_PROOF
+  {
+    const static int ID = BC_COMMANDS_POOL_BASE + 12;
+
+    struct request
+    {
+
+      // BT-Encoded string of the Uptime Proof
+      std::string proof;
+      std::string sig;
+      std::string ed_sig;
 
       KV_MAP_SERIALIZABLE
     };
