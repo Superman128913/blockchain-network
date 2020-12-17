@@ -57,6 +57,10 @@ PendingTransactionImpl::~PendingTransactionImpl()
 
 }
 
+void PendingTransactionImpl::setError(std::string error_msg) {
+  m_status = {Status_Error, tr(error_msg)};
+}
+
 std::vector<std::string> PendingTransactionImpl::txid() const
 {
     std::vector<std::string> txid;
