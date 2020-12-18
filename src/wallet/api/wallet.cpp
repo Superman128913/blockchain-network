@@ -994,9 +994,9 @@ uint64_t WalletImpl::unlockedBalance(uint32_t accountIndex) const
     return m_wallet->unlocked_balance(accountIndex, false);
 }
 
-std::vector<std::pair<std::string, uint32_t>>* WalletImpl::listCurrentStakes() const
+std::vector<std::pair<std::string, uint64_t>>* WalletImpl::listCurrentStakes() const
 {
-    std::vector<std::pair<std::string, uint32_t>>* stakes = new std::vector<std::pair<std::string, uint32_t>>;
+    std::vector<std::pair<std::string, uint64_t>>* stakes = new std::vector<std::pair<std::string, uint64_t>>;
 
     auto response = m_wallet->list_current_stakes();
 
