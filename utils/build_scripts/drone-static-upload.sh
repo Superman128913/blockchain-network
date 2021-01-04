@@ -24,15 +24,15 @@ branch_or_tag=${DRONE_BRANCH:-${DRONE_TAG:-unknown}}
 upload_to="builds.lokinet.dev/${DRONE_REPO// /_}/${branch_or_tag// /_}"
 
 filename=
-for f in loki-*.tar.xz loki-*.zip; do
-    if [[ $f != loki-\** ]]; then
+for f in oxen-*.tar.xz oxen-*.zip; do
+    if [[ $f != oxen-\** ]]; then
         filename=$f
         break
     fi
 done
 
 if [ -z "$filename" ]; then
-    echo "Did not find expected loki-*.tar.xz or .zip!"
+    echo "Did not find expected oxen-*.tar.xz or .zip!"
     ls -l
     exit 1
 fi
