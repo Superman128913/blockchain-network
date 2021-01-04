@@ -39,7 +39,7 @@
 #include "epee/misc_log_ex.h"
 #include "util.h"
 #include "spawn.h"
-#include "loki.h"
+#include "oxen.h"
 #include "string_util.h"
 
 #undef LOKI_DEFAULT_LOG_CATEGORY

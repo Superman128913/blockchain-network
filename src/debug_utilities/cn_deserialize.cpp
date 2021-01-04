@@ -31,7 +31,7 @@
 #include "cryptonote_basic/tx_extra.h"
 #include "cryptonote_core/blockchain.h"
 #include "common/command_line.h"
-#include "loki_economy.h"
+#include "oxen_economy.h"
 #include "common/hex.h"
 #include "version.h"
 #include <lokimq/hex.h>
@@ -76,14 +76,14 @@ struct extra_printer {
   void operator()(const tx_extra_tx_key_image_proofs& x) { std::cout << "TX key image proofs (" << x.proofs.size() << ")"; }
   void operator()(const tx_extra_tx_key_image_unlock& x) { std::cout << "TX key image unlock: " << x.key_image; }
   void operator()(const tx_extra_burn& x) { std::cout << "Transaction burned fee/payment: " << print_money(x.amount); }
-  void operator()(const tx_extra_loki_name_system& x) {
+  void operator()(const tx_extra_oxen_name_system& x) {
     std::cout << "LNS " << (x.is_buying() ? "registration" : x.is_updating() ? "update" : "(unknown)");
     switch (x.type)
     {
-      case lns::mapping_type::lokinet: std::cout << " - Lokinet (1y)"; break;
-      case lns::mapping_type::lokinet_2years: std::cout << " - Lokinet (2y)"; break;
-      case lns::mapping_type::lokinet_5years: std::cout << " - Lokinet (5y)"; break;
-      case lns::mapping_type::lokinet_10years: std::cout << " - Lokinet (10y)"; break;
+      case lns::mapping_type::oxennet: std::cout << " - Lokinet (1y)"; break;
+      case lns::mapping_type::oxennet_2years: std::cout << " - Lokinet (2y)"; break;
+      case lns::mapping_type::oxennet_5years: std::cout << " - Lokinet (5y)"; break;
+      case lns::mapping_type::oxennet_10years: std::cout << " - Lokinet (10y)"; break;
       case lns::mapping_type::session: std::cout << " - Session address"; break;
       case lns::mapping_type::wallet: std::cout << " - Wallet address"; break;
       case lns::mapping_type::update_record_internal:

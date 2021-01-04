@@ -28,7 +28,7 @@
 
 #pragma once
 
-// This file (plus .cpp) contains the glue layer between cryptonote_core and loki-mq.
+// This file (plus .cpp) contains the glue layer between cryptonote_core and oxen-mq.
 
 #include <vector>
 

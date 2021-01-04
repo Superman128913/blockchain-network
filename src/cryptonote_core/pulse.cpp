@@ -488,7 +488,7 @@ void pulse::handle_message(void *quorumnet_state, pulse::message const &msg)
     return;
   }
 
-  // TODO(loki): We don't support messages from future rounds. A round
+  // TODO(oxen): We don't support messages from future rounds. A round
   // mismatch will be detected in the signature as the round is included in the
   // signature hash.
 
@@ -885,7 +885,7 @@ Yes +-----[Block can not be added to blockchain]
       Genesis Pulse Block for the base timestamp and the top block hash and
       height for signatures.
 
-    - // TODO(loki): After the Genesis Pulse Block is checkpointed, we can
+    - // TODO(oxen): After the Genesis Pulse Block is checkpointed, we can
       // remove it from the event loop. Right now we recheck every block incase
       // of (the very unlikely event) reorgs that might change the block at the
       // hardfork.

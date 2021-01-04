@@ -2325,7 +2325,7 @@ skip:
         }
       }
       MGINFO_YELLOW("\n**********************************************************************\n"
-        << "You are now synchronized with the network. You may now start loki-wallet-cli.\n"
+        << "You are now synchronized with the network. You may now start oxen-wallet-cli.\n"
         << "\n"
         << "Use the \"help\" command to see the list of available commands.\n"
         << "**********************************************************************");
@@ -2687,7 +2687,7 @@ skip:
       MINFO("Target height decreasing from " << previous_target << " to " << target);
       m_core.set_target_blockchain_height(target);
       if (target == 0 && context.m_state > cryptonote_connection_context::state_before_handshake && !m_stopping)
-        MCWARNING("global", "lokid is now disconnected from the network");
+        MCWARNING("global", "oxend is now disconnected from the network");
     }
 
     m_block_queue.flush_spans(context.m_connection_id, false);

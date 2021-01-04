@@ -127,7 +127,7 @@ daemon::daemon(boost::program_options::variables_map vm_) :
   auto rpc_config = cryptonote::rpc_args::process(vm);
   bool new_rpc_options = !is_arg_defaulted(vm, cryptonote::rpc::http_server::arg_rpc_admin)
     || !is_arg_defaulted(vm, cryptonote::rpc::http_server::arg_rpc_public);
-  // TODO: Remove these options, perhaps starting in loki 9.0
+  // TODO: Remove these options, perhaps starting in oxen 9.0
   bool deprecated_rpc_options = !is_arg_defaulted(vm, cryptonote::rpc::http_server::arg_rpc_bind_port)
     || !is_arg_defaulted(vm, cryptonote::rpc::http_server::arg_rpc_restricted_bind_port)
     || !is_arg_defaulted(vm, cryptonote::rpc::http_server::arg_restricted_rpc)
@@ -145,7 +145,7 @@ daemon::daemon(boost::program_options::variables_map vm_) :
   std::vector<std::tuple<std::string, uint16_t, bool>> rpc_listen_admin, rpc_listen_public;
   if (deprecated_rpc_options)
   {
-    MGINFO_RED(deprecated_option_names << " options are deprecated and will be removed from a future lokid version; use --rpc-public/--rpc-admin instead");
+    MGINFO_RED(deprecated_option_names << " options are deprecated and will be removed from a future oxend version; use --rpc-public/--rpc-admin instead");
 
     // These old options from Monero are really janky: --restricted-rpc turns the main port
     // restricted, but then we also have --rpc-restricted-bind-port but both are stuck with
@@ -297,7 +297,7 @@ bool daemon::run(bool interactive)
 
   try
   {
-    MGINFO_BLUE("Starting up lokid services...");
+    MGINFO_BLUE("Starting up oxend services...");
     cryptonote::GetCheckpointsCallback get_checkpoints;
 #if defined(PER_BLOCK_CHECKPOINT)
     get_checkpoints = blocks::GetCheckpointsData;

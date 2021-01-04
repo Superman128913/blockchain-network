@@ -151,7 +151,7 @@ namespace ki {
                       bool need_all_additionals)
   {
     for(auto & td : transfers){
-      // TODO(doyle): TODO(loki): We should use td.m_pk_index!!
+      // TODO(doyle): TODO(oxen): We should use td.m_pk_index!!
       ::crypto::public_key tx_pub_key = wallet->get_tx_pub_key_from_received_outs(td);
       const std::vector<::crypto::public_key> additional_tx_pub_keys = cryptonote::get_additional_tx_pub_keys_from_extra(td.m_tx);
 

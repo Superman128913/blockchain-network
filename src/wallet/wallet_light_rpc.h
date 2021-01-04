@@ -82,7 +82,7 @@ namespace light_rpc
         std::string hash;                       // The hash of this transaction.
         uint64_t timestamp;                     // The unix time at which the block was recorded into the blockchain.
         uint64_t total_received;                // Total Loki received in atomic units.
-        uint64_t total_sent;                    // Total loki sent in atomic units.
+        uint64_t total_sent;                    // Total oxen sent in atomic units.
         uint64_t unlock_time;                   // Unlock time in blocks.
         uint64_t height;                        // Block height transaction was made.
         std::list<spent_output> spent_outputs;  // List of spent outputs.
@@ -91,7 +91,7 @@ namespace light_rpc
         bool mempool;                           // States if the transaction is sitting in the mempool. `true if the transaction is, `false` if not.
         uint32_t mixin;                         // The number of other signatures (aside from yours) in the ring signature that authorises the transaction.
 
-        // TODO(loki): Also the pay type, is it a stake? But since this is undocumented and not used, not implemented yet
+        // TODO(oxen): Also the pay type, is it a stake? But since this is undocumented and not used, not implemented yet
 
         BEGIN_KV_SERIALIZE_MAP()
           KV_SERIALIZE(id)

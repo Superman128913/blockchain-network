@@ -32,12 +32,12 @@
 #include "cryptonote_config.h"
 #include "cryptonote_core.h"
 #include "version.h"
-#include "common/loki.h"
+#include "common/oxen.h"
 #include "common/util.h"
 #include "epee/net/local_ip.h"
 #include <boost/endian/conversion.hpp>
 
-#include "common/loki_integration_test_hooks.h"
+#include "common/oxen_integration_test_hooks.h"
 
 #undef LOKI_DEFAULT_LOG_CATEGORY
 #define LOKI_DEFAULT_LOG_CATEGORY "quorum_cop"
@@ -317,7 +317,7 @@ namespace service_nodes
 
             if (m_core.get_nettype() == cryptonote::MAINNET && m_core.get_current_blockchain_height() < 646151)
             {
-              // TODO(loki): Pulse grace period, temporary code to be deleted
+              // TODO(oxen): Pulse grace period, temporary code to be deleted
               // once the grace height has transpired to give Service Nodes time
               // to upgrade for the Pulse sorting key hot fix.
               continue;
@@ -326,7 +326,7 @@ namespace service_nodes
             auto quorum = m_core.get_quorum(quorum_type::obligations, m_obligations_height);
             if (!quorum)
             {
-              // TODO(loki): Fatal error
+              // TODO(oxen): Fatal error
               LOG_ERROR("Obligations quorum for height: " << m_obligations_height << " was not cached in daemon!");
               continue;
             }
@@ -481,7 +481,7 @@ namespace service_nodes
               auto quorum = m_core.get_quorum(quorum_type::checkpointing, m_last_checkpointed_height);
               if (!quorum)
               {
-                // TODO(loki): Fatal error
+                // TODO(oxen): Fatal error
                 LOG_ERROR("Checkpoint quorum for height: " << m_last_checkpointed_height << " was not cached in daemon!");
                 continue;
               }

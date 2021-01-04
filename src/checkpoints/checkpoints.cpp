@@ -39,8 +39,8 @@
 #include "blockchain_db/blockchain_db.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
 
-#include "common/loki_integration_test_hooks.h"
-#include "common/loki.h"
+#include "common/oxen_integration_test_hooks.h"
+#include "common/oxen.h"
 #include "common/file.h"
 #include "common/hex.h"
 
@@ -81,7 +81,7 @@ namespace cryptonote
 
     if (nettype == MAINNET)
     {
-      uint64_t last_index         = loki::array_count(HARDCODED_MAINNET_CHECKPOINTS) - 1;
+      uint64_t last_index         = oxen::array_count(HARDCODED_MAINNET_CHECKPOINTS) - 1;
       height_to_hash const &entry = HARDCODED_MAINNET_CHECKPOINTS[last_index];
 
       if (tools::hex_to_type(entry.hash, result))
@@ -149,7 +149,7 @@ namespace cryptonote
   }
   bool checkpoints::update_checkpoint(checkpoint_t const &checkpoint)
   {
-    // NOTE(loki): Assumes checkpoint is valid
+    // NOTE(oxen): Assumes checkpoint is valid
     bool result        = true;
     bool batch_started = false;
     try
@@ -312,7 +312,7 @@ namespace cryptonote
 #if !defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
     if (nettype == MAINNET)
     {
-      for (size_t i = 0; i < loki::array_count(HARDCODED_MAINNET_CHECKPOINTS); ++i)
+      for (size_t i = 0; i < oxen::array_count(HARDCODED_MAINNET_CHECKPOINTS); ++i)
       {
         height_to_hash const &checkpoint = HARDCODED_MAINNET_CHECKPOINTS[i];
         ADD_CHECKPOINT(checkpoint.height, checkpoint.hash);

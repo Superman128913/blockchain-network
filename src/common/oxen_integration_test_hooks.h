@@ -65,7 +65,7 @@ const command_line::arg_descriptor<std::string, false> arg_hardforks_override = 
 const command_line::arg_descriptor<std::string, false> arg_pipe_name = {
   "integration-test-pipe-name"
 , "Specify the pipe name for stdin and stdout"
-, "loki-default-pipe-name"
+, "oxen-default-pipe-name"
 , false
 };
 

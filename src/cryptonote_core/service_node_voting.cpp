@@ -242,7 +242,7 @@ namespace service_nodes
         assert(!"Invalid Code Path");
         break;
 
-      // TODO(loki): DRY quorum verification with state change obligations.
+      // TODO(oxen): DRY quorum verification with state change obligations.
 
       case quorum_type::checkpointing:
       {

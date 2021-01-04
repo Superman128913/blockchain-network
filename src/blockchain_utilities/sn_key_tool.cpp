@@ -29,7 +29,7 @@ generate [--overwrite] FILENAME
     FILENAME.  If FILENAME contains the string "PUBKEY" it will be replaced
     with the generated public key value (in hex).
 
-    For an active service node this file is named `key_ed25519` in the lokid
+    For an active service node this file is named `key_ed25519` in the oxend
     data directory.
 
     If FILENAME already exists the command will fail unless the `--overwrite`

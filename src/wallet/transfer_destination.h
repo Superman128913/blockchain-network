@@ -28,7 +28,7 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
-#include "common/loki.h"
+#include "common/oxen.h"
 #include <string>
 #include <cstdint>
 #include "epee/serialization/keyvalue_serialization.h"

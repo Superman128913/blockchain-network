@@ -515,7 +515,7 @@ namespace trezor{
     m_http_session.SetUrl(std::string{url});
     m_http_session.SetTimeout(HTTP_TIMEOUT);
     m_http_session.SetHeader({
-      {"Origin", "https://monero.trezor.io"}, // FIXME (loki) - does this matter to the bridge?
+      {"Origin", "https://monero.trezor.io"}, // FIXME (oxen) - does this matter to the bridge?
       {"Content-Type", "application/json; charset=utf-8"}
     });
     m_http_session.SetBody(body);
