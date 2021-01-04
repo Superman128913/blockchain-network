@@ -51,7 +51,7 @@ add_executable(unit_tests
   keccak.cpp
   levin.cpp
   logging.cpp
-  loki_name_system.cpp
+  oxen_name_system.cpp
   long_term_block_weight.cpp
   lmdb.cpp
   main.cpp

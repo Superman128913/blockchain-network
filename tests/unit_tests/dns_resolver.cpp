@@ -160,7 +160,7 @@ TEST(DNSResolver, GetTXTRecord)
 
 TEST(DNSResolver, GetMulti)
 {
-  auto records = tools::DNSResolver::instance().get_many(tools::DNS_TYPE_A, {"loki.network", "example.invalid", "lokinet.org"});
+  auto records = tools::DNSResolver::instance().get_many(tools::DNS_TYPE_A, {"oxen.network", "example.invalid", "oxennet.org"});
   EXPECT_EQ(records.size(), 3);
   EXPECT_TRUE(records[0].size() > 0);
   EXPECT_EQ(records[1].size(), 0);
