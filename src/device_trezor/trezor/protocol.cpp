@@ -559,7 +559,7 @@ namespace tx {
     tsx_data.set_num_inputs(static_cast<google::protobuf::uint32>(input_size));
     tsx_data.set_mixin(static_cast<google::protobuf::uint32>(tx.sources[0].outputs.size() - 1));
     tsx_data.set_account(tx.subaddr_account);
-    tsx_data.set_monero_version(std::string{LOKI_VERSION_STR} + "|" + std::string{LOKI_VERSION_TAG});
+    tsx_data.set_monero_version(std::string{OXEN_VERSION_STR} + "|" + std::string{OXEN_VERSION_TAG});
     tsx_data.set_hard_fork(m_aux_data->hard_fork ? *m_aux_data->hard_fork : 0);
 
     if (client_version() <= 1){

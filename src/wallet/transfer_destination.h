@@ -35,7 +35,7 @@
 
 namespace wallet {
 
-LOKI_RPC_DOC_INTROSPECT
+OXEN_RPC_DOC_INTROSPECT
 struct transfer_destination
 {
   std::string address; // Destination public address.

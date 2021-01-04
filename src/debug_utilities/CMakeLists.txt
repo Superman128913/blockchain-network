@@ -27,7 +27,7 @@
 # STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 # THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-loki_add_executable(cn_deserialize "loki-utils-deserialize"
+oxen_add_executable(cn_deserialize "oxen-utils-deserialize"
   cn_deserialize.cpp
   )
 
@@ -37,7 +37,7 @@ target_link_libraries(cn_deserialize
     p2p
     extra)
 
-loki_add_executable(object_sizes "loki-utils-object-sizes"
+oxen_add_executable(object_sizes "oxen-utils-object-sizes"
   object_sizes.cpp
   )
 
@@ -53,7 +53,7 @@ set(dns_checks_sources
   dns_checks.cpp
   )
 
-loki_add_executable(dns_checks "loki-utils-dns-checks" dns_checks.cpp)
+oxen_add_executable(dns_checks "oxen-utils-dns-checks" dns_checks.cpp)
 
 target_link_libraries(dns_checks
     PRIVATE

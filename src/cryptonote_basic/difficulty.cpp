@@ -37,8 +37,8 @@
 #include "difficulty.h"
 #include "hardfork.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "difficulty"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "difficulty"
 
 namespace cryptonote {
 

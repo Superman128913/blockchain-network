@@ -43,12 +43,12 @@
 #include "p2p/net_node.h"
 #include "cryptonote_protocol/cryptonote_protocol_handler.h"
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
 #include "common/oxen_integration_test_hooks.h"
 #endif
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "daemon.rpc"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "daemon.rpc"
 
 namespace boost::program_options {
 class options_description;
@@ -262,7 +262,7 @@ namespace cryptonote::rpc {
     GET_STAKING_REQUIREMENT::response                   invoke(GET_STAKING_REQUIREMENT::request&& req, rpc_context context);
     PERFORM_BLOCKCHAIN_TEST::response                   invoke(PERFORM_BLOCKCHAIN_TEST::request&& req, rpc_context context);
     STORAGE_SERVER_PING::response                       invoke(STORAGE_SERVER_PING::request&& req, rpc_context context);
-    LOKINET_PING::response                              invoke(LOKINET_PING::request&& req, rpc_context context);
+    OXENNET_PING::response                              invoke(OXENNET_PING::request&& req, rpc_context context);
     GET_CHECKPOINTS::response                           invoke(GET_CHECKPOINTS::request&& req, rpc_context context);
     GET_SN_STATE_CHANGES::response                      invoke(GET_SN_STATE_CHANGES::request&& req, rpc_context context);
     REPORT_PEER_SS_STATUS::response                     invoke(REPORT_PEER_SS_STATUS::request&& req, rpc_context context);
@@ -273,7 +273,7 @@ namespace cryptonote::rpc {
     LNS_RESOLVE::response                               invoke(LNS_RESOLVE::request&& req, rpc_context context);
     FLUSH_CACHE::response                               invoke(FLUSH_CACHE::request&& req, rpc_context);
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     void on_relay_uptime_and_votes()
     {
       m_core.submit_uptime_proof();

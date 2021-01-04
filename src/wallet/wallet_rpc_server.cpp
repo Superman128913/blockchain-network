@@ -57,8 +57,8 @@
 #include "cryptonote_core/oxen_name_system.h"
 #include "serialization/boost_std_variant.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "wallet.rpc"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "wallet.rpc"
 
 namespace rpc = cryptonote::rpc;
 using namespace tools::wallet_rpc;
@@ -497,7 +497,7 @@ namespace tools
 
     m_restricted = command_line::get_arg(m_vm, arg_restricted);
 
-    m_server_header = "oxen-wallet-rpc/"s + (m_restricted ? std::to_string(LOKI_VERSION[0]) : std::string{LOKI_VERSION_STR});
+    m_server_header = "oxen-wallet-rpc/"s + (m_restricted ? std::to_string(OXEN_VERSION[0]) : std::string{OXEN_VERSION_STR});
 
     m_cors = {rpc_config.access_control_origins.begin(), rpc_config.access_control_origins.end()};
 
@@ -855,7 +855,7 @@ namespace tools
             if (!dnssec_valid)
               throw wallet_rpc_error{error_code::WRONG_ADDRESS, "Invalid DNSSEC for "s + std::string{url}};
             if (addresses.empty())
-              throw wallet_rpc_error{error_code::WRONG_ADDRESS, "No Loki address found at "s + std::string{url}};
+              throw wallet_rpc_error{error_code::WRONG_ADDRESS, "No Oxen address found at "s + std::string{url}};
             return addresses[0];
           }))
       throw wallet_rpc_error{error_code::WRONG_ADDRESS, "Invalid address: "s + std::string{addr_or_url}};
@@ -2940,7 +2940,7 @@ namespace {
   //------------------------------------------------------------------------------------------------------------------------------
 
   //
-  // Loki
+  // Oxen
   //
   STAKE::response wallet_rpc_server::invoke(STAKE::request&& req)
   {

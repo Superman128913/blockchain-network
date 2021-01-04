@@ -1,6 +1,6 @@
 #include "scoped_message_writer.h"
 
-#define LOKI_INTEGRATION_TEST_HOOKS_IMPLEMENTATION
+#define OXEN_INTEGRATION_TEST_HOOKS_IMPLEMENTATION
 #include "common/oxen_integration_test_hooks.h"
 
 // NOTE(oxen): This file only exists because I need a way to hook into the
@@ -16,7 +16,7 @@ tools::scoped_message_writer::~scoped_message_writer()
   {
     m_flush = false;
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     std::cout << m_oss.str() << "\n";
     return;
 #endif

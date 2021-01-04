@@ -43,7 +43,7 @@ namespace light_rpc
   struct LIGHT_RPC_COMMAND {};
 
   //-----------------------------------------------
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // TODO: Undocumented light wallet RPC call
   struct GET_ADDRESS_TXS : LIGHT_RPC_COMMAND
   {
@@ -134,7 +134,7 @@ namespace light_rpc
   };
 
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // TODO: Undocumented light wallet RPC call
   struct GET_ADDRESS_INFO : LIGHT_RPC_COMMAND
   {
@@ -194,7 +194,7 @@ namespace light_rpc
   };
 
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // TODO: Undocumented light wallet RPC call
   struct GET_UNSPENT_OUTS : LIGHT_RPC_COMMAND
   {
@@ -266,7 +266,7 @@ namespace light_rpc
       };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // TODO: Undocumented light wallet RPC call
   struct SUBMIT_RAW_TX : LIGHT_RPC_COMMAND
   {
@@ -300,7 +300,7 @@ namespace light_rpc
       };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // TODO: Undocumented light wallet RPC call
   struct LOGIN : LIGHT_RPC_COMMAND
   {
@@ -333,7 +333,7 @@ namespace light_rpc
       };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // TODO: Undocumented light wallet RPC call
   struct IMPORT_WALLET_REQUEST : LIGHT_RPC_COMMAND
   {
@@ -372,7 +372,7 @@ namespace light_rpc
   };
 
   //-----------------------------------------------
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // TODO: Undocumented light wallet RPC call
   struct GET_RANDOM_OUTS : LIGHT_RPC_COMMAND
   {

@@ -37,7 +37,7 @@
 
 namespace cryptonote
 {
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct subaddress_index
   {
     uint32_t major; // The account index, major index

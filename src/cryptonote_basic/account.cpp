@@ -43,8 +43,8 @@ extern "C"
 #include "cryptonote_config.h"
 #include "common/meta.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "account"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "account"
 
 using namespace std;
 

@@ -64,8 +64,8 @@
 #include "p2p/net_node.h"
 #include "version.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "daemon.rpc"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "daemon.rpc"
 
 
 namespace cryptonote { namespace rpc {
@@ -435,9 +435,9 @@ namespace cryptonote { namespace rpc {
     res.database_size = m_core.get_blockchain_storage().get_db().get_database_size();
     if (!context.admin)
       res.database_size = round_up(res.database_size, 1'000'000'000);
-    res.version = context.admin ? LOKI_VERSION_FULL : std::to_string(LOKI_VERSION[0]);
+    res.version = context.admin ? OXEN_VERSION_FULL : std::to_string(OXEN_VERSION[0]);
     res.status_line = context.admin ? m_core.get_status_string() :
-      "v" + std::to_string(LOKI_VERSION[0]) + "; Height: " + std::to_string(res.height);
+      "v" + std::to_string(OXEN_VERSION[0]) + "; Height: " + std::to_string(res.height);
 
     res.status = STATUS_OK;
     return res;
@@ -1292,7 +1292,7 @@ namespace cryptonote { namespace rpc {
     const uint8_t major_version = m_core.get_blockchain_storage().get_current_hard_fork_version();
 
     res.pow_algorithm =
-        major_version >= network_version_12_checkpointing    ? "RandomX (LOKI variant)"               :
+        major_version >= network_version_12_checkpointing    ? "RandomX (OXEN variant)"               :
         major_version == network_version_11_infinite_staking ? "Cryptonight Turtle Light (Variant 2)" :
                                                                "Cryptonight Heavy (Variant 2)";
 
@@ -1522,7 +1522,7 @@ namespace cryptonote { namespace rpc {
   //------------------------------------------------------------------------------------------------------------------------------
 
   //
-  // Loki
+  // Oxen
   //
   GET_OUTPUT_BLACKLIST::response core_rpc_server::invoke(GET_OUTPUT_BLACKLIST::request&& req, rpc_context context)
   {
@@ -2308,7 +2308,7 @@ namespace cryptonote { namespace rpc {
       res.service_node_state.quorumnet_port       = m_core.quorumnet_port();
       res.service_node_state.pubkey_ed25519       = std::move(get_service_node_key_res.service_node_ed25519_pubkey);
       res.service_node_state.pubkey_x25519        = std::move(get_service_node_key_res.service_node_x25519_pubkey);
-      res.service_node_state.service_node_version = LOKI_VERSION;
+      res.service_node_state.service_node_version = OXEN_VERSION;
     }
     else
     {
@@ -3291,11 +3291,11 @@ namespace cryptonote { namespace rpc {
       });
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  LOKINET_PING::response core_rpc_server::invoke(LOKINET_PING::request&& req, rpc_context context)
+  OXENNET_PING::response core_rpc_server::invoke(OXENNET_PING::request&& req, rpc_context context)
   {
-    return handle_ping<LOKINET_PING>(
-        req.version, service_nodes::MIN_LOKINET_VERSION,
-        "Lokinet", m_core.m_last_oxennet_ping, LOKINET_PING_LIFETIME,
+    return handle_ping<OXENNET_PING>(
+        req.version, service_nodes::MIN_OXENNET_VERSION,
+        "Oxennet", m_core.m_last_oxennet_ping, OXENNET_PING_LIFETIME,
         [this](bool significant) { if (significant) m_core.reset_proof_interval(); });
   }
   //------------------------------------------------------------------------------------------------------------------------------

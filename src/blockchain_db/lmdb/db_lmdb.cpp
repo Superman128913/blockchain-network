@@ -48,8 +48,8 @@
 #include "cryptonote_core/service_node_list.h"
 #include "cryptonote_basic/hardfork.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "blockchain.db.lmdb"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "blockchain.db.lmdb"
 
 
 using namespace crypto;

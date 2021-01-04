@@ -63,8 +63,8 @@
 #include "language_base.h"
 #include "singleton.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "mnemonic"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "mnemonic"
 
 namespace crypto
 {
@@ -293,7 +293,7 @@ namespace crypto
       }
 
       std::vector<uint32_t> matched_indices;
-      LOKI_DEFER { memwipe(matched_indices.data(), matched_indices.size() * sizeof(matched_indices[0])); };
+      OXEN_DEFER { memwipe(matched_indices.data(), matched_indices.size() * sizeof(matched_indices[0])); };
       Language::Base *language;
       if (!find_seed_language(seed, has_checksum, matched_indices, &language))
       {

@@ -38,8 +38,8 @@
 
 #include "lmdb/db_lmdb.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "blockchain.db"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "blockchain.db"
 
 namespace cryptonote
 {

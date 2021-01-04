@@ -35,12 +35,12 @@
 
 #include "common/oxen_integration_test_hooks.h"
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
 #include <thread>
 #endif
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "daemon"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "daemon"
 
 namespace daemonize {
 
@@ -396,7 +396,7 @@ void command_server::init_commands(cryptonote::rpc::core_rpc_server* rpc_server)
         },
     "");
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     m_command_lookup.set_handler(
       "relay_votes_and_uptime", [rpc_server](const auto&) {
         rpc_server->on_relay_uptime_and_votes();
@@ -458,7 +458,7 @@ bool command_server::start_handling(std::function<void(void)> exit_handler)
 {
   if (m_is_rpc) return false;
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
   auto handle_pipe = [&]()
   {
     // TODO(doyle): Hack, don't hook into input until the daemon has completely initialised, i.e. you can print the status
@@ -516,7 +516,7 @@ bool command_server::help(const std::vector<std::string>& args)
 std::string command_server::get_commands_str()
 {
   std::stringstream ss;
-  ss << "Loki '" << LOKI_RELEASE_NAME << "' (v" << LOKI_VERSION_FULL << ")" << std::endl;
+  ss << "Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")" << std::endl;
   ss << "Commands:\n";
   m_command_lookup.for_each([&ss] (const std::string&, const std::string& usage, const std::string&) {
       ss << "  " << usage << "\n"; });

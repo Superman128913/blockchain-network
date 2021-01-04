@@ -66,8 +66,8 @@ extern "C" {
 
 using namespace std::literals;
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "daemon"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "daemon"
 
 namespace daemonize {
 
@@ -287,7 +287,7 @@ bool daemon::run(bool interactive)
       stop();
   }};
 
-  LOKI_DEFER
+  OXEN_DEFER
   {
     stop_sig = true;
     stop_thread.join();

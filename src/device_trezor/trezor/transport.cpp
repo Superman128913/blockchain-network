@@ -44,8 +44,8 @@
 #include "transport.hpp"
 #include "messages/messages-common.pb.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "device.trezor.transport"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "device.trezor.transport"
 
 using namespace std;
 using json = rapidjson::Document;
@@ -521,7 +521,7 @@ namespace trezor{
     m_http_session.SetBody(body);
 
     cpr::Response res;
-    LOKI_DEFER {
+    OXEN_DEFER {
       if (!res.text.empty())
         memwipe(res.text.data(), res.text.size());
     };
@@ -852,11 +852,11 @@ namespace trezor{
 #  define TREZOR_LIBUSB_SET_DEBUG(ctx, level) libusb_set_debug(ctx, level)
 #endif
 
-    if (ELPP->vRegistry()->allowed(el::Level::Debug, LOKI_DEFAULT_LOG_CATEGORY))
+    if (ELPP->vRegistry()->allowed(el::Level::Debug, OXEN_DEFAULT_LOG_CATEGORY))
       TREZOR_LIBUSB_SET_DEBUG(ctx, 3);
-    else if (ELPP->vRegistry()->allowed(el::Level::Warning, LOKI_DEFAULT_LOG_CATEGORY))
+    else if (ELPP->vRegistry()->allowed(el::Level::Warning, OXEN_DEFAULT_LOG_CATEGORY))
       TREZOR_LIBUSB_SET_DEBUG(ctx, 2);
-    else if (ELPP->vRegistry()->allowed(el::Level::Error, LOKI_DEFAULT_LOG_CATEGORY))
+    else if (ELPP->vRegistry()->allowed(el::Level::Error, OXEN_DEFAULT_LOG_CATEGORY))
       TREZOR_LIBUSB_SET_DEBUG(ctx, 1);
 
 #undef TREZOR_LIBUSB_SET_DEBUG

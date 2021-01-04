@@ -2,9 +2,9 @@
 
 using namespace std::literals;
 
-const std::array<uint16_t, 3> LOKI_VERSION = {@PROJECT_VERSION_MAJOR@, @PROJECT_VERSION_MINOR@, @PROJECT_VERSION_PATCH@};
+const std::array<uint16_t, 3> OXEN_VERSION = {@PROJECT_VERSION_MAJOR@, @PROJECT_VERSION_MINOR@, @PROJECT_VERSION_PATCH@};
 
-const std::string_view LOKI_VERSION_TAG = "@VERSIONTAG@"sv;
-const std::string_view LOKI_VERSION_STR = "@PROJECT_VERSION@"sv;
-const std::string_view LOKI_RELEASE_NAME = "@LOKI_RELEASE_CODENAME@"sv;
-const std::string_view LOKI_VERSION_FULL = "@PROJECT_VERSION@-@VERSIONTAG@@LOKI_RELEASE_SUFFIX@"sv;
+const std::string_view OXEN_VERSION_TAG = "@VERSIONTAG@"sv;
+const std::string_view OXEN_VERSION_STR = "@PROJECT_VERSION@"sv;
+const std::string_view OXEN_RELEASE_NAME = "@OXEN_RELEASE_CODENAME@"sv;
+const std::string_view OXEN_VERSION_FULL = "@PROJECT_VERSION@-@VERSIONTAG@@OXEN_RELEASE_SUFFIX@"sv;

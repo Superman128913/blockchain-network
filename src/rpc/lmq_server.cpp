@@ -2,8 +2,8 @@
 #include "lmq_server.h"
 #include "lokimq/lokimq.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "daemon.rpc"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "daemon.rpc"
 
 namespace cryptonote { namespace rpc {
 

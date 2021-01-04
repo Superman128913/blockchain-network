@@ -41,8 +41,8 @@
 #include "common/threadpool.h"
 #include "crypto/crypto.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "net.dns"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "net.dns"
 
 using namespace std::literals;
 static constexpr std::array DEFAULT_DNS_PUBLIC_ADDR =

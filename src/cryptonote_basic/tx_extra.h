@@ -62,7 +62,7 @@ constexpr uint8_t
   TX_EXTRA_TAG_TX_KEY_IMAGE_UNLOCK        = 0x77,
   TX_EXTRA_TAG_SERVICE_NODE_STATE_CHANGE  = 0x78,
   TX_EXTRA_TAG_BURN                       = 0x79,
-  TX_EXTRA_TAG_LOKI_NAME_SYSTEM           = 0x7A,
+  TX_EXTRA_TAG_OXEN_NAME_SYSTEM           = 0x7A,
 
   TX_EXTRA_MYSTERIOUS_MINERGATE_TAG       = 0xDE;
 
@@ -573,4 +573,4 @@ BINARY_VARIANT_TAG(cryptonote::tx_extra_tx_secret_key,               cryptonote:
 BINARY_VARIANT_TAG(cryptonote::tx_extra_tx_key_image_proofs,         cryptonote::TX_EXTRA_TAG_TX_KEY_IMAGE_PROOFS);
 BINARY_VARIANT_TAG(cryptonote::tx_extra_tx_key_image_unlock,         cryptonote::TX_EXTRA_TAG_TX_KEY_IMAGE_UNLOCK);
 BINARY_VARIANT_TAG(cryptonote::tx_extra_burn,                        cryptonote::TX_EXTRA_TAG_BURN);
-BINARY_VARIANT_TAG(cryptonote::tx_extra_oxen_name_system,            cryptonote::TX_EXTRA_TAG_LOKI_NAME_SYSTEM);
+BINARY_VARIANT_TAG(cryptonote::tx_extra_oxen_name_system,            cryptonote::TX_EXTRA_TAG_OXEN_NAME_SYSTEM);

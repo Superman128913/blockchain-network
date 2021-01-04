@@ -50,8 +50,8 @@
 #include "cryptonote_core/service_node_voting.h"
 #include "cryptonote_core/oxen_name_system.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "cn"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "cn"
 
 using namespace crypto;
 

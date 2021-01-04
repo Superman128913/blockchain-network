@@ -39,8 +39,8 @@
 
 #include "common/oxen_integration_test_hooks.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "quorum_cop"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "quorum_cop"
 
 namespace service_nodes
 {
@@ -116,7 +116,7 @@ namespace service_nodes
     bool check_uptime_obligation     = true;
     bool check_checkpoint_obligation = true;
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     if (integration_test::state.disable_obligation_uptime_proof) check_uptime_obligation = false;
     if (integration_test::state.disable_obligation_checkpointing) check_checkpoint_obligation = false;
 #endif
@@ -266,7 +266,7 @@ namespace service_nodes
     {
       quorum_type const type = static_cast<quorum_type>(i);
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
       if (integration_test::state.disable_checkpoint_quorum && type == quorum_type::checkpointing) continue;
       if (integration_test::state.disable_obligation_quorum && type == quorum_type::obligations) continue;
 #endif
@@ -447,7 +447,7 @@ namespace service_nodes
                       // NOTE: Don't warn uptime proofs if the daemon is just
                       // recently started and is candidate for testing (i.e.
                       // restarting the daemon)
-                      if (!my_test_results.uptime_proved && live_time < LOKI_HOUR(1))
+                      if (!my_test_results.uptime_proved && live_time < OXEN_HOUR(1))
                           continue;
 
                       LOG_PRINT_L0("Service Node (yours) is active but is not passing tests for quorum: " << m_obligations_height);

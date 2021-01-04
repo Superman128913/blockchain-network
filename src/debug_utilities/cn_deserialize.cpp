@@ -36,8 +36,8 @@
 #include "version.h"
 #include <lokimq/hex.h>
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "debugtools.deserialize"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "debugtools.deserialize"
 
 namespace po = boost::program_options;
 
@@ -80,10 +80,10 @@ struct extra_printer {
     std::cout << "LNS " << (x.is_buying() ? "registration" : x.is_updating() ? "update" : "(unknown)");
     switch (x.type)
     {
-      case lns::mapping_type::oxennet: std::cout << " - Lokinet (1y)"; break;
-      case lns::mapping_type::oxennet_2years: std::cout << " - Lokinet (2y)"; break;
-      case lns::mapping_type::oxennet_5years: std::cout << " - Lokinet (5y)"; break;
-      case lns::mapping_type::oxennet_10years: std::cout << " - Lokinet (10y)"; break;
+      case lns::mapping_type::oxennet: std::cout << " - Oxennet (1y)"; break;
+      case lns::mapping_type::oxennet_2years: std::cout << " - Oxennet (2y)"; break;
+      case lns::mapping_type::oxennet_5years: std::cout << " - Oxennet (5y)"; break;
+      case lns::mapping_type::oxennet_10years: std::cout << " - Oxennet (10y)"; break;
       case lns::mapping_type::session: std::cout << " - Session address"; break;
       case lns::mapping_type::wallet: std::cout << " - Wallet address"; break;
       case lns::mapping_type::update_record_internal:
@@ -155,7 +155,7 @@ int main(int argc, char* argv[])
 
   if (command_line::get_arg(vm, command_line::arg_help))
   {
-    std::cout << "Loki '" << LOKI_RELEASE_NAME << "' (v" << LOKI_VERSION_FULL << ")\n\n";
+    std::cout << "Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")\n\n";
     std::cout << desc_options << std::endl;
     return 1;
   }

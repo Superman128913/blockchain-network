@@ -42,8 +42,8 @@
 #include <crtdbg.h>
 #endif
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "wallet.wallet2"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "wallet.wallet2"
 
 // workaround for a suspected bug in pthread/kernel on MacOS X
 #ifdef __APPLE__
@@ -128,7 +128,7 @@ namespace wallet_args
     command_line::add_arg(desc_params, arg_max_concurrency);
     command_line::add_arg(desc_params, arg_config_file);
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     command_line::add_arg(desc_params, integration_test::arg_pipe_name);
 #endif
 
@@ -144,7 +144,7 @@ namespace wallet_args
       auto parser = po::command_line_parser(argc, argv).options(desc_all).positional(positional_options);
       po::store(parser.run(), vm);
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
       {
         const std::string arg_pipe_name = command_line::get_arg(vm, integration_test::arg_pipe_name);
         integration_test::init(arg_pipe_name);
@@ -153,7 +153,7 @@ namespace wallet_args
 
       if (command_line::get_arg(vm, command_line::arg_help))
       {
-        Print(print) << "Loki '" << LOKI_RELEASE_NAME << "' (v" << LOKI_VERSION_FULL << ")\n";
+        Print(print) << "Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")\n";
         Print(print) << wallet_args::tr("This is the command line oxen wallet. It needs to connect to a oxen\n"
 												  "daemon to work correctly.") << "\n";
         Print(print) << wallet_args::tr("Usage:") << "\n  " << usage;
@@ -163,7 +163,7 @@ namespace wallet_args
       }
       else if (command_line::get_arg(vm, command_line::arg_version))
       {
-        Print(print) << "Loki '" << LOKI_RELEASE_NAME << "' (v" << LOKI_VERSION_FULL << ")";
+        Print(print) << "Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")";
         should_terminate = true;
         return true;
       }
@@ -215,13 +215,13 @@ namespace wallet_args
     if (!command_line::is_arg_defaulted(vm, arg_max_concurrency))
       tools::set_max_concurrency(command_line::get_arg(vm, arg_max_concurrency));
 
-    Print(print) << "Loki '" << LOKI_RELEASE_NAME << "' (v" << LOKI_VERSION_FULL << ")";
+    Print(print) << "Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")";
 
     if (!command_line::is_arg_defaulted(vm, arg_log_level))
       MINFO("Setting log level = " << command_line::get_arg(vm, arg_log_level));
     else
     {
-      const char *logs = getenv("LOKI_LOGS");
+      const char *logs = getenv("OXEN_LOGS");
       MINFO("Setting log levels = " << (logs ? logs : "<default>"));
     }
     MINFO(wallet_args::tr("Logging to: ") << log_path);

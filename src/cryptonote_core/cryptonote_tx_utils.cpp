@@ -1107,7 +1107,7 @@ namespace cryptonote
     const blobdata bd        = get_block_hashing_blob(b);
     const uint8_t hf_version = b.major_version;
 
-#if defined(LOKI_INTEGRATION_TESTS)
+#if defined(OXEN_INTEGRATION_TESTS)
     miners = 0;
 #endif
 
