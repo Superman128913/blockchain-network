@@ -28,7 +28,7 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #ifdef _WIN32
- #define __STDC_FORMAT_MACROS // NOTE(loki): Explicitly define the PRIu64 macro on Mingw
+ #define __STDC_FORMAT_MACROS // NOTE(oxen): Explicitly define the PRIu64 macro on Mingw
 #endif
 
 #include "common/unordered_containers_boost_serialization.h"
@@ -135,7 +135,7 @@ static bool parse_db_sync_mode(std::string db_sync_mode)
 
 static fs::path get_default_db_path()
 {
-  // remove .loki, replace with .shared-ringdb
+  // remove .oxen, replace with .shared-ringdb
   fs::path p = tools::get_default_data_dir();
   p.replace_filename(".shared-ringdb");
   return p;
@@ -963,7 +963,7 @@ static void open_db(const fs::path& filename, MDB_env** env, MDB_txn** txn, MDB_
   CHECK_AND_ASSERT_THROW_MES(!dbr, "Failed to create LDMB environment: " + std::string(mdb_strerror(dbr)));
   dbr = mdb_env_set_maxdbs(*env, 1);
   CHECK_AND_ASSERT_THROW_MES(!dbr, "Failed to set max env dbs: " + std::string(mdb_strerror(dbr)));
-  MINFO("Opening loki blockchain at " << filename);
+  MINFO("Opening oxen blockchain at " << filename);
   dbr = mdb_env_open(*env, filename.string().c_str(), flags, 0664);
   CHECK_AND_ASSERT_THROW_MES(!dbr, "Failed to open rings database file '"
       + filename.u8string() + "': " + std::string(mdb_strerror(dbr)));
@@ -1239,7 +1239,7 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-  mlog_configure(mlog_get_default_log_path("loki-blockchain-mark-spent-outputs.log"), true);
+  mlog_configure(mlog_get_default_log_path("oxen-blockchain-mark-spent-outputs.log"), true);
   if (!command_line::is_arg_defaulted(vm, arg_log_level))
     mlog_set_log(command_line::get_arg(vm, arg_log_level).c_str());
   else

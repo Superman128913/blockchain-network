@@ -268,7 +268,7 @@ namespace service_nodes {
   constexpr uint8_t MAXIMUM_EXTERNAL_OUT_OF_SYNC = 80;
 
 static_assert(STAKING_PORTIONS != UINT64_MAX, "UINT64_MAX is used as the invalid value for failing to calculate the min_node_contribution");
-// return: UINT64_MAX if (num_contributions > the max number of contributions), otherwise the amount in loki atomic units
+// return: UINT64_MAX if (num_contributions > the max number of contributions), otherwise the amount in oxen atomic units
 uint64_t get_min_node_contribution            (uint8_t version, uint64_t staking_requirement, uint64_t total_reserved, size_t num_contributions);
 uint64_t get_min_node_contribution_in_portions(uint8_t version, uint64_t staking_requirement, uint64_t total_reserved, size_t num_contributions);
 

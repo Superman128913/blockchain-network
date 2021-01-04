@@ -33,7 +33,7 @@
 #include "epee/string_tools.h"
 #include "daemon/command_server.h"
 
-#include "common/loki_integration_test_hooks.h"
+#include "common/oxen_integration_test_hooks.h"
 
 #if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
 #include <thread>
@@ -320,7 +320,7 @@ void command_server::init_commands(cryptonote::rpc::core_rpc_server* rpc_server)
     , "bc_dyn_stats <last_block_count>"
     , "Print the information about current blockchain dynamic state."
     );
-    // TODO(loki): Implement
+    // TODO(oxen): Implement
 #if 0
     m_command_lookup.set_handler(
       "update"
@@ -351,7 +351,7 @@ void command_server::init_commands(cryptonote::rpc::core_rpc_server* rpc_server)
     , [this](const auto &x) { return m_parser.version(x); }
     , "Print version information."
     );
-#if 0 // TODO(loki): Pruning not supported because of Service Node List
+#if 0 // TODO(oxen): Pruning not supported because of Service Node List
     m_command_lookup.set_handler(
       "prune_blockchain"
     , [this](const auto &x) { return m_parser.prune_blockchain(x); }

@@ -42,7 +42,7 @@
 #include "checkpoints/checkpoints.h"
 #include <boost/format.hpp>
 
-#include "common/loki_integration_test_hooks.h"
+#include "common/oxen_integration_test_hooks.h"
 
 #include <fstream>
 #include <ctime>
@@ -560,11 +560,11 @@ bool rpc_command_executor::show_status() {
         str << "NOT RECEIVED";
     str << " (storage), ";
 
-    if (*ires.last_lokinet_ping > 0)
-        str << get_human_time_ago(*ires.last_lokinet_ping, time(nullptr), true /*abbreviate*/);
+    if (*ires.last_oxennet_ping > 0)
+        str << get_human_time_ago(*ires.last_oxennet_ping, time(nullptr), true /*abbreviate*/);
     else
         str << "NOT RECEIVED";
-    str << " (lokinet)";
+    str << " (oxennet)";
 
     tools::success_msg_writer() << str.str();
   }
@@ -1115,8 +1115,8 @@ bool rpc_command_executor::print_status()
 
   // Make a request to get_height because it is public and relatively simple
   GET_HEIGHT::response res;
-  if (invoke<GET_HEIGHT>({}, res, "lokid is NOT running")) {
-    tools::success_msg_writer() << "lokid is running (height: " << res.height << ")";
+  if (invoke<GET_HEIGHT>({}, res, "oxend is NOT running")) {
+    tools::success_msg_writer() << "oxend is running (height: " << res.height << ")";
     return true;
   }
   return false;
@@ -2067,7 +2067,7 @@ bool rpc_command_executor::prepare_registration()
       case register_step::is_solo_stake__operator_address_to_reserve:
       {
         std::string address_str;
-        last_input_result = input_line_back_cancel_get_input("Enter the loki address for the solo staker", address_str);
+        last_input_result = input_line_back_cancel_get_input("Enter the oxen address for the solo staker", address_str);
         if (last_input_result == input_line_result::back)
           continue;
 
@@ -2172,7 +2172,7 @@ bool rpc_command_executor::prepare_registration()
       case register_step::is_open_stake__operator_address_to_reserve:
       {
         std::string address_str;
-        last_input_result = input_line_back_cancel_get_input("Enter the loki address for the operator", address_str);
+        last_input_result = input_line_back_cancel_get_input("Enter the oxen address for the operator", address_str);
         if (last_input_result == input_line_result::back)
           continue;
 
@@ -2196,7 +2196,7 @@ bool rpc_command_executor::prepare_registration()
         std::cout << "Minimum amount that can be reserved: " << cryptonote::print_money(min_contribution) << " " << cryptonote::get_unit() << std::endl;
 
         std::string contribution_str;
-        last_input_result = input_line_back_cancel_get_input("How much loki does the operator want to reserve in the stake?", contribution_str);
+        last_input_result = input_line_back_cancel_get_input("How much oxen does the operator want to reserve in the stake?", contribution_str);
         if (last_input_result == input_line_result::back)
           continue;
 
@@ -2247,7 +2247,7 @@ bool rpc_command_executor::prepare_registration()
 
       case register_step::is_open_stake__contributor_address_to_reserve:
       {
-        std::string const prompt = "Enter the loki address for contributor " + std::to_string(state.contributions.size() + 1);
+        std::string const prompt = "Enter the oxen address for contributor " + std::to_string(state.contributions.size() + 1);
         std::string address_str;
         last_input_result = input_line_back_cancel_get_input(prompt.c_str(), address_str);
         if (last_input_result == input_line_result::back)
@@ -2277,7 +2277,7 @@ bool rpc_command_executor::prepare_registration()
         std::cout << "There is " << cryptonote::print_money(amount_left) << " " << cryptonote::get_unit() << " left to meet the staking requirement." << std::endl;
 
         std::string contribution_str;
-        std::string const prompt = "How much loki does contributor " + std::to_string(state.contributions.size() + 1) + " want to reserve in the stake?";
+        std::string const prompt = "How much oxen does contributor " + std::to_string(state.contributions.size() + 1) + " want to reserve in the stake?";
         last_input_result        = input_line_back_cancel_get_input(prompt.c_str(), contribution_str);
         if (last_input_result == input_line_result::back)
           continue;

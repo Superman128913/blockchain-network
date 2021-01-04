@@ -36,7 +36,7 @@
 #include "epee/string_tools.h"
 #include "version.h"
 
-#include "common/loki_integration_test_hooks.h"
+#include "common/oxen_integration_test_hooks.h"
 
 #if defined(WIN32)
 #include <crtdbg.h>
@@ -132,7 +132,7 @@ namespace wallet_args
     command_line::add_arg(desc_params, integration_test::arg_pipe_name);
 #endif
 
-    i18n_set_language("translations", "loki", lang);
+    i18n_set_language("translations", "oxen", lang);
 
     po::options_description desc_all, desc_visible;
     desc_visible.add(desc_general).add(desc_params);
@@ -154,7 +154,7 @@ namespace wallet_args
       if (command_line::get_arg(vm, command_line::arg_help))
       {
         Print(print) << "Loki '" << LOKI_RELEASE_NAME << "' (v" << LOKI_VERSION_FULL << ")\n";
-        Print(print) << wallet_args::tr("This is the command line loki wallet. It needs to connect to a loki\n"
+        Print(print) << wallet_args::tr("This is the command line oxen wallet. It needs to connect to a oxen\n"
 												  "daemon to work correctly.") << "\n";
         Print(print) << wallet_args::tr("Usage:") << "\n  " << usage;
         Print(print) << desc_visible;

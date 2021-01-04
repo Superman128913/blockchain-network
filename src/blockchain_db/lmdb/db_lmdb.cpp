@@ -1562,7 +1562,7 @@ void BlockchainLMDB::open(const fs::path& filename, cryptonote::network_type net
       if (mdb_flags & MDB_RDONLY)
       {
         MFATAL("Existing lmdb database needs to be converted, which cannot be done on a read-only database.");
-        MFATAL("Please run lokid once to convert the database.");
+        MFATAL("Please run oxend once to convert the database.");
         failed = true;
       }
       else

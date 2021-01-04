@@ -69,7 +69,7 @@ extern "C" {
 #include "common/i18n.h"
 #include "epee/net/local_ip.h"
 
-#include "common/loki_integration_test_hooks.h"
+#include "common/oxen_integration_test_hooks.h"
 
 #undef LOKI_DEFAULT_LOG_CATEGORY
 #define LOKI_DEFAULT_LOG_CATEGORY "cn"
@@ -234,7 +234,7 @@ namespace cryptonote
     "block-rate-notify"
   , "Run a program when the block rate undergoes large fluctuations. This might "
     "be a sign of large amounts of hash rate going on and off the Loki network, "
-    "or could be a sign that lokid is not properly synchronizing with the network. %t will be replaced "
+    "or could be a sign that oxend is not properly synchronizing with the network. %t will be replaced "
     "by the number of minutes for the observation window, %b by the number of "
     "blocks observed within that window, and %e by the number of blocks that was "
     "expected in that window."
@@ -282,7 +282,7 @@ namespace cryptonote
   , m_last_json_checkpoints_update(0)
   , m_nettype(UNDEFINED)
   , m_last_storage_server_ping(0)
-  , m_last_lokinet_ping(0)
+  , m_last_oxennet_ping(0)
   , m_pad_transactions(false)
   {
     m_checkpoints_updating.clear();
@@ -349,7 +349,7 @@ namespace cryptonote
 
     command_line::add_arg(desc, arg_pad_transactions);
     command_line::add_arg(desc, arg_block_notify);
-#if 0 // TODO(loki): Pruning not supported because of Service Node List
+#if 0 // TODO(oxen): Pruning not supported because of Service Node List
     command_line::add_arg(desc, arg_prune_blockchain);
 #endif
     command_line::add_arg(desc, arg_reorg_notify);
@@ -431,7 +431,7 @@ namespace cryptonote
       }
 
       if (!storage_ok) {
-        MERROR("IMPORTANT: All service node operators are now required to run the loki storage "
+        MERROR("IMPORTANT: All service node operators are now required to run the oxen storage "
                << "server and provide the public ip and ports on which it can be accessed on the internet.");
         return false;
       }
@@ -527,7 +527,7 @@ namespace cryptonote
   }
 
   // Returns a string for systemd status notifications such as:
-  // Height: 1234567, SN: active, proof: 55m12s, storage: 4m48s, lokinet: 47s
+  // Height: 1234567, SN: active, proof: 55m12s, storage: 4m48s, oxennet: 47s
   std::string core::get_status_string() const
   {
     std::string s;
@@ -562,8 +562,8 @@ namespace cryptonote
         s += time_ago_str(now, last_proof);
         s += ", storage: ";
         s += time_ago_str(now, m_last_storage_server_ping);
-        s += ", lokinet: ";
-        s += time_ago_str(now, m_last_lokinet_ping);
+        s += ", oxennet: ";
+        s += time_ago_str(now, m_last_oxennet_ping);
       }
     }
     return s;
@@ -824,7 +824,7 @@ namespace cryptonote
     // Checkpoints
     m_checkpoints_path = m_config_folder / fs::u8path(JSON_HASH_FILE_NAME);
 
-    sqlite3 *lns_db = lns::init_loki_name_system(lns_db_file_path, db->is_read_only());
+    sqlite3 *lns_db = lns::init_oxen_name_system(lns_db_file_path, db->is_read_only());
     if (!lns_db) return false;
 
     init_lokimq(vm);
@@ -983,7 +983,7 @@ namespace cryptonote
       MGINFO_YELLOW("- primary: " << tools::type_to_hex(keys.pub));
       MGINFO_YELLOW("- ed25519: " << tools::type_to_hex(keys.pub_ed25519));
       // .snode address is the ed25519 pubkey, encoded with base32z and with .snode appended:
-      MGINFO_YELLOW("- lokinet: " << lokimq::to_base32z(tools::view_guts(keys.pub_ed25519)) << ".snode");
+      MGINFO_YELLOW("- oxennet: " << lokimq::to_base32z(tools::view_guts(keys.pub_ed25519)) << ".snode");
       MGINFO_YELLOW("-  x25519: " << tools::type_to_hex(keys.pub_x25519));
     } else {
       // Only print the x25519 version because it's the only thing useful for a non-SN (for
@@ -1749,7 +1749,7 @@ namespace cryptonote
     if (count == 0)
       return result;
 
-    auto& [emission_amount, total_fee_amount, burnt_loki] = result;
+    auto& [emission_amount, total_fee_amount, burnt_oxen] = result;
 
     // Caching.
     //
@@ -1774,7 +1774,7 @@ namespace cryptonote
         if (count >= m_coinbase_cache.height) {
           emission_amount = m_coinbase_cache.emissions;
           total_fee_amount = m_coinbase_cache.fees;
-          burnt_loki = m_coinbase_cache.burnt;
+          burnt_oxen = m_coinbase_cache.burnt;
           start_offset = m_coinbase_cache.height;
           count -= m_coinbase_cache.height;
         }
@@ -1804,7 +1804,7 @@ namespace cryptonote
             // The cache is updated and we can still use it, so update our variables.
             emission_amount = m_coinbase_cache.emissions;
             total_fee_amount = m_coinbase_cache.fees;
-            burnt_loki = m_coinbase_cache.burnt;
+            burnt_oxen = m_coinbase_cache.burnt;
             count -= m_coinbase_cache.height - start_offset;
             start_offset = m_coinbase_cache.height;
           }
@@ -1820,7 +1820,7 @@ namespace cryptonote
     const uint64_t end = start_offset + count - 1;
     m_blockchain_storage.for_blocks_range(start_offset, end,
       [this, &cache_to, &result, &cache_build_started](uint64_t height, const crypto::hash& hash, const block& b){
-      auto& [emission_amount, total_fee_amount, burnt_loki] = result;
+      auto& [emission_amount, total_fee_amount, burnt_oxen] = result;
       std::vector<transaction> txs;
       std::vector<crypto::hash> missed_txs;
       uint64_t coinbase_amount = get_outs_money_amount(b.miner_tx);
@@ -1831,7 +1831,7 @@ namespace cryptonote
         tx_fee_amount += get_tx_miner_fee(tx, b.major_version >= HF_VERSION_FEE_BURNING);
         if(b.major_version >= HF_VERSION_FEE_BURNING)
         {
-          burnt_loki += get_burned_amount_from_tx_extra(tx.extra);
+          burnt_oxen += get_burned_amount_from_tx_extra(tx.extra);
         }
       }
 
@@ -1845,7 +1845,7 @@ namespace cryptonote
           m_coinbase_cache.height = height;
           m_coinbase_cache.emissions = emission_amount;
           m_coinbase_cache.fees = total_fee_amount;
-          m_coinbase_cache.burnt = burnt_loki;
+          m_coinbase_cache.burnt = burnt_oxen;
         }
         if (m_coinbase_cache.building)
         {
@@ -2213,7 +2213,7 @@ namespace cryptonote
 
   void core::update_lmq_sns()
   {
-    // TODO: let callers (e.g. lokinet, ss) subscribe to callbacks when this fires
+    // TODO: let callers (e.g. oxennet, ss) subscribe to callbacks when this fires
     lokimq::pubkey_set active_sns;
     m_service_node_list.copy_active_x25519_pubkeys(std::inserter(active_sns, active_sns.end()));
     m_lmq->set_active_sns(std::move(active_sns));
@@ -2321,10 +2321,10 @@ namespace cryptonote
                 "is running! It is required to run alongside the Loki daemon");
             return;
           }
-          if (!check_external_ping(m_last_lokinet_ping, LOKINET_PING_LIFETIME, "Lokinet"))
+          if (!check_external_ping(m_last_oxennet_ping, LOKINET_PING_LIFETIME, "Lokinet"))
           {
             MGINFO_RED(
-                "Failed to submit uptime proof: have not heard from lokinet recently. Make sure that it "
+                "Failed to submit uptime proof: have not heard from oxennet recently. Make sure that it "
                 "is running! It is required to run alongside the Loki daemon");
             return;
           }

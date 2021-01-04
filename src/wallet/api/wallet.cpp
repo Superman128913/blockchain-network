@@ -30,7 +30,7 @@
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #ifdef _WIN32
- #define __STDC_FORMAT_MACROS // NOTE(loki): Explicitly define the PRIu64 macro on Mingw
+ #define __STDC_FORMAT_MACROS // NOTE(oxen): Explicitly define the PRIu64 macro on Mingw
 #endif
 
 #include "wallet.h"
@@ -71,7 +71,7 @@ namespace {
     fs::path get_default_ringdb_path(cryptonote::network_type nettype)
     {
       auto dir = tools::get_default_data_dir();
-      // remove .loki, replace with .shared-ringdb
+      // remove .oxen, replace with .shared-ringdb
       dir.replace_filename(".shared-ringdb");
       if (nettype == cryptonote::TESTNET)
         dir /= "testnet";
@@ -1492,7 +1492,7 @@ PendingTransaction *WalletImpl::createTransactionMultDest(const std::vector<std:
             }
 
             if (amount) {
-                loki_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, txtype::standard, priority);
+                oxen_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, txtype::standard, priority);
                 transaction->m_pending_tx = m_wallet->create_transactions_2(dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, 0 /* unlock_time */,
                                                                             priority,
                                                                             extra, subaddr_account, subaddr_indices, tx_params);

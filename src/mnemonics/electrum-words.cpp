@@ -44,7 +44,7 @@
 #include "epee/misc_language.h"
 #include "epee/int-util.h"
 #include "mnemonics/electrum-words.h"
-#include "common/loki.h"
+#include "common/oxen.h"
 #include <boost/crc.hpp>
 
 #include "chinese_simplified.h"

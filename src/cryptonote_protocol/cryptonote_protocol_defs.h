@@ -36,7 +36,7 @@
 #include "epee/net/net_utils_base.h"
 #include "cryptonote_basic/blobdatatype.h"
 
-#include "common/loki.h"
+#include "common/oxen.h"
 
 namespace service_nodes
 {

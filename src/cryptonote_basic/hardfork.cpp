@@ -30,7 +30,7 @@
 #include <algorithm>
 #include <cstdio>
 
-#include "common/loki.h"
+#include "common/oxen.h"
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "blockchain_db/blockchain_db.h"
 #include "hardfork.h"
@@ -56,7 +56,7 @@ static uint8_t get_block_version(const cryptonote::block &b)
   return b.major_version;
 }
 
-// TODO(loki): Re-evaluate Hardfork as a class. Originally designed to
+// TODO(oxen): Re-evaluate Hardfork as a class. Originally designed to
 // handle voting, hardforks are now locked in, maybe we just need helper
 // functions on the hardcoded table instead of hiding everything behind
 // a class.

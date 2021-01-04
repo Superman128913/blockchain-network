@@ -33,7 +33,7 @@
 #include <boost/serialization/version.hpp>
 #include <ostream>
 
-#include "common/loki.h"
+#include "common/oxen.h"
 
 namespace cryptonote
 {

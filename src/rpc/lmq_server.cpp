@@ -37,7 +37,7 @@ const command_line::arg_descriptor<std::vector<std::string>> arg_lmq_local_contr
   "lmq-local-control",
   "Adds an unencrypted LokiMQ RPC listener with full, unrestricted capabilities and no authentication at the given address. "
 #ifndef _WIN32
-    "Listens at ipc://<data-dir>/lokid.sock if not specified. Specify 'none' to disable the default. "
+    "Listens at ipc://<data-dir>/oxend.sock if not specified. Specify 'none' to disable the default. "
 #endif
     "WARNING: Do not use this on a publicly accessible address!"};
 
@@ -128,7 +128,7 @@ lmq_rpc::lmq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
     // windows.  In theory we could do some runtime detection to see if the Windows version is new
     // enough to support unix domain sockets, but for now the Windows default is just "don't listen"
 #ifndef _WIN32
-    locals.push_back("ipc://" + core.get_config_directory().u8string() + "/lokid.sock");
+    locals.push_back("ipc://" + core.get_config_directory().u8string() + "/oxend.sock");
 #endif
   } else if (locals.size() == 1 && locals[0] == "none") {
     locals.clear();

@@ -51,7 +51,7 @@
 #include "trezor_defs.hpp"
 #include "messages_map.hpp"
 
-#include "common/loki.h"
+#include "common/oxen.h"
 
 #include "messages/messages.pb.h"
 #include "messages/messages-common.pb.h"

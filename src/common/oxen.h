@@ -36,7 +36,7 @@
 #include <utility>
 
 #define LOKI_RPC_DOC_INTROSPECT
-namespace loki
+namespace oxen
 {
 double      round           (double);
 double      exp2            (double);
@@ -71,7 +71,7 @@ struct defer_helper
 
 #define LOKI_TOKEN_COMBINE2(x, y) x ## y
 #define LOKI_TOKEN_COMBINE(x, y) LOKI_TOKEN_COMBINE2(x, y)
-#define LOKI_DEFER auto const LOKI_TOKEN_COMBINE(loki_defer_, __LINE__) = loki::defer_helper() + [&]()
+#define LOKI_DEFER auto const LOKI_TOKEN_COMBINE(oxen_defer_, __LINE__) = oxen::defer_helper() + [&]()
 
 template <typename T, size_t N>
 constexpr size_t array_count(T (&)[N]) { return N; }

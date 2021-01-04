@@ -28,7 +28,7 @@
 //
 #if defined(HAVE_HIDAPI) 
 
-#include "common/loki.h"
+#include "common/oxen.h"
 #include "log.hpp"
 #include "device_io_hid.hpp"
 

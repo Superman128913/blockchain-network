@@ -36,7 +36,7 @@ add_library(cryptonote_core
   service_node_quorum_cop.cpp
   service_node_swarm.cpp
   tx_blink.cpp
-  loki_name_system.cpp
+  oxen_name_system.cpp
   tx_pool.cpp
   tx_sanity_check.cpp
   cryptonote_tx_utils.cpp

@@ -63,7 +63,7 @@
 #include "checkpoints/checkpoints.h"
 #include "cryptonote_basic/hardfork.h"
 #include "blockchain_db/blockchain_db.h"
-#include "cryptonote_core/loki_name_system.h"
+#include "cryptonote_core/oxen_name_system.h"
 #include "pulse.h"
 
 struct sqlite3;
@@ -1113,7 +1113,7 @@ namespace cryptonote
 
     bool create_block_template_internal(block& b, const crypto::hash *from_block, block_template_info const &info, difficulty_type& di, uint64_t& height, uint64_t& expected_reward, const blobdata& ex_nonce);
 
-    bool load_missing_blocks_into_loki_subsystems();
+    bool load_missing_blocks_into_oxen_subsystems();
 
     // TODO: evaluate whether or not each of these typedefs are left over from blockchain_storage
     typedef std::unordered_set<crypto::key_image> key_images_container;

@@ -56,7 +56,7 @@
 PUSH_WARNINGS
 DISABLE_VS_WARNINGS(4355)
 
-#include "common/loki_integration_test_hooks.h"
+#include "common/oxen_integration_test_hooks.h"
 namespace cryptonote
 {
    struct test_options {
@@ -1008,8 +1008,8 @@ namespace cryptonote
       */
      bool set_storage_server_peer_reachable(crypto::public_key const &pubkey, bool value);
 
-     /// Time point at which the storage server and lokinet last pinged us
-     std::atomic<time_t> m_last_storage_server_ping, m_last_lokinet_ping;
+     /// Time point at which the storage server and oxennet last pinged us
+     std::atomic<time_t> m_last_storage_server_ping, m_last_oxennet_ping;
      std::atomic<uint16_t> m_storage_lmq_port;
 
      uint32_t sn_public_ip() const { return m_sn_public_ip; }
@@ -1024,7 +1024,7 @@ namespace cryptonote
      bool relay_txpool_transactions();
 
      /**
-      * @brief returns the lokid config directory
+      * @brief returns the oxend config directory
       */
      const fs::path& get_config_directory() const { return m_config_folder; }
 

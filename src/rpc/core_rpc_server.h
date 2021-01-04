@@ -44,7 +44,7 @@
 #include "cryptonote_protocol/cryptonote_protocol_handler.h"
 
 #if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
-#include "common/loki_integration_test_hooks.h"
+#include "common/oxen_integration_test_hooks.h"
 #endif
 
 #undef LOKI_DEFAULT_LOG_CATEGORY
