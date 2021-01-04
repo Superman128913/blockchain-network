@@ -49,7 +49,7 @@ namespace service_nodes
 {
   constexpr uint64_t INVALID_HEIGHT = static_cast<uint64_t>(-1);
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct participation_entry
   {
     bool is_pulse   = false;

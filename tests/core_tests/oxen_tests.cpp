@@ -51,8 +51,8 @@ static void add_service_nodes(oxen_chain_generator &gen, size_t count)
   gen.create_and_add_next_block(registration_txs);
 }
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "sn_core_tests"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "sn_core_tests"
 
 // Suppose we have checkpoint and alt block at height 40 and the main chain is at height 40 with a differing block.
 // Main chain receives checkpoints for height 40 on the alt chain via votes and reorgs back to height 39.
@@ -1987,7 +1987,7 @@ bool oxen_name_system_name_value_max_lengths::generate(std::vector<test_event_en
   // Lokinet
   if (lns::mapping_type_allowed(gen.hardfork(), lns::mapping_type::oxennet))
   {
-    std::string name(lns::LOKINET_DOMAIN_NAME_MAX, 'a');
+    std::string name(lns::OXENNET_DOMAIN_NAME_MAX, 'a');
     name.replace(name.size() - 6, 5, ".oxen");
 
     data.type            = lns::mapping_type::oxennet;

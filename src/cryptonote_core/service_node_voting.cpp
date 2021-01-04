@@ -43,8 +43,8 @@
 #include <string>
 #include <vector>
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "service_nodes"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "service_nodes"
 
 namespace service_nodes
 {
@@ -590,7 +590,7 @@ namespace service_nodes
     std::unique_lock lock{m_lock};
 
     // TODO(doyle): Rate-limiting: A better threshold value that follows suite with transaction relay time back-off
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     constexpr uint64_t TIME_BETWEEN_RELAY = 0;
 #else
     constexpr uint64_t TIME_BETWEEN_RELAY = 60 * 2;

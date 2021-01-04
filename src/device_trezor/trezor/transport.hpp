@@ -167,7 +167,7 @@ namespace trezor {
       t_serialize(request, req);
 
       std::string res;
-      LOKI_DEFER { if (!res.empty()) memwipe(res.data(), res.size()); };
+      OXEN_DEFER { if (!res.empty()) memwipe(res.data(), res.size()); };
 
       try {
         res = post_json(uri, std::move(req));

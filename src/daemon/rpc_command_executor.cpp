@@ -51,8 +51,8 @@
 #include <numeric>
 #include <stack>
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "daemon"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "daemon"
 
 using namespace cryptonote::rpc;
 
@@ -65,7 +65,7 @@ namespace {
   {
     std::cout << prompt << std::flush;
     std::string result;
-#if defined (LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined (OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     integration_test::write_buffered_stdout();
     result = integration_test::read_from_pipe();
 #else
@@ -608,7 +608,7 @@ bool rpc_command_executor::mining_status() {
   if (!mining_busy && mres.active && mres.speed > 0 && mres.block_target > 0 && mres.difficulty > 0)
   {
     uint64_t daily = 86400 / (double)mres.difficulty * mres.speed * mres.block_reward;
-    tools::msg_writer() << "Expected: " << cryptonote::print_money(daily) << " LOKI daily, " << cryptonote::print_money(7*daily) << " weekly";
+    tools::msg_writer() << "Expected: " << cryptonote::print_money(daily) << " OXEN daily, " << cryptonote::print_money(7*daily) << " weekly";
   }
 
   return true;
@@ -928,7 +928,7 @@ static void print_pool(const std::vector<cryptonote::rpc::tx_info> &transactions
     w << "blob_size: " << tx_info.blob_size << "\n"
       << "weight: " << tx_info.weight << "\n"
       << "fee: " << cryptonote::print_money(tx_info.fee) << "\n"
-      /// NB(Loki): in v13 we have min_fee = per_out*outs + per_byte*bytes, only the total fee/byte matters for
+      /// NB(Oxen): in v13 we have min_fee = per_out*outs + per_byte*bytes, only the total fee/byte matters for
       /// the purpose of building a block template from the pool, so we still print the overall fee / byte here.
       /// (we can't back out the individual per_out and per_byte that got used anyway).
       << "fee/byte: " << cryptonote::print_money(tx_info.fee / (double)tx_info.weight) << "\n"
@@ -1227,7 +1227,7 @@ bool rpc_command_executor::ban(const std::string &address, time_t seconds, bool 
     // TODO(doyle): Work around because integration tests break when using
     // mlog_set_categories(""), so emit the block message using msg writer
     // instead of the logging system.
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     tools::success_msg_writer() << "Host " << address << (clear_ban ? " unblocked." : " blocked.");
 #endif
 
@@ -1922,7 +1922,7 @@ bool rpc_command_executor::prepare_registration()
 
   uint64_t block_height = std::max(res.height, res.target_height);
   uint8_t hf_version = hf_res.version;
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
   cryptonote::network_type const nettype = cryptonote::FAKECHAIN;
 #else
   cryptonote::network_type const nettype =
@@ -2432,7 +2432,7 @@ bool rpc_command_executor::prune_blockchain()
 
     tools::success_msg_writer() << "Blockchain pruned";
 #else
-    tools::fail_msg_writer() << "Blockchain pruning is not supported in Loki yet";
+    tools::fail_msg_writer() << "Blockchain pruning is not supported in Oxen yet";
 #endif
     return true;
 }

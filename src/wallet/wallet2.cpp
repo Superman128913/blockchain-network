@@ -104,8 +104,8 @@ using namespace cryptonote;
 
 namespace string_tools = epee::string_tools;
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "wallet.wallet2"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "wallet.wallet2"
 
 namespace {
 
@@ -1724,8 +1724,8 @@ void wallet2::scan_output(const cryptonote::transaction &tx, bool miner_tx, cons
       if (pool) reason = (blink) ? blink_reason : pool_reason;
 
       std::optional<epee::wipeable_string> pwd = m_callback->on_get_password(reason);
-      THROW_WALLET_EXCEPTION_IF(!pwd, error::password_needed, tr("Password is needed to compute key image for incoming LOKI"));
-      THROW_WALLET_EXCEPTION_IF(!verify_password(*pwd), error::password_needed, tr("Invalid password: password is needed to compute key image for incoming LOKI"));
+      THROW_WALLET_EXCEPTION_IF(!pwd, error::password_needed, tr("Password is needed to compute key image for incoming OXEN"));
+      THROW_WALLET_EXCEPTION_IF(!verify_password(*pwd), error::password_needed, tr("Invalid password: password is needed to compute key image for incoming OXEN"));
       decrypt_keys(*pwd);
       m_encrypt_keys_after_refresh = *pwd;
     }
@@ -3113,7 +3113,7 @@ std::vector<wallet2::get_pool_state_tx> wallet2::get_pool_state(bool refreshed)
     blink_hashes = std::move(res.tx_hashes);
   }
 
-  LOKI_DEFER {
+  OXEN_DEFER {
     if (m_encrypt_keys_after_refresh)
     {
       encrypt_keys(*m_encrypt_keys_after_refresh);
@@ -3500,7 +3500,7 @@ void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blo
   // subsequent pulls in this refresh.
   start_height = 0;
 
-  LOKI_DEFER {
+  OXEN_DEFER {
     if (m_encrypt_keys_after_refresh)
     {
       encrypt_keys(*m_encrypt_keys_after_refresh);
@@ -4996,7 +4996,7 @@ std::string wallet2::make_multisig(const epee::wipeable_string &password,
   std::vector<crypto::secret_key> multisig_keys;
   rct::key spend_pkey = rct::identity();
   rct::key spend_skey;
-  LOKI_DEFER { memwipe(&spend_skey, sizeof(spend_skey)); };
+  OXEN_DEFER { memwipe(&spend_skey, sizeof(spend_skey)); };
   std::vector<crypto::public_key> multisig_signers;
 
   // decrypt keys
@@ -5168,7 +5168,7 @@ std::string wallet2::exchange_multisig_keys(const epee::wipeable_string &passwor
   bool reencrypt = false;
   crypto::chacha_key chacha_key;
   epee::misc_utils::auto_scope_leave_caller keys_reencryptor;
-  LOKI_DEFER {
+  OXEN_DEFER {
     if (reencrypt)
     {
       m_account.encrypt_keys(chacha_key);
@@ -7636,7 +7636,7 @@ bool wallet2::sign_multisig_tx(multisig_tx_set &exported_txs, std::vector<crypto
 
         rct::keyV k;
         rct::key skey = rct::zero();
-        LOKI_DEFER {
+        OXEN_DEFER {
           memwipe(k.data(), k.size() * sizeof(rct::key));
           memwipe(&skey, sizeof(skey));
         };
@@ -9656,7 +9656,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
           [](const auto& a, const auto& b) { return a.index < b.index; });
     }
 
-    if (ELPP->vRegistry()->allowed(el::Level::Debug, LOKI_DEFAULT_LOG_CATEGORY))
+    if (ELPP->vRegistry()->allowed(el::Level::Debug, OXEN_DEFAULT_LOG_CATEGORY))
     {
       std::map<uint64_t, std::set<uint64_t>> outs;
       for (const auto &i: get_outputs)
@@ -10778,11 +10778,11 @@ bool wallet2::light_wallet_key_image_is_ours(const crypto::key_image& key_image,
 }
 
 // Before we have the final fee we can't determine the amount to burn, so we stick in this
-// placeholder then go back once we know the fee and replace it.  This value (~4398 LOKI) was chosen
+// placeholder then go back once we know the fee and replace it.  This value (~4398 OXEN) was chosen
 // because it's unlikely to ever be needed to be burned in a single transaction, and is the maximum
 // encoded value we can store in 6 bytes (tx extra integers are encoded 7 bits per byte -- see
-// common/varint.h).  7 bytes is likely just wasteful (we don't need more than 4400 LOKI burned at a
-// time), and 5 bytes (max 34.3 LOKI) might conceivable not be enough.
+// common/varint.h).  7 bytes is likely just wasteful (we don't need more than 4400 OXEN burned at a
+// time), and 5 bytes (max 34.3 OXEN) might conceivable not be enough.
 static constexpr uint64_t BURN_FEE_PLACEHOLDER = (1ULL << (6*7)) - 1;
 
 // Another implementation of transaction creation that is hopefully better
@@ -14191,7 +14191,7 @@ size_t wallet2::import_multisig(std::vector<cryptonote::blobdata> blobs)
   CHECK_AND_ASSERT_THROW_MES(info.size() + 1 <= m_multisig_signers.size() && info.size() + 1 >= m_multisig_threshold, "Wrong number of multisig sources");
 
   std::vector<std::vector<rct::key>> k;
-  LOKI_DEFER {
+  OXEN_DEFER {
     for (auto& kv : k)
       memwipe(kv.data(), kv.size() * sizeof(rct::key));
   };

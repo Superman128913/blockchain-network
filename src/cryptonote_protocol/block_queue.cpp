@@ -38,8 +38,8 @@
 #include "common/pruning.h"
 #include "block_queue.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "cn.block_queue"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "cn.block_queue"
 
 namespace std {
 template<>

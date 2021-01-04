@@ -1,4 +1,4 @@
-# Loki Blockchain Utilities
+# Oxen Blockchain Utilities
 
 Copyright (c) 2014-2019, The Monero Project
 Copyright (c)      2018, The Loki Project
@@ -15,13 +15,13 @@ See also each utility's "--help" option.
 
 `$ oxen-blockchain-export`
 
-This loads the existing blockchain and exports it to `$LOKI_DATA_DIR/export/blockchain.raw`
+This loads the existing blockchain and exports it to `$OXEN_DATA_DIR/export/blockchain.raw`
 
 ### Import the exported file
 
 `$ oxen-blockchain-import`
 
-This imports blocks from `$LOKI_DATA_DIR/export/blockchain.raw` (exported using the
+This imports blocks from `$OXEN_DATA_DIR/export/blockchain.raw` (exported using the
 `oxen-blockchain-export` tool as described above) into the current database.
 
 Defaults: `--batch on`, `--batch size 20000`, `--verify on`

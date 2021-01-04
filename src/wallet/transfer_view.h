@@ -63,7 +63,7 @@ inline const char *pay_type_string(pay_type type)
   }
 }
 
-LOKI_RPC_DOC_INTROSPECT
+OXEN_RPC_DOC_INTROSPECT
 struct transfer_view
 {
   std::string txid;                                          // Transaction ID for this transfer.

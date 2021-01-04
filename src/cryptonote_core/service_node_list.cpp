@@ -61,8 +61,8 @@ extern "C" {
 #include "service_node_swarm.h"
 #include "version.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "service_nodes"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "service_nodes"
 
 namespace service_nodes
 {
@@ -2761,7 +2761,7 @@ namespace service_nodes
     assert(m_service_node_keys);
     const auto& keys = *m_service_node_keys;
     cryptonote::NOTIFY_UPTIME_PROOF::request result = {};
-    result.snode_version                            = LOKI_VERSION;
+    result.snode_version                            = OXEN_VERSION;
     result.timestamp                                = time(nullptr);
     result.pubkey                                   = keys.pub;
     result.public_ip                                = public_ip;

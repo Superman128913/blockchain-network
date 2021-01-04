@@ -70,8 +70,8 @@ extern "C" {
 
 #include "common/oxen_integration_test_hooks.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "cn"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "cn"
 
 DISABLE_VS_WARNINGS(4355)
 
@@ -356,7 +356,7 @@ namespace cryptonote
     command_line::add_arg(desc, arg_keep_alt_blocks);
 
     command_line::add_arg(desc, arg_store_quorum_history);
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     command_line::add_arg(desc, integration_test::arg_hardforks_override);
     command_line::add_arg(desc, integration_test::arg_pipe_name);
 #endif
@@ -416,7 +416,7 @@ namespace cryptonote
 
         if (!epee::net_utils::is_ip_public(m_sn_public_ip)) {
           if (m_service_node_list.debug_allow_local_ips) {
-            MWARNING("Address given for public-ip is not public; allowing it because dev-allow-local-ips was specified. This service node WILL NOT WORK ON THE PUBLIC LOKI NETWORK!");
+            MWARNING("Address given for public-ip is not public; allowing it because dev-allow-local-ips was specified. This service node WILL NOT WORK ON THE PUBLIC OXEN NETWORK!");
           } else {
             MERROR("Address given for public-ip is not public: " << epee::string_tools::get_ip_string_from_int32(m_sn_public_ip));
             storage_ok = false;
@@ -510,7 +510,7 @@ namespace cryptonote
   {
     std::string s;
     s.reserve(128);
-    s += 'v'; s += LOKI_VERSION_STR;
+    s += 'v'; s += OXEN_VERSION_STR;
     s += "; Height: ";
     s += std::to_string(get_blockchain_storage().get_current_blockchain_height());
     s += ", SN: ";
@@ -552,7 +552,7 @@ namespace cryptonote
   {
     start_time = std::time(nullptr);
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     const std::string arg_hardforks_override = command_line::get_arg(vm, integration_test::arg_hardforks_override);
 
     std::vector<std::pair<uint8_t, uint64_t>> integration_test_hardforks;
@@ -642,7 +642,7 @@ namespace cryptonote
     bool sync_on_blocks = true;
     uint64_t sync_threshold = 1;
 
-#if !defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS) // In integration mode, don't delete the DB. This should be explicitly done in the tests. Otherwise the more likely behaviour is persisting the DB across multiple daemons in the same test.
+#if !defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS) // In integration mode, don't delete the DB. This should be explicitly done in the tests. Otherwise the more likely behaviour is persisting the DB across multiple daemons in the same test.
     if (m_nettype == FAKECHAIN && !keep_fakechain)
     {
       // reset the db by removing the database file before opening it
@@ -1987,7 +1987,7 @@ namespace cryptonote
     std::vector<block_complete_entry> blocks;
     m_miner.pause();
     {
-      LOKI_DEFER { m_miner.resume(); };
+      OXEN_DEFER { m_miner.resume(); };
       try
       {
         blocks.push_back(get_block_complete_entry(b, m_mempool));
@@ -2241,7 +2241,7 @@ namespace cryptonote
                 "is running! It is required to run alongside the Loki daemon");
             return;
           }
-          if (!check_external_ping(m_last_oxennet_ping, LOKINET_PING_LIFETIME, "Lokinet"))
+          if (!check_external_ping(m_last_oxennet_ping, OXENNET_PING_LIFETIME, "Lokinet"))
           {
             MGINFO_RED(
                 "Failed to submit uptime proof: have not heard from oxennet recently. Make sure that it "
@@ -2299,7 +2299,7 @@ namespace cryptonote
     m_miner.on_idle();
     m_mempool.on_idle();
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     integration_test::state.core_is_idle = true;
 #endif
 
@@ -2403,7 +2403,7 @@ namespace cryptonote
       return true;
     }
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     MDEBUG("Not checking block rate, integration test mode");
     return true;
 #endif

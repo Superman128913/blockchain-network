@@ -18,8 +18,8 @@ extern "C"
 #include <sodium/crypto_generichash.h>
 };
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "pulse"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "pulse"
 
 // Deliberately makes pulse communications flakey for testing purposes:
 //#define PULSE_TEST_CODE
@@ -344,7 +344,7 @@ std::string msg_source_string(round_context const &context, pulse::message const
 bool msg_signature_check(pulse::message const &msg, crypto::hash const &top_block_hash, service_nodes::quorum const &quorum, std::string *error)
 {
   std::stringstream stream;
-  LOKI_DEFER {
+  OXEN_DEFER {
     if (error) *error = stream.str();
   };
 

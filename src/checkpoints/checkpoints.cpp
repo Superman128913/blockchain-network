@@ -44,8 +44,8 @@
 #include "common/file.h"
 #include "common/hex.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "checkpoints"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "checkpoints"
 
 namespace cryptonote
 {
@@ -309,7 +309,7 @@ namespace cryptonote
     if (db->is_read_only())
       return true;
 
-#if !defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if !defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     if (nettype == MAINNET)
     {
       for (size_t i = 0; i < oxen::array_count(HARDCODED_MAINNET_CHECKPOINTS); ++i)

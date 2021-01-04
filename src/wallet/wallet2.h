@@ -77,8 +77,8 @@
 
 #include "rpc/http_client.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "wallet.wallet2"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "wallet.wallet2"
 
 #define SUBADDRESS_LOOKAHEAD_MAJOR 50
 #define SUBADDRESS_LOOKAHEAD_MINOR 200
@@ -86,7 +86,7 @@
 class Serialization_portability_wallet_Test;
 class wallet_accessor_test;
 
-LOKI_RPC_DOC_INTROSPECT
+OXEN_RPC_DOC_INTROSPECT
 namespace tools
 {
   static const char *ERR_MSG_NETWORK_VERSION_QUERY_FAILED = tr("Could not query the current network version, try later");

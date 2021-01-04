@@ -30,8 +30,8 @@ extern "C"
 #include <sodium/randombytes.h>
 }
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "lns"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "lns"
 
 namespace lns
 {
@@ -749,8 +749,8 @@ bool validate_lns_name(mapping_type type, std::string name, std::string *reason)
 
   if (is_oxennet)
     max_name_len = name.find('-') != std::string::npos
-      ? LOKINET_DOMAIN_NAME_MAX
-      : LOKINET_DOMAIN_NAME_MAX_NOHYPHEN;
+      ? OXENNET_DOMAIN_NAME_MAX
+      : OXENNET_DOMAIN_NAME_MAX_NOHYPHEN;
   else if (type == mapping_type::session) max_name_len = lns::SESSION_DISPLAY_NAME_MAX;
   else if (type == mapping_type::wallet)  max_name_len = lns::WALLET_NAME_MAX;
   else
@@ -774,7 +774,7 @@ bool validate_lns_name(mapping_type type, std::string name, std::string *reason)
   // NOTE: Validate domain specific requirements
   if (is_oxennet)
   {
-    // LOKINET
+    // OXENNET
     // Domain has to start with an alphanumeric, and can have (alphanumeric or hyphens) in between, the character before the suffix <char>'.oxen' must be alphanumeric followed by the suffix '.oxen'
     // It's *approximately* this regex, but there are some extra restrictions below
     // ^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.oxen$
@@ -955,7 +955,7 @@ bool mapping_value::validate_encrypted(mapping_type type, std::string_view value
   if (blob) *blob = {};
   std::stringstream err_stream;
   int value_len = crypto_aead_xchacha20poly1305_ietf_ABYTES + crypto_aead_xchacha20poly1305_ietf_NPUBBYTES;
-  if (is_oxennet_type(type)) value_len              += LOKINET_ADDRESS_BINARY_LENGTH;
+  if (is_oxennet_type(type)) value_len              += OXENNET_ADDRESS_BINARY_LENGTH;
   else if (type == mapping_type::wallet)  value_len += WALLET_ACCOUNT_BINARY_LENGTH;
   else if (type == mapping_type::session)
   {
@@ -1031,7 +1031,7 @@ static bool verify_lns_signature(crypto::hash const &hash, lns::generic_signatur
 static bool validate_against_previous_mapping(lns::name_system_db &lns_db, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_oxen_name_system const &lns_extra, std::string *reason)
 {
   std::stringstream err_stream;
-  LOKI_DEFER { if (reason && reason->empty()) *reason = err_stream.str(); };
+  OXEN_DEFER { if (reason && reason->empty()) *reason = err_stream.str(); };
 
   crypto::hash expected_prev_txid = crypto::null_hash;
   std::string name_hash           = hash_to_base64(lns_extra.name_hash);
@@ -1383,7 +1383,7 @@ bool mapping_value::decrypt(std::string_view name, mapping_type type, const cryp
   {
     switch(type) {
       case mapping_type::session: dec_length = SESSION_PUBLIC_KEY_BINARY_LENGTH; break;
-      case mapping_type::oxennet: dec_length = LOKINET_ADDRESS_BINARY_LENGTH; break;
+      case mapping_type::oxennet: dec_length = OXENNET_ADDRESS_BINARY_LENGTH; break;
       case mapping_type::wallet:  dec_length = WALLET_ACCOUNT_BINARY_LENGTH; break;
       default: MERROR("Invalid mapping_type passed to mapping_value::decrypt"); return false;
     }

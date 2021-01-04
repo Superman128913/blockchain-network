@@ -42,8 +42,8 @@
 #include <shared_mutex>
 #include <iterator>
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "qnet"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "qnet"
 
 namespace quorumnet {
 

@@ -44,7 +44,7 @@ namespace hw {
     namespace ledger {
 
     // Required coin value as returned by INS_GET_NETWORK during connection
-    constexpr auto COIN_NETWORK = "LOKI"sv;
+    constexpr auto COIN_NETWORK = "OXEN"sv;
 
     /* Minimal supported version */
     #define MINIMAL_APP_VERSION_MAJOR    0

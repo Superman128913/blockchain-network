@@ -1,5 +1,5 @@
-#ifndef LOKI_NAME_SYSTEM_H
-#define LOKI_NAME_SYSTEM_H
+#ifndef OXEN_NAME_SYSTEM_H
+#define OXEN_NAME_SYSTEM_H
 
 #include "crypto/crypto.h"
 #include "cryptonote_config.h"
@@ -28,9 +28,9 @@ namespace lns
 
 constexpr size_t WALLET_NAME_MAX                  = 97; // mainnet addresses are 95 but testnet/devnet are 97
 constexpr size_t WALLET_ACCOUNT_BINARY_LENGTH     = 2 * sizeof(crypto::public_key);
-constexpr size_t LOKINET_DOMAIN_NAME_MAX          = 63 + 5; // DNS components name must be at most 63 (+ 5 for .oxen); this limit applies if there is at least one hyphen (and thus includes punycode)
-constexpr size_t LOKINET_DOMAIN_NAME_MAX_NOHYPHEN = 32 + 5; // If the name does not contain a - then we restrict it to 32 characters so that it cannot be (and is obviously not) an encoded .oxen address (52 characters)
-constexpr size_t LOKINET_ADDRESS_BINARY_LENGTH    = sizeof(crypto::ed25519_public_key);
+constexpr size_t OXENNET_DOMAIN_NAME_MAX          = 63 + 5; // DNS components name must be at most 63 (+ 5 for .oxen); this limit applies if there is at least one hyphen (and thus includes punycode)
+constexpr size_t OXENNET_DOMAIN_NAME_MAX_NOHYPHEN = 32 + 5; // If the name does not contain a - then we restrict it to 32 characters so that it cannot be (and is obviously not) an encoded .oxen address (52 characters)
+constexpr size_t OXENNET_ADDRESS_BINARY_LENGTH    = sizeof(crypto::ed25519_public_key);
 constexpr size_t SESSION_DISPLAY_NAME_MAX         = 64;
 constexpr size_t SESSION_PUBLIC_KEY_BINARY_LENGTH = 1 + sizeof(crypto::ed25519_public_key); // Session keys at prefixed with 0x05 + ed25519 key
 
@@ -42,7 +42,7 @@ constexpr size_t SODIUM_ENCRYPTION_EXTRA_BYTES = 40; // crypto_aead_xchacha20pol
 
 struct mapping_value
 {
-  static size_t constexpr BUFFER_SIZE = std::max({WALLET_ACCOUNT_BINARY_LENGTH, LOKINET_ADDRESS_BINARY_LENGTH, SESSION_PUBLIC_KEY_BINARY_LENGTH}) + SODIUM_ENCRYPTION_EXTRA_BYTES;
+  static size_t constexpr BUFFER_SIZE = std::max({WALLET_ACCOUNT_BINARY_LENGTH, OXENNET_ADDRESS_BINARY_LENGTH, SESSION_PUBLIC_KEY_BINARY_LENGTH}) + SODIUM_ENCRYPTION_EXTRA_BYTES;
   std::array<uint8_t, BUFFER_SIZE> buffer;
   bool encrypted;
   size_t len;
@@ -321,4 +321,4 @@ private:
 };
 
 }; // namespace service_nodes
-#endif // LOKI_NAME_SYSTEM_H
+#endif // OXEN_NAME_SYSTEM_H

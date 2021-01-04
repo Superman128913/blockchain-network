@@ -50,17 +50,17 @@ message(STATUS "CMake version ${CMAKE_VERSION}")
 # Has to be set before `project()`, and ignored on non-macos:
 set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12 CACHE STRING "macOS deployment target (Apple clang only)")
 
-project(loki
+project(oxen
     VERSION 8.1.4
     LANGUAGES CXX C)
-set(LOKI_RELEASE_CODENAME "Salty Saga")
+  set(OXEN_RELEASE_CODENAME "Salty Saga")
 
 # String value to append to the full version string; this is intended to easily identify whether a
 # binary was build from the release or development branches.  This should be permanently set to an
 # empty string on `stable`, "-dev" on the `dev` branch, and can be set externally (via cmake
 # arguments) where it makes sense to take some other branch release with an extra value.
-if(NOT DEFINED LOKI_RELEASE_SUFFIX)
-  set(LOKI_RELEASE_SUFFIX "")
+if(NOT DEFINED OXEN_RELEASE_SUFFIX)
+  set(OXEN_RELEASE_SUFFIX "")
 endif()
 
 if(POLICY CMP0079)
@@ -857,7 +857,7 @@ if (WIN32)
 endif()
 
 if (BUILD_INTEGRATION)
-  target_compile_definitions(extra INTERFACE LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+  target_compile_definitions(extra INTERFACE OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
 else()
   option(USE_READLINE "Build with GNU readline support." ON)
   if(USE_READLINE AND BUILD_STATIC_DEPS)
@@ -894,8 +894,8 @@ if(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND ARCH_WIDTH EQUAL "32" AND NOT IOS AN
   endif()
 endif()
 
-option(LOKI_DEBUG_SHORT_PROOFS "Developer option to substantially reduce uptime proof intervals for local test network debugging (the result lokid will not be usable on the live networks)" OFF)
-if (LOKI_DEBUG_SHORT_PROOFS)
+option(OXEN_DEBUG_SHORT_PROOFS "Developer option to substantially reduce uptime proof intervals for local test network debugging (the result oxend will not be usable on the live networks)" OFF)
+if (OXEN_DEBUG_SHORT_PROOFS)
   add_definitions(-DUPTIME_PROOF_BASE_MINUTE=3) # 20x faster uptime proofs
 endif()
 
@@ -958,11 +958,11 @@ endif()
 # Set up a `make strip_binaries` target that strips built binaries.  This depends on all
 # default-built binaries and strips them after build.  (To also build and strip debug utilities
 # there is also a `make strip_binaries_all` target.)
-get_property(loki_exec_tgts_all GLOBAL PROPERTY loki_executable_targets)
-set(loki_exec_tgts "")
+get_property(oxen_exec_tgts_all GLOBAL PROPERTY oxen_executable_targets)
+set(oxen_exec_tgts "")
 set(strip_binaries "")
 set(strip_binaries_all "")
-foreach(tgt ${loki_exec_tgts_all})
+foreach(tgt ${oxen_exec_tgts_all})
   list(APPEND strip_binaries_all COMMAND ${CMAKE_STRIP} $<TARGET_FILE:${tgt}>)
   # Look for a EXCLUDE_FROM_ALL property:
   get_property(tgt_excl_all TARGET ${tgt} PROPERTY EXCLUDE_FROM_ALL)
@@ -971,12 +971,12 @@ foreach(tgt ${loki_exec_tgts_all})
   get_property(tgt_dir TARGET ${tgt} PROPERTY SOURCE_DIR)
   get_property(tgt_dir_excl_all DIRECTORY ${tgt_dir} PROPERTY EXCLUDE_FROM_ALL)
   if (NOT tgt_excl_all AND NOT tgt_dir_excl_all)
-    list(APPEND loki_exec_tgts ${tgt})
+    list(APPEND oxen_exec_tgts ${tgt})
     list(APPEND strip_binaries COMMAND ${CMAKE_STRIP} $<TARGET_FILE:${tgt}>)
   endif()
 endforeach()
-add_custom_target(strip_binaries ${strip_binaries} DEPENDS ${loki_exec_tgts})
-add_custom_target(strip_binaries_all ${strip_binaries_all} DEPENDS ${loki_exec_tgts_all})
+add_custom_target(strip_binaries ${strip_binaries} DEPENDS ${oxen_exec_tgts})
+add_custom_target(strip_binaries_all ${strip_binaries_all} DEPENDS ${oxen_exec_tgts_all})
 
 execute_process(COMMAND tar --version RESULT_VARIABLE tar_exit_code OUTPUT_VARIABLE tar_vers)
 set(git_tag "-unknown")
@@ -1017,17 +1017,17 @@ elseif(tar_os STREQUAL "Windows")
   endif()
   set(default_archive create_zip) # .tar.xz files are too scary for Windows users
 endif()
-set(tar_dir "loki-${tar_os}-${PROJECT_VERSION}${LOKI_RELEASE_SUFFIX}${git_tag}")
+set(tar_dir "oxen-${tar_os}-${PROJECT_VERSION}${OXEN_RELEASE_SUFFIX}${git_tag}")
 add_custom_target(create_tarxz
   COMMAND ${CMAKE_COMMAND} -E rename bin "${tar_dir}"
   COMMAND ${CMAKE_COMMAND} -E tar cvJ "${tar_dir}.tar.xz" -- "${tar_dir}"
   COMMAND ${CMAKE_COMMAND} -E rename "${tar_dir}" bin
-  DEPENDS ${loki_exec_tgts})
+  DEPENDS ${oxen_exec_tgts})
 
 add_custom_target(create_zip
   COMMAND ${CMAKE_COMMAND} -E rename bin "${tar_dir}"
   COMMAND ${CMAKE_COMMAND} -E tar cv "${tar_dir}.zip" --format=zip -- "${tar_dir}"
   COMMAND ${CMAKE_COMMAND} -E rename "${tar_dir}" bin
-  DEPENDS ${loki_exec_tgts})
+  DEPENDS ${oxen_exec_tgts})
 
 add_custom_target(create_archive DEPENDS ${default_archive})

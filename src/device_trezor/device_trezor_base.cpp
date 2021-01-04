@@ -37,8 +37,8 @@ namespace trezor {
 
 #ifdef WITH_DEVICE_TREZOR
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "device.trezor"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "device.trezor"
 #define TREZOR_BIP44_HARDENED_ZERO 0x80000000
 
     const uint32_t device_trezor_base::DEFAULT_BIP44_PATH[] = {0x8000002c, 0x80000080};
@@ -363,7 +363,7 @@ namespace trezor {
       require_connected();
       std::string tmp_session_id;
       auto initMsg = std::make_shared<messages::management::Initialize>();
-      LOKI_DEFER {
+      OXEN_DEFER {
         memwipe(&tmp_session_id[0], tmp_session_id.size());
       };
 
@@ -456,7 +456,7 @@ namespace trezor {
         m.set_allocated_pin(&pin_field);
       }
 
-      LOKI_DEFER {
+      OXEN_DEFER {
         m.release_pin();
         if (!pin_field.empty()){
           memwipe(&pin_field[0], pin_field.size());
@@ -513,7 +513,7 @@ namespace trezor {
         }
       }
 
-      LOKI_DEFER {
+      OXEN_DEFER {
         m.release_passphrase();
         if (!passphrase_field.empty()){
           memwipe(&passphrase_field[0], passphrase_field.size());
