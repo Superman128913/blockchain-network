@@ -63,17 +63,17 @@ enum struct mapping_type : uint16_t
 {
   session = 0,
   wallet = 1,
-  oxennet = 2, // the type value stored in the database; counts as 1-year when used in a buy tx.
-  oxennet_2years,
-  oxennet_5years,
-  oxennet_10years,
+  lokinet = 2, // the type value stored in the database; counts as 1-year when used in a buy tx.
+  lokinet_2years,
+  lokinet_5years,
+  lokinet_10years,
   _count,
   update_record_internal,
 };
 
-constexpr bool is_oxennet_type(mapping_type t) { return t >= mapping_type::oxennet && t <= mapping_type::oxennet_10years; }
+constexpr bool is_lokinet_type(mapping_type t) { return t >= mapping_type::lokinet && t <= mapping_type::lokinet_10years; }
 
-// How many days we add per "year" of LNS oxennet registration.  We slightly extend this to the 368
+// How many days we add per "year" of LNS lokinet registration.  We slightly extend this to the 368
 // days per registration "year" to allow for some blockchain time drift + leap years.
 constexpr uint64_t REGISTRATION_YEAR_DAYS = 368;
 
@@ -81,7 +81,7 @@ constexpr uint64_t burn_needed(uint8_t hf_version, mapping_type type)
 {
   uint64_t result = 0;
 
-  // The base amount for session/wallet/oxennet-1year:
+  // The base amount for session/wallet/lokinet-1year:
   const uint64_t basic_fee = (
       hf_version >= 16 ? 15*COIN :  // cryptonote::network_version_16_pulse -- but don't want to add cryptonote_config.h include
       20*COIN                       // cryptonote::network_version_15_lns
@@ -92,16 +92,16 @@ constexpr uint64_t burn_needed(uint8_t hf_version, mapping_type type)
       result = 0;
       break;
 
-    case mapping_type::oxennet: /* FALLTHRU */
+    case mapping_type::lokinet: /* FALLTHRU */
     case mapping_type::session: /* FALLTHRU */
     case mapping_type::wallet: /* FALLTHRU */
     default:
       result = basic_fee;
       break;
 
-    case mapping_type::oxennet_2years: result = 2 * basic_fee; break;
-    case mapping_type::oxennet_5years: result = 4 * basic_fee; break;
-    case mapping_type::oxennet_10years: result = 6 * basic_fee; break;
+    case mapping_type::lokinet_2years: result = 2 * basic_fee; break;
+    case mapping_type::lokinet_5years: result = 4 * basic_fee; break;
+    case mapping_type::lokinet_10years: result = 6 * basic_fee; break;
   }
   return result;
 }

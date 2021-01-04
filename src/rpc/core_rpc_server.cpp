@@ -420,7 +420,7 @@ namespace cryptonote { namespace rpc {
       res.service_node = m_core.service_node();
       res.start_time = (uint64_t)m_core.get_start_time();
       res.last_storage_server_ping = (uint64_t)m_core.m_last_storage_server_ping;
-      res.last_oxennet_ping = (uint64_t)m_core.m_last_oxennet_ping;
+      res.last_lokinet_ping = (uint64_t)m_core.m_last_lokinet_ping;
       res.free_space = m_core.get_free_space();
       res.height_without_bootstrap = res.height;
       std::shared_lock lock{m_bootstrap_daemon_mutex};
@@ -779,10 +779,10 @@ namespace cryptonote { namespace rpc {
         lns.blocks = lns::expiry_blocks(nettype, x.type);
         switch (x.type)
         {
-          case lns::mapping_type::oxennet: [[fallthrough]];
-          case lns::mapping_type::oxennet_2years: [[fallthrough]];
-          case lns::mapping_type::oxennet_5years: [[fallthrough]];
-          case lns::mapping_type::oxennet_10years: lns.type = "oxennet"; break;
+          case lns::mapping_type::lokinet: [[fallthrough]];
+          case lns::mapping_type::lokinet_2years: [[fallthrough]];
+          case lns::mapping_type::lokinet_5years: [[fallthrough]];
+          case lns::mapping_type::lokinet_10years: lns.type = "lokinet"; break;
 
           case lns::mapping_type::session: lns.type = "session"; break;
           case lns::mapping_type::wallet:  lns.type = "wallet"; break;
@@ -3291,11 +3291,11 @@ namespace cryptonote { namespace rpc {
       });
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  OXENNET_PING::response core_rpc_server::invoke(OXENNET_PING::request&& req, rpc_context context)
+  LOKINET_PING::response core_rpc_server::invoke(LOKINET_PING::request&& req, rpc_context context)
   {
-    return handle_ping<OXENNET_PING>(
-        req.version, service_nodes::MIN_OXENNET_VERSION,
-        "Oxennet", m_core.m_last_oxennet_ping, OXENNET_PING_LIFETIME,
+    return handle_ping<LOKINET_PING>(
+        req.version, service_nodes::MIN_LOKINET_VERSION,
+        "Lokinet", m_core.m_last_lokinet_ping, LOKINET_PING_LIFETIME,
         [this](bool significant) { if (significant) m_core.reset_proof_interval(); });
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -3519,7 +3519,7 @@ namespace cryptonote { namespace rpc {
       {
         types.push_back(static_cast<lns::mapping_type>(type));
         if (!lns::mapping_type_allowed(hf_version, types.back()))
-          throw rpc_error{ERROR_WRONG_PARAM, "Invalid oxennet type '" + std::to_string(type) + "'"};
+          throw rpc_error{ERROR_WRONG_PARAM, "Invalid lokinet type '" + std::to_string(type) + "'"};
       }
 
       // This also takes 32 raw bytes, but that is undocumented (because it is painful to pass
@@ -3619,7 +3619,7 @@ namespace cryptonote { namespace rpc {
     uint8_t hf_version = m_core.get_hard_fork_version(m_core.get_current_blockchain_height());
     auto type = static_cast<lns::mapping_type>(req.type);
     if (!lns::mapping_type_allowed(hf_version, type))
-      throw rpc_error{ERROR_WRONG_PARAM, "Invalid oxennet type '" + std::to_string(req.type) + "'"};
+      throw rpc_error{ERROR_WRONG_PARAM, "Invalid lokinet type '" + std::to_string(req.type) + "'"};
 
     if (auto mapping = m_core.get_blockchain_storage().name_system_db().resolve(
         type, *name_hash, m_core.get_current_blockchain_height()))

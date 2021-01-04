@@ -3231,8 +3231,8 @@ namespace {
     {
       auto& entry = res.known_names.emplace_back();
       auto& type = entry_types.emplace_back(details.type);
-      if (type > lns::mapping_type::oxennet && type <= lns::mapping_type::oxennet_10years)
-        type = lns::mapping_type::oxennet;
+      if (type > lns::mapping_type::lokinet && type <= lns::mapping_type::lokinet_10years)
+        type = lns::mapping_type::lokinet;
       entry.type = lns::mapping_type_str(type);
       entry.hashed = details.hashed_name;
       entry.name = details.name;

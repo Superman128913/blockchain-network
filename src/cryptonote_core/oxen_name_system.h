@@ -28,9 +28,9 @@ namespace lns
 
 constexpr size_t WALLET_NAME_MAX                  = 97; // mainnet addresses are 95 but testnet/devnet are 97
 constexpr size_t WALLET_ACCOUNT_BINARY_LENGTH     = 2 * sizeof(crypto::public_key);
-constexpr size_t OXENNET_DOMAIN_NAME_MAX          = 63 + 5; // DNS components name must be at most 63 (+ 5 for .oxen); this limit applies if there is at least one hyphen (and thus includes punycode)
-constexpr size_t OXENNET_DOMAIN_NAME_MAX_NOHYPHEN = 32 + 5; // If the name does not contain a - then we restrict it to 32 characters so that it cannot be (and is obviously not) an encoded .oxen address (52 characters)
-constexpr size_t OXENNET_ADDRESS_BINARY_LENGTH    = sizeof(crypto::ed25519_public_key);
+constexpr size_t LOKINET_DOMAIN_NAME_MAX          = 63 + 5; // DNS components name must be at most 63 (+ 5 for .oxen); this limit applies if there is at least one hyphen (and thus includes punycode)
+constexpr size_t LOKINET_DOMAIN_NAME_MAX_NOHYPHEN = 32 + 5; // If the name does not contain a - then we restrict it to 32 characters so that it cannot be (and is obviously not) an encoded .oxen address (52 characters)
+constexpr size_t LOKINET_ADDRESS_BINARY_LENGTH    = sizeof(crypto::ed25519_public_key);
 constexpr size_t SESSION_DISPLAY_NAME_MAX         = 64;
 constexpr size_t SESSION_PUBLIC_KEY_BINARY_LENGTH = 1 + sizeof(crypto::ed25519_public_key); // Session keys at prefixed with 0x05 + ed25519 key
 
@@ -42,7 +42,7 @@ constexpr size_t SODIUM_ENCRYPTION_EXTRA_BYTES = 40; // crypto_aead_xchacha20pol
 
 struct mapping_value
 {
-  static size_t constexpr BUFFER_SIZE = std::max({WALLET_ACCOUNT_BINARY_LENGTH, OXENNET_ADDRESS_BINARY_LENGTH, SESSION_PUBLIC_KEY_BINARY_LENGTH}) + SODIUM_ENCRYPTION_EXTRA_BYTES;
+  static size_t constexpr BUFFER_SIZE = std::max({WALLET_ACCOUNT_BINARY_LENGTH, LOKINET_ADDRESS_BINARY_LENGTH, SESSION_PUBLIC_KEY_BINARY_LENGTH}) + SODIUM_ENCRYPTION_EXTRA_BYTES;
   std::array<uint8_t, BUFFER_SIZE> buffer;
   bool encrypted;
   size_t len;
@@ -96,7 +96,7 @@ struct mapping_value
 
   // Validate a human readable mapping value representation in 'value' and write the binary form into 'blob'.
   // value: if type is session, 66 character hex string of an ed25519 public key (with 05 prefix)
-  //                   oxennet, 52 character base32z string of an ed25519 public key
+  //                   lokinet, 52 character base32z string of an ed25519 public key
   //                   wallet,  the wallet public address string
   // blob: (optional) if function returns true, validate will load the binary data into blob (ready for encryption via encrypt())
   static bool validate(cryptonote::network_type nettype, mapping_type type, std::string_view value, mapping_value *blob = nullptr, std::string *reason = nullptr);
@@ -110,10 +110,10 @@ inline std::string_view mapping_type_str(mapping_type type)
 {
   switch(type)
   {
-    case mapping_type::oxennet:         return "oxennet"sv; // general type stored in the database; 1 year when in a purchase tx
-    case mapping_type::oxennet_2years:  return "oxennet_2years"sv;  // Only used in a buy tx, not in the DB
-    case mapping_type::oxennet_5years:  return "oxennet_5years"sv;  // "
-    case mapping_type::oxennet_10years: return "oxennet_10years"sv; // "
+    case mapping_type::lokinet:         return "lokinet"sv; // general type stored in the database; 1 year when in a purchase tx
+    case mapping_type::lokinet_2years:  return "lokinet_2years"sv;  // Only used in a buy tx, not in the DB
+    case mapping_type::lokinet_5years:  return "lokinet_5years"sv;  // "
+    case mapping_type::lokinet_10years: return "lokinet_10years"sv; // "
     case mapping_type::session:         return "session"sv;
     case mapping_type::wallet:          return "wallet"sv;
     default: assert(false);             return "xx_unhandled_type"sv;
@@ -123,22 +123,22 @@ inline std::ostream &operator<<(std::ostream &os, mapping_type type) { return os
 
 constexpr bool mapping_type_allowed(uint8_t hf_version, mapping_type type) {
   return (type == mapping_type::session && hf_version >= cryptonote::network_version_15_lns)
-      || (is_oxennet_type(type) && hf_version >= cryptonote::network_version_16_pulse);
+      || (is_lokinet_type(type) && hf_version >= cryptonote::network_version_16_pulse);
 }
 
 // Returns all mapping types supported for lookup as of the given hardfork.  (Note that this does
-// not return the dedicated length types such as mapping_type::oxennet_5years as those are only
+// not return the dedicated length types such as mapping_type::lokinet_5years as those are only
 // relevant within a LNS buy tx).
 std::vector<mapping_type> all_mapping_types(uint8_t hf_version);
 
 sqlite3 *init_oxen_name_system(const fs::path& file_path, bool read_only);
 
 /// Returns the integer value used in the database and in RPC lookup calls for the given mapping
-/// type.  In particularly this maps all mapping_type::oxennet_Xyears values to the underlying value
-/// of mapping_type::oxennet.
+/// type.  In particularly this maps all mapping_type::lokinet_Xyears values to the underlying value
+/// of mapping_type::lokinet.
 constexpr uint16_t db_mapping_type(lns::mapping_type type) {
-  if (is_oxennet_type(type))
-    return static_cast<uint16_t>(mapping_type::oxennet);
+  if (is_lokinet_type(type))
+    return static_cast<uint16_t>(mapping_type::lokinet);
   return static_cast<uint16_t>(type);
 }
 
@@ -170,7 +170,7 @@ std::string        tx_extra_signature(std::string_view value, generic_owner cons
 
 enum struct lns_tx_type { lookup, buy, update, renew };
 // Converts a human readable case-insensitive string denoting the mapping type into a value suitable for storing into the LNS DB.
-// Currently accepts "session" or "oxennet" for lookups, buys, updates, and renewals; for buys and renewals also accepts "oxennet_Ny[ear]" for N=2,5,10
+// Currently accepts "session" or "lokinet" for lookups, buys, updates, and renewals; for buys and renewals also accepts "lokinet_Ny[ear]" for N=2,5,10
 // Lookups are implied by none of buy/update/renew.
 // mapping_type: (optional) if function returns true, the uint16_t value of the 'type' will be set
 bool         validate_mapping_type(std::string_view type, uint8_t hf_version, lns_tx_type txtype, mapping_type *mapping_type, std::string *reason);

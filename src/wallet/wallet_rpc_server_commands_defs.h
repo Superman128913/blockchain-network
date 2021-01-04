@@ -2186,7 +2186,7 @@ namespace tools::wallet_rpc {
     static constexpr const char *description =
 R"(Buy a Loki Name System (LNS) mapping that maps a unique name to a Session ID or Lokinet address.
 
-Currently supports Session and Lokinet registrations. Lokinet registrations can be for 1, 2, 5, or 10 years by specifying a type value of "oxennet", "oxennet_2y", "oxennet_5y", "oxennet_10y". Session registrations do not expire.
+Currently supports Session and Lokinet registrations. Lokinet registrations can be for 1, 2, 5, or 10 years by specifying a type value of "lokinet", "lokinet_2y", "lokinet_5y", "lokinet_10y". Session registrations do not expire.
 
 The owner of the LNS entry (by default, the purchasing wallet) will be permitted to submit LNS update transactions to the Loki blockchain (for example to update a Session pubkey or the target Lokinet address). You may change the primary owner or add a backup owner in the registration and can change them later with update transactions. Owner addresses can be either Loki wallets, or generic ed25519 pubkeys (for advanced uses).
 
@@ -2198,7 +2198,7 @@ For more information on updating and signing see the LNS_UPDATE_MAPPING document
 
     struct request
     {
-      std::string        type;            // The mapping type: "session", "oxennet", "oxennet_2y", "oxennet_5y", "oxennet_10y".
+      std::string        type;            // The mapping type: "session", "lokinet", "lokinet_2y", "lokinet_5y", "lokinet_10y".
       std::string        owner;           // (Optional): The ed25519 public key or wallet address that has authority to update the mapping.
       std::string        backup_owner;    // (Optional): The secondary, backup public key that has authority to update the mapping.
       std::string        name;            // The name to purchase via Loki Name Service
@@ -2231,19 +2231,19 @@ For more information on updating and signing see the LNS_UPDATE_MAPPING document
   };
 
   OXEN_RPC_DOC_INTROSPECT
-  // Renew an active oxennet LNS registration
+  // Renew an active lokinet LNS registration
   struct LNS_RENEW_MAPPING : RESTRICTED
   {
     static constexpr auto names() { return NAMES("lns_renew_mapping"); }
 
     static constexpr const char *description =
-R"(Renews a Loki Name System oxennet mapping by adding to the existing expiry time.
+R"(Renews a Loki Name System lokinet mapping by adding to the existing expiry time.
 
-The renewal can be for 1, 2, 5, or 10 years by specifying a `type` value of "oxennet_2y", "oxennet_10y", etc.)";
+The renewal can be for 1, 2, 5, or 10 years by specifying a `type` value of "lokinet_2y", "lokinet_10y", etc.)";
 
     struct request
     {
-      std::string        type;      // The mapping type, "oxennet" (1-year), or "oxennet_2y", "oxennet_5y", "oxennet_10y" for multi-year registrations.
+      std::string        type;      // The mapping type, "lokinet" (1-year), or "lokinet_2y", "lokinet_5y", "lokinet_10y" for multi-year registrations.
       std::string        name;      // The name to update
 
       uint32_t           account_index;    // (Optional) Transfer from this account index. (Defaults to 0)
@@ -2277,7 +2277,7 @@ If signing is performed externally then you must first encrypt the `value` (if b
 
     struct request
     {
-      std::string        type;      // The mapping type, "session" or "oxennet".
+      std::string        type;      // The mapping type, "session" or "lokinet".
       std::string        name;      // The name to update via Loki Name Service
       std::string        value;     // (Optional): The new value that the name maps to via Loki Name Service. If not specified or given the empty string "", then the mapping's value remains unchanged. If using a `signature` then this value (if non-empty) must be already encrypted.
       std::string        owner;     // (Optional): The new owner of the mapping. If not specified or given the empty string "", then the mapping's owner remains unchanged.
@@ -2323,7 +2323,7 @@ This command is only required if the open wallet is one of the owners of a LNS r
 
     struct request
     {
-      std::string type;  // The mapping type, currently we only support "session". In future "oxennet" and "blockchain" mappings will be available.
+      std::string type;  // The mapping type, currently we only support "session". In future "lokinet" and "blockchain" mappings will be available.
       std::string name;  // The desired name to update via Loki Name Service
       std::string encrypted_value; // (Optional): The new encrypted value that the name maps to via Loki Name Service. If not specified or given the empty string "", then the mapping's value remains unchanged.
       std::string owner;     // (Optional): The new owner of the mapping. If not specified or given the empty string "", then the mapping's owner remains unchanged.
@@ -2349,7 +2349,7 @@ This command is only required if the open wallet is one of the owners of a LNS r
 
     struct request
     {
-      std::string type; // The mapping type, "session" or "oxennet".
+      std::string type; // The mapping type, "session" or "lokinet".
       std::string name; // The desired name to hash
 
       KV_MAP_SERIALIZABLE
@@ -2373,7 +2373,7 @@ This command is only required if the open wallet is one of the owners of a LNS r
 
     struct known_record
     {
-      std::string type;                          // The mapping type, "session" or "oxennet".
+      std::string type;                          // The mapping type, "session" or "lokinet".
       std::string hashed;                        // The hashed name (in base64)
       std::string name;                          // The plaintext name
       std::string owner;                         // The public key that purchased the Loki Name Service entry.
@@ -2411,7 +2411,7 @@ This command is only required if the open wallet is one of the owners of a LNS r
 
     struct record
     {
-      std::string type; // The LNS type (mandatory); currently support values are: "session", "oxennet"
+      std::string type; // The LNS type (mandatory); currently support values are: "session", "lokinet"
       std::string name; // The (unhashed) name of the record
 
       KV_MAP_SERIALIZABLE
@@ -2436,7 +2436,7 @@ This command is only required if the open wallet is one of the owners of a LNS r
     struct request
     {
       std::string name;            // The LNS name with which to encrypt the value.
-      std::string type;            // The mapping type: "session" or "oxennet".
+      std::string type;            // The mapping type: "session" or "lokinet".
       std::string value;           // The value to be encrypted.
 
       KV_MAP_SERIALIZABLE
@@ -2459,7 +2459,7 @@ This command is only required if the open wallet is one of the owners of a LNS r
     struct request
     {
       std::string name;            // The LNS name of the given encrypted value.
-      std::string type;            // The mapping type: "session" or "oxennet".
+      std::string type;            // The mapping type: "session" or "lokinet".
       std::string encrypted_value; // The encrypted value represented in hex.
 
       KV_MAP_SERIALIZABLE
