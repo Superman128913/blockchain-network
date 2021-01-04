@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Example script using Python to query and decode and decrypt a .loki address or HF16+ Session address
+# Example script using Python to query and decode and decrypt a .oxen address or HF16+ Session address
 
 import requests
 import nacl.hash
@@ -8,7 +8,7 @@ import nacl.secret
 from base64 import b64encode, b32encode
 import sys
 
-name = "Jason.loki"
+name = "Jason.oxen"
 type = 2 # 2 == lokinet, 0 == session
 
 name_hash = nacl.hash.blake2b(name.lower().encode(), encoder=nacl.encoding.RawEncoder)
@@ -18,7 +18,7 @@ name_hash_b64 = b64encode(name_hash)
 
 print("Name: {}, hashed+base64: {}".format(name, name_hash_b64.decode()))
 
-# Make the RPC request to some lokid
+# Make the RPC request to some oxend
 r = requests.post('http://localhost:22023/json_rpc',
         json={ "jsonrpc": "2.0", "id": "0",
             "method": "lns_resolve", "params": { "type": 2, "name_hash": name_hash_b64 }
@@ -60,7 +60,7 @@ val = val.translate(str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567", "ybndrfg8e
 # Base32 is also padded with '=', which isn't used in z-base-32:
 val = val.rstrip('=')
 
-# Finally slap ".loki" on the end:
-val += ".loki"
+# Finally slap ".oxen" on the end:
+val += ".oxen"
 
 print("Result: {}".format(val))

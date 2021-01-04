@@ -1073,7 +1073,7 @@ struct lns_keys_t
 {
   lns::generic_owner owner;
   lns::mapping_value wallet_value; // NOTE: this field is the binary (value) part of the name -> (value) mapping
-  lns::mapping_value oxennet_value;
+  lns::mapping_value lokinet_value;
   lns::mapping_value session_value;
 };
 
@@ -1083,22 +1083,22 @@ static lns_keys_t make_lns_keys(cryptonote::account_base const &src)
   result.owner                  = lns::make_monero_owner(src.get_keys().m_account_address, false /*is_subaddress*/);
   result.session_value.len      = lns::SESSION_PUBLIC_KEY_BINARY_LENGTH;
   result.wallet_value.len       = sizeof(src.get_keys().m_account_address);
-  result.oxennet_value.len      = sizeof(result.owner.wallet.address.m_spend_public_key);
+  result.lokinet_value.len      = sizeof(result.owner.wallet.address.m_spend_public_key);
 
-  memcpy(&result.session_value.buffer[0] + 1, &result.owner.wallet.address.m_spend_public_key, result.oxennet_value.len);
+  memcpy(&result.session_value.buffer[0] + 1, &result.owner.wallet.address.m_spend_public_key, result.lokinet_value.len);
   memcpy(&result.wallet_value.buffer[0], (char *)&src.get_keys().m_account_address, result.wallet_value.len);
 
   // NOTE: Just needs a 32 byte key. Reuse spend key
-  memcpy(&result.oxennet_value.buffer[0], (char *)&result.owner.wallet.address.m_spend_public_key, result.oxennet_value.len);
+  memcpy(&result.lokinet_value.buffer[0], (char *)&result.owner.wallet.address.m_spend_public_key, result.lokinet_value.len);
 
   result.session_value.buffer[0] = 5; // prefix with 0x05
   return result;
 }
 
 // Lokinet FAKECHAIN LNS expiry blocks
-uint64_t oxennet_expiry(lns::mapping_type type) {
+uint64_t lokinet_expiry(lns::mapping_type type) {
   auto exp = lns::expiry_blocks(cryptonote::FAKECHAIN, type);
-  if (!exp) throw std::logic_error{"test suite bug: oxennet_expiry called with non-oxennet mapping type"};
+  if (!exp) throw std::logic_error{"test suite bug: lokinet_expiry called with non-lokinet mapping type"};
   return *exp;
 }
 
@@ -1112,19 +1112,19 @@ bool oxen_name_system_expiration::generate(std::vector<test_event_entry> &events
   gen.add_mined_money_unlock_blocks();
 
   lns_keys_t miner_key = make_lns_keys(miner);
-  for (auto mapping_type = lns::mapping_type::oxennet;
-       mapping_type     <= lns::mapping_type::oxennet_10years;
+  for (auto mapping_type = lns::mapping_type::lokinet;
+       mapping_type     <= lns::mapping_type::lokinet_10years;
        mapping_type      = static_cast<lns::mapping_type>(static_cast<uint16_t>(mapping_type) + 1))
   {
     std::string const name     = "mydomain.oxen";
     if (lns::mapping_type_allowed(gen.hardfork(), mapping_type))
     {
-      cryptonote::transaction tx = gen.create_and_add_oxen_name_system_tx(miner, gen.hardfork(), mapping_type, name, miner_key.oxennet_value);
+      cryptonote::transaction tx = gen.create_and_add_oxen_name_system_tx(miner, gen.hardfork(), mapping_type, name, miner_key.lokinet_value);
       gen.create_and_add_next_block({tx});
       crypto::hash tx_hash = cryptonote::get_transaction_hash(tx);
 
       uint64_t height_of_lns_entry   = gen.height();
-      uint64_t expected_expiry_block = height_of_lns_entry + oxennet_expiry(mapping_type);
+      uint64_t expected_expiry_block = height_of_lns_entry + lokinet_expiry(mapping_type);
       std::string name_hash = lns::name_to_base64_hash(name);
 
       oxen_register_callback(events, "check_lns_entries", [=](cryptonote::core &c, size_t ev_index)
@@ -1139,7 +1139,7 @@ bool oxen_name_system_expiration::generate(std::vector<test_event_entry> &events
                                      << " == " << owner.address.to_string(cryptonote::FAKECHAIN));
 
         lns::mapping_record record = lns_db.get_mapping(mapping_type, name_hash);
-        CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::oxennet, name, miner_key.oxennet_value, height_of_lns_entry, height_of_lns_entry + oxennet_expiry(mapping_type), tx_hash, miner_key.owner, {} /*backup_owner*/));
+        CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::lokinet, name, miner_key.lokinet_value, height_of_lns_entry, height_of_lns_entry + lokinet_expiry(mapping_type), tx_hash, miner_key.owner, {} /*backup_owner*/));
         return true;
       });
 
@@ -1160,14 +1160,14 @@ bool oxen_name_system_expiration::generate(std::vector<test_event_entry> &events
                                      << " == " << owner.address.to_string(cryptonote::FAKECHAIN));
 
         lns::mapping_record record = lns_db.get_mapping(mapping_type, name_hash);
-        CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::oxennet, name, miner_key.oxennet_value, height_of_lns_entry, height_of_lns_entry + oxennet_expiry(mapping_type), tx_hash, miner_key.owner, {} /*backup_owner*/));
+        CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::lokinet, name, miner_key.lokinet_value, height_of_lns_entry, height_of_lns_entry + lokinet_expiry(mapping_type), tx_hash, miner_key.owner, {} /*backup_owner*/));
         CHECK_EQ(record.active(blockchain_height), false);
         return true;
       });
     }
     else
     {
-      cryptonote::transaction tx = gen.create_oxen_name_system_tx(miner, gen.hardfork(), mapping_type, name, miner_key.oxennet_value);
+      cryptonote::transaction tx = gen.create_oxen_name_system_tx(miner, gen.hardfork(), mapping_type, name, miner_key.lokinet_value);
       gen.add_tx(tx, false /*can_be_added_to_blockchain*/, "Can not add LNS TX that uses disallowed type");
     }
   }
@@ -1213,20 +1213,20 @@ bool oxen_name_system_get_mappings_by_owner::generate(std::vector<test_event_ent
   uint64_t session_height = gen.height();
 
   // NOTE: Register some Lokinet names
-  std::string oxennet_name1 = "Lorem.oxen";
-  std::string oxennet_name_hash1 = "GsM6OUk5E5D9keBIK2PlA4kjwiPe+/UB0nUurjKvFJQ=";
-  std::string oxennet_name2 = "ipSum.oxen";
-  std::string oxennet_name_hash2 = "p8IYR3ZWr0KSU4ZPazYxTkwvXsm0dzq5dmour7VmIDY=";
-  crypto::hash oxennet_name1_txid = {}, oxennet_name2_txid = {};
-  if (lns::mapping_type_allowed(gen.hardfork(), lns::mapping_type::oxennet))
+  std::string lokinet_name1 = "Lorem.oxen";
+  std::string lokinet_name_hash1 = "GsM6OUk5E5D9keBIK2PlA4kjwiPe+/UB0nUurjKvFJQ=";
+  std::string lokinet_name2 = "ipSum.oxen";
+  std::string lokinet_name_hash2 = "p8IYR3ZWr0KSU4ZPazYxTkwvXsm0dzq5dmour7VmIDY=";
+  crypto::hash lokinet_name1_txid = {}, lokinet_name2_txid = {};
+  if (lns::mapping_type_allowed(gen.hardfork(), lns::mapping_type::lokinet))
   {
-    cryptonote::transaction tx1 = gen.create_and_add_oxen_name_system_tx(bob, gen.hardfork(), lns::mapping_type::oxennet, oxennet_name1, bob_key.oxennet_value);
-    cryptonote::transaction tx2 = gen.create_and_add_oxen_name_system_tx(miner, gen.hardfork(), lns::mapping_type::oxennet_5years, oxennet_name2, bob_key.oxennet_value, &bob_key.owner);
+    cryptonote::transaction tx1 = gen.create_and_add_oxen_name_system_tx(bob, gen.hardfork(), lns::mapping_type::lokinet, lokinet_name1, bob_key.lokinet_value);
+    cryptonote::transaction tx2 = gen.create_and_add_oxen_name_system_tx(miner, gen.hardfork(), lns::mapping_type::lokinet_5years, lokinet_name2, bob_key.lokinet_value, &bob_key.owner);
     gen.create_and_add_next_block({tx1, tx2});
-    oxennet_name1_txid = get_transaction_hash(tx1);
-    oxennet_name2_txid = get_transaction_hash(tx2);
+    lokinet_name1_txid = get_transaction_hash(tx1);
+    lokinet_name2_txid = get_transaction_hash(tx2);
   }
-  uint64_t oxennet_height = gen.height();
+  uint64_t lokinet_height = gen.height();
 
   // NOTE: Register some wallet names
   std::string wallet_name1 = "Wallet1";
@@ -1254,7 +1254,7 @@ bool oxen_name_system_get_mappings_by_owner::generate(std::vector<test_event_ent
     size_t expected_size = 0;
     if (lns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), lns::mapping_type::session)) expected_size += 2;
     if (lns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), lns::mapping_type::wallet)) expected_size += 2;
-    if (lns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), lns::mapping_type::oxennet)) expected_size += 2;
+    if (lns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), lns::mapping_type::lokinet)) expected_size += 2;
     CHECK_EQ(records.size(), expected_size);
 
     std::sort(records.begin(), records.end(), [](const auto& a, const auto& b) {
@@ -1270,12 +1270,12 @@ bool oxen_name_system_get_mappings_by_owner::generate(std::vector<test_event_ent
       CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, records[1], lns::mapping_type::session, session_name2, bob_key.session_value, session_height, std::nullopt, session_name2_txid, bob_key.owner, {} /*backup_owner*/));
     }
 
-    if (lns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), lns::mapping_type::oxennet))
+    if (lns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), lns::mapping_type::lokinet))
     {
-      CHECK_EQ(records[2].name_hash, oxennet_name_hash1);
-      CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, records[2], lns::mapping_type::oxennet, oxennet_name1, bob_key.oxennet_value, oxennet_height, oxennet_height + oxennet_expiry(lns::mapping_type::oxennet), oxennet_name1_txid, bob_key.owner, {} /*backup_owner*/));
-      CHECK_EQ(records[3].name_hash, oxennet_name_hash2);
-      CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, records[3], lns::mapping_type::oxennet, oxennet_name2, bob_key.oxennet_value, oxennet_height, oxennet_height + oxennet_expiry(lns::mapping_type::oxennet_5years), oxennet_name2_txid, bob_key.owner, {} /*backup_owner*/));
+      CHECK_EQ(records[2].name_hash, lokinet_name_hash1);
+      CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, records[2], lns::mapping_type::lokinet, lokinet_name1, bob_key.lokinet_value, lokinet_height, lokinet_height + lokinet_expiry(lns::mapping_type::lokinet), lokinet_name1_txid, bob_key.owner, {} /*backup_owner*/));
+      CHECK_EQ(records[3].name_hash, lokinet_name_hash2);
+      CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, records[3], lns::mapping_type::lokinet, lokinet_name2, bob_key.lokinet_value, lokinet_height, lokinet_height + lokinet_expiry(lns::mapping_type::lokinet_5years), lokinet_name2_txid, bob_key.owner, {} /*backup_owner*/));
     }
 
     if (lns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), lns::mapping_type::wallet))
@@ -1421,9 +1421,9 @@ bool oxen_name_system_handles_duplicate_in_lns_db::generate(std::vector<test_eve
   lns_keys_t miner_key     = make_lns_keys(miner);
   lns_keys_t bob_key       = make_lns_keys(bob);
   std::string session_name = "myfriendlydisplayname.oxen";
-  std::string oxennet_name = session_name;
+  std::string lokinet_name = session_name;
   auto custom_type         = static_cast<lns::mapping_type>(3928);
-  crypto::hash session_tx_hash = {}, oxennet_tx_hash = {};
+  crypto::hash session_tx_hash = {}, lokinet_tx_hash = {};
   {
     // NOTE: Allow duplicates with the same name but different type
     cryptonote::transaction bar = gen.create_and_add_oxen_name_system_tx(miner, gen.hardfork(), lns::mapping_type::session, session_name, bob_key.session_value);
@@ -1432,11 +1432,11 @@ bool oxen_name_system_handles_duplicate_in_lns_db::generate(std::vector<test_eve
     std::vector<cryptonote::transaction> txs;
     txs.push_back(bar);
 
-    if (lns::mapping_type_allowed(gen.hardfork(), lns::mapping_type::oxennet))
+    if (lns::mapping_type_allowed(gen.hardfork(), lns::mapping_type::lokinet))
     {
-      cryptonote::transaction bar3 = gen.create_and_add_oxen_name_system_tx(miner, gen.hardfork(), lns::mapping_type::oxennet_2years, session_name, miner_key.oxennet_value);
+      cryptonote::transaction bar3 = gen.create_and_add_oxen_name_system_tx(miner, gen.hardfork(), lns::mapping_type::lokinet_2years, session_name, miner_key.lokinet_value);
       txs.push_back(bar3);
-      oxennet_tx_hash = get_transaction_hash(bar3);
+      lokinet_tx_hash = get_transaction_hash(bar3);
     }
 
     gen.create_and_add_next_block(txs);
@@ -1465,10 +1465,10 @@ bool oxen_name_system_handles_duplicate_in_lns_db::generate(std::vector<test_eve
     CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record1, lns::mapping_type::session, session_name, bob_key.session_value, height_of_lns_entry, std::nullopt, session_tx_hash, miner_key.owner, {} /*backup_owner*/));
     CHECK_EQ(record1.owner_id, owner.id);
 
-    if (lns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), lns::mapping_type::oxennet))
+    if (lns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), lns::mapping_type::lokinet))
     {
-      lns::mapping_record record2 = lns_db.get_mapping(lns::mapping_type::oxennet, session_name_hash);
-      CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record2, lns::mapping_type::oxennet, oxennet_name, miner_key.oxennet_value, height_of_lns_entry, height_of_lns_entry + oxennet_expiry(lns::mapping_type::oxennet_2years), oxennet_tx_hash, miner_key.owner, {} /*backup_owner*/));
+      lns::mapping_record record2 = lns_db.get_mapping(lns::mapping_type::lokinet, session_name_hash);
+      CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record2, lns::mapping_type::lokinet, lokinet_name, miner_key.lokinet_value, height_of_lns_entry, height_of_lns_entry + lokinet_expiry(lns::mapping_type::lokinet_2years), lokinet_tx_hash, miner_key.owner, {} /*backup_owner*/));
       CHECK_EQ(record2.owner_id, owner.id);
       CHECK_EQ(record2.active(blockchain_height), true);
     }
@@ -1586,21 +1586,21 @@ bool oxen_name_system_invalid_tx_extra_params::generate(std::vector<test_event_e
       }
     }
 
-    if (lns::mapping_type_allowed(gen.hardfork(), lns::mapping_type::oxennet))
+    if (lns::mapping_type_allowed(gen.hardfork(), lns::mapping_type::lokinet))
     {
-      valid_data.type = lns::mapping_type::oxennet;
+      valid_data.type = lns::mapping_type::lokinet;
       // Lokinet name empty
       {
         cryptonote::tx_extra_oxen_name_system data = valid_data;
         data.name_hash                             = {};
-        data.encrypted_value                       = miner_key.oxennet_value.make_encrypted("").to_string();
+        data.encrypted_value                       = miner_key.lokinet_value.make_encrypted("").to_string();
         make_lns_tx_with_custom_extra(gen, events, miner, data, false, "(Lokinet) Empty domain name in LNS is invalid");
       }
 
       // Lokinet value too short
       {
         cryptonote::tx_extra_oxen_name_system data = valid_data;
-        data.encrypted_value                       = miner_key.oxennet_value.make_encrypted(name).to_string();
+        data.encrypted_value                       = miner_key.lokinet_value.make_encrypted(name).to_string();
         data.encrypted_value.resize(data.encrypted_value.size() - 1);
         make_lns_tx_with_custom_extra(gen, events, miner, data, false, "(Lokinet) Domain value in LNS too long");
       }
@@ -1608,7 +1608,7 @@ bool oxen_name_system_invalid_tx_extra_params::generate(std::vector<test_event_e
       // Lokinet value too long
       {
         cryptonote::tx_extra_oxen_name_system data = valid_data;
-        data.encrypted_value                       = miner_key.oxennet_value.make_encrypted(name).to_string();
+        data.encrypted_value                       = miner_key.lokinet_value.make_encrypted(name).to_string();
         data.encrypted_value.resize(data.encrypted_value.size() + 1);
         make_lns_tx_with_custom_extra(gen, events, miner, data, false, "(Lokinet) Domain value in LNS too long");
       }
@@ -1665,10 +1665,10 @@ bool oxen_name_system_large_reorg::generate(std::vector<test_event_entry> &event
 
   // NOTE: Generate the first round of LNS transactions belonging to miner
   uint64_t first_lns_height                 = 0;
-  std::string const oxennet_name1           = "website.oxen";
+  std::string const lokinet_name1           = "website.oxen";
   std::string const wallet_name1            = "MyWallet";
   std::string const session_name1           = "I-Like-Loki";
-  crypto::hash session_tx_hash1 = {}, wallet_tx_hash1 = {}, oxennet_tx_hash1 = {};
+  crypto::hash session_tx_hash1 = {}, wallet_tx_hash1 = {}, lokinet_tx_hash1 = {};
   {
     // NOTE: Generate and add the (transactions + block) to the blockchain
     {
@@ -1684,11 +1684,11 @@ bool oxen_name_system_large_reorg::generate(std::vector<test_event_entry> &event
         wallet_tx_hash1 = get_transaction_hash(wallet_tx);
       }
 
-      if (lns::mapping_type_allowed(gen.hardfork(), lns::mapping_type::oxennet_10years))
+      if (lns::mapping_type_allowed(gen.hardfork(), lns::mapping_type::lokinet_10years))
       {
-        cryptonote::transaction oxennet_tx = gen.create_and_add_oxen_name_system_tx(miner, gen.hardfork(), lns::mapping_type::oxennet_10years, oxennet_name1, miner_key.oxennet_value);
-        txs.push_back(oxennet_tx);
-        oxennet_tx_hash1 = get_transaction_hash(oxennet_tx);
+        cryptonote::transaction lokinet_tx = gen.create_and_add_oxen_name_system_tx(miner, gen.hardfork(), lns::mapping_type::lokinet_10years, lokinet_name1, miner_key.lokinet_value);
+        txs.push_back(lokinet_tx);
+        lokinet_tx_hash1 = get_transaction_hash(lokinet_tx);
       }
       gen.create_and_add_next_block(txs);
     }
@@ -1703,15 +1703,15 @@ bool oxen_name_system_large_reorg::generate(std::vector<test_event_entry> &event
 
       size_t expected_size = 1;
       if (lns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), lns::mapping_type::wallet)) expected_size += 1;
-      if (lns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), lns::mapping_type::oxennet)) expected_size += 1;
+      if (lns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), lns::mapping_type::lokinet)) expected_size += 1;
       CHECK_EQ(records.size(), expected_size);
 
       for (lns::mapping_record const &record : records)
       {
         if (record.type == lns::mapping_type::session)
           CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::session, session_name1, miner_key.session_value, first_lns_height, std::nullopt, session_tx_hash1, miner_key.owner, {} /*backup_owner*/));
-        else if (record.type == lns::mapping_type::oxennet)
-          CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::oxennet, oxennet_name1, miner_key.oxennet_value, first_lns_height, first_lns_height + oxennet_expiry(lns::mapping_type::oxennet_10years), oxennet_tx_hash1, miner_key.owner, {} /*backup_owner*/));
+        else if (record.type == lns::mapping_type::lokinet)
+          CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::lokinet, lokinet_name1, miner_key.lokinet_value, first_lns_height, first_lns_height + lokinet_expiry(lns::mapping_type::lokinet_10years), lokinet_tx_hash1, miner_key.owner, {} /*backup_owner*/));
         else if (record.type == lns::mapping_type::wallet)
           CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::wallet, wallet_name1, miner_key.wallet_value, first_lns_height, std::nullopt, wallet_tx_hash1, miner_key.owner, {} /*backup_owner*/));
         else
@@ -1723,22 +1723,22 @@ bool oxen_name_system_large_reorg::generate(std::vector<test_event_entry> &event
     });
   }
 
-  // NOTE: Generate and add the second round of (transactions + block) to the blockchain, renew oxennet and add bob's session, update miner's session value to other's session value
+  // NOTE: Generate and add the second round of (transactions + block) to the blockchain, renew lokinet and add bob's session, update miner's session value to other's session value
   cryptonote::account_base const other = gen.add_account();
   lns_keys_t const other_key           = make_lns_keys(other);
   uint64_t second_lns_height = 0;
   {
     std::string const bob_session_name1 = "I-Like-Session";
-    crypto::hash session_tx_hash2 = {}, oxennet_tx_hash2 = {}, session_tx_hash3;
+    crypto::hash session_tx_hash2 = {}, lokinet_tx_hash2 = {}, session_tx_hash3;
     {
       std::vector<cryptonote::transaction> txs;
       txs.push_back(gen.create_and_add_oxen_name_system_tx(bob, gen.hardfork(), lns::mapping_type::session, bob_session_name1, bob_key.session_value));
       session_tx_hash2 = cryptonote::get_transaction_hash(txs[0]);
 
-      if (lns::mapping_type_allowed(gen.hardfork(), lns::mapping_type::oxennet))
+      if (lns::mapping_type_allowed(gen.hardfork(), lns::mapping_type::lokinet))
       {
-        txs.push_back(gen.create_and_add_oxen_name_system_tx_renew(miner, gen.hardfork(), lns::mapping_type::oxennet_5years, oxennet_name1));
-        oxennet_tx_hash2 = cryptonote::get_transaction_hash(txs.back());
+        txs.push_back(gen.create_and_add_oxen_name_system_tx_renew(miner, gen.hardfork(), lns::mapping_type::lokinet_5years, lokinet_name1));
+        lokinet_tx_hash2 = cryptonote::get_transaction_hash(txs.back());
       }
 
       txs.push_back(gen.create_and_add_oxen_name_system_tx_update(miner, gen.hardfork(), lns::mapping_type::session, session_name1, &other_key.session_value));
@@ -1761,8 +1761,8 @@ bool oxen_name_system_large_reorg::generate(std::vector<test_event_entry> &event
         {
           if (record.type == lns::mapping_type::session)
             CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::session, session_name1, other_key.session_value, second_lns_height, std::nullopt, session_tx_hash3, miner_key.owner, {} /*backup_owner*/));
-          else if (record.type == lns::mapping_type::oxennet)
-            CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::oxennet, oxennet_name1, miner_key.oxennet_value, second_lns_height, first_lns_height + oxennet_expiry(lns::mapping_type::oxennet_5years) + oxennet_expiry(lns::mapping_type::oxennet_10years), oxennet_tx_hash2, miner_key.owner, {} /*backup_owner*/));
+          else if (record.type == lns::mapping_type::lokinet)
+            CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::lokinet, lokinet_name1, miner_key.lokinet_value, second_lns_height, first_lns_height + lokinet_expiry(lns::mapping_type::lokinet_5years) + lokinet_expiry(lns::mapping_type::lokinet_10years), lokinet_tx_hash2, miner_key.owner, {} /*backup_owner*/));
           else if (record.type == lns::mapping_type::wallet)
             CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::wallet, wallet_name1, miner_key.wallet_value, first_lns_height, std::nullopt, wallet_tx_hash1, miner_key.owner, {} /*backup_owner*/));
           else
@@ -1809,15 +1809,15 @@ bool oxen_name_system_large_reorg::generate(std::vector<test_event_entry> &event
       std::vector<lns::mapping_record> records = lns_db.get_mappings_by_owner(miner_key.owner);
       size_t expected_size = 1;
       if (lns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), lns::mapping_type::wallet)) expected_size += 1;
-      if (lns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), lns::mapping_type::oxennet)) expected_size += 1;
+      if (lns::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), lns::mapping_type::lokinet)) expected_size += 1;
       CHECK_EQ(records.size(), expected_size);
 
       for (lns::mapping_record const &record : records)
       {
         if (record.type == lns::mapping_type::session)
           CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::session, session_name1, miner_key.session_value, first_lns_height, std::nullopt, session_tx_hash1, miner_key.owner, {} /*backup_owner*/));
-        else if (record.type == lns::mapping_type::oxennet)
-          CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::oxennet, oxennet_name1, miner_key.oxennet_value, first_lns_height, first_lns_height + oxennet_expiry(lns::mapping_type::oxennet_10years), oxennet_tx_hash1, miner_key.owner, {} /*backup_owner*/));
+        else if (record.type == lns::mapping_type::lokinet)
+          CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::lokinet, lokinet_name1, miner_key.lokinet_value, first_lns_height, first_lns_height + lokinet_expiry(lns::mapping_type::lokinet_10years), lokinet_tx_hash1, miner_key.owner, {} /*backup_owner*/));
         else if (record.type == lns::mapping_type::wallet)
           CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::wallet, wallet_name1, miner_key.wallet_value, first_lns_height, std::nullopt, wallet_tx_hash1, miner_key.owner, {} /*backup_owner*/));
         else
@@ -1861,7 +1861,7 @@ bool oxen_name_system_name_renewal::generate(std::vector<test_event_entry> &even
   oxen_chain_generator gen(events, hard_forks);
   cryptonote::account_base miner = gen.first_miner_;
 
-  if (!lns::mapping_type_allowed(hard_forks.back().first, lns::mapping_type::oxennet))
+  if (!lns::mapping_type_allowed(hard_forks.back().first, lns::mapping_type::lokinet))
       return true;
 
   {
@@ -1871,7 +1871,7 @@ bool oxen_name_system_name_renewal::generate(std::vector<test_event_entry> &even
 
   lns_keys_t miner_key = make_lns_keys(miner);
   std::string const name    = "mydomain.oxen";
-  cryptonote::transaction tx = gen.create_and_add_oxen_name_system_tx(miner, gen.hardfork(), lns::mapping_type::oxennet, name, miner_key.oxennet_value);
+  cryptonote::transaction tx = gen.create_and_add_oxen_name_system_tx(miner, gen.hardfork(), lns::mapping_type::lokinet, name, miner_key.lokinet_value);
   gen.create_and_add_next_block({tx});
   crypto::hash prev_txid = get_transaction_hash(tx);
 
@@ -1890,21 +1890,21 @@ bool oxen_name_system_name_renewal::generate(std::vector<test_event_entry> &even
                                  << " == " << owner.address.to_string(cryptonote::FAKECHAIN));
 
     std::string name_hash = lns::name_to_base64_hash(name);
-    lns::mapping_record record = lns_db.get_mapping(lns::mapping_type::oxennet, name_hash);
-    CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::oxennet, name, miner_key.oxennet_value, height_of_lns_entry, height_of_lns_entry + oxennet_expiry(lns::mapping_type::oxennet), prev_txid, miner_key.owner, {} /*backup_owner*/));
+    lns::mapping_record record = lns_db.get_mapping(lns::mapping_type::lokinet, name_hash);
+    CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::lokinet, name, miner_key.lokinet_value, height_of_lns_entry, height_of_lns_entry + lokinet_expiry(lns::mapping_type::lokinet), prev_txid, miner_key.owner, {} /*backup_owner*/));
     return true;
   });
 
   gen.create_and_add_next_block();
 
-  // Renew the oxennet entry a few times
-  cryptonote::transaction renew_tx = gen.create_and_add_oxen_name_system_tx_renew(miner, gen.hardfork(), lns::mapping_type::oxennet_5years, name);
+  // Renew the lokinet entry a few times
+  cryptonote::transaction renew_tx = gen.create_and_add_oxen_name_system_tx_renew(miner, gen.hardfork(), lns::mapping_type::lokinet_5years, name);
   gen.create_and_add_next_block({renew_tx});
-  renew_tx = gen.create_and_add_oxen_name_system_tx_renew(miner, gen.hardfork(), lns::mapping_type::oxennet_10years, name);
+  renew_tx = gen.create_and_add_oxen_name_system_tx_renew(miner, gen.hardfork(), lns::mapping_type::lokinet_10years, name);
   gen.create_and_add_next_block({renew_tx});
-  renew_tx = gen.create_and_add_oxen_name_system_tx_renew(miner, gen.hardfork(), lns::mapping_type::oxennet_2years, name);
+  renew_tx = gen.create_and_add_oxen_name_system_tx_renew(miner, gen.hardfork(), lns::mapping_type::lokinet_2years, name);
   gen.create_and_add_next_block({renew_tx});
-  renew_tx = gen.create_and_add_oxen_name_system_tx_renew(miner, gen.hardfork(), lns::mapping_type::oxennet, name);
+  renew_tx = gen.create_and_add_oxen_name_system_tx_renew(miner, gen.hardfork(), lns::mapping_type::lokinet, name);
   gen.create_and_add_next_block({renew_tx});
   crypto::hash txid       = cryptonote::get_transaction_hash(renew_tx);
   uint64_t renewal_height = gen.height();
@@ -1922,15 +1922,15 @@ bool oxen_name_system_name_renewal::generate(std::vector<test_event_entry> &even
                                  << " == " << owner.address.to_string(cryptonote::FAKECHAIN));
 
     std::string name_hash = lns::name_to_base64_hash(name);
-    lns::mapping_record record = lns_db.get_mapping(lns::mapping_type::oxennet, name_hash);
-    CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::oxennet, name, miner_key.oxennet_value, renewal_height,
+    lns::mapping_record record = lns_db.get_mapping(lns::mapping_type::lokinet, name_hash);
+    CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::lokinet, name, miner_key.lokinet_value, renewal_height,
           // Original registration:
-          height_of_lns_entry + oxennet_expiry(lns::mapping_type::oxennet)
+          height_of_lns_entry + lokinet_expiry(lns::mapping_type::lokinet)
           // The renewals:
-          + oxennet_expiry(lns::mapping_type::oxennet_5years)
-          + oxennet_expiry(lns::mapping_type::oxennet_10years)
-          + oxennet_expiry(lns::mapping_type::oxennet_2years)
-          + oxennet_expiry(lns::mapping_type::oxennet),
+          + lokinet_expiry(lns::mapping_type::lokinet_5years)
+          + lokinet_expiry(lns::mapping_type::lokinet_10years)
+          + lokinet_expiry(lns::mapping_type::lokinet_2years)
+          + lokinet_expiry(lns::mapping_type::lokinet),
           txid, miner_key.owner, {} /*backup_owner*/));
     return true;
   });
@@ -1985,14 +1985,14 @@ bool oxen_name_system_name_value_max_lengths::generate(std::vector<test_event_en
   }
 
   // Lokinet
-  if (lns::mapping_type_allowed(gen.hardfork(), lns::mapping_type::oxennet))
+  if (lns::mapping_type_allowed(gen.hardfork(), lns::mapping_type::lokinet))
   {
-    std::string name(lns::OXENNET_DOMAIN_NAME_MAX, 'a');
+    std::string name(lns::LOKINET_DOMAIN_NAME_MAX, 'a');
     name.replace(name.size() - 6, 5, ".oxen");
 
-    data.type            = lns::mapping_type::oxennet;
+    data.type            = lns::mapping_type::lokinet;
     data.name_hash       = lns::name_to_hash(name);
-    data.encrypted_value = miner_key.oxennet_value.make_encrypted(name).to_string();
+    data.encrypted_value = miner_key.lokinet_value.make_encrypted(name).to_string();
     make_lns_tx_with_custom_extra(gen, events, miner, data);
   }
 
@@ -2018,22 +2018,22 @@ bool oxen_name_system_update_mapping_after_expiry_fails::generate(std::vector<te
   gen.add_mined_money_unlock_blocks();
 
   lns_keys_t miner_key = make_lns_keys(miner);
-  if (lns::mapping_type_allowed(gen.hardfork(), lns::mapping_type::oxennet))
+  if (lns::mapping_type_allowed(gen.hardfork(), lns::mapping_type::lokinet))
   {
     std::string const name     = "mydomain.oxen";
-    cryptonote::transaction tx = gen.create_and_add_oxen_name_system_tx(miner, gen.hardfork(), lns::mapping_type::oxennet, name, miner_key.oxennet_value);
+    cryptonote::transaction tx = gen.create_and_add_oxen_name_system_tx(miner, gen.hardfork(), lns::mapping_type::lokinet, name, miner_key.lokinet_value);
     crypto::hash tx_hash = cryptonote::get_transaction_hash(tx);
     gen.create_and_add_next_block({tx});
 
     uint64_t height_of_lns_entry   = gen.height();
-    uint64_t expected_expiry_block = height_of_lns_entry + oxennet_expiry(lns::mapping_type::oxennet);
+    uint64_t expected_expiry_block = height_of_lns_entry + lokinet_expiry(lns::mapping_type::lokinet);
 
     while (gen.height() <= expected_expiry_block)
       gen.create_and_add_next_block();
 
     {
       lns_keys_t bob_key = make_lns_keys(gen.add_account());
-      cryptonote::transaction tx1 = gen.create_oxen_name_system_tx_update(miner, gen.hardfork(), lns::mapping_type::oxennet, name, &bob_key.oxennet_value);
+      cryptonote::transaction tx1 = gen.create_oxen_name_system_tx_update(miner, gen.hardfork(), lns::mapping_type::lokinet, name, &bob_key.lokinet_value);
       gen.add_tx(tx1, false /*can_be_added_to_blockchain*/, "Can not update a LNS record that is already expired");
     }
 
@@ -2050,8 +2050,8 @@ bool oxen_name_system_update_mapping_after_expiry_fails::generate(std::vector<te
                                    << " == " << owner.address.to_string(cryptonote::FAKECHAIN));
 
       std::string name_hash        = lns::name_to_base64_hash(name);
-      lns::mapping_record record = lns_db.get_mapping(lns::mapping_type::oxennet, name_hash);
-      CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::oxennet, name, miner_key.oxennet_value, height_of_lns_entry, height_of_lns_entry + oxennet_expiry(lns::mapping_type::oxennet), tx_hash, miner_key.owner, {} /*backup_owner*/));
+      lns::mapping_record record = lns_db.get_mapping(lns::mapping_type::lokinet, name_hash);
+      CHECK_TEST_CONDITION(verify_lns_mapping_record(perr_context, record, lns::mapping_type::lokinet, name, miner_key.lokinet_value, height_of_lns_entry, height_of_lns_entry + lokinet_expiry(lns::mapping_type::lokinet), tx_hash, miner_key.owner, {} /*backup_owner*/));
       CHECK_EQ(record.active(blockchain_height), false);
       CHECK_EQ(record.owner_id, owner.id);
       return true;
@@ -2507,7 +2507,7 @@ bool oxen_name_system_wrong_burn::generate(std::vector<test_event_entry> &events
   }
 
   lns_keys_t lns_keys             = make_lns_keys(miner);
-  lns::mapping_type const types[] = {lns::mapping_type::session, lns::mapping_type::wallet, lns::mapping_type::oxennet};
+  lns::mapping_type const types[] = {lns::mapping_type::session, lns::mapping_type::wallet, lns::mapping_type::lokinet};
   for (int i = 0; i < 2; i++)
   {
     bool under_burn = (i == 0);
@@ -2528,10 +2528,10 @@ bool oxen_name_system_wrong_burn::generate(std::vector<test_event_entry> &events
           value = lns_keys.wallet_value;
           name = "my-friendly-wallet-name";
         }
-        else if (type == lns::mapping_type::oxennet)
+        else if (type == lns::mapping_type::lokinet)
         {
-          value = lns_keys.oxennet_value;
-          name  = "myfriendlyoxennetname.oxen";
+          value = lns_keys.lokinet_value;
+          name  = "myfriendlylokinetname.oxen";
         }
         else
             assert("Unhandled type enum" == nullptr);

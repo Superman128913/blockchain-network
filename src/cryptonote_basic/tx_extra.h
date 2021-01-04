@@ -489,9 +489,9 @@ namespace cryptonote
     bool is_updating() const { return field_is_set(lns::extra_field::signature) && field_any_set(lns::extra_field::updatable_fields); }
     // True if this is buying a new LNS record
     bool is_buying()   const { return (fields == lns::extra_field::buy || fields == lns::extra_field::buy_no_backup); }
-    // True if this is renewing an existing LNS: has no fields at all, is a renewal registration (i.e. oxennet),
+    // True if this is renewing an existing LNS: has no fields at all, is a renewal registration (i.e. lokinet),
     // and has a non-null txid set (which should point to the most recent registration or update).
-    bool is_renewing() const { return fields == lns::extra_field::none && prev_txid && is_oxennet_type(type); }
+    bool is_renewing() const { return fields == lns::extra_field::none && prev_txid && is_lokinet_type(type); }
 
     static tx_extra_oxen_name_system make_buy(
         lns::generic_owner const& owner,

@@ -12,7 +12,7 @@ TEST(oxen_name_system, name_tests)
     bool allowed;
   };
 
-  name_test const oxennet_names[] = {
+  name_test const lokinet_names[] = {
       {"a.oxen", true},
       {"domain.oxen", true},
       {"xn--tda.oxen", true}, // ü
@@ -72,8 +72,8 @@ TEST(oxen_name_system, name_tests)
   {
     auto type = static_cast<lns::mapping_type>(type16);
     if (type == lns::mapping_type::wallet) continue; // Not yet supported
-    name_test const *names = lns::is_oxennet_type(type) ? oxennet_names : session_wallet_names;
-    size_t names_count     = lns::is_oxennet_type(type) ? oxen::char_count(oxennet_names) : oxen::char_count(session_wallet_names);
+    name_test const *names = lns::is_lokinet_type(type) ? lokinet_names : session_wallet_names;
+    size_t names_count     = lns::is_lokinet_type(type) ? oxen::char_count(lokinet_names) : oxen::char_count(session_wallet_names);
 
     for (size_t i = 0; i < names_count; i++)
     {
@@ -90,9 +90,9 @@ TEST(oxen_name_system, value_encrypt_and_decrypt)
   value.len                = 32;
   memset(&value.buffer[0], 'a', value.len);
 
-  // The type here is not hugely important for decryption except that oxennet (as opposed to
+  // The type here is not hugely important for decryption except that lokinet (as opposed to
   // session) doesn't fall back to argon2 decryption if decryption fails.
-  constexpr auto type = lns::mapping_type::oxennet;
+  constexpr auto type = lns::mapping_type::lokinet;
 
   // Encryption and Decryption success
   {

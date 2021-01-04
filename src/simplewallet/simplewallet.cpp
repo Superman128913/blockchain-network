@@ -255,14 +255,14 @@ namespace
   const char* USAGE_REQUEST_STAKE_UNLOCK("request_stake_unlock <service_node_pubkey>");
   const char* USAGE_PRINT_LOCKED_STAKES("print_locked_stakes");
 
-  const char* USAGE_LNS_BUY_MAPPING("lns_buy_mapping [index=<N1>[,<N2>,...]] [<priority>] [type=session|oxennet|oxennet_2y|oxennet_5y|oxennet_10y] [owner=<value>] [backup_owner=<value>] <name> <value>");
-  const char* USAGE_LNS_RENEW_MAPPING("lns_renew_mapping [index=<N1>[,<N2>,...]] [<priority>] [type=oxennet|oxennet_2y|oxennet_5y|oxennet_10y] <name>");
-  const char* USAGE_LNS_UPDATE_MAPPING("lns_update_mapping [index=<N1>[,<N2>,...]] [<priority>] [type=session|oxennet] [owner=<value>] [backup_owner=<value>] [value=<lns_value>] [signature=<hex_signature>] <name>");
+  const char* USAGE_LNS_BUY_MAPPING("lns_buy_mapping [index=<N1>[,<N2>,...]] [<priority>] [type=session|lokinet|lokinet_2y|lokinet_5y|lokinet_10y] [owner=<value>] [backup_owner=<value>] <name> <value>");
+  const char* USAGE_LNS_RENEW_MAPPING("lns_renew_mapping [index=<N1>[,<N2>,...]] [<priority>] [type=lokinet|lokinet_2y|lokinet_5y|lokinet_10y] <name>");
+  const char* USAGE_LNS_UPDATE_MAPPING("lns_update_mapping [index=<N1>[,<N2>,...]] [<priority>] [type=session|lokinet] [owner=<value>] [backup_owner=<value>] [value=<lns_value>] [signature=<hex_signature>] <name>");
 
-  const char* USAGE_LNS_ENCRYPT("lns_encrypt [type=session|oxennet] <name> <value>");
-  const char* USAGE_LNS_MAKE_UPDATE_MAPPING_SIGNATURE("lns_make_update_mapping_signature [type=session|oxennet] [owner=<value>] [backup_owner=<value>] [value=<encrypted_lns_value>] <name>");
+  const char* USAGE_LNS_ENCRYPT("lns_encrypt [type=session|lokinet] <name> <value>");
+  const char* USAGE_LNS_MAKE_UPDATE_MAPPING_SIGNATURE("lns_make_update_mapping_signature [type=session|lokinet] [owner=<value>] [backup_owner=<value>] [value=<encrypted_lns_value>] <name>");
   const char* USAGE_LNS_PRINT_OWNERS_TO_NAMES("lns_print_owners_to_names [<owner> ...]");
-  const char* USAGE_LNS_PRINT_NAME_TO_OWNERS("lns_print_name_to_owners [type=session|oxennet] <name> [<name> ...]");
+  const char* USAGE_LNS_PRINT_NAME_TO_OWNERS("lns_print_name_to_owners [type=session|lokinet] <name> [<name> ...]");
 
 #if defined (OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
   std::string input_line(const std::string &prompt, bool yesno = false)
@@ -6430,7 +6430,7 @@ static std::optional<lns::mapping_type> guess_lns_type(tools::wallet2& wallet, s
   if (typestr.empty())
   {
     if (tools::ends_with(name, ".oxen") && (tools::ends_with(value, ".oxen") || value.empty()))
-      return lns::mapping_type::oxennet;
+      return lns::mapping_type::lokinet;
     if (!tools::ends_with(name, ".oxen") && tools::starts_with(value, "05") && value.length() == 2*lns::SESSION_PUBLIC_KEY_BINARY_LENGTH)
       return lns::mapping_type::session;
 
@@ -6511,13 +6511,13 @@ bool simple_wallet::lns_buy_mapping(std::vector<std::string> args)
     std::cout << std::endl << tr("Buying Oxen Name System Record") << std::endl << std::endl;
     if (*type == lns::mapping_type::session)
       std::cout << boost::format(tr("Session Name: %s")) % name << std::endl;
-    else if (lns::is_oxennet_type(*type))
+    else if (lns::is_lokinet_type(*type))
     {
-      std::cout << boost::format(tr("Oxennet Name: %s")) % name << std::endl;
+      std::cout << boost::format(tr("Lokinet Name: %s")) % name << std::endl;
       int years = 
-          *type == lns::mapping_type::oxennet_10years ? 10 :
-          *type == lns::mapping_type::oxennet_5years ? 5 :
-          *type == lns::mapping_type::oxennet_2years ? 2 :
+          *type == lns::mapping_type::lokinet_10years ? 10 :
+          *type == lns::mapping_type::lokinet_5years ? 5 :
+          *type == lns::mapping_type::lokinet_2years ? 2 :
           1;
       int blocks = BLOCKS_EXPECTED_IN_DAYS(years * lns::REGISTRATION_YEAR_DAYS);
       std::cout << boost::format(tr("Registration: %d years (%d blocks)")) % years % blocks << "\n";
@@ -6605,15 +6605,15 @@ bool simple_wallet::lns_renew_mapping(std::vector<std::string> args)
     dsts.push_back(info);
 
     std::cout << "\n" << tr("Renew Oxen Name System Record") << "\n\n";
-    if (lns::is_oxennet_type(type))
-      std::cout << boost::format(tr("Oxennet Name:  %s")) % name << "\n";
+    if (lns::is_lokinet_type(type))
+      std::cout << boost::format(tr("Lokinet Name:  %s")) % name << "\n";
     else
       std::cout << boost::format(tr("Name:          %s")) % name << "\n";
 
     int years = 1;
-    if (type == lns::mapping_type::oxennet_2years) years = 2;
-    else if (type == lns::mapping_type::oxennet_5years) years = 5;
-    else if (type == lns::mapping_type::oxennet_10years) years = 10;
+    if (type == lns::mapping_type::lokinet_2years) years = 2;
+    else if (type == lns::mapping_type::lokinet_5years) years = 5;
+    else if (type == lns::mapping_type::lokinet_10years) years = 10;
     int blocks = BLOCKS_EXPECTED_IN_DAYS(years * lns::REGISTRATION_YEAR_DAYS);
     std::cout << boost::format(tr("Renewal years: %d (%d blocks)")) % years % blocks << "\n";
     std::cout << boost::format(tr("New expiry:    Block %d")) % (*response[0].expiration_height + blocks) << "\n";
@@ -6711,8 +6711,8 @@ bool simple_wallet::lns_update_mapping(std::vector<std::string> args)
     std::cout << std::endl << tr("Updating Oxen Name System Record") << std::endl << std::endl;
     if (type == lns::mapping_type::session)
       std::cout << boost::format(tr("Session Name:     %s")) % name << std::endl;
-    else if (lns::is_oxennet_type(type))
-      std::cout << boost::format(tr("Oxennet Name:     %s")) % name << std::endl;
+    else if (lns::is_lokinet_type(type))
+      std::cout << boost::format(tr("Lokinet Name:     %s")) % name << std::endl;
     else
       std::cout << boost::format(tr("Name:             %s")) % name << std::endl;
 

@@ -80,10 +80,10 @@ struct extra_printer {
     std::cout << "LNS " << (x.is_buying() ? "registration" : x.is_updating() ? "update" : "(unknown)");
     switch (x.type)
     {
-      case lns::mapping_type::oxennet: std::cout << " - Oxennet (1y)"; break;
-      case lns::mapping_type::oxennet_2years: std::cout << " - Oxennet (2y)"; break;
-      case lns::mapping_type::oxennet_5years: std::cout << " - Oxennet (5y)"; break;
-      case lns::mapping_type::oxennet_10years: std::cout << " - Oxennet (10y)"; break;
+      case lns::mapping_type::lokinet: std::cout << " - Lokinet (1y)"; break;
+      case lns::mapping_type::lokinet_2years: std::cout << " - Lokinet (2y)"; break;
+      case lns::mapping_type::lokinet_5years: std::cout << " - Lokinet (5y)"; break;
+      case lns::mapping_type::lokinet_10years: std::cout << " - Lokinet (10y)"; break;
       case lns::mapping_type::session: std::cout << " - Session address"; break;
       case lns::mapping_type::wallet: std::cout << " - Wallet address"; break;
       case lns::mapping_type::update_record_internal:

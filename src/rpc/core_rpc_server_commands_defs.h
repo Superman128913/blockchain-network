@@ -303,8 +303,8 @@ namespace rpc {
         std::optional<bool> buy;                 // Provided and true iff this is an LNS buy record
         std::optional<bool> update;              // Provided and true iff this is an LNS record update
         std::optional<bool> renew;               // Provided and true iff this is an LNS record renewal
-        std::string type;                        // The LNS request type.  For registrations: "oxennet", "session", "wallet"; for a record update: "update"
-        std::optional<uint64_t> blocks;          // The registration length in blocks (only applies to oxennet registrations; session/wallet registrations do not expire)
+        std::string type;                        // The LNS request type.  For registrations: "lokinet", "session", "wallet"; for a record update: "update"
+        std::optional<uint64_t> blocks;          // The registration length in blocks (only applies to lokinet registrations; session/wallet registrations do not expire)
         std::string name_hash;                   // The hashed name of the record being purchased/updated, in hex (the actual name is not provided on the blockchain).
         std::optional<std::string> prev_txid;    // For an update, this points at the txid of the previous lns update transaction.
         std::optional<std::string> value;        // The encrypted value of the record, in hex.  Note that this is encrypted using the actual name itself (*not* the hashed name).
@@ -641,7 +641,7 @@ namespace rpc {
       std::optional<bool> service_node;                    // Will be true if the node is running in --service-node mode.
       std::optional<uint64_t> start_time;                  // Start time of the daemon, as UNIX time.
       std::optional<uint64_t> last_storage_server_ping;    // Last ping time of the storage server (0 if never or not running as a service node)
-      std::optional<uint64_t> last_oxennet_ping;           // Last ping time of oxennet (0 if never or not running as a service node)
+      std::optional<uint64_t> last_lokinet_ping;           // Last ping time of lokinet (0 if never or not running as a service node)
       std::optional<uint64_t> free_space;                  // Available disk space on the node.
       bool offline;                         // States if the node is offline (`true`) or online (`false`).
       bool untrusted;                       // States if the result is obtained using the bootstrap mode, and is therefore not trusted (`true`), or when the daemon is fully synced (`false`).
@@ -2192,9 +2192,9 @@ namespace rpc {
   };
 
   OXEN_RPC_DOC_INTROSPECT
-  struct OXENNET_PING : RPC_COMMAND
+  struct LOKINET_PING : RPC_COMMAND
   {
-    static constexpr auto names() { return NAMES("oxennet_ping"); }
+    static constexpr auto names() { return NAMES("lokinet_ping"); }
 
     struct request
     {
@@ -2433,7 +2433,7 @@ namespace rpc {
     struct request_entry
     {
       std::string name_hash; // The 32-byte BLAKE2b hash of the name to resolve to a public key via Loki Name Service. The value must be provided either in hex (64 hex digits) or base64 (44 characters with padding, or 43 characters without).
-      std::vector<uint16_t> types; // If empty, query all types. Currently supported types are 0 (session) and 2 (oxennet). In future updates more mapping types will be available.
+      std::vector<uint16_t> types; // If empty, query all types. Currently supported types are 0 (session) and 2 (lokinet). In future updates more mapping types will be available.
 
       KV_MAP_SERIALIZABLE
     };
@@ -2449,7 +2449,7 @@ namespace rpc {
     struct response_entry
     {
       uint64_t entry_index;     // The index in request_entry's `entries` array that was resolved via Loki Name Service.
-      lns::mapping_type type;   // The type of Loki Name Service entry that the owner owns: currently supported values are 0 (session), 2 (oxennet)
+      lns::mapping_type type;   // The type of Loki Name Service entry that the owner owns: currently supported values are 0 (session), 2 (lokinet)
       std::string name_hash;    // The hash of the name that was queried, in base64
       std::string owner;        // The public key that purchased the Loki Name Service entry.
       std::optional<std::string> backup_owner; // The backup public key that the owner specified when purchasing the Loki Name Service entry. Omitted if no backup owner.
@@ -2535,7 +2535,7 @@ namespace rpc {
 
     struct request
     {
-      uint16_t type;         // The LNS type (mandatory); currently supported values are: 0 = session, 2 = oxennet.
+      uint16_t type;         // The LNS type (mandatory); currently supported values are: 0 = session, 2 = lokinet.
       std::string name_hash; // The 32-byte BLAKE2b hash of the name to look up, encoded as 64 hex digits or 44/43 base64 characters (with/without padding).
 
       KV_MAP_SERIALIZABLE
@@ -2640,7 +2640,7 @@ namespace rpc {
     GET_SERVICE_NODES,
     GET_SERVICE_NODE_STATUS,
     STORAGE_SERVER_PING,
-    OXENNET_PING,
+    LOKINET_PING,
     GET_STAKING_REQUIREMENT,
     GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES,
     GET_OUTPUT_BLACKLIST,

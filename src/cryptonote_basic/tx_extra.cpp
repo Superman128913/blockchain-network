@@ -29,7 +29,7 @@ tx_extra_oxen_name_system tx_extra_oxen_name_system::make_buy(
 tx_extra_oxen_name_system tx_extra_oxen_name_system::make_renew(
     lns::mapping_type type, crypto::hash const &name_hash, crypto::hash const &prev_txid)
 {
-  assert(is_oxennet_type(type) && prev_txid);
+  assert(is_lokinet_type(type) && prev_txid);
 
   tx_extra_oxen_name_system result{};
   result.fields = lns::extra_field::none;

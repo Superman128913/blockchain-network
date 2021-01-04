@@ -103,7 +103,7 @@ std::pair<std::basic_string_view<unsigned char>, std::basic_string_view<unsigned
 std::string lns::mapping_value::to_readable_value(cryptonote::network_type nettype, lns::mapping_type type) const
 {
   std::string result;
-  if (is_oxennet_type(type))
+  if (is_lokinet_type(type))
   {
     result = lokimq::to_base32z(to_view()) + ".oxen";
   }
@@ -611,23 +611,23 @@ std::vector<mapping_type> all_mapping_types(uint8_t hf_version) {
   if (hf_version >= cryptonote::network_version_15_lns)
     result.push_back(mapping_type::session);
   if (hf_version >= cryptonote::network_version_16_pulse)
-    result.push_back(mapping_type::oxennet);
+    result.push_back(mapping_type::lokinet);
   return result;
 }
 
 std::optional<uint64_t> expiry_blocks(cryptonote::network_type nettype, mapping_type type)
 {
   std::optional<uint64_t> result;
-  if (is_oxennet_type(type))
+  if (is_lokinet_type(type))
   {
     // For testnet we shorten 1-, 2-, and 5-year renewals to 1/2/5 days with 1-day renewal, but
     // leave 10 years alone to allow long-term registrations on testnet.
-    const bool testnet_short = nettype == cryptonote::TESTNET && type != mapping_type::oxennet_10years;
+    const bool testnet_short = nettype == cryptonote::TESTNET && type != mapping_type::lokinet_10years;
 
-    if (type == mapping_type::oxennet)              result = BLOCKS_EXPECTED_IN_DAYS(1 * REGISTRATION_YEAR_DAYS);
-    else if (type == mapping_type::oxennet_2years)  result = BLOCKS_EXPECTED_IN_DAYS(2 * REGISTRATION_YEAR_DAYS);
-    else if (type == mapping_type::oxennet_5years)  result = BLOCKS_EXPECTED_IN_DAYS(5 * REGISTRATION_YEAR_DAYS);
-    else if (type == mapping_type::oxennet_10years) result = BLOCKS_EXPECTED_IN_DAYS(10 * REGISTRATION_YEAR_DAYS);
+    if (type == mapping_type::lokinet)              result = BLOCKS_EXPECTED_IN_DAYS(1 * REGISTRATION_YEAR_DAYS);
+    else if (type == mapping_type::lokinet_2years)  result = BLOCKS_EXPECTED_IN_DAYS(2 * REGISTRATION_YEAR_DAYS);
+    else if (type == mapping_type::lokinet_5years)  result = BLOCKS_EXPECTED_IN_DAYS(5 * REGISTRATION_YEAR_DAYS);
+    else if (type == mapping_type::lokinet_10years) result = BLOCKS_EXPECTED_IN_DAYS(10 * REGISTRATION_YEAR_DAYS);
     assert(result);
 
     if (testnet_short)
@@ -744,13 +744,13 @@ static bool check_condition(bool condition, std::string* reason, T&&... args) {
 
 bool validate_lns_name(mapping_type type, std::string name, std::string *reason)
 {
-  bool const is_oxennet = is_oxennet_type(type);
+  bool const is_lokinet = is_lokinet_type(type);
   size_t max_name_len   = 0;
 
-  if (is_oxennet)
+  if (is_lokinet)
     max_name_len = name.find('-') != std::string::npos
-      ? OXENNET_DOMAIN_NAME_MAX
-      : OXENNET_DOMAIN_NAME_MAX_NOHYPHEN;
+      ? LOKINET_DOMAIN_NAME_MAX
+      : LOKINET_DOMAIN_NAME_MAX_NOHYPHEN;
   else if (type == mapping_type::session) max_name_len = lns::SESSION_DISPLAY_NAME_MAX;
   else if (type == mapping_type::wallet)  max_name_len = lns::WALLET_NAME_MAX;
   else
@@ -772,15 +772,15 @@ bool validate_lns_name(mapping_type type, std::string name, std::string *reason)
   std::string_view name_view{name}; // Will chop this down as we validate each part
 
   // NOTE: Validate domain specific requirements
-  if (is_oxennet)
+  if (is_lokinet)
   {
-    // OXENNET
+    // LOKINET
     // Domain has to start with an alphanumeric, and can have (alphanumeric or hyphens) in between, the character before the suffix <char>'.oxen' must be alphanumeric followed by the suffix '.oxen'
     // It's *approximately* this regex, but there are some extra restrictions below
     // ^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.oxen$
 
     // Reserved names:
-    // - localhost.oxen has special meaning within oxennet (it is always a CNAME to the local
+    // - localhost.oxen has special meaning within lokinet (it is always a CNAME to the local
     //   address)
     // - oxen.oxen and snode.oxen are prohibited in case someone added .oxen or .snode as search
     //   domains (in which case the user looking up "foo.oxen" would try end up trying to resolve
@@ -907,13 +907,13 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
       std::memcpy(blob->buffer.data(), &addr_info, blob->len);
     }
   }
-  else if (is_oxennet_type(type))
+  else if (is_lokinet_type(type))
   {
     // We need a 52 char base32z string that decodes to a 32-byte value, which really means we need
     // 51 base32z chars (=255 bits) followed by a 1-bit value ('y'=0, or 'o'=0b10000); anything else
-    // in the last spot isn't a valid oxennet address.
+    // in the last spot isn't a valid lokinet address.
     if (check_condition(value.size() != 57 || !tools::ends_with(value, ".oxen") || !lokimq::is_base32z(value.substr(0, 52)) || !(value[51] == 'y' || value[51] == 'o'),
-                reason, "'", value, "' is not a valid oxennet address"))
+                reason, "'", value, "' is not a valid lokinet address"))
       return false;
 
     if (blob)
@@ -955,7 +955,7 @@ bool mapping_value::validate_encrypted(mapping_type type, std::string_view value
   if (blob) *blob = {};
   std::stringstream err_stream;
   int value_len = crypto_aead_xchacha20poly1305_ietf_ABYTES + crypto_aead_xchacha20poly1305_ietf_NPUBBYTES;
-  if (is_oxennet_type(type)) value_len              += OXENNET_ADDRESS_BINARY_LENGTH;
+  if (is_lokinet_type(type)) value_len              += LOKINET_ADDRESS_BINARY_LENGTH;
   else if (type == mapping_type::wallet)  value_len += WALLET_ACCOUNT_BINARY_LENGTH;
   else if (type == mapping_type::session)
   {
@@ -1206,28 +1206,28 @@ bool validate_mapping_type(std::string_view mapping_type_str, uint8_t hf_version
     mapping_type_ = lns::mapping_type::session;
   else if (hf_version >= cryptonote::network_version_16_pulse)
   {
-    if (tools::string_iequal(mapping, "oxennet"))
-      mapping_type_ = lns::mapping_type::oxennet;
+    if (tools::string_iequal(mapping, "lokinet"))
+      mapping_type_ = lns::mapping_type::lokinet;
     else if (txtype == lns_tx_type::buy || txtype == lns_tx_type::renew)
     {
-      if (tools::string_iequal_any(mapping, "oxennet_1y", "oxennet_1years")) // Can also specify "oxennet"
-        mapping_type_ = lns::mapping_type::oxennet;
-      else if (tools::string_iequal_any(mapping, "oxennet_2y", "oxennet_2years"))
-        mapping_type_ = lns::mapping_type::oxennet_2years;
-      else if (tools::string_iequal_any(mapping, "oxennet_5y", "oxennet_5years"))
-        mapping_type_ = lns::mapping_type::oxennet_5years;
-      else if (tools::string_iequal_any(mapping, "oxennet_10y", "oxennet_10years"))
-        mapping_type_ = lns::mapping_type::oxennet_10years;
+      if (tools::string_iequal_any(mapping, "lokinet_1y", "lokinet_1years")) // Can also specify "lokinet"
+        mapping_type_ = lns::mapping_type::lokinet;
+      else if (tools::string_iequal_any(mapping, "lokinet_2y", "lokinet_2years"))
+        mapping_type_ = lns::mapping_type::lokinet_2years;
+      else if (tools::string_iequal_any(mapping, "lokinet_5y", "lokinet_5years"))
+        mapping_type_ = lns::mapping_type::lokinet_5years;
+      else if (tools::string_iequal_any(mapping, "lokinet_10y", "lokinet_10years"))
+        mapping_type_ = lns::mapping_type::lokinet_10years;
     }
   }
 
   if (!mapping_type_)
   {
     if (reason) *reason = "Unsupported LNS type \"" + std::string{mapping_type_str} + "\"; supported " + (
-        txtype == lns_tx_type::update ? "update types are: session, oxennet" :
-        txtype == lns_tx_type::renew  ? "renew types are: oxennet_1y, oxennet_2y, oxennet_5y, oxennet_10y" :
-        txtype == lns_tx_type::buy    ? "buy types are session, oxennet_1y, oxennet_2y, oxennet_5y, oxennet_10y"
-                                      : "lookup types are session, oxennet");
+        txtype == lns_tx_type::update ? "update types are: session, lokinet" :
+        txtype == lns_tx_type::renew  ? "renew types are: lokinet_1y, lokinet_2y, lokinet_5y, lokinet_10y" :
+        txtype == lns_tx_type::buy    ? "buy types are session, lokinet_1y, lokinet_2y, lokinet_5y, lokinet_10y"
+                                      : "lookup types are session, lokinet");
     return false;
   }
 
@@ -1383,7 +1383,7 @@ bool mapping_value::decrypt(std::string_view name, mapping_type type, const cryp
   {
     switch(type) {
       case mapping_type::session: dec_length = SESSION_PUBLIC_KEY_BINARY_LENGTH; break;
-      case mapping_type::oxennet: dec_length = OXENNET_ADDRESS_BINARY_LENGTH; break;
+      case mapping_type::lokinet: dec_length = LOKINET_ADDRESS_BINARY_LENGTH; break;
       case mapping_type::wallet:  dec_length = WALLET_ACCOUNT_BINARY_LENGTH; break;
       default: MERROR("Invalid mapping_type passed to mapping_value::decrypt"); return false;
     }
