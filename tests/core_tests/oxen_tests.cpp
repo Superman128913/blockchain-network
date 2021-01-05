@@ -1213,9 +1213,9 @@ bool oxen_name_system_get_mappings_by_owner::generate(std::vector<test_event_ent
   uint64_t session_height = gen.height();
 
   // NOTE: Register some Lokinet names
-  std::string lokinet_name1 = "Lorem.oxen";
+  std::string lokinet_name1 = "Lorem.loki";
   std::string lokinet_name_hash1 = "GsM6OUk5E5D9keBIK2PlA4kjwiPe+/UB0nUurjKvFJQ=";
-  std::string lokinet_name2 = "ipSum.oxen";
+  std::string lokinet_name2 = "ipSum.loki";
   std::string lokinet_name_hash2 = "p8IYR3ZWr0KSU4ZPazYxTkwvXsm0dzq5dmour7VmIDY=";
   crypto::hash lokinet_name1_txid = {}, lokinet_name2_txid = {};
   if (lns::mapping_type_allowed(gen.hardfork(), lns::mapping_type::lokinet))
