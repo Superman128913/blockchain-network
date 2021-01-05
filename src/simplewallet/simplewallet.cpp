@@ -5626,18 +5626,15 @@ void simple_wallet::check_for_inactivity_lock(bool user)
     if (!user)
     {
         tools::msg_writer() << R"(
-        .
-      oooo
-    oooo
-  oooo   .           You Oxen Wallet has been locked to
-oooo    oooo         protect you while you were away.
-  oooo    oooo
-    oooo    oooo     (Use `set inactivity-lock-timeout 0`
-      oooo    oooo   to disable this inactivity timeout)
-        .   oooo
-          oooo
-        oooo
-         .
+      ........            
+   ..............          
+ ...###########....   Your Oxen Wallet has been locked to
+......########......  protect you while you were away.
+.........#..........       
+......#######.......  (Use `set inactivity-lock-timeout 0`     
+ ...###########....   to disable this inactivity timeout)
+  ...............          
+      ........  
 )";
     }
 
