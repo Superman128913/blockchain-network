@@ -24,7 +24,7 @@ if len(sys.argv) > 1 and any(sys.argv[1].startswith(x) for x in ("ipc://", "tcp:
     remote = sys.argv[1]
     del sys.argv[1]
 else:
-    remote = "ipc://./loki.sock"
+    remote = "ipc://./oxen.sock"
 
 curve_pubkey = b''
 my_privkey, my_pubkey = b'', b''
