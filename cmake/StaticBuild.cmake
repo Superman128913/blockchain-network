@@ -5,10 +5,10 @@
 
 set(LOCAL_MIRROR "" CACHE STRING "local mirror path/URL for lib downloads")
 
-set(OPENSSL_VERSION 1.1.1h CACHE STRING "openssl version")
+set(OPENSSL_VERSION 1.1.1i CACHE STRING "openssl version")
 set(OPENSSL_MIRROR ${LOCAL_MIRROR} https://www.openssl.org/source CACHE STRING "openssl download mirror(s)")
 set(OPENSSL_SOURCE openssl-${OPENSSL_VERSION}.tar.gz)
-set(OPENSSL_HASH SHA256=5c9ca8774bd7b03e5784f26ae9e9e6d749c9da2438545077e6b3d755a06595d9
+set(OPENSSL_HASH SHA256=e8be6a35fe41d10603c3cc635e93289ed00bf34b79671a3a4de64fcee00d5242
     CACHE STRING "openssl source hash")
 
 set(EXPAT_VERSION 2.2.10 CACHE STRING "expat version")
@@ -19,18 +19,18 @@ set(EXPAT_SOURCE expat-${EXPAT_VERSION}.tar.xz)
 set(EXPAT_HASH SHA512=a8e0c8a9cf7e6fbacdc6e709f3c99c533ab550fba52557d24259bb8b360f9697624c7500c0e9886fa57ee2b529aadd0d1835d66fe8112e15c20df75cd3eb090f
     CACHE STRING "expat source hash")
 
-set(UNBOUND_VERSION 1.12.0 CACHE STRING "unbound version")
+set(UNBOUND_VERSION 1.13.0 CACHE STRING "unbound version")
 set(UNBOUND_MIRROR ${LOCAL_MIRROR} https://nlnetlabs.nl/downloads/unbound CACHE STRING "unbound download mirror(s)")
 set(UNBOUND_SOURCE unbound-${UNBOUND_VERSION}.tar.gz)
-set(UNBOUND_HASH SHA256=5b9253a97812f24419bf2e6b3ad28c69287261cf8c8fa79e3e9f6d3bf7ef5835
+set(UNBOUND_HASH SHA256=a954043a95b0326ca4037e50dace1f3a207a0a19e9a4a22f4c6718fc623db2a1
     CACHE STRING "unbound source hash")
 
-set(BOOST_VERSION 1.74.0 CACHE STRING "boost version")
+set(BOOST_VERSION 1.75.0 CACHE STRING "boost version")
 set(BOOST_MIRROR ${LOCAL_MIRROR} https://dl.bintray.com/boostorg/release/${BOOST_VERSION}/source
     CACHE STRING "boost download mirror(s)")
 string(REPLACE "." "_" BOOST_VERSION_ ${BOOST_VERSION})
 set(BOOST_SOURCE boost_${BOOST_VERSION_}.tar.bz2)
-set(BOOST_HASH SHA256=83bfc1507731a0906e387fc28b7ef5417d591429e51e788417fe9ff025e116b1
+set(BOOST_HASH SHA256=953db31e016db7bb207f11432bef7df100516eeb746843fa0486a222e3fd49cb
     CACHE STRING "boost source hash")
 
 set(NCURSES_VERSION 6.2 CACHE STRING "ncurses version")
@@ -47,11 +47,11 @@ set(READLINE_SOURCE readline-${READLINE_VERSION}.tar.gz)
 set(READLINE_HASH SHA512=41759d27bc3a258fefd7f4ff3277fa6ab9c21abb7b160e1a75aa8eba547bd90b288514e76264bd94fb0172da8a4faa54aab2c07b68a0356918ecf7f1969e866f
     CACHE STRING "readline source hash")
 
-set(SQLITE3_VERSION 3330000 CACHE STRING "sqlite3 version")
+set(SQLITE3_VERSION 3340000 CACHE STRING "sqlite3 version")
 set(SQLITE3_MIRROR ${LOCAL_MIRROR} https://www.sqlite.org/2020
     CACHE STRING "sqlite3 download mirror(s)")
 set(SQLITE3_SOURCE sqlite-autoconf-${SQLITE3_VERSION}.tar.gz)
-set(SQLITE3_HASH SHA512=c0d79d4012a01f12128ab5044b887576a130663245b85befcc0ab82ad3a315dd1e7f54b6301f842410c9c21b73237432c44a1d7c2fe0e0709435fec1f1a20a11
+set(SQLITE3_HASH SHA512=75a1a2d86ab41354941b8574e780b1eae09c3c01f8da4b08f606b96962b80550f739ec7e9b1ceb07bba1cedced6d18a1408e4c10ff645eb1829d368ad308cf2f
     CACHE STRING "sqlite3 source hash")
 
 set(EUDEV_VERSION 3.2.9 CACHE STRING "eudev version")
@@ -105,11 +105,11 @@ set(ZLIB_SOURCE zlib-${ZLIB_VERSION}.tar.gz)
 set(ZLIB_HASH SHA512=73fd3fff4adeccd4894084c15ddac89890cd10ef105dd5e1835e1e9bbb6a49ff229713bd197d203edfa17c2727700fce65a2a235f07568212d820dca88b528ae
     CACHE STRING "zlib source hash")
 
-set(CURL_VERSION 7.72.0 CACHE STRING "curl version")
+set(CURL_VERSION 7.74.0 CACHE STRING "curl version")
 set(CURL_MIRROR ${LOCAL_MIRROR} https://curl.haxx.se/download https://curl.askapache.com
   CACHE STRING "curl mirror(s)")
 set(CURL_SOURCE curl-${CURL_VERSION}.tar.xz)
-set(CURL_HASH SHA256=0ded0808c4d85f2ee0db86980ae610cc9d165e9ca9da466196cc73c346513713
+set(CURL_HASH SHA256=999d5f2c403cf6e25d58319fdd596611e455dd195208746bc6e6d197a77e878b
   CACHE STRING "curl source hash")
 
 
