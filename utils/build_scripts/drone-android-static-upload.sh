@@ -24,12 +24,12 @@ branch_or_tag=${DRONE_BRANCH:-${DRONE_TAG:-unknown}}
 upload_to="builds.lokinet.dev/${DRONE_REPO// /_}/${branch_or_tag// /_}"
 
 tmpdir=android-deps-${DRONE_COMMIT}
-mkdir -p $tmpdir
-cp src/wallet/api/wallet2_api.h $tmpdir
+mkdir -p $tmpdir/include $tmpdir/lib
+cp src/wallet/api/wallet2_api.h $tmpdir/include
 
 for android_abi in "$@"; do
-    mkdir -p $tmpdir/${android_abi}
-    ln -s ../../build-${android_abi}/src/wallet/api/libwallet_merged.a $tmpdir/${android_abi}/libwallet_api.a
+    mkdir -p $tmpdir/lib/${android_abi}
+    ln -s ../../build-${android_abi}/src/wallet/api/libwallet_merged.a $tmpdir/lib/${android_abi}/libwallet_api.a
 done
 
 filename=android-deps-${DRONE_COMMIT}.tar.xz
