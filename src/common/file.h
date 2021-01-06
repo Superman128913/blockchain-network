@@ -111,6 +111,7 @@ namespace tools {
    * Unix: ~/.CRYPTONOTE_NAME
    */
   fs::path get_default_data_dir();
+  fs::path get_depreciated_default_data_dir();
 
 #ifdef WIN32
   /**

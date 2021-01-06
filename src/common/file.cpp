@@ -300,13 +300,6 @@ namespace tools {
       return true;
     }
 
-    fs::path depreciated_path = get_depreciated_default_data_dir();
-    if (fs::is_directory(depreciated_path, ec))
-    {
-      fs::rename(depreciated_path, path);
-      fs::create_directory_symlink(depreciated_path, path);
-      return true;
-    }
 
     bool res = fs::create_directories(path, ec);
     if (res)
