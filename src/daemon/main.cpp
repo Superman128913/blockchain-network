@@ -213,7 +213,7 @@ int main(int argc, char const * argv[])
 
     // logging is now set up
     // FIXME: only print this when starting up as a daemon but not when running rpc commands
-    MGINFO_GREEN("Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")");
+    MGINFO_CYAN("Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")");
 
     // If there are positional options, we're running a daemon command
     {
