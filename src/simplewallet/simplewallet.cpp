@@ -6426,9 +6426,9 @@ static std::optional<lns::mapping_type> guess_lns_type(tools::wallet2& wallet, s
 {
   if (typestr.empty())
   {
-    if (tools::ends_with(name, ".oxen") && (tools::ends_with(value, ".oxen") || value.empty()))
+    if (tools::ends_with(name, ".loki") && (tools::ends_with(value, ".loki") || value.empty()))
       return lns::mapping_type::lokinet;
-    if (!tools::ends_with(name, ".oxen") && tools::starts_with(value, "05") && value.length() == 2*lns::SESSION_PUBLIC_KEY_BINARY_LENGTH)
+    if (!tools::ends_with(name, ".loki") && tools::starts_with(value, "05") && value.length() == 2*lns::SESSION_PUBLIC_KEY_BINARY_LENGTH)
       return lns::mapping_type::session;
 
     fail_msg_writer() << tr("Could not infer LNS type from name/value; trying using the type= argument or see `help' for more details");

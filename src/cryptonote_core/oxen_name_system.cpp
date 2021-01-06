@@ -782,27 +782,27 @@ bool validate_lns_name(mapping_type type, std::string name, std::string *reason)
     // Reserved names:
     // - localhost.oxen has special meaning within lokinet (it is always a CNAME to the local
     //   address)
-    // - oxen.oxen and snode.oxen are prohibited in case someone added .oxen or .snode as search
-    //   domains (in which case the user looking up "foo.oxen" would try end up trying to resolve
-    //   "foo.oxen.oxen").
-    for (auto& reserved : {"localhost.oxen"sv, "oxen.oxen"sv, "snode.oxen"sv})
+    // - loki.loki and snode.oxen are prohibited in case someone added .loki or .snode as search
+    //   domains (in which case the user looking up "foo.loki" would try end up trying to resolve
+    //   "foo.loki.loki").
+    for (auto& reserved : {"localhost.loki"sv, "loki.loki"sv, "snode.loki"sv})
       if (check_condition(name == reserved, reason, "LNS type=", type, ", specifies mapping from name->value using protocol reserved name=", name))
         return false;
 
-    auto constexpr SHORTEST_DOMAIN = "a.oxen"sv;
+    auto constexpr SHORTEST_DOMAIN = "a.loki"sv;
     if (check_condition(name.size() < SHORTEST_DOMAIN.size(), reason, "LNS type=", type, ", specifies mapping from name->value where the name is shorter than the shortest possible name=", SHORTEST_DOMAIN, ", given name=", name))
       return false;
 
-    // Must end with .oxen
-    auto constexpr SUFFIX = ".oxen"sv;
-    if (check_condition(!tools::ends_with(name_view, SUFFIX), reason, "LNS type=", type, ", specifies mapping from name->value where the name does not end with the domain .oxen, name=", name))
+    // Must end with .loki
+    auto constexpr SUFFIX = ".loki"sv;
+    if (check_condition(!tools::ends_with(name_view, SUFFIX), reason, "LNS type=", type, ", specifies mapping from name->value where the name does not end with the domain .loki, name=", name))
       return false;
 
     name_view.remove_suffix(SUFFIX.size());
 
     // All domains containing '--' as 3rd/4th letter are reserved except for xn-- punycode domains
     if (check_condition(name_view.size() >= 4 && name_view.substr(2, 2) == "--"sv && !tools::starts_with(name_view, "xn--"sv),
-          reason, "LNS type=", type, ", specifies reserved name `?\?--*.oxen': ", name))
+          reason, "LNS type=", type, ", specifies reserved name `?\?--*.loki': ", name))
       return false;
 
     // Must start with alphanumeric
@@ -812,8 +812,8 @@ bool validate_lns_name(mapping_type type, std::string name, std::string *reason)
     name_view.remove_prefix(1);
 
     if (!name_view.empty()) {
-      // Character preceding .oxen must be alphanumeric
-      if (check_condition(!char_is_alphanum(name_view.back()), reason, "LNS type=", type ,", specifies mapping from name->value where the character preceding the .oxen is not alphanumeric, char=", name_view.back(), ", name=", name))
+      // Character preceding .loki must be alphanumeric
+      if (check_condition(!char_is_alphanum(name_view.back()), reason, "LNS type=", type ,", specifies mapping from name->value where the character preceding the .loki is not alphanumeric, char=", name_view.back(), ", name=", name))
         return false;
       name_view.remove_suffix(1);
     }

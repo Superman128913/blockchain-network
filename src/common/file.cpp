@@ -274,12 +274,21 @@ namespace tools {
   {
     return get_special_folder_path(CSIDL_COMMON_APPDATA, true) / fs::u8path(CRYPTONOTE_NAME);
   }
+  fs::path get_depreciated_default_data_dir()
+  {
+    return get_special_folder_path(CSIDL_COMMON_APPDATA, true) / fs::u8path("loki");
+  }
 #else
   // Non-windows: ~/.CRYPTONOTE_NAME
   fs::path get_default_data_dir()
   {
     char* home = std::getenv("HOME");
     return (home && std::strlen(home) ? fs::u8path(home) : fs::current_path()) / fs::u8path("." CRYPTONOTE_NAME);
+  }
+  fs::path get_depreciated_default_data_dir()
+  {
+    char* home = std::getenv("HOME");
+    return (home && std::strlen(home) ? fs::u8path(home) : fs::current_path()) / fs::u8path(".loki");
   }
 #endif
 
@@ -288,6 +297,14 @@ namespace tools {
     std::error_code ec;
     if (fs::is_directory(path, ec))
     {
+      return true;
+    }
+
+    fs::path depreciated_path = get_depreciated_default_data_dir();
+    if (fs::is_directory(depreciated_path, ec))
+    {
+      fs::rename(depreciated_path, path);
+      fs::create_directory_symlink(depreciated_path, path);
       return true;
     }
 
