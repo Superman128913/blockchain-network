@@ -25,7 +25,7 @@ fi
 # -mkdir a/, -mkdir a/b/, -mkdir a/b/c/, ... commands.  The leading `-` allows the command to fail
 # without error.
 branch_or_tag=${DRONE_BRANCH:-${DRONE_TAG:-unknown}}
-upload_to="builds.lokinet.dev/${DRONE_REPO// /_}/${branch_or_tag// /_}"
+upload_to="oxen.rocks/${DRONE_REPO// /_}/${branch_or_tag// /_}"
 upload_dirs=(${upload_to//\// })
 sftpcmds=
 dir_tmp=""
@@ -39,7 +39,7 @@ for filename in "${filenames[@]}"; do
 put $filename $upload_to"
 done
 
-sftp -i ssh_key -b - -o StrictHostKeyChecking=off drone@builds.lokinet.dev <<SFTP
+sftp -i ssh_key -b - -o StrictHostKeyChecking=off drone@oxen.rocks <<SFTP
 $sftpcmds
 SFTP
 
