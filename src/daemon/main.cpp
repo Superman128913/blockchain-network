@@ -118,9 +118,15 @@ int main(int argc, char const * argv[])
     });
     if (!ok) return 1;
 
+    // Some ANSI color sequences that we use here (before the log system is initialized):
+    constexpr auto RESET = "\033[0m";
+    constexpr auto RED = "\033[31;1m";
+    constexpr auto YELLOW = "\033[33;1m";
+    constexpr auto CYAN = "\033[36;1m";
+
     if (command_line::get_arg(vm, command_line::arg_help))
     {
-      std::cout << "Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")\n\n";
+      std::cout << CYAN << "Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")" << RESET << "\n\n";
       std::cout << "Usage: " + std::string{argv[0]} + " [options|settings] [daemon_command...]" << std::endl << std::endl;
       std::cout << visible_options << std::endl;
       return 0;
@@ -129,7 +135,7 @@ int main(int argc, char const * argv[])
     // Oxen Version
     if (command_line::get_arg(vm, command_line::arg_version))
     {
-      std::cout << "Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")\n\n";
+      std::cout << CYAN << "Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")" << RESET << "\n\n";
       return 0;
     }
 
@@ -148,8 +154,7 @@ int main(int argc, char const * argv[])
       }
       catch (const std::exception &e)
       {
-        // log system isn't initialized yet
-        std::cerr << "Error parsing config file: " << e.what() << std::endl;
+        std::cerr << RED << "Error parsing config file: " << e.what() << RESET << "\n";
         throw;
       }
     }
@@ -164,7 +169,7 @@ int main(int argc, char const * argv[])
     const bool regtest = command_line::get_arg(vm, cryptonote::arg_regtest_on);
     if (testnet + devnet + regtest > 1)
     {
-      std::cerr << "Can't specify more than one of --testnet and --devnet and --regtest\n";
+      std::cerr << RED << "Can't specify more than one of --testnet and --devnet and --regtest" << RESET << "\n";
       return 1;
     }
 
