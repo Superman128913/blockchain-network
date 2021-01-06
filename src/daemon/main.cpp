@@ -140,7 +140,25 @@ int main(int argc, char const * argv[])
     }
 
     auto config = fs::u8path(command_line::get_arg(vm, daemon_args::arg_config_file));
+    bool load_config = false;
     if (std::error_code ec; fs::exists(config, ec))
+      load_config = true;
+    else if (!command_line::is_arg_defaulted(vm, daemon_args::arg_config_file))
+    {
+      std::cerr << RED << "Can't find config file " << config << RESET << "\n";
+      return 1;
+    }
+    else if (auto old = config; fs::exists(old.replace_filename("loki.conf"), ec))
+    {
+      if (fs::rename(old, config, ec); ec) {
+        std::cerr << RED << "Failed to migrate config file " << old << " to " << config << ": " << ec.message() << RESET << "\n";
+        return 1;
+      }
+      std::cerr << YELLOW << "Renamed old config file " << old << " to " << config << RESET << "\n";
+      load_config = true;
+    }
+
+    if (load_config)
     {
       try
       {
@@ -157,11 +175,6 @@ int main(int argc, char const * argv[])
         std::cerr << RED << "Error parsing config file: " << e.what() << RESET << "\n";
         throw;
       }
-    }
-    else if (!command_line::is_arg_defaulted(vm, daemon_args::arg_config_file))
-    {
-      std::cerr << "Can't find config file " << config << std::endl;
-      return 1;
     }
 
     const bool testnet = command_line::get_arg(vm, cryptonote::arg_testnet_on);
