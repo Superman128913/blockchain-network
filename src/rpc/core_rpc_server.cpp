@@ -961,9 +961,9 @@ namespace cryptonote { namespace rpc {
           e.as_hex = lokimq::to_hex(tx_data);
       }
 
-      if (req.decode_as_json || req.tx_extra)
+      cryptonote::transaction t;
+      if (req.decode_as_json || req.tx_extra || req.stake_info)
       {
-        cryptonote::transaction t;
         if (req.prune || pruned)
         {
           if (!cryptonote::parse_and_validate_tx_base_from_blob(tx_data, t))
@@ -1007,6 +1007,14 @@ namespace cryptonote { namespace rpc {
         e.relayed = false;
         if (e.block_height <= immutable_height)
             might_be_blink = false;
+      }
+
+      if (req.stake_info) {
+        auto hf_version = m_core.get_hard_fork_version(e.in_pool ? m_core.get_current_blockchain_height() : e.block_height);
+        service_nodes::staking_components sc;
+        if (service_nodes::tx_get_staking_components_and_amounts(nettype(), hf_version, t, e.block_height, &sc)
+            && sc.transferred > 0)
+          e.stake_amount = sc.transferred;
       }
 
       if (might_be_blink)
@@ -1442,8 +1450,19 @@ namespace cryptonote { namespace rpc {
       return res;
 
     std::function<void(const transaction& tx, tx_info& txi)> load_extra;
-    if (req.tx_extra)
-        load_extra = [this](const transaction& tx, tx_info& txi) { load_tx_extra_data(txi.extra.emplace(), tx, nettype()); };
+    if (req.tx_extra || req.stake_info)
+        load_extra = [this, &req](const transaction& tx, tx_info& txi) {
+            if (req.tx_extra)
+                load_tx_extra_data(txi.extra.emplace(), tx, nettype());
+            if (req.stake_info) {
+                auto height = m_core.get_current_blockchain_height();
+                auto hf_version = m_core.get_hard_fork_version(height);
+                service_nodes::staking_components sc;
+                if (service_nodes::tx_get_staking_components_and_amounts(nettype(), hf_version, tx, height, &sc)
+                        && sc.transferred > 0)
+                    txi.stake_amount = sc.transferred;
+            }
+        };
 
     m_core.get_pool().get_transactions_and_spent_keys_info(res.transactions, res.spent_key_images, load_extra, context.admin);
     for (tx_info& txi : res.transactions)
