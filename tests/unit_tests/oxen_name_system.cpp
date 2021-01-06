@@ -13,31 +13,31 @@ TEST(oxen_name_system, name_tests)
   };
 
   name_test const lokinet_names[] = {
-      {"a.oxen", true},
-      {"domain.oxen", true},
-      {"xn--tda.oxen", true}, // ü
-      {"xn--Mnchen-Ost-9db.oxen", true}, // München-Ost
-      {"xn--fwg93vdaef749it128eiajklmnopqrstu7dwaxyz0a1a2a3a643qhok169a.oxen", true}, // ⸘🌻‽💩🤣♠♡♢♣🂡🂢🂣🂤🂥🂦🂧🂨🂩🂪🂫🂬🂭🂮🂱🂲🂳🂴🂵🂶🂷🂸🂹
-      {"abcdefghijklmnopqrstuvwxyz123456.oxen", true}, // Max length = 32 if no hyphen (so that it can't look like a raw address)
-      {"a-cdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz0123456789a.oxen", true}, // Max length = 63 if there is at least one hyphen
+      {"a.loki", true},
+      {"domain.loki", true},
+      {"xn--tda.loki", true}, // ü
+      {"xn--Mnchen-Ost-9db.loki", true}, // München-Ost
+      {"xn--fwg93vdaef749it128eiajklmnopqrstu7dwaxyz0a1a2a3a643qhok169a.loki", true}, // ⸘🌻‽💩🤣♠♡♢♣🂡🂢🂣🂤🂥🂦🂧🂨🂩🂪🂫🂬🂭🂮🂱🂲🂳🂴🂵🂶🂷🂸🂹
+      {"abcdefghijklmnopqrstuvwxyz123456.loki", true}, // Max length = 32 if no hyphen (so that it can't look like a raw address)
+      {"a-cdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz0123456789a.loki", true}, // Max length = 63 if there is at least one hyphen
 
-      {"abc.domain.oxen", false},
+      {"abc.domain.loki", false},
       {"a", false},
       {"a.loko", false},
-      {"a domain name.oxen", false},
-      {"-.oxen", false},
-      {"a_b.oxen", false},
-      {" a.oxen", false},
-      {"a.oxen ", false},
-      {" a.oxen ", false},
-      {"localhost.oxen", false},
+      {"a domain name.loki", false},
+      {"-.loki", false},
+      {"a_b.loki", false},
+      {" a.loki", false},
+      {"a.loki ", false},
+      {" a.loki ", false},
+      {"localhost.loki", false},
       {"localhost", false},
-      {"oxen.oxen", false},
-      {"snode.oxen", false},
-      {"abcdefghijklmnopqrstuvwxyz1234567.oxen", false}, // Too long (no hyphen)
-      {"a-cdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz0123456789ab.oxen", false}, // Too long with hyphen
-      {"xn--fwg93vdaef749it128eiajklmnopqrstu7dwaxyz0a1a2a3a643qhok169ab.oxen", false}, // invalid (punycode and DNS name parts max at 63)
-      {"ab--xyz.oxen", false}, // Double-hyphen at chars 3&4 is reserved by DNS (currently only xn-- is used).
+      {"oxen.loki", false},
+      {"snode.loki", false},
+      {"abcdefghijklmnopqrstuvwxyz1234567.loki", false}, // Too long (no hyphen)
+      {"a-cdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz0123456789ab.loki", false}, // Too long with hyphen
+      {"xn--fwg93vdaef749it128eiajklmnopqrstu7dwaxyz0a1a2a3a643qhok169ab.loki", false}, // invalid (punycode and DNS name parts max at 63)
+      {"ab--xyz.loki", false}, // Double-hyphen at chars 3&4 is reserved by DNS (currently only xn-- is used).
   };
 
   name_test const session_wallet_names[] = {
