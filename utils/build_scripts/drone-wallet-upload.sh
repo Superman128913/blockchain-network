@@ -14,10 +14,10 @@ set -o xtrace  # Don't start tracing until *after* we write the ssh key
 
 chmod 600 ssh_key
 
-filenames=(dist/electron/Packaged/loki-electron-wallet-*)
+filenames=(dist/electron/Packaged/oxen-electron-wallet-*)
 if [ "${#filenames[@]}" -lt 1 ] || ! [ -f "${filenames[0]}" ]; then
     echo "Did not find expected electron wallet packages"
-    find loki-electron-gui-wallet/dist/electron/Packaged
+    find dist/electron
     exit 1
 fi
 
