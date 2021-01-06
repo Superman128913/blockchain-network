@@ -163,6 +163,11 @@ uint64_t PendingTransactionImpl::amount() const
         for (const auto &dest : ptx.dests) {
             result += dest.amount;
         }
+        //TODO(sean)
+        service_nodes::staking_components sc;
+        if (service_nodes::tx_get_staking_components_and_amounts(nettype, hf_version, ptx.tx, ptx.block_height, &sc)
+        && sc.transferred > 0)
+        result = sc.transferred;
     }
     return result;
 }
