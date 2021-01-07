@@ -120,6 +120,7 @@ public:
     bool rescanSpent() override;
     NetworkType nettype() const override {return static_cast<NetworkType>(m_wallet->nettype());}
     void hardForkInfo(uint8_t &version, uint64_t &earliest_height) const override;
+    std::optional<uint8_t> hardForkVersion() const override;
     bool useForkRules(uint8_t version, int64_t early_blocks) const override;
 
     void addSubaddressAccount(const std::string& label) override;
