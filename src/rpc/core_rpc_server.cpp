@@ -41,13 +41,13 @@
 #include <lokimq/base64.h>
 #include "crypto/crypto.h"
 #include "cryptonote_basic/tx_extra.h"
-#include "cryptonote_core/loki_name_system.h"
+#include "cryptonote_core/oxen_name_system.h"
 #include "cryptonote_core/pulse.h"
-#include "loki_economy.h"
+#include "oxen_economy.h"
 #include "epee/string_tools.h"
 #include "core_rpc_server.h"
 #include "common/command_line.h"
-#include "common/loki.h"
+#include "common/oxen.h"
 #include "common/sha256sum.h"
 #include "common/perf_timer.h"
 #include "common/random.h"
@@ -64,8 +64,8 @@
 #include "p2p/net_node.h"
 #include "version.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "daemon.rpc"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "daemon.rpc"
 
 
 namespace cryptonote { namespace rpc {
@@ -435,9 +435,9 @@ namespace cryptonote { namespace rpc {
     res.database_size = m_core.get_blockchain_storage().get_db().get_database_size();
     if (!context.admin)
       res.database_size = round_up(res.database_size, 1'000'000'000);
-    res.version = context.admin ? LOKI_VERSION_FULL : std::to_string(LOKI_VERSION[0]);
+    res.version = context.admin ? OXEN_VERSION_FULL : std::to_string(OXEN_VERSION[0]);
     res.status_line = context.admin ? m_core.get_status_string() :
-      "v" + std::to_string(LOKI_VERSION[0]) + "; Height: " + std::to_string(res.height);
+      "v" + std::to_string(OXEN_VERSION[0]) + "; Height: " + std::to_string(res.height);
 
     res.status = STATUS_OK;
     return res;
@@ -774,7 +774,7 @@ namespace cryptonote { namespace rpc {
         else if (owner.type == lns::generic_owner_sig_type::ed25519)
           entry = tools::type_to_hex(owner.ed25519);
       }
-      void operator()(const tx_extra_loki_name_system& x) {
+      void operator()(const tx_extra_oxen_name_system& x) {
         auto& lns = entry.lns.emplace();
         lns.blocks = lns::expiry_blocks(nettype, x.type);
         switch (x.type)
@@ -1300,7 +1300,7 @@ namespace cryptonote { namespace rpc {
     const uint8_t major_version = m_core.get_blockchain_storage().get_current_hard_fork_version();
 
     res.pow_algorithm =
-        major_version >= network_version_12_checkpointing    ? "RandomX (LOKI variant)"               :
+        major_version >= network_version_12_checkpointing    ? "RandomX (OXEN variant)"               :
         major_version == network_version_11_infinite_staking ? "Cryptonight Turtle Light (Variant 2)" :
                                                                "Cryptonight Heavy (Variant 2)";
 
@@ -1541,7 +1541,7 @@ namespace cryptonote { namespace rpc {
   //------------------------------------------------------------------------------------------------------------------------------
 
   //
-  // Loki
+  // Oxen
   //
   GET_OUTPUT_BLACKLIST::response core_rpc_server::invoke(GET_OUTPUT_BLACKLIST::request&& req, rpc_context context)
   {
@@ -2327,7 +2327,7 @@ namespace cryptonote { namespace rpc {
       res.service_node_state.quorumnet_port       = m_core.quorumnet_port();
       res.service_node_state.pubkey_ed25519       = std::move(get_service_node_key_res.service_node_ed25519_pubkey);
       res.service_node_state.pubkey_x25519        = std::move(get_service_node_key_res.service_node_x25519_pubkey);
-      res.service_node_state.service_node_version = LOKI_VERSION;
+      res.service_node_state.service_node_version = OXEN_VERSION;
     }
     else
     {
@@ -3586,7 +3586,7 @@ namespace cryptonote { namespace rpc {
       if (!lns::parse_owner_to_generic_owner(m_core.get_nettype(), owner, lns_owner, &errmsg))
         throw rpc_error{ERROR_WRONG_PARAM, std::move(errmsg)};
 
-      // TODO(loki): We now serialize both owner and backup_owner, since if
+      // TODO(oxen): We now serialize both owner and backup_owner, since if
       // we specify an owner that is backup owner, we don't show the (other)
       // owner. For RPC compatibility we keep the request_index around until the
       // next hard fork (16)

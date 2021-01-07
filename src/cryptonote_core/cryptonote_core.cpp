@@ -69,10 +69,10 @@ extern "C" {
 #include "common/i18n.h"
 #include "epee/net/local_ip.h"
 
-#include "common/loki_integration_test_hooks.h"
+#include "common/oxen_integration_test_hooks.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "cn"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "cn"
 
 DISABLE_VS_WARNINGS(4355)
 
@@ -234,7 +234,7 @@ namespace cryptonote
     "block-rate-notify"
   , "Run a program when the block rate undergoes large fluctuations. This might "
     "be a sign of large amounts of hash rate going on and off the Loki network, "
-    "or could be a sign that lokid is not properly synchronizing with the network. %t will be replaced "
+    "or could be a sign that oxend is not properly synchronizing with the network. %t will be replaced "
     "by the number of minutes for the observation window, %b by the number of "
     "blocks observed within that window, and %e by the number of blocks that was "
     "expected in that window."
@@ -349,7 +349,7 @@ namespace cryptonote
 
     command_line::add_arg(desc, arg_pad_transactions);
     command_line::add_arg(desc, arg_block_notify);
-#if 0 // TODO(loki): Pruning not supported because of Service Node List
+#if 0 // TODO(oxen): Pruning not supported because of Service Node List
     command_line::add_arg(desc, arg_prune_blockchain);
 #endif
     command_line::add_arg(desc, arg_reorg_notify);
@@ -357,7 +357,7 @@ namespace cryptonote
     command_line::add_arg(desc, arg_keep_alt_blocks);
 
     command_line::add_arg(desc, arg_store_quorum_history);
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     command_line::add_arg(desc, integration_test::arg_hardforks_override);
     command_line::add_arg(desc, integration_test::arg_pipe_name);
 #endif
@@ -417,7 +417,7 @@ namespace cryptonote
 
         if (!epee::net_utils::is_ip_public(m_sn_public_ip)) {
           if (m_service_node_list.debug_allow_local_ips) {
-            MWARNING("Address given for public-ip is not public; allowing it because dev-allow-local-ips was specified. This service node WILL NOT WORK ON THE PUBLIC LOKI NETWORK!");
+            MWARNING("Address given for public-ip is not public; allowing it because dev-allow-local-ips was specified. This service node WILL NOT WORK ON THE PUBLIC OXEN NETWORK!");
           } else {
             MERROR("Address given for public-ip is not public: " << epee::string_tools::get_ip_string_from_int32(m_sn_public_ip));
             storage_ok = false;
@@ -431,7 +431,7 @@ namespace cryptonote
       }
 
       if (!storage_ok) {
-        MERROR("IMPORTANT: All service node operators are now required to run the loki storage "
+        MERROR("IMPORTANT: All service node operators are now required to run the oxen storage "
                << "server and provide the public ip and ports on which it can be accessed on the internet.");
         return false;
       }
@@ -532,7 +532,7 @@ namespace cryptonote
   {
     std::string s;
     s.reserve(128);
-    s += 'v'; s += LOKI_VERSION_STR;
+    s += 'v'; s += OXEN_VERSION_STR;
     s += "; Height: ";
     s += std::to_string(get_blockchain_storage().get_current_blockchain_height());
     s += ", SN: ";
@@ -574,7 +574,7 @@ namespace cryptonote
   {
     start_time = std::time(nullptr);
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     const std::string arg_hardforks_override = command_line::get_arg(vm, integration_test::arg_hardforks_override);
 
     std::vector<std::pair<uint8_t, uint64_t>> integration_test_hardforks;
@@ -664,7 +664,7 @@ namespace cryptonote
     bool sync_on_blocks = true;
     uint64_t sync_threshold = 1;
 
-#if !defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS) // In integration mode, don't delete the DB. This should be explicitly done in the tests. Otherwise the more likely behaviour is persisting the DB across multiple daemons in the same test.
+#if !defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS) // In integration mode, don't delete the DB. This should be explicitly done in the tests. Otherwise the more likely behaviour is persisting the DB across multiple daemons in the same test.
     if (m_nettype == FAKECHAIN && !keep_fakechain)
     {
       // reset the db by removing the database file before opening it
@@ -824,7 +824,7 @@ namespace cryptonote
     // Checkpoints
     m_checkpoints_path = m_config_folder / fs::u8path(JSON_HASH_FILE_NAME);
 
-    sqlite3 *lns_db = lns::init_loki_name_system(lns_db_file_path, db->is_read_only());
+    sqlite3 *lns_db = lns::init_oxen_name_system(lns_db_file_path, db->is_read_only());
     if (!lns_db) return false;
 
     init_lokimq(vm);
@@ -1749,7 +1749,7 @@ namespace cryptonote
     if (count == 0)
       return result;
 
-    auto& [emission_amount, total_fee_amount, burnt_loki] = result;
+    auto& [emission_amount, total_fee_amount, burnt_oxen] = result;
 
     // Caching.
     //
@@ -1774,7 +1774,7 @@ namespace cryptonote
         if (count >= m_coinbase_cache.height) {
           emission_amount = m_coinbase_cache.emissions;
           total_fee_amount = m_coinbase_cache.fees;
-          burnt_loki = m_coinbase_cache.burnt;
+          burnt_oxen = m_coinbase_cache.burnt;
           start_offset = m_coinbase_cache.height;
           count -= m_coinbase_cache.height;
         }
@@ -1804,7 +1804,7 @@ namespace cryptonote
             // The cache is updated and we can still use it, so update our variables.
             emission_amount = m_coinbase_cache.emissions;
             total_fee_amount = m_coinbase_cache.fees;
-            burnt_loki = m_coinbase_cache.burnt;
+            burnt_oxen = m_coinbase_cache.burnt;
             count -= m_coinbase_cache.height - start_offset;
             start_offset = m_coinbase_cache.height;
           }
@@ -1820,7 +1820,7 @@ namespace cryptonote
     const uint64_t end = start_offset + count - 1;
     m_blockchain_storage.for_blocks_range(start_offset, end,
       [this, &cache_to, &result, &cache_build_started](uint64_t height, const crypto::hash& hash, const block& b){
-      auto& [emission_amount, total_fee_amount, burnt_loki] = result;
+      auto& [emission_amount, total_fee_amount, burnt_oxen] = result;
       std::vector<transaction> txs;
       std::vector<crypto::hash> missed_txs;
       uint64_t coinbase_amount = get_outs_money_amount(b.miner_tx);
@@ -1831,7 +1831,7 @@ namespace cryptonote
         tx_fee_amount += get_tx_miner_fee(tx, b.major_version >= HF_VERSION_FEE_BURNING);
         if(b.major_version >= HF_VERSION_FEE_BURNING)
         {
-          burnt_loki += get_burned_amount_from_tx_extra(tx.extra);
+          burnt_oxen += get_burned_amount_from_tx_extra(tx.extra);
         }
       }
 
@@ -1845,7 +1845,7 @@ namespace cryptonote
           m_coinbase_cache.height = height;
           m_coinbase_cache.emissions = emission_amount;
           m_coinbase_cache.fees = total_fee_amount;
-          m_coinbase_cache.burnt = burnt_loki;
+          m_coinbase_cache.burnt = burnt_oxen;
         }
         if (m_coinbase_cache.building)
         {
@@ -2067,7 +2067,7 @@ namespace cryptonote
     std::vector<block_complete_entry> blocks;
     m_miner.pause();
     {
-      LOKI_DEFER { m_miner.resume(); };
+      OXEN_DEFER { m_miner.resume(); };
       try
       {
         blocks.push_back(get_block_complete_entry(b, m_mempool));
@@ -2379,7 +2379,7 @@ namespace cryptonote
     m_miner.on_idle();
     m_mempool.on_idle();
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     integration_test::state.core_is_idle = true;
 #endif
 
@@ -2483,7 +2483,7 @@ namespace cryptonote
       return true;
     }
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     MDEBUG("Not checking block rate, integration test mode");
     return true;
 #endif

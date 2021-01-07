@@ -127,7 +127,7 @@ bool gen_bp_tx_validation_base::generate_with(std::vector<test_event_entry>& eve
     blk_r = blk_last;
   }
 
-  // NOTE(loki): Submit one or more extra block. On the fork height, we allow exactly the forking
+  // NOTE(oxen): Submit one or more extra block. On the fork height, we allow exactly the forking
   // block to contain borromean TX's, due to some clients constructing old style TX's on the fork
   // height, and for CLSAG we allow 10. So make sure we create extra blocks so that the block
   // containing the new txes is tested with the new mandatory rules.
@@ -189,7 +189,7 @@ bool gen_bp_tx_validation_base::generate_with(std::vector<test_event_entry>& eve
 
     tx_destination_entry change_addr{0, from.get_keys().m_account_address, false /* is subaddr */ };
 
-    // NOTE(loki): Monero tests presume the generated TX doesn't have change so remove it from our output.
+    // NOTE(oxen): Monero tests presume the generated TX doesn't have change so remove it from our output.
     for (auto it = destinations.begin(); it != destinations.end(); ++it)
     {
       if (it->amount != change_amount) continue;
@@ -210,7 +210,7 @@ bool gen_bp_tx_validation_base::generate_with(std::vector<test_event_entry>& eve
       return false;
     }
 
-    loki_construct_tx_params tx_params;
+    oxen_construct_tx_params tx_params;
     tx_params.hf_version = generator.m_hf_version;
     if (!cryptonote::construct_tx_and_get_tx_key(
         from.get_keys(),

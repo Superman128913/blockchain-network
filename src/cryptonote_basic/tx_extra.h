@@ -36,7 +36,7 @@
 #include "serialization/variant.h"
 #include "crypto/crypto.h"
 #include "common/hex.h"
-#include "loki_economy.h"
+#include "oxen_economy.h"
 #include "cryptonote_basic.h"
 
 
@@ -62,7 +62,7 @@ constexpr uint8_t
   TX_EXTRA_TAG_TX_KEY_IMAGE_UNLOCK        = 0x77,
   TX_EXTRA_TAG_SERVICE_NODE_STATE_CHANGE  = 0x78,
   TX_EXTRA_TAG_BURN                       = 0x79,
-  TX_EXTRA_TAG_LOKI_NAME_SYSTEM           = 0x7A,
+  TX_EXTRA_TAG_OXEN_NAME_SYSTEM           = 0x7A,
 
   TX_EXTRA_MYSTERIOUS_MINERGATE_TAG       = 0xDE;
 
@@ -470,7 +470,7 @@ namespace cryptonote
     END_SERIALIZE()
   };
 
-  struct tx_extra_loki_name_system
+  struct tx_extra_oxen_name_system
   {
     uint8_t                 version = 0;
     lns::mapping_type       type;
@@ -493,7 +493,7 @@ namespace cryptonote
     // and has a non-null txid set (which should point to the most recent registration or update).
     bool is_renewing() const { return fields == lns::extra_field::none && prev_txid && is_lokinet_type(type); }
 
-    static tx_extra_loki_name_system make_buy(
+    static tx_extra_oxen_name_system make_buy(
         lns::generic_owner const& owner,
         lns::generic_owner const* backup_owner,
         lns::mapping_type type,
@@ -501,9 +501,9 @@ namespace cryptonote
         const std::string& encrypted_value,
         const crypto::hash& prev_txid);
 
-    static tx_extra_loki_name_system make_renew(lns::mapping_type type, const crypto::hash& name_hash, const crypto::hash& prev_txid);
+    static tx_extra_oxen_name_system make_renew(lns::mapping_type type, const crypto::hash& name_hash, const crypto::hash& prev_txid);
 
-    static tx_extra_loki_name_system make_update(
+    static tx_extra_oxen_name_system make_update(
         const lns::generic_signature& signature,
         lns::mapping_type type,
         const crypto::hash& name_hash,
@@ -544,7 +544,7 @@ namespace cryptonote
       tx_extra_service_node_contributor,
       tx_extra_service_node_pubkey,
       tx_extra_tx_secret_key,
-      tx_extra_loki_name_system,
+      tx_extra_oxen_name_system,
       tx_extra_tx_key_image_proofs,
       tx_extra_tx_key_image_unlock,
       tx_extra_burn,
@@ -573,4 +573,4 @@ BINARY_VARIANT_TAG(cryptonote::tx_extra_tx_secret_key,               cryptonote:
 BINARY_VARIANT_TAG(cryptonote::tx_extra_tx_key_image_proofs,         cryptonote::TX_EXTRA_TAG_TX_KEY_IMAGE_PROOFS);
 BINARY_VARIANT_TAG(cryptonote::tx_extra_tx_key_image_unlock,         cryptonote::TX_EXTRA_TAG_TX_KEY_IMAGE_UNLOCK);
 BINARY_VARIANT_TAG(cryptonote::tx_extra_burn,                        cryptonote::TX_EXTRA_TAG_BURN);
-BINARY_VARIANT_TAG(cryptonote::tx_extra_loki_name_system,            cryptonote::TX_EXTRA_TAG_LOKI_NAME_SYSTEM);
+BINARY_VARIANT_TAG(cryptonote::tx_extra_oxen_name_system,            cryptonote::TX_EXTRA_TAG_OXEN_NAME_SYSTEM);

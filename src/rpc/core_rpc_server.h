@@ -43,12 +43,12 @@
 #include "p2p/net_node.h"
 #include "cryptonote_protocol/cryptonote_protocol_handler.h"
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
-#include "common/loki_integration_test_hooks.h"
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
+#include "common/oxen_integration_test_hooks.h"
 #endif
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "daemon.rpc"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "daemon.rpc"
 
 namespace boost::program_options {
 class options_description;
@@ -273,7 +273,7 @@ namespace cryptonote::rpc {
     LNS_RESOLVE::response                               invoke(LNS_RESOLVE::request&& req, rpc_context context);
     FLUSH_CACHE::response                               invoke(FLUSH_CACHE::request&& req, rpc_context);
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     void on_relay_uptime_and_votes()
     {
       m_core.submit_uptime_proof();

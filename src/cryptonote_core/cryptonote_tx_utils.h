@@ -51,24 +51,24 @@ namespace cryptonote
   uint64_t get_portion_of_reward                     (uint64_t portions, uint64_t total_service_node_reward);
   uint64_t service_node_reward_formula               (uint64_t base_reward, uint8_t hard_fork_version);
 
-  struct loki_miner_tx_context
+  struct oxen_miner_tx_context
   {
-    static loki_miner_tx_context miner_block(network_type nettype,
+    static oxen_miner_tx_context miner_block(network_type nettype,
                                              cryptonote::account_public_address const &block_producer,
                                              service_nodes::payout const &block_leader = service_nodes::null_payout)
     {
-        loki_miner_tx_context result = {};
+        oxen_miner_tx_context result = {};
         result.nettype               = nettype;
         result.miner_block_producer  = block_producer;
         result.block_leader          = block_leader;
         return result;
     }
 
-    static loki_miner_tx_context pulse_block(network_type nettype,
+    static oxen_miner_tx_context pulse_block(network_type nettype,
                                              service_nodes::payout const &block_producer,
                                              service_nodes::payout const &block_leader = service_nodes::null_payout)
     {
-      loki_miner_tx_context result = {};
+      oxen_miner_tx_context result = {};
       result.pulse                 = true;
       result.nettype               = nettype;
       result.pulse_block_producer  = block_producer;
@@ -93,7 +93,7 @@ namespace cryptonote
       size_t current_block_weight,
       uint64_t fee,
       transaction& tx,
-      const loki_miner_tx_context &miner_context,
+      const oxen_miner_tx_context &miner_context,
       const blobdata& extra_nonce = blobdata(),
       uint8_t hard_fork_version = 1);
 
@@ -113,7 +113,7 @@ namespace cryptonote
     uint64_t original_base_reward;
   };
 
-  struct loki_block_reward_context
+  struct oxen_block_reward_context
   {
     using portions = uint64_t;
     bool                     testnet_override;
@@ -123,12 +123,12 @@ namespace cryptonote
     std::vector<service_nodes::payout_entry> block_leader_payouts = {service_nodes::null_payout_entry};
   };
 
-  // NOTE(loki): I would combine this into get_base_block_reward, but
+  // NOTE(oxen): I would combine this into get_base_block_reward, but
   // cryptonote_basic as a library is to be able to trivially link with
   // cryptonote_core since it would have a circular dependency on Blockchain
 
   // NOTE: Block reward function that should be called after hard fork v10
-  bool get_loki_block_reward(size_t median_weight, size_t current_block_weight, uint64_t already_generated_coins, int hard_fork_version, block_reward_parts &result, const loki_block_reward_context &loki_context);
+  bool get_oxen_block_reward(size_t median_weight, size_t current_block_weight, uint64_t already_generated_coins, int hard_fork_version, block_reward_parts &result, const oxen_block_reward_context &oxen_context);
 
   struct tx_source_entry
   {
@@ -203,7 +203,7 @@ namespace cryptonote
     END_SERIALIZE()
   };
 
-  struct loki_construct_tx_params
+  struct oxen_construct_tx_params
   {
     uint8_t hf_version = cryptonote::network_version_7;
     txtype tx_type     = txtype::standard;
@@ -222,9 +222,9 @@ namespace cryptonote
 
   //---------------------------------------------------------------
   crypto::public_key get_destination_view_key_pub(const std::vector<tx_destination_entry> &destinations, const std::optional<cryptonote::tx_destination_entry>& change_addr);
-  bool construct_tx(const account_keys& sender_account_keys, std::vector<tx_source_entry> &sources, const std::vector<tx_destination_entry>& destinations, const std::optional<cryptonote::tx_destination_entry>& change_addr, const std::vector<uint8_t> &extra, transaction& tx, uint64_t unlock_time, const loki_construct_tx_params &tx_params = {});
-  bool construct_tx_with_tx_key   (const account_keys& sender_account_keys, const std::unordered_map<crypto::public_key, subaddress_index>& subaddresses, std::vector<tx_source_entry>& sources, std::vector<tx_destination_entry>& destinations, const std::optional<cryptonote::tx_destination_entry>& change_addr, const std::vector<uint8_t> &extra, transaction& tx, uint64_t unlock_time, const crypto::secret_key &tx_key, const std::vector<crypto::secret_key> &additional_tx_keys, const rct::RCTConfig &rct_config, rct::multisig_out *msout = NULL, bool shuffle_outs = true, loki_construct_tx_params const &tx_params = {});
-  bool construct_tx_and_get_tx_key(const account_keys& sender_account_keys, const std::unordered_map<crypto::public_key, subaddress_index>& subaddresses, std::vector<tx_source_entry>& sources, std::vector<tx_destination_entry>& destinations, const std::optional<cryptonote::tx_destination_entry>& change_addr, const std::vector<uint8_t> &extra, transaction& tx, uint64_t unlock_time,       crypto::secret_key &tx_key,       std::vector<crypto::secret_key> &additional_tx_keys, const rct::RCTConfig &rct_config, rct::multisig_out *msout = NULL, loki_construct_tx_params const &tx_params = {});
+  bool construct_tx(const account_keys& sender_account_keys, std::vector<tx_source_entry> &sources, const std::vector<tx_destination_entry>& destinations, const std::optional<cryptonote::tx_destination_entry>& change_addr, const std::vector<uint8_t> &extra, transaction& tx, uint64_t unlock_time, const oxen_construct_tx_params &tx_params = {});
+  bool construct_tx_with_tx_key   (const account_keys& sender_account_keys, const std::unordered_map<crypto::public_key, subaddress_index>& subaddresses, std::vector<tx_source_entry>& sources, std::vector<tx_destination_entry>& destinations, const std::optional<cryptonote::tx_destination_entry>& change_addr, const std::vector<uint8_t> &extra, transaction& tx, uint64_t unlock_time, const crypto::secret_key &tx_key, const std::vector<crypto::secret_key> &additional_tx_keys, const rct::RCTConfig &rct_config, rct::multisig_out *msout = NULL, bool shuffle_outs = true, oxen_construct_tx_params const &tx_params = {});
+  bool construct_tx_and_get_tx_key(const account_keys& sender_account_keys, const std::unordered_map<crypto::public_key, subaddress_index>& subaddresses, std::vector<tx_source_entry>& sources, std::vector<tx_destination_entry>& destinations, const std::optional<cryptonote::tx_destination_entry>& change_addr, const std::vector<uint8_t> &extra, transaction& tx, uint64_t unlock_time,       crypto::secret_key &tx_key,       std::vector<crypto::secret_key> &additional_tx_keys, const rct::RCTConfig &rct_config, rct::multisig_out *msout = NULL, oxen_construct_tx_params const &tx_params = {});
   bool generate_output_ephemeral_keys(const size_t tx_version, bool &found_change,
                                       const cryptonote::account_keys &sender_account_keys, const crypto::public_key &txkey_pub,  const crypto::secret_key &tx_key,
                                       const cryptonote::tx_destination_entry &dst_entr, const std::optional<cryptonote::tx_destination_entry> &change_addr, const size_t output_index,

@@ -28,15 +28,15 @@
 //
 #if defined(HAVE_HIDAPI) 
 
-#include "common/loki.h"
+#include "common/oxen.h"
 #include "log.hpp"
 #include "device_io_hid.hpp"
 
 namespace hw {
   namespace io {
  
-    #undef LOKI_DEFAULT_LOG_CATEGORY
-    #define LOKI_DEFAULT_LOG_CATEGORY "device.io"
+    #undef OXEN_DEFAULT_LOG_CATEGORY
+    #define OXEN_DEFAULT_LOG_CATEGORY "device.io"
  
     #define ASSERT_X(exp,msg)    CHECK_AND_ASSERT_THROW_MES(exp, msg); 
 
@@ -120,7 +120,7 @@ namespace hw {
 
       hid_device_info *result = nullptr;
       for (; devices_list != nullptr; devices_list = devices_list->next) {
-        LOKI_DEFER {
+        OXEN_DEFER {
           MDEBUG( (result == devices_list ? "SELECTED" : "SKIPPED ") <<
                   " HID Device" <<
                   " path " << safe_hid_path(devices_list) <<

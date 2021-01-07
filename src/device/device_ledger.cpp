@@ -49,8 +49,8 @@ namespace hw {
 
   #ifdef WITH_DEVICE_LEDGER
 
-    #undef LOKI_DEFAULT_LOG_CATEGORY
-    #define LOKI_DEFAULT_LOG_CATEGORY "device.ledger"
+    #undef OXEN_DEFAULT_LOG_CATEGORY
+    #define OXEN_DEFAULT_LOG_CATEGORY "device.ledger"
 
     /* ===================================================================== */
     /* ===                           Debug                              ==== */
@@ -482,8 +482,8 @@ namespace hw {
     bool device_ledger::reset() {
       reset_buffer();
       int offset = set_command_header_noopt(INS_RESET);
-      CHECK_AND_ASSERT_THROW_MES(offset + LOKI_VERSION_STR.size() <= BUFFER_SEND_SIZE, "LOKI_VERSION_STR is too long");
-      send_bytes(LOKI_VERSION_STR.data(), LOKI_VERSION_STR.size(), offset);
+      CHECK_AND_ASSERT_THROW_MES(offset + OXEN_VERSION_STR.size() <= BUFFER_SEND_SIZE, "OXEN_VERSION_STR is too long");
+      send_bytes(OXEN_VERSION_STR.data(), OXEN_VERSION_STR.size(), offset);
       finish_and_exchange(offset);
 
       CHECK_AND_ASSERT_THROW_MES(length_recv>=3, "Communication error, less than three bytes received. Check your application version.");
@@ -1583,7 +1583,7 @@ namespace hw {
           additional_txkey.sec = additional_tx_keys[output_index];
       }
 
-      bool &is_change = found_change; // NOTE(loki): Alias our param into theirs so we don't have to change much code.
+      bool &is_change = found_change; // NOTE(oxen): Alias our param into theirs so we don't have to change much code.
 
       if (change_addr && dst_entr == *change_addr && !is_change)
         is_change = true; // sending change to yourself; derivation = a*R

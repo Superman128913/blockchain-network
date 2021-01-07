@@ -1,9 +1,9 @@
 #include <bitset>
 #include <variant>
 #include "common/hex.h"
-#include "loki_name_system.h"
+#include "oxen_name_system.h"
 
-#include "common/loki.h"
+#include "common/oxen.h"
 #include "common/string_util.h"
 #include "crypto/hash.h"
 #include "cryptonote_basic/cryptonote_basic.h"
@@ -11,7 +11,7 @@
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "cryptonote_basic/tx_extra.h"
 #include "cryptonote_core/blockchain.h"
-#include "loki_economy.h"
+#include "oxen_economy.h"
 
 #include <lokimq/hex.h>
 #include <lokimq/base32z.h>
@@ -30,8 +30,8 @@ extern "C"
 #include <sodium/randombytes.h>
 }
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "lns"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "lns"
 
 namespace lns
 {
@@ -105,7 +105,7 @@ std::string lns::mapping_value::to_readable_value(cryptonote::network_type netty
   std::string result;
   if (is_lokinet_type(type))
   {
-    result = lokimq::to_base32z(to_view()) + ".loki";
+    result = lokimq::to_base32z(to_view()) + ".oxen";
   }
   else if (type == lns::mapping_type::wallet)
   {
@@ -128,7 +128,7 @@ std::string lns::mapping_value::to_readable_value(cryptonote::network_type netty
 
 namespace {
 
-std::string lns_extra_string(cryptonote::network_type nettype, cryptonote::tx_extra_loki_name_system const &data)
+std::string lns_extra_string(cryptonote::network_type nettype, cryptonote::tx_extra_oxen_name_system const &data)
 {
   std::stringstream stream;
   stream << "LNS Extra={";
@@ -555,7 +555,7 @@ sql_compiled_statement::~sql_compiled_statement()
   sqlite3_finalize(statement);
 }
 
-sqlite3 *init_loki_name_system(const fs::path& file_path, bool read_only)
+sqlite3 *init_oxen_name_system(const fs::path& file_path, bool read_only)
 {
   sqlite3 *result = nullptr;
   int sql_init    = sqlite3_initialize();
@@ -775,14 +775,14 @@ bool validate_lns_name(mapping_type type, std::string name, std::string *reason)
   if (is_lokinet)
   {
     // LOKINET
-    // Domain has to start with an alphanumeric, and can have (alphanumeric or hyphens) in between, the character before the suffix <char>'.loki' must be alphanumeric followed by the suffix '.loki'
+    // Domain has to start with an alphanumeric, and can have (alphanumeric or hyphens) in between, the character before the suffix <char>'.oxen' must be alphanumeric followed by the suffix '.oxen'
     // It's *approximately* this regex, but there are some extra restrictions below
-    // ^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.loki$
+    // ^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.oxen$
 
     // Reserved names:
-    // - localhost.loki has special meaning within lokinet (it is always a CNAME to the local
+    // - localhost.oxen has special meaning within lokinet (it is always a CNAME to the local
     //   address)
-    // - loki.loki and snode.loki are prohibited in case someone added .loki or .snode as search
+    // - loki.loki and snode.oxen are prohibited in case someone added .loki or .snode as search
     //   domains (in which case the user looking up "foo.loki" would try end up trying to resolve
     //   "foo.loki.loki").
     for (auto& reserved : {"localhost.loki"sv, "loki.loki"sv, "snode.loki"sv})
@@ -912,7 +912,7 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
     // We need a 52 char base32z string that decodes to a 32-byte value, which really means we need
     // 51 base32z chars (=255 bits) followed by a 1-bit value ('y'=0, or 'o'=0b10000); anything else
     // in the last spot isn't a valid lokinet address.
-    if (check_condition(value.size() != 57 || !tools::ends_with(value, ".loki") || !lokimq::is_base32z(value.substr(0, 52)) || !(value[51] == 'y' || value[51] == 'o'),
+    if (check_condition(value.size() != 57 || !tools::ends_with(value, ".oxen") || !lokimq::is_base32z(value.substr(0, 52)) || !(value[51] == 'y' || value[51] == 'o'),
                 reason, "'", value, "' is not a valid lokinet address"))
       return false;
 
@@ -1028,10 +1028,10 @@ static bool verify_lns_signature(crypto::hash const &hash, lns::generic_signatur
   }
 }
 
-static bool validate_against_previous_mapping(lns::name_system_db &lns_db, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_loki_name_system const &lns_extra, std::string *reason)
+static bool validate_against_previous_mapping(lns::name_system_db &lns_db, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_oxen_name_system const &lns_extra, std::string *reason)
 {
   std::stringstream err_stream;
-  LOKI_DEFER { if (reason && reason->empty()) *reason = err_stream.str(); };
+  OXEN_DEFER { if (reason && reason->empty()) *reason = err_stream.str(); };
 
   crypto::hash expected_prev_txid = crypto::null_hash;
   std::string name_hash           = hash_to_base64(lns_extra.name_hash);
@@ -1107,16 +1107,16 @@ static bool validate_against_previous_mapping(lns::name_system_db &lns_db, uint6
 // Sanity check value to disallow the empty name hash
 static const crypto::hash null_name_hash = name_to_hash("");
 
-bool name_system_db::validate_lns_tx(uint8_t hf_version, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_loki_name_system &lns_extra, std::string *reason)
+bool name_system_db::validate_lns_tx(uint8_t hf_version, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_oxen_name_system &lns_extra, std::string *reason)
 {
   // -----------------------------------------------------------------------------------------------
   // Pull out LNS Extra from TX
   // -----------------------------------------------------------------------------------------------
   {
-    if (check_condition(tx.type != cryptonote::txtype::loki_name_system, reason, tx, ", uses wrong tx type, expected=", cryptonote::txtype::loki_name_system))
+    if (check_condition(tx.type != cryptonote::txtype::oxen_name_system, reason, tx, ", uses wrong tx type, expected=", cryptonote::txtype::oxen_name_system))
       return false;
 
-    if (check_condition(!cryptonote::get_field_from_tx_extra(tx.extra, lns_extra), reason, tx, ", didn't have loki name service in the tx_extra"))
+    if (check_condition(!cryptonote::get_field_from_tx_extra(tx.extra, lns_extra), reason, tx, ", didn't have oxen name service in the tx_extra"))
       return false;
   }
 
@@ -1190,7 +1190,7 @@ bool name_system_db::validate_lns_tx(uint8_t hf_version, uint64_t blockchain_hei
     if (burn != burn_required)
     {
       char const *over_or_under = burn > burn_required ? "too much " : "insufficient ";
-      if (check_condition(true, reason, tx, ", ", lns_extra_string(nettype, lns_extra), " burned ", over_or_under, "loki=", burn, ", require=", burn_required))
+      if (check_condition(true, reason, tx, ", ", lns_extra_string(nettype, lns_extra), " burned ", over_or_under, "oxen=", burn, ", require=", burn_required))
         return false;
     }
   }
@@ -1807,7 +1807,7 @@ name_system_db::~name_system_db()
 
 namespace {
 
-std::optional<int64_t> add_or_get_owner_id(lns::name_system_db &lns_db, crypto::hash const &tx_hash, cryptonote::tx_extra_loki_name_system const &entry, lns::generic_owner const &key)
+std::optional<int64_t> add_or_get_owner_id(lns::name_system_db &lns_db, crypto::hash const &tx_hash, cryptonote::tx_extra_oxen_name_system const &entry, lns::generic_owner const &key)
 {
   int64_t result = 0;
   if (owner_record owner = lns_db.get_owner_by_key(key)) result = owner.id;
@@ -1827,7 +1827,7 @@ std::optional<int64_t> add_or_get_owner_id(lns::name_system_db &lns_db, crypto::
 // Build a query and bind values that will create a new row at the given height by copying the
 // current highest-height row values and/or updating the given update fields.
 using update_variant = std::variant<uint16_t, int64_t, uint64_t, blob_view, std::string>;
-std::pair<std::string, std::vector<update_variant>> update_record_query(name_system_db& lns_db, uint64_t height, const cryptonote::tx_extra_loki_name_system& entry, const crypto::hash& tx_hash)
+std::pair<std::string, std::vector<update_variant>> update_record_query(name_system_db& lns_db, uint64_t height, const cryptonote::tx_extra_oxen_name_system& entry, const crypto::hash& tx_hash)
 {
   assert(entry.is_updating() || entry.is_renewing());
 
@@ -1903,7 +1903,7 @@ FROM "mappings" WHERE "type" = ? AND "name_hash" = ? ORDER BY "update_height" DE
   return result;
 }
 
-bool add_lns_entry(lns::name_system_db &lns_db, uint64_t height, cryptonote::tx_extra_loki_name_system const &entry, crypto::hash const &tx_hash)
+bool add_lns_entry(lns::name_system_db &lns_db, uint64_t height, cryptonote::tx_extra_oxen_name_system const &entry, crypto::hash const &tx_hash)
 {
   // -----------------------------------------------------------------------------------------------
   // New Mapping Insert or Completely Replace
@@ -1983,10 +1983,10 @@ bool name_system_db::add_block(const cryptonote::block &block, const std::vector
   {
     for (cryptonote::transaction const &tx : txs)
     {
-      if (tx.type != cryptonote::txtype::loki_name_system)
+      if (tx.type != cryptonote::txtype::oxen_name_system)
         continue;
 
-      cryptonote::tx_extra_loki_name_system entry = {};
+      cryptonote::tx_extra_oxen_name_system entry = {};
       std::string fail_reason;
       if (!validate_lns_tx(block.major_version, height, tx, entry, &fail_reason))
       {
@@ -2019,11 +2019,11 @@ struct lns_update_history
   uint64_t owner_last_update_height        = static_cast<uint64_t>(-1);
   uint64_t backup_owner_last_update_height = static_cast<uint64_t>(-1);
 
-  void     update(uint64_t height, cryptonote::tx_extra_loki_name_system const &lns_extra);
+  void     update(uint64_t height, cryptonote::tx_extra_oxen_name_system const &lns_extra);
   uint64_t newest_update_height() const;
 };
 
-void lns_update_history::update(uint64_t height, cryptonote::tx_extra_loki_name_system const &lns_extra)
+void lns_update_history::update(uint64_t height, cryptonote::tx_extra_oxen_name_system const &lns_extra)
 {
   if (lns_extra.field_is_set(lns::extra_field::encrypted_value))
     value_last_update_height = height;
@@ -2045,7 +2045,7 @@ struct replay_lns_tx
 {
   uint64_t                              height;
   crypto::hash                          tx_hash;
-  cryptonote::tx_extra_loki_name_system entry;
+  cryptonote::tx_extra_oxen_name_system entry;
 };
 
 void name_system_db::block_detach(cryptonote::Blockchain const &blockchain, uint64_t new_blockchain_height)
@@ -2062,7 +2062,7 @@ bool name_system_db::save_owner(lns::generic_owner const &owner, int64_t *row_id
   return result;
 }
 
-bool name_system_db::save_mapping(crypto::hash const &tx_hash, cryptonote::tx_extra_loki_name_system const &src, uint64_t height, std::optional<uint64_t> expiration, int64_t owner_id, std::optional<int64_t> backup_owner_id)
+bool name_system_db::save_mapping(crypto::hash const &tx_hash, cryptonote::tx_extra_oxen_name_system const &src, uint64_t height, std::optional<uint64_t> expiration, int64_t owner_id, std::optional<int64_t> backup_owner_id)
 {
   if (!src.is_buying())
     return false;

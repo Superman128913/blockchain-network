@@ -37,10 +37,10 @@
 #include "wallet/transfer_view.h"
 
 #include "common/meta.h"
-#include "common/loki.h"
+#include "common/oxen.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "wallet.rpc"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "wallet.rpc"
 
 // When making *any* change here, bump minor
 // If the change is incompatible, then bump major and set minor to 0
@@ -86,7 +86,7 @@ namespace tools::wallet_rpc {
   }
 
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Return the wallet's balance.
   struct GET_BALANCE : RPC_COMMAND
   {
@@ -108,7 +108,7 @@ namespace tools::wallet_rpc {
       uint32_t address_index;       // Index of the subaddress in the account.
       std::string address;          // Address at this index. Base58 representation of the public keys.
       uint64_t balance;             // Balance for the subaddress (locked or unlocked).
-      uint64_t unlocked_balance;    // Unlocked funds are those funds that are sufficiently deep enough in the loki blockchain to be considered safe to spend.
+      uint64_t unlocked_balance;    // Unlocked funds are those funds that are sufficiently deep enough in the oxen blockchain to be considered safe to spend.
       std::string label;            // Label for the subaddress.
       uint64_t num_unspent_outputs; // Number of unspent outputs available for the subaddress.
       uint64_t blocks_to_unlock;    // The number of blocks remaining for the balance to unlock
@@ -120,7 +120,7 @@ namespace tools::wallet_rpc {
     struct response
     {
       uint64_t   balance;                              // The total balance (atomic units) of the currently opened wallet.
-      uint64_t   unlocked_balance;                     // Unlocked funds are those funds that are sufficiently deep enough in the loki blockchain to be considered safe to spend.
+      uint64_t   unlocked_balance;                     // Unlocked funds are those funds that are sufficiently deep enough in the oxen blockchain to be considered safe to spend.
       bool       multisig_import_needed;               // True if importing multisig data is needed for returning a correct balance.
       std::vector<per_subaddress_info> per_subaddress; // Balance information for each subaddress in an account.
       uint64_t blocks_to_unlock;                       // The number of blocks remaining for the balance to unlock
@@ -130,7 +130,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Return the wallet's addresses for an account. Optionally filter for specific set of subaddresses.
   struct GET_ADDRESS : RPC_COMMAND
   {
@@ -163,7 +163,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get account and address indexes from a specific (sub)address.
   struct GET_ADDRESS_INDEX : RPC_COMMAND
   {
@@ -184,7 +184,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Create a new address for an account. Optionally, label the new address.
   struct CREATE_ADDRESS : RPC_COMMAND
   {
@@ -210,7 +210,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Label an address.
   struct LABEL_ADDRESS : RPC_COMMAND
   {
@@ -227,7 +227,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get all accounts for a wallet. Optionally filter accounts by tag.
   struct GET_ACCOUNTS : RPC_COMMAND
   {
@@ -263,7 +263,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Create a new account with an optional label.
   struct CREATE_ACCOUNT : RPC_COMMAND
   {
@@ -285,7 +285,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Label an account.
   struct LABEL_ACCOUNT : RPC_COMMAND
   {
@@ -302,7 +302,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get a list of user-defined account tags.
   struct GET_ACCOUNT_TAGS : RPC_COMMAND
   {
@@ -327,7 +327,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Apply a filtering tag to a list of accounts.
   struct TAG_ACCOUNTS : RPC_COMMAND
   {
@@ -344,7 +344,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Remove filtering tag from a list of accounts.
   struct UNTAG_ACCOUNTS : RPC_COMMAND
   {
@@ -360,7 +360,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Set description for an account tag.
   struct SET_ACCOUNT_TAG_DESCRIPTION : RPC_COMMAND
   {
@@ -377,7 +377,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Returns the wallet's current block height and blockchain immutable height
   struct GET_HEIGHT : RPC_COMMAND
   {
@@ -394,8 +394,8 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
-  // Send loki to a number of recipients. To preview the transaction fee, set do_not_relay to true and get_tx_metadata to true. 
+  OXEN_RPC_DOC_INTROSPECT
+  // Send oxen to a number of recipients. To preview the transaction fee, set do_not_relay to true and get_tx_metadata to true. 
   // Submit the response using the data in get_tx_metadata in the RPC call, relay_tx.
   struct TRANSFER : RESTRICTED
   {
@@ -403,14 +403,14 @@ namespace tools::wallet_rpc {
 
     struct request
     {
-      std::list<wallet::transfer_destination> destinations; // Array of destinations to receive LOKI.
+      std::list<wallet::transfer_destination> destinations; // Array of destinations to receive OXEN.
       uint32_t account_index;                       // (Optional) Transfer from this account index. (Defaults to 0)
       std::set<uint32_t> subaddr_indices;           // (Optional) Transfer from this set of subaddresses. (Defaults to 0)
       uint32_t priority;                            // Set a priority for the transaction. Accepted values are: 1 for unimportant or 5 for blink. (0 and 2-4 are accepted for backwards compatibility and are equivalent to 5)
-      uint64_t unlock_time;                         // Number of blocks before the loki can be spent (0 to use the default lock time).
+      uint64_t unlock_time;                         // Number of blocks before the oxen can be spent (0 to use the default lock time).
       std::string payment_id;                       // (Optional) Random 64-character hex string to identify a transaction.
       bool get_tx_key;                              // (Optional) Return the transaction key after sending.
-      bool do_not_relay;                            // (Optional) If true, the newly created transaction will not be relayed to the loki network. (Defaults to false)
+      bool do_not_relay;                            // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
       bool get_tx_hex;                              // Return the transaction as hex string after sending. (Defaults to false)
       bool get_tx_metadata;                         // Return the metadata needed to relay the transaction. (Defaults to false)
 
@@ -432,7 +432,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Same as transfer, but can split into more than one tx if necessary.
   struct TRANSFER_SPLIT : RESTRICTED
   {
@@ -440,14 +440,14 @@ namespace tools::wallet_rpc {
 
     struct request
     {
-      std::list<wallet::transfer_destination> destinations; // Array of destinations to receive LOKI:
+      std::list<wallet::transfer_destination> destinations; // Array of destinations to receive OXEN:
       uint32_t account_index;                       // (Optional) Transfer from this account index. (Defaults to 0)
       std::set<uint32_t> subaddr_indices;           // (Optional) Transfer from this set of subaddresses. (Defaults to 0)
       uint32_t priority;                            // Set a priority for the transaction. Accepted values are: 1 for unimportant or 5 for blink. (0 and 2-4 are accepted for backwards compatibility and are equivalent to 5)
-      uint64_t unlock_time;                         // Number of blocks before the loki can be spent (0 to not add a lock).
+      uint64_t unlock_time;                         // Number of blocks before the oxen can be spent (0 to not add a lock).
       std::string payment_id;                       // (Optional) Random 32-byte/64-character hex string to identify a transaction.
       bool get_tx_keys;                             // (Optional) Return the transaction keys after sending.
-      bool do_not_relay;                            // (Optional) If true, the newly created transaction will not be relayed to the loki network. (Defaults to false)
+      bool do_not_relay;                            // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
       bool get_tx_hex;                              // Return the transactions as hex string after sending.
       bool get_tx_metadata;                         // Return list of transaction metadata needed to relay the transfer later.
 
@@ -476,7 +476,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct DESCRIBE_TRANSFER : RESTRICTED
   {
     static constexpr auto names() { return NAMES("describe_transfer"); }
@@ -494,7 +494,7 @@ namespace tools::wallet_rpc {
       uint64_t amount_in;              // Amount in, in atomic units.
       uint64_t amount_out;             // amount out, in atomic units.
       uint32_t ring_size;              // Ring size of transfer.
-      uint64_t unlock_time;            // Number of blocks before the loki can be spent (0 represents the default network lock time).
+      uint64_t unlock_time;            // Number of blocks before the oxen can be spent (0 represents the default network lock time).
       std::list<recipient> recipients; // List of addresses and amounts.
       std::string payment_id;          // Payment ID matching the input parameter.
       uint64_t change_amount;          // Change received from transaction in atomic units.
@@ -522,7 +522,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Sign a transaction created on a read-only wallet (in cold-signing process).
   struct SIGN_TRANSFER : RESTRICTED
   {
@@ -548,7 +548,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Submit a previously signed transaction on a read-only wallet (in cold-signing process).
   struct SUBMIT_TRANSFER : RESTRICTED
   {
@@ -569,7 +569,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Send all dust outputs back to the wallet's, to make them easier to spend (and mix).
   struct SWEEP_DUST : RESTRICTED
   {
@@ -578,7 +578,7 @@ namespace tools::wallet_rpc {
     struct request
     {
       bool get_tx_keys;     // (Optional) Return the transaction keys after sending.
-      bool do_not_relay;    // (Optional) If true, the newly created transaction will not be relayed to the loki network. (Defaults to false)
+      bool do_not_relay;    // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
       bool get_tx_hex;      // (Optional) Return the transactions as hex string after sending. (Defaults to false)
       bool get_tx_metadata; // (Optional) Return list of transaction metadata needed to relay the transfer later. (Defaults to false)
 
@@ -607,7 +607,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Send all unlocked balance to an address.
   struct SWEEP_ALL : RESTRICTED
   {
@@ -621,7 +621,7 @@ namespace tools::wallet_rpc {
       bool subaddr_indices_all;           //
       uint32_t priority;                  // Set a priority for the transaction. Accepted values are: 1 for unimportant or 5 for blink. (0 and 2-4 are accepted for backwards compatibility and are equivalent to 5)
       uint64_t outputs;                   // 
-      uint64_t unlock_time;               // Number of blocks before the loki can be spent (0 to not add a lock).
+      uint64_t unlock_time;               // Number of blocks before the oxen can be spent (0 to not add a lock).
       std::string payment_id;             // (Optional) 64-character hex string to identify a transaction.
       bool get_tx_keys;                   // (Optional) Return the transaction keys after sending.
       uint64_t below_amount;              // (Optional) Include outputs below this amount.
@@ -654,7 +654,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Send all of a specific unlocked output to an address.
   struct SWEEP_SINGLE : RESTRICTED
   {
@@ -665,7 +665,7 @@ namespace tools::wallet_rpc {
       std::string address;    // Destination public address.
       uint32_t priority;      // Set a priority for the transaction. Accepted values are: 1 for unimportant or 5 for blink. (0 and 2-4 are accepted for backwards compatibility and are equivalent to 5)
       uint64_t outputs;       // 
-      uint64_t unlock_time;   // Number of blocks before the loki can be spent (0 to not add a lock).
+      uint64_t unlock_time;   // Number of blocks before the oxen can be spent (0 to not add a lock).
       std::string payment_id; // (Optional) 64-character hex string to identify a transaction.
       bool get_tx_key;        // (Optional) Return the transaction keys after sending.
       std::string key_image;  // Key image of specific output to sweep.
@@ -691,7 +691,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Relay transaction metadata to the daemon 
   struct RELAY_TX : RPC_COMMAND
   {
@@ -713,7 +713,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Save the wallet file.
   struct STORE : RESTRICTED
   {
@@ -724,7 +724,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // 
   struct payment_details
   {
@@ -740,7 +740,7 @@ namespace tools::wallet_rpc {
     KV_MAP_SERIALIZABLE
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get a list of incoming payments using a given payment id.
   struct GET_PAYMENTS : RPC_COMMAND
   {
@@ -761,7 +761,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get a list of incoming payments using a given payment id, 
   // or a list of payments ids, from a given height. 
   //
@@ -788,7 +788,7 @@ namespace tools::wallet_rpc {
     };
   };
   
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // 
   struct transfer_details
   {
@@ -805,7 +805,7 @@ namespace tools::wallet_rpc {
     KV_MAP_SERIALIZABLE
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Return a list of incoming transfers to the wallet.
   struct INCOMING_TRANSFERS : RPC_COMMAND
   {
@@ -828,7 +828,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Return the spend or view private key.
   struct QUERY_KEY : RESTRICTED
   {
@@ -849,7 +849,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Make an integrated address from the wallet address and a payment id.
   struct MAKE_INTEGRATED_ADDRESS : RPC_COMMAND
   {
@@ -872,7 +872,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Retrieve the standard address and payment id corresponding to an integrated address.
   struct SPLIT_INTEGRATED_ADDRESS : RPC_COMMAND
   {
@@ -895,7 +895,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Stops the wallet, storing the current state.
   struct STOP_WALLET : RESTRICTED
   {
@@ -906,7 +906,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Rescan the blockchain from scratch, losing any information 
   // which can not be recovered from the blockchain itself.
   // This includes destination addresses, tx secret keys, tx notes, etc.
@@ -926,7 +926,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Set arbitrary string notes for transactions.
   struct SET_TX_NOTES : RESTRICTED
   {
@@ -943,7 +943,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get string notes for transactions.
   struct GET_TX_NOTES : RPC_COMMAND
   {
@@ -964,7 +964,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Set arbitrary attribute.
   struct SET_ATTRIBUTE : RESTRICTED
   {
@@ -981,7 +981,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get attribute value by name.
   struct GET_ATTRIBUTE : RESTRICTED
   {
@@ -1003,7 +1003,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get transaction secret key from transaction id.
   struct GET_TX_KEY : RPC_COMMAND
   {
@@ -1024,7 +1024,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Check a transaction in the blockchain with its secret key.
   struct CHECK_TX_KEY : RPC_COMMAND
   {
@@ -1049,7 +1049,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get transaction signature to prove it.
   struct GET_TX_PROOF : RPC_COMMAND
   {
@@ -1072,7 +1072,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Prove a transaction by checking its signature.
   struct CHECK_TX_PROOF : RPC_COMMAND
   {
@@ -1099,7 +1099,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Generate a signature to prove a spend. Unlike proving a transaction, it does not requires the destination public address.
   struct GET_SPEND_PROOF : RPC_COMMAND
   {
@@ -1121,7 +1121,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Prove a spend using a signature. Unlike proving a transaction, it does not requires the destination public address.
   struct CHECK_SPEND_PROOF : RPC_COMMAND
   {
@@ -1144,7 +1144,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Generate a signature to prove of an available amount in a wallet.
   struct GET_RESERVE_PROOF : RPC_COMMAND
   {
@@ -1168,7 +1168,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Proves a wallet has a disposable reserve using a signature.
   struct CHECK_RESERVE_PROOF : RPC_COMMAND
   {
@@ -1193,7 +1193,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Returns a list of transfers, by default all transfer types are included. If all requested type fields are false, then all transfers will be queried.
   struct GET_TRANSFERS : RESTRICTED
   {
@@ -1231,7 +1231,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Returns a string with the transfers formatted as csv
   struct GET_TRANSFERS_CSV : RESTRICTED
   {
@@ -1247,7 +1247,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Show information about a transfer to/from this address.
   struct GET_TRANSFER_BY_TXID : RESTRICTED
   {
@@ -1270,7 +1270,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Sign a string.
   struct SIGN : RESTRICTED
   {
@@ -1293,7 +1293,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Verify a signature on a string.
   struct VERIFY : RESTRICTED
   {
@@ -1316,7 +1316,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Export all outputs in hex format.
   struct EXPORT_OUTPUTS : RESTRICTED
   {
@@ -1337,7 +1337,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Import outputs in hex format.
   struct IMPORT_OUTPUTS : RESTRICTED
   {
@@ -1358,7 +1358,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Export a signed set of key images.
   struct EXPORT_KEY_IMAGES : RPC_COMMAND
   {
@@ -1388,7 +1388,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Import signed key images list and verify their spent status.
   struct IMPORT_KEY_IMAGES : RESTRICTED
   {
@@ -1420,7 +1420,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct uri_spec
   {
     std::string address;        // Wallet address.
@@ -1432,7 +1432,7 @@ namespace tools::wallet_rpc {
     KV_MAP_SERIALIZABLE
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Create a payment URI using the official URI spec.
   struct MAKE_URI : RPC_COMMAND
   {
@@ -1448,7 +1448,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Parse a payment URI to get payment information.
   struct PARSE_URI : RPC_COMMAND
   {
@@ -1470,7 +1470,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Add an entry to the address book.
   struct ADD_ADDRESS_BOOK_ENTRY : RESTRICTED
   {
@@ -1492,7 +1492,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Edit a entry in the address book.
   struct EDIT_ADDRESS_BOOK_ENTRY : RESTRICTED
   {
@@ -1512,7 +1512,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Retrieves entries from the address book.
   struct GET_ADDRESS_BOOK_ENTRY : RESTRICTED
   {
@@ -1542,7 +1542,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Delete an entry from the address book.
   struct DELETE_ADDRESS_BOOK_ENTRY : RESTRICTED
   {
@@ -1558,7 +1558,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Rescan the blockchain for spent outputs.
   struct RESCAN_SPENT : RESTRICTED
   {
@@ -1569,7 +1569,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Refresh a wallet after opening.
   struct REFRESH : RESTRICTED
   {
@@ -1591,7 +1591,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct AUTO_REFRESH : RESTRICTED
   {
     static constexpr auto names() { return NAMES("auto_refresh"); }
@@ -1607,8 +1607,8 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
-  // Start mining in the loki daemon.
+  OXEN_RPC_DOC_INTROSPECT
+  // Start mining in the oxen daemon.
   struct START_MINING : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("start_mining"); }
@@ -1623,8 +1623,8 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
-  // Stop mining in the loki daemon.
+  OXEN_RPC_DOC_INTROSPECT
+  // Stop mining in the oxen daemon.
   struct STOP_MINING : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("stop_mining"); }
@@ -1634,7 +1634,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get a list of available languages for your wallet's seed.
   struct GET_LANGUAGES : RPC_COMMAND
   {
@@ -1651,8 +1651,8 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
-  // Create a new wallet. You need to have set the argument "'--wallet-dir" when launching loki-wallet-rpc to make this work.
+  OXEN_RPC_DOC_INTROSPECT
+  // Create a new wallet. You need to have set the argument "'--wallet-dir" when launching oxen-wallet-rpc to make this work.
   struct CREATE_WALLET : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("create_wallet"); }
@@ -1672,8 +1672,8 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
-  // Open a wallet. You need to have set the argument "--wallet-dir" when launching loki-wallet-rpc to make this work.
+  OXEN_RPC_DOC_INTROSPECT
+  // Open a wallet. You need to have set the argument "--wallet-dir" when launching oxen-wallet-rpc to make this work.
   // The wallet rpc executable may only open wallet files within the same directory as wallet-dir, otherwise use the
   // "--wallet-file" flag to open specific wallets.
   struct OPEN_WALLET : RPC_COMMAND
@@ -1692,7 +1692,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Close the currently opened wallet, after trying to save it.
   struct CLOSE_WALLET : RPC_COMMAND
   {
@@ -1708,7 +1708,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Change a wallet password.
   struct CHANGE_WALLET_PASSWORD : RESTRICTED
   {
@@ -1725,7 +1725,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Restore a wallet using the private spend key, view key and public address.
   struct GENERATE_FROM_KEYS : RPC_COMMAND
   {
@@ -1753,7 +1753,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Restore a wallet using the seed words.
   struct RESTORE_DETERMINISTIC_WALLET : RPC_COMMAND
   {
@@ -1783,7 +1783,7 @@ namespace tools::wallet_rpc {
     };
   };
   
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Check if a wallet is a multisig one.
   struct IS_MULTISIG : RPC_COMMAND
   {
@@ -1802,7 +1802,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Prepare a wallet for multisig by generating a multisig string to share with peers.
   struct PREPARE_MULTISIG : RESTRICTED
   {
@@ -1818,7 +1818,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Make a wallet multisig by importing peers multisig string.
   struct MAKE_MULTISIG : RESTRICTED
   {
@@ -1842,7 +1842,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Export multisig info for other participants.
   struct EXPORT_MULTISIG : RESTRICTED
   {
@@ -1858,7 +1858,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Import multisig info from other participants.
   struct IMPORT_MULTISIG : RESTRICTED
   {
@@ -1879,7 +1879,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Turn this wallet into a multisig wallet, extra step for N-1/N wallets.
   struct FINALIZE_MULTISIG : RESTRICTED
   {
@@ -1901,7 +1901,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // 
   struct EXCHANGE_MULTISIG_KEYS : RESTRICTED
   {
@@ -1924,7 +1924,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Sign a transaction in multisig.
   struct SIGN_MULTISIG : RESTRICTED
   {
@@ -1946,7 +1946,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Submit a signed multisig transaction.
   struct SUBMIT_MULTISIG : RESTRICTED
   {
@@ -1967,7 +1967,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get RPC version Major & Minor integer-format, where Major is the first 16 bits and Minor the last 16 bits.
   struct GET_VERSION : RPC_COMMAND
   {
@@ -1983,7 +1983,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Stake for Service Node.
   struct STAKE : RESTRICTED
   {
@@ -1997,7 +1997,7 @@ namespace tools::wallet_rpc {
       std::string        service_node_key; // Service Node Public Address.
       uint32_t           priority;         // Set a priority for the transaction. Accepted values are: or 0-4 for: default, unimportant, normal, elevated, priority.
       bool               get_tx_key;       // (Optional) Return the transaction key after sending.
-      bool               do_not_relay;     // (Optional) If true, the newly created transaction will not be relayed to the loki network. (Defaults to false)
+      bool               do_not_relay;     // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
       bool               get_tx_hex;       // Return the transaction as hex string after sending (Defaults to false)
       bool               get_tx_metadata;  // Return the metadata needed to relay the transaction. (Defaults to false)
 
@@ -2019,7 +2019,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Register Service Node.
   struct REGISTER_SERVICE_NODE : RESTRICTED
   {
@@ -2029,7 +2029,7 @@ namespace tools::wallet_rpc {
     {
       std::string register_service_node_str; // String supplied by the prepare_registration command.
       bool        get_tx_key;                // (Optional) Return the transaction key after sending.
-      bool        do_not_relay;              // (Optional) If true, the newly created transaction will not be relayed to the loki network. (Defaults to false)
+      bool        do_not_relay;              // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
       bool        get_tx_hex;                // Return the transaction as hex string after sending (Defaults to false)
       bool        get_tx_metadata;           // Return the metadata needed to relay the transaction. (Defaults to false)
 
@@ -2051,7 +2051,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Request to unlock stake by deregistering Service Node.
   struct REQUEST_STAKE_UNLOCK : RESTRICTED
   {
@@ -2073,7 +2073,7 @@ namespace tools::wallet_rpc {
     };
   };
   
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Check if Service Node can unlock its stake.
   struct CAN_REQUEST_STAKE_UNLOCK : RESTRICTED
   {
@@ -2095,7 +2095,7 @@ namespace tools::wallet_rpc {
     };
   };
   
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Parse an address to validate if it's a valid Loki address.
   struct VALIDATE_ADDRESS : RPC_COMMAND
   {
@@ -2122,7 +2122,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct SET_DAEMON : RESTRICTED
   {
     static constexpr auto names() { return NAMES("set_daemon"); }
@@ -2143,7 +2143,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct SET_LOG_LEVEL : RESTRICTED
   {
     static constexpr auto names() { return NAMES("set_log_level"); }
@@ -2158,7 +2158,7 @@ namespace tools::wallet_rpc {
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct SET_LOG_CATEGORIES : RESTRICTED
   {
     static constexpr auto names() { return NAMES("set_log_categories"); }
@@ -2178,7 +2178,7 @@ namespace tools::wallet_rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct LNS_BUY_MAPPING : RESTRICTED
   {
     static constexpr auto names() { return NAMES("lns_buy_mapping"); }
@@ -2208,7 +2208,7 @@ For more information on updating and signing see the LNS_UPDATE_MAPPING document
       std::set<uint32_t> subaddr_indices; // (Optional) Transfer from this set of subaddresses. (Defaults to 0)
       uint32_t           priority;        // Set a priority for the transaction. Accepted values are: or 0-4 for: default, unimportant, normal, elevated, priority.
       bool               get_tx_key;      // (Optional) Return the transaction key after sending.
-      bool               do_not_relay;    // (Optional) If true, the newly created transaction will not be relayed to the loki network. (Defaults to false)
+      bool               do_not_relay;    // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
       bool               get_tx_hex;      // Return the transaction as hex string after sending (Defaults to false)
       bool               get_tx_metadata; // Return the metadata needed to relay the transaction. (Defaults to false)
 
@@ -2230,7 +2230,7 @@ For more information on updating and signing see the LNS_UPDATE_MAPPING document
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Renew an active lokinet LNS registration
   struct LNS_RENEW_MAPPING : RESTRICTED
   {
@@ -2250,7 +2250,7 @@ The renewal can be for 1, 2, 5, or 10 years by specifying a `type` value of "lok
       std::set<uint32_t> subaddr_indices;  // (Optional) Transfer from this set of subaddresses. (Defaults to 0)
       uint32_t           priority;         // Set a priority for the transaction. Accepted values are: 0-4 for: default, unimportant, normal, elevated, priority.
       bool               get_tx_key;       // (Optional) Return the transaction key after sending.
-      bool               do_not_relay;     // (Optional) If true, the newly created transaction will not be relayed to the loki network. (Defaults to false)
+      bool               do_not_relay;     // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
       bool               get_tx_hex;       // Return the transaction as hex string after sending (Defaults to false)
       bool               get_tx_metadata;  // Return the metadata needed to relay the transaction. (Defaults to false)
 
@@ -2260,7 +2260,7 @@ The renewal can be for 1, 2, 5, or 10 years by specifying a `type` value of "lok
     using response = LNS_BUY_MAPPING::response;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Update the underlying value in the name->value mapping via Loki Name Service.
   struct LNS_UPDATE_MAPPING : RESTRICTED
   {
@@ -2288,7 +2288,7 @@ If signing is performed externally then you must first encrypt the `value` (if b
       std::set<uint32_t> subaddr_indices;  // (Optional) Transfer from this set of subaddresses. (Defaults to 0)
       uint32_t           priority;         // Set a priority for the transaction. Accepted values are: 0-4 for: default, unimportant, normal, elevated, priority.
       bool               get_tx_key;       // (Optional) Return the transaction key after sending.
-      bool               do_not_relay;     // (Optional) If true, the newly created transaction will not be relayed to the loki network. (Defaults to false)
+      bool               do_not_relay;     // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
       bool               get_tx_hex;       // Return the transaction as hex string after sending (Defaults to false)
       bool               get_tx_metadata;  // Return the metadata needed to relay the transaction. (Defaults to false)
 
@@ -2311,7 +2311,7 @@ If signing is performed externally then you must first encrypt the `value` (if b
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct LNS_MAKE_UPDATE_SIGNATURE : RESTRICTED
   {
     static constexpr auto names() { return NAMES("lns_make_update_mapping_signature"); }
@@ -2341,7 +2341,7 @@ This command is only required if the open wallet is one of the owners of a LNS r
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Takes a LNS name, upon validating it, generates the hash and returns the base64 representation of the hash suitable for use in the daemon LNS name queries.
   struct LNS_HASH_NAME : RPC_COMMAND
   {
@@ -2363,7 +2363,7 @@ This command is only required if the open wallet is one of the owners of a LNS r
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Returns a list of known, plain-text LNS names along with record details for names that this
   // wallet knows about.  This can optionally decrypt the LNS value as well, or else just return the
   // encrypted value.
@@ -2402,7 +2402,7 @@ This command is only required if the open wallet is one of the owners of a LNS r
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Adds one or more names to the persistent LNS wallet cache of known names (i.e. for names that
   // are owned by this wallet that aren't currently in the cache).
   struct LNS_ADD_KNOWN_NAMES : RPC_COMMAND
@@ -2427,7 +2427,7 @@ This command is only required if the open wallet is one of the owners of a LNS r
     using response = EMPTY;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Takes a LNS encrypted value and encrypts the mapping value using the LNS name.
   struct LNS_ENCRYPT_VALUE : RPC_COMMAND
   {
@@ -2450,7 +2450,7 @@ This command is only required if the open wallet is one of the owners of a LNS r
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Takes a LNS encrypted value and decrypts the mapping value using the LNS name.
   struct LNS_DECRYPT_VALUE : RPC_COMMAND
   {

@@ -56,7 +56,7 @@ target_link_libraries(wallet
     OpenSSL::Crypto
     extra)
 
-loki_add_executable(wallet_rpc_server "loki-wallet-rpc"
+oxen_add_executable(wallet_rpc_server "oxen-wallet-rpc"
   wallet_rpc_server.cpp
   wallet_rpc_server_commands_defs.cpp
   )

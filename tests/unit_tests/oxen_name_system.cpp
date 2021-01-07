@@ -1,10 +1,10 @@
 #include "gtest/gtest.h"
 
-#include "common/loki.h"
-#include "cryptonote_core/loki_name_system.h"
-#include "loki_economy.h"
+#include "common/oxen.h"
+#include "cryptonote_core/oxen_name_system.h"
+#include "oxen_economy.h"
 
-TEST(loki_name_system, name_tests)
+TEST(oxen_name_system, name_tests)
 {
   struct name_test
   {
@@ -73,7 +73,7 @@ TEST(loki_name_system, name_tests)
     auto type = static_cast<lns::mapping_type>(type16);
     if (type == lns::mapping_type::wallet) continue; // Not yet supported
     name_test const *names = lns::is_lokinet_type(type) ? lokinet_names : session_wallet_names;
-    size_t names_count     = lns::is_lokinet_type(type) ? loki::char_count(lokinet_names) : loki::char_count(session_wallet_names);
+    size_t names_count     = lns::is_lokinet_type(type) ? oxen::char_count(lokinet_names) : oxen::char_count(session_wallet_names);
 
     for (size_t i = 0; i < names_count; i++)
     {
@@ -83,7 +83,7 @@ TEST(loki_name_system, name_tests)
   }
 }
 
-TEST(loki_name_system, value_encrypt_and_decrypt)
+TEST(oxen_name_system, value_encrypt_and_decrypt)
 {
   std::string name         = "my lns name";
   lns::mapping_value value = {};
@@ -126,7 +126,7 @@ TEST(loki_name_system, value_encrypt_and_decrypt)
   }
 }
 
-TEST(loki_name_system, value_encrypt_and_decrypt_heavy)
+TEST(oxen_name_system, value_encrypt_and_decrypt_heavy)
 {
   std::string name         = "abcdefg";
   lns::mapping_value value = {};

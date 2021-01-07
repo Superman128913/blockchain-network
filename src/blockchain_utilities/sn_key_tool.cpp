@@ -29,7 +29,7 @@ generate [--overwrite] FILENAME
     FILENAME.  If FILENAME contains the string "PUBKEY" it will be replaced
     with the generated public key value (in hex).
 
-    For an active service node this file is named `key_ed25519` in the lokid
+    For an active service node this file is named `key_ed25519` in the oxend
     data directory.
 
     If FILENAME already exists the command will fail unless the `--overwrite`
@@ -44,7 +44,7 @@ legacy [--overwrite] FILENAME
     If FILENAME already exists the command will fail unless the `--overwrite`
     flag is specified.
 
-    Note that legacy keypairs are not needed as of Loki 8.x; you can use just a
+    Note that legacy keypairs are not needed as of Oxen 8.x; you can use just a
     Ed25519 keypair (and this is the default for new service node
     installations).
 

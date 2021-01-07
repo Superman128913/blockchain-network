@@ -37,32 +37,15 @@
 
 namespace daemon_args
 {
-  const command_line::arg_descriptor<std::string, false, true, 2> arg_config_file = {
-    "config-file"
-  , "Specify configuration file"
-  , (daemonizer::get_default_data_dir() / std::string(CRYPTONOTE_NAME ".conf")).string()
-  , {{ &cryptonote::arg_testnet_on, &cryptonote::arg_devnet_on }}
-  , [](std::array<bool, 2> testnet_devnet, bool defaulted, std::string val)->std::string {
-      if (testnet_devnet[0] && defaulted)
-        return (daemonizer::get_default_data_dir() / "testnet" / (CRYPTONOTE_NAME ".conf")).u8string();
-      else if (testnet_devnet[1] && defaulted)
-        return (daemonizer::get_default_data_dir() / "devnet" / (CRYPTONOTE_NAME ".conf")).u8string();
-      return val;
-    }
-  };
-  const command_line::arg_descriptor<std::string, false, true, 2> arg_log_file = {
-    "log-file"
-  , "Specify log file"
-  , (daemonizer::get_default_data_dir() / std::string(CRYPTONOTE_NAME ".log")).string()
-  , {{ &cryptonote::arg_testnet_on, &cryptonote::arg_devnet_on }}
-  , [](std::array<bool, 2> testnet_devnet, bool defaulted, std::string val)->std::string {
-      if (testnet_devnet[0] && defaulted)
-        return (daemonizer::get_default_data_dir() / "testnet" / (CRYPTONOTE_NAME ".log")).u8string();
-      else if (testnet_devnet[1] && defaulted)
-        return (daemonizer::get_default_data_dir() / "devnet" / (CRYPTONOTE_NAME ".log")).u8string();
-      return val;
-    }
-  };
+  const command_line::arg_descriptor<std::string> arg_config_file = {
+    "config-file",
+    "Specify configuration file",
+    "<data-dir>/" CRYPTONOTE_NAME ".conf"};
+
+  const command_line::arg_descriptor<std::string> arg_log_file = {
+    "log-file",
+    "Specify log file",
+    "<data-dir>/" CRYPTONOTE_NAME ".log"};
   const command_line::arg_descriptor<std::size_t> arg_max_log_file_size = {
     "max-log-file-size"
   , "Specify maximum log file size [B]"

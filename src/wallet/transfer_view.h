@@ -28,7 +28,7 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
-#include "common/loki.h"
+#include "common/oxen.h"
 #include <string>
 #include <vector>
 #include "cryptonote_basic/subaddress_index.h"
@@ -63,7 +63,7 @@ inline const char *pay_type_string(pay_type type)
   }
 }
 
-LOKI_RPC_DOC_INTROSPECT
+OXEN_RPC_DOC_INTROSPECT
 struct transfer_view
 {
   std::string txid;                                          // Transaction ID for this transfer.

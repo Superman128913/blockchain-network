@@ -111,6 +111,7 @@ namespace tools {
    * Unix: ~/.CRYPTONOTE_NAME
    */
   fs::path get_default_data_dir();
+  fs::path get_depreciated_default_data_dir();
 
 #ifdef WIN32
   /**
@@ -123,12 +124,6 @@ namespace tools {
    */
   fs::path get_special_folder_path(int nfolder, bool iscreate);
 #endif
-
-  /*! \brief creates directories for a path
-   *
-   *  wrapper around fs::create_directories.  
-   */
-  bool create_directories_if_necessary(const fs::path& path);
 
   void set_strict_default_file_permissions(bool strict);
 

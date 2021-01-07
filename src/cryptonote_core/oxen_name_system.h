@@ -1,5 +1,5 @@
-#ifndef LOKI_NAME_SYSTEM_H
-#define LOKI_NAME_SYSTEM_H
+#ifndef OXEN_NAME_SYSTEM_H
+#define OXEN_NAME_SYSTEM_H
 
 #include "crypto/crypto.h"
 #include "cryptonote_config.h"
@@ -19,7 +19,7 @@ struct checkpoint_t;
 struct block;
 class transaction;
 struct account_address;
-struct tx_extra_loki_name_system;
+struct tx_extra_oxen_name_system;
 class Blockchain;
 }; // namespace cryptonote
 
@@ -131,7 +131,7 @@ constexpr bool mapping_type_allowed(uint8_t hf_version, mapping_type type) {
 // relevant within a LNS buy tx).
 std::vector<mapping_type> all_mapping_types(uint8_t hf_version);
 
-sqlite3 *init_loki_name_system(const fs::path& file_path, bool read_only);
+sqlite3 *init_oxen_name_system(const fs::path& file_path, bool read_only);
 
 /// Returns the integer value used in the database and in RPC lookup calls for the given mapping
 /// type.  In particularly this maps all mapping_type::lokinet_Xyears values to the underlying value
@@ -272,7 +272,7 @@ struct name_system_db
   // Signifies the blockchain has reorganized commences the rollback and pruning procedures.
   void                        block_detach   (cryptonote::Blockchain const &blockchain, uint64_t new_blockchain_height);
   bool                        save_owner     (generic_owner const &owner, int64_t *row_id);
-  bool                        save_mapping   (crypto::hash const &tx_hash, cryptonote::tx_extra_loki_name_system const &src, uint64_t height, std::optional<uint64_t> expiration_height, int64_t owner_id, std::optional<int64_t> backup_owner_id);
+  bool                        save_mapping   (crypto::hash const &tx_hash, cryptonote::tx_extra_oxen_name_system const &src, uint64_t height, std::optional<uint64_t> expiration_height, int64_t owner_id, std::optional<int64_t> backup_owner_id);
   bool                        save_settings  (uint64_t top_height, crypto::hash const &top_hash, int version);
 
   // Delete all mappings that are registered on height or newer followed by deleting all owners no longer referenced in the DB
@@ -295,7 +295,7 @@ struct name_system_db
 
   // Validates an LNS transaction.  If the function returns true then entry will be populated with
   // the LNS details.  On a false return, `reason` is instead populated with the failure reason.
-  bool validate_lns_tx(uint8_t hf_version, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_loki_name_system &entry, std::string *reason);
+  bool validate_lns_tx(uint8_t hf_version, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_oxen_name_system &entry, std::string *reason);
 
   // Destructor; closes the sqlite3 database if one is open
   ~name_system_db();
@@ -321,4 +321,4 @@ private:
 };
 
 }; // namespace service_nodes
-#endif // LOKI_NAME_SYSTEM_H
+#endif // OXEN_NAME_SYSTEM_H

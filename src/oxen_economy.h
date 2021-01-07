@@ -16,7 +16,7 @@ constexpr uint64_t FOUNDATION_REWARD_HF15 = BLOCK_REWARD_HF15 * 10 / 100;
 
 // HF16+ money supply parameters: same as HF15 except the miner fee goes away and is redirected to
 // LF to be used exclusively for Loki Chainflip liquidity seeding and incentives.  See
-// https://github.com/loki-project/loki-improvement-proposals/issues/24 for more details.  This ends
+// https://github.com/oxen-project/oxen-improvement-proposals/issues/24 for more details.  This ends
 // after 6 months.
 constexpr uint64_t BLOCK_REWARD_HF16        = BLOCK_REWARD_HF15;
 constexpr uint64_t CHAINFLIP_LIQUIDITY_HF16 = BLOCK_REWARD_HF15 * 24 / 100;
