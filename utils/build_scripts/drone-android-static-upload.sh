@@ -29,7 +29,7 @@ cp src/wallet/api/wallet2_api.h $tmpdir/include
 
 for android_abi in "$@"; do
     mkdir -p $tmpdir/lib/${android_abi}
-    ln -s ../../build-${android_abi}/src/wallet/api/libwallet_merged.a $tmpdir/lib/${android_abi}/libwallet_api.a
+    ln -s ../../../build-${android_abi}/src/wallet/api/libwallet_merged.a $tmpdir/lib/${android_abi}/libwallet_api.a
 done
 
 filename=android-deps-${DRONE_COMMIT}.tar.xz
