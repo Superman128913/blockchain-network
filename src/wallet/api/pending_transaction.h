@@ -42,8 +42,10 @@ class PendingTransactionImpl : public PendingTransaction
 {
 public:
     PendingTransactionImpl(WalletImpl &wallet);
+    PendingTransactionImpl(WalletImpl &wallet, std::vector<tools::wallet2::pending_tx> pending_tx);
     ~PendingTransactionImpl();
     std::pair<int, std::string> status() const override { return m_status; }
+    void setError(std::string error_msg) override;
     bool good() const override { return m_status.first == Status_Ok; }
     bool commit(std::string_view filename = "", bool overwrite = false, bool blink = false) override;
     uint64_t amount() const override;

@@ -45,7 +45,6 @@ add_executable(unit_tests
   epee_levin_protocol_handler_async.cpp
   epee_utils.cpp
   expect.cpp
-  json_serialization.cpp
   get_xtype_from_string.cpp
   hashchain.cpp
   hmac_keccak.cpp
@@ -100,7 +99,6 @@ target_link_libraries(unit_tests
     lmdb_lib
     rpc
     net
-    serialization
     wallet
     p2p
     version

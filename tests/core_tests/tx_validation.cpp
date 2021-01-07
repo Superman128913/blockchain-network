@@ -48,7 +48,7 @@ namespace
       m_tx.version = version;
       m_tx.unlock_time = unlock_time;
 
-      m_tx_key = keypair::generate(hw::get_device("default"));
+      m_tx_key = keypair{hw::get_device("default")};
       add_tx_extra<tx_extra_pub_key>(m_tx, m_tx_key.pub);
     }
 
@@ -180,27 +180,6 @@ namespace
 //----------------------------------------------------------------------------------------------------------------------
 // Tests
 
-bool gen_tx_big_version::generate(std::vector<test_event_entry>& events) const
-{
-  uint64_t ts_start = 1338224400;
-
-  GENERATE_ACCOUNT(miner_account);
-  MAKE_GENESIS_BLOCK(events, blk_tail, miner_account, ts_start);
-  REWIND_BLOCKS_N(events, blk_money_unlocked, blk_tail, miner_account, 30);
-  REWIND_BLOCKS(events, blk_head, blk_money_unlocked, miner_account);
-
-  std::vector<tx_source_entry> sources;
-  std::vector<tx_destination_entry> destinations;
-  fill_tx_sources_and_destinations(events, blk_money_unlocked, miner_account, get_address(miner_account), MK_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
-
-  transaction tx = {};
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), -1).build();
-  DO_CALLBACK(events, "mark_invalid_tx");
-  events.push_back(tx);
-
-  return true;
-}
-
 bool gen_tx_unlock_time::generate(std::vector<test_event_entry>& events) const
 {
   uint64_t ts_start = 1338224400;
@@ -304,7 +283,7 @@ bool gen_tx_no_inputs_no_outputs::generate(std::vector<test_event_entry>& events
 
   transaction tx = {};
   tx.version     = cryptonote::txversion::v2_ringct;
-  add_tx_extra<tx_extra_pub_key>(tx, keypair::generate(hw::get_device("default")).pub);
+  add_tx_extra<tx_extra_pub_key>(tx, keypair{hw::get_device("default")}.pub);
 
   DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(tx);
@@ -535,7 +514,7 @@ bool gen_tx_key_image_not_derive_from_tx_key::generate(std::vector<test_event_en
   txin_to_key& in_to_key        = var::get<txin_to_key>(tx.vin.front());
 
   // Use fake key image
-  keypair keys = keypair::generate(hw::get_device("default"));
+  keypair keys{hw::get_device("default")};
   key_image fake_key_image;
   crypto::generate_key_image(keys.pub, keys.sec, fake_key_image);
   in_to_key.k_image = fake_key_image;

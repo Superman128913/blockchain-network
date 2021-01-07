@@ -35,6 +35,13 @@
 #include "cryptonote_basic/subaddress_index.h"
 #include "cryptonote_core/cryptonote_tx_utils.h"
 #include "common/lock.h"
+#include "common/varint.h"
+#include <chrono>
+#include <boost/endian/conversion.hpp>
+
+#ifdef DEBUG_HWDEVICE
+#include <sodium/crypto_generichash.h>
+#endif
 
 namespace hw {
 
@@ -49,87 +56,63 @@ namespace hw {
     /* ===                           Debug                              ==== */
     /* ===================================================================== */
 
-    void set_apdu_verbose(bool verbose) {
-      apdu_verbose = verbose;
-    }
+    namespace {
 
-    #define TRACKD MTRACE("hw")
-    #define ASSERT_SW(sw,ok,msk) CHECK_AND_ASSERT_THROW_MES(((sw)&(mask))==(ok), \
-      "Wrong Device Status: " << "0x" << std::hex << (sw) << " (" << Status::to_string(sw) << "), " << \
-      "EXPECTED 0x" << std::hex << (ok) << " (" << Status::to_string(ok) << "), " << \
-      "MASK 0x" << std::hex << (mask));
-    #define ASSERT_T0(exp)       CHECK_AND_ASSERT_THROW_MES(exp, "Protocol assert failure: "#exp ) ;
-    #define ASSERT_X(exp,msg)    CHECK_AND_ASSERT_THROW_MES(exp, msg); 
+    bool apdu_verbose = true;
 
-    #ifdef DEBUG_HWDEVICE
-      crypto::secret_key dbg_viewkey;
-      crypto::secret_key dbg_spendkey;
-    #endif
-
-    struct Status
-    {
-      unsigned int code;
-      const char *string;
-
-      constexpr operator unsigned int() const
-      {
-        return this->code;
-      }
-
-      static const char *to_string(unsigned int code);
-    };
-
-    // Must be sorted in ascending order by the code
-    #define LEDGER_STATUS(status) {status, #status}
-    constexpr Status status_codes[] = {
-      LEDGER_STATUS(SW_BYTES_REMAINING_00),
-      LEDGER_STATUS(SW_WARNING_STATE_UNCHANGED),
-      LEDGER_STATUS(SW_STATE_TERMINATED),
-      LEDGER_STATUS(SW_MORE_DATA_AVAILABLE),
-      LEDGER_STATUS(SW_WRONG_LENGTH),
-      LEDGER_STATUS(SW_LOGICAL_CHANNEL_NOT_SUPPORTED),
-      LEDGER_STATUS(SW_SECURE_MESSAGING_NOT_SUPPORTED),
-      LEDGER_STATUS(SW_LAST_COMMAND_EXPECTED),
-      LEDGER_STATUS(SW_COMMAND_CHAINING_NOT_SUPPORTED),
+    #define LEDGER_STATUS(status) {status, #status##sv}
+    constexpr std::pair<unsigned int, std::string_view> status_codes[] = {
+      LEDGER_STATUS(SW_SECURITY_PIN_LOCKED),
       LEDGER_STATUS(SW_SECURITY_LOAD_KEY),
       LEDGER_STATUS(SW_SECURITY_COMMITMENT_CONTROL),
       LEDGER_STATUS(SW_SECURITY_AMOUNT_CHAIN_CONTROL),
       LEDGER_STATUS(SW_SECURITY_COMMITMENT_CHAIN_CONTROL),
       LEDGER_STATUS(SW_SECURITY_OUTKEYS_CHAIN_CONTROL),
       LEDGER_STATUS(SW_SECURITY_MAXOUTPUT_REACHED),
-      LEDGER_STATUS(SW_SECURITY_TRUSTED_INPUT),
-      LEDGER_STATUS(SW_CLIENT_NOT_SUPPORTED),
-      LEDGER_STATUS(SW_SECURITY_STATUS_NOT_SATISFIED),
-      LEDGER_STATUS(SW_FILE_INVALID),
-      LEDGER_STATUS(SW_PIN_BLOCKED),
-      LEDGER_STATUS(SW_DATA_INVALID),
-      LEDGER_STATUS(SW_CONDITIONS_NOT_SATISFIED),
+      LEDGER_STATUS(SW_SECURITY_HMAC),
+      LEDGER_STATUS(SW_SECURITY_RANGE_VALUE),
+      LEDGER_STATUS(SW_SECURITY_INTERNAL),
+      LEDGER_STATUS(SW_SECURITY_MAX_SIGNATURE_REACHED),
+      LEDGER_STATUS(SW_SECURITY_PREFIX_HASH),
+      LEDGER_STATUS(SW_SECURITY_LOCKED),
+
       LEDGER_STATUS(SW_COMMAND_NOT_ALLOWED),
-      LEDGER_STATUS(SW_APPLET_SELECT_FAILED),
+      LEDGER_STATUS(SW_SUBCOMMAND_NOT_ALLOWED),
+      LEDGER_STATUS(SW_DENY),
+      LEDGER_STATUS(SW_KEY_NOT_SET),
       LEDGER_STATUS(SW_WRONG_DATA),
-      LEDGER_STATUS(SW_FUNC_NOT_SUPPORTED),
-      LEDGER_STATUS(SW_FILE_NOT_FOUND),
-      LEDGER_STATUS(SW_RECORD_NOT_FOUND),
-      LEDGER_STATUS(SW_FILE_FULL),
-      LEDGER_STATUS(SW_INCORRECT_P1P2),
-      LEDGER_STATUS(SW_REFERENCED_DATA_NOT_FOUND),
+      LEDGER_STATUS(SW_WRONG_DATA_RANGE),
+      LEDGER_STATUS(SW_IO_FULL),
+
+      LEDGER_STATUS(SW_CLIENT_NOT_SUPPORTED),
+
       LEDGER_STATUS(SW_WRONG_P1P2),
-      LEDGER_STATUS(SW_CORRECT_LENGTH_00),
       LEDGER_STATUS(SW_INS_NOT_SUPPORTED),
-      LEDGER_STATUS(SW_CLA_NOT_SUPPORTED),
+      LEDGER_STATUS(SW_PROTOCOL_NOT_SUPPORTED),
+
       LEDGER_STATUS(SW_UNKNOWN),
-      LEDGER_STATUS(SW_OK),
-      LEDGER_STATUS(SW_ALGORITHM_UNSUPPORTED)
     };
 
-    const char *Status::to_string(unsigned int code)
+    std::string status_string(unsigned int code)
     {
-      constexpr size_t status_codes_size = sizeof(status_codes) / sizeof(status_codes[0]);
-      constexpr const Status *status_codes_end = &status_codes[status_codes_size];
-
-      const Status *item = std::lower_bound(&status_codes[0], status_codes_end, code);
-      return (item == status_codes_end || code < *item) ? "UNKNOWN" : item->string;
+      for (auto& [code_, str] : status_codes)
+        if (code_ == code)
+          return std::string{str};
+      if ((code & 0xff00) == SW_WRONG_LENGTH)
+        return "SW_WRONG_LENGTH(" + std::to_string(code & 0xff) + ")";
+      return "UNKNOWN"s;
     }
+
+    } // anon namespace
+
+    void set_apdu_verbose(bool verbose) {
+      apdu_verbose = verbose;
+    }
+
+#ifdef DEBUG_HWDEVICE
+    crypto::secret_key dbg_viewkey;
+    crypto::secret_key dbg_spendkey;
+#endif
 
     /* ===================================================================== */
     /* ===                        hmacmap                               ==== */
@@ -137,18 +120,18 @@ namespace hw {
 
 
     SecHMAC::SecHMAC(const uint8_t s[32], const uint8_t h[32]) {
-        memcpy(this->sec, s, 32);
-        memcpy(this->hmac, h, 32);
+        std::memcpy(sec, s, 32);
+        std::memcpy(hmac, h, 32);
     }
 
     void  HMACmap::find_mac(const uint8_t sec[32], uint8_t hmac[32]) {
       size_t sz = hmacs.size();
-      log_hexbuffer("find_mac: lookup for ", (char*)sec,32);
+      log_hexbuffer("find_mac: lookup for ", sec,32);
       for (size_t i=0; i<sz; i++) {
-       log_hexbuffer("find_mac:   - try ",(char*)hmacs[i].sec,32);
+       log_hexbuffer("find_mac:   - try ", hmacs[i].sec, 32);
         if (memcmp(sec, hmacs[i].sec, 32) == 0) {
-          memcpy(hmac, hmacs[i].hmac, 32);
-          log_hexbuffer("find_mac:   - found ",(char*)hmacs[i].hmac,32);
+          std::memcpy(hmac, hmacs[i].hmac, 32);
+          log_hexbuffer("find_mac:   - found ", hmacs[i].hmac, 32);
           return;
         }
 
@@ -157,8 +140,8 @@ namespace hw {
     }
 
     void  HMACmap::add_mac(const uint8_t sec[32], const uint8_t hmac[32]) {
-      log_hexbuffer("add_mac: sec  ", (char*)sec,32);
-      log_hexbuffer("add_mac: hmac ", (char*)hmac,32);
+      log_hexbuffer("add_mac: sec  ", sec, 32);
+      log_hexbuffer("add_mac: hmac ", hmac, 32);
       hmacs.push_back(SecHMAC(sec,hmac));
     }
 
@@ -225,20 +208,20 @@ namespace hw {
       ABP.clear();
     }
 
-    #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
     void Keymap::log() {
       log_message("keymap", "content");
       size_t sz = ABP.size();
       for (size_t i=0; i<sz; i++) {
         log_message("  keymap", std::to_string(i));
-        log_hexbuffer("    Aout", (char*)ABP[i].Aout.bytes, 32);
-        log_hexbuffer("    Bout", (char*)ABP[i].Bout.bytes, 32);
+        log_hexbuffer("    Aout", ABP[i].Aout.bytes, 32);
+        log_hexbuffer("    Bout", ABP[i].Bout.bytes, 32);
         log_message  ("  is_sub", std::to_string(ABP[i].is_subaddress));
         log_message  ("   index", std::to_string(ABP[i].index));
-        log_hexbuffer("    Pout", (char*)ABP[i].Pout.bytes, 32);
+        log_hexbuffer("    Pout", ABP[i].Pout.bytes, 32);
       }
     }
-    #endif
+#endif
 
     /* ===================================================================== */
     /* ===                       Internal Helpers                       ==== */
@@ -249,7 +232,7 @@ namespace hw {
 
     bool operator==(const crypto::key_derivation &d0, const crypto::key_derivation &d1) {
       static_assert(sizeof(crypto::key_derivation) == 32, "key_derivation must be 32 bytes");
-      return !crypto_verify_32((const unsigned char*)&d0, (const unsigned char*)&d1);
+      return !crypto_verify_32(reinterpret_cast<const unsigned char*>(&d0), reinterpret_cast<const unsigned char*>(&d1));
     }
 
     /* ===================================================================== */
@@ -258,102 +241,121 @@ namespace hw {
 
     static int device_id = 0;
 
-    #define PROTOCOL_VERSION                    3
+    #define PROTOCOL_VERSION                    1
 
-    #define INS_NONE                            0x00
-    #define INS_RESET                           0x02
+#ifdef NDEBUG
+    #define LEDGER_INS(name, code) \
+    static constexpr uint8_t INS_##name = code
+#else
+    // Reverse lookup table for commands -> names, only available in debug compilations
+    static std::unordered_map<uint8_t, std::string_view> debug_ins_names;
+    static uint8_t debug_record_ins(uint8_t code, std::string_view name) { debug_ins_names.emplace(code, name); return code; }
 
-    #define INS_GET_KEY                         0x20
-    #define INS_DISPLAY_ADDRESS                 0x21
-    #define INS_PUT_KEY                         0x22
-    #define INS_GET_CHACHA8_PREKEY              0x24
-    #define INS_VERIFY_KEY                      0x26
-    #define INS_MANAGE_SEEDWORDS                0x28
+    #define LEDGER_INS(name, code) \
+    static const uint8_t INS_##name = debug_record_ins(code, #name##sv)
+#endif
 
-    #define INS_SECRET_KEY_TO_PUBLIC_KEY        0x30
-    #define INS_GEN_KEY_DERIVATION              0x32
-    #define INS_DERIVATION_TO_SCALAR            0x34
-    #define INS_DERIVE_PUBLIC_KEY               0x36
-    #define INS_DERIVE_SECRET_KEY               0x38
-    #define INS_GEN_KEY_IMAGE                   0x3A
-    #define INS_SECRET_KEY_ADD                  0x3C
-    #define INS_SECRET_KEY_SUB                  0x3E
-    #define INS_GENERATE_KEYPAIR                0x40
-    #define INS_SECRET_SCAL_MUL_KEY             0x42
-    #define INS_SECRET_SCAL_MUL_BASE            0x44
+    LEDGER_INS(RESET,                           0x02);
 
-    #define INS_DERIVE_SUBADDRESS_PUBLIC_KEY    0x46
-    #define INS_GET_SUBADDRESS                  0x48
-    #define INS_GET_SUBADDRESS_SPEND_PUBLIC_KEY 0x4A
-    #define INS_GET_SUBADDRESS_SECRET_KEY       0x4C
+    LEDGER_INS(GET_NETWORK,                     0x10);
 
-    #define INS_OPEN_TX                         0x70
-    #define INS_SET_SIGNATURE_MODE              0x72
-    #define INS_GET_ADDITIONAL_KEY              0x74
-    #define INS_STEALTH                         0x76
-    #define INS_GEN_COMMITMENT_MASK             0x77
-    #define INS_BLIND                           0x78
-    #define INS_UNBLIND                         0x7A
-    #define INS_GEN_TXOUT_KEYS                  0x7B
-    #define INS_PREFIX_HASH                     0x7D
-    #define INS_VALIDATE                        0x7C
-    #define INS_MLSAG                           0x7E
-    #define INS_CLSAG                           0x7F
-    #define INS_CLOSE_TX                        0x80
+    LEDGER_INS(GET_KEY,                         0x20);
+    LEDGER_INS(DISPLAY_ADDRESS,                 0x21);
+    LEDGER_INS(PUT_KEY,                         0x22);
+    LEDGER_INS(GET_CHACHA8_PREKEY,              0x24);
+    LEDGER_INS(VERIFY_KEY,                      0x26);
 
-    #define INS_GET_TX_PROOF                    0xA0
+    LEDGER_INS(SECRET_KEY_TO_PUBLIC_KEY,        0x30);
+    LEDGER_INS(GEN_KEY_DERIVATION,              0x32);
+    LEDGER_INS(DERIVATION_TO_SCALAR,            0x34);
+    LEDGER_INS(DERIVE_PUBLIC_KEY,               0x36);
+    LEDGER_INS(DERIVE_SECRET_KEY,               0x38);
+    LEDGER_INS(GEN_KEY_IMAGE,                   0x3A);
+    LEDGER_INS(SECRET_KEY_ADD,                  0x3C);
+    LEDGER_INS(SECRET_KEY_SUB,                  0x3E);
+    LEDGER_INS(GENERATE_KEYPAIR,                0x40);
+    LEDGER_INS(SECRET_SCAL_MUL_KEY,             0x42);
+    LEDGER_INS(SECRET_SCAL_MUL_BASE,            0x44);
 
-    #define INS_GET_RESPONSE                    0xc0
+    LEDGER_INS(DERIVE_SUBADDRESS_PUBLIC_KEY,    0x46);
+    LEDGER_INS(GET_SUBADDRESS,                  0x48);
+    LEDGER_INS(GET_SUBADDRESS_SPEND_PUBLIC_KEY, 0x4A);
+    LEDGER_INS(GET_SUBADDRESS_SECRET_KEY,       0x4C);
+
+    LEDGER_INS(OPEN_TX,                         0x70);
+    LEDGER_INS(SET_SIGNATURE_MODE,              0x72);
+    LEDGER_INS(GET_ADDITIONAL_KEY,              0x74);
+    LEDGER_INS(GET_TX_SECRET_KEY,               0x75);
+    LEDGER_INS(ENCRYPT_PAYMENT_ID,              0x76);
+    LEDGER_INS(GEN_COMMITMENT_MASK,             0x77);
+    LEDGER_INS(BLIND,                           0x78);
+    LEDGER_INS(UNBLIND,                         0x7A);
+    LEDGER_INS(GEN_TXOUT_KEYS,                  0x7B);
+    LEDGER_INS(PREFIX_HASH,                     0x7D);
+    LEDGER_INS(VALIDATE,                        0x7C);
+    LEDGER_INS(CLSAG,                           0x7F);
+    LEDGER_INS(CLOSE_TX,                        0x80);
+
+    LEDGER_INS(GET_TX_PROOF,                    0xA0);
+    LEDGER_INS(GEN_UNLOCK_SIGNATURE,            0xA2);
+    LEDGER_INS(GEN_LNS_SIGNATURE,               0xA3);
+    LEDGER_INS(GEN_KEY_IMAGE_SIGNATURE,         0xA4);
+
+    LEDGER_INS(GET_RESPONSE,                    0xc0);
+
+    #define OPTION_MORE_DATA                    0x80
+
+    // When we have to send a bunch of data to be keccak hashed we send in chunks of this size; we
+    // could go up to 254, but Keccak uses 136-byte chunks so it makes some sense to send at that
+    // size.
+    constexpr size_t KECCAK_HASH_CHUNK_SIZE = 136;
+    static_assert(KECCAK_HASH_CHUNK_SIZE <= 254, "Max keccak data chunk size exceeds the protocol limit");
+
+    constexpr size_t BLAKE2B_HASH_CHUNK_SIZE = 128;
+    static_assert(BLAKE2B_HASH_CHUNK_SIZE <= 254, "Max BLAKE2b data chunk size exceeds the protocol limit");
 
 
     device_ledger::device_ledger(): hw_device(0x0101, 0x05, 64, 2000) {
-      this->id = device_id++;
-      this->reset_buffer();      
-      this->mode = NONE;
-      this->has_view_key = false;
-      this->tx_in_progress = false;
-      MDEBUG( "Device "<<this->id <<" Created");
+      id = device_id++;
+      reset_buffer();
+      mode = NONE;
+      has_view_key = false;
+      tx_in_progress = false;
+      MDEBUG("Device " << id << " Created");
     }
 
     device_ledger::~device_ledger() {
-      this->release();
-      MDEBUG( "Device "<<this->id <<" Destroyed");
+      release();
+      MDEBUG("Device " << id << " Destroyed");
     }
 
     /* ======================================================================= */
     /*  LOCKER                                                                 */
-    /* ======================================================================= */ 
-    
+    /* ======================================================================= */
+
     //lock the device for a long sequence
-    void device_ledger::lock(void) {
-      MDEBUG( "Ask for LOCKING for device "<<this->name << " in thread ");
+    void device_ledger::lock() {
+      MDEBUG("Ask for LOCKING for device " << name << " in thread ");
       device_locker.lock();
-      MDEBUG( "Device "<<this->name << " LOCKed");
+      MDEBUG("Device " << name << " LOCKed");
     }
 
     //lock the device for a long sequence
-    bool device_ledger::try_lock(void) {
-      MDEBUG( "Ask for LOCKING(try) for device "<<this->name << " in thread ");
+    bool device_ledger::try_lock() {
+      MDEBUG("Ask for LOCKING(try) for device " << name << " in thread ");
       bool r = device_locker.try_lock();
-      if (r) {
-        MDEBUG( "Device "<<this->name << " LOCKed(try)");
-      } else {
-        MDEBUG( "Device "<<this->name << " not LOCKed(try)");
-      }
+      MDEBUG("Device " << name << (r ? "" : " not") << " LOCKed(try)");
       return r;
     }
 
-    //lock the device for a long sequence
-    void device_ledger::unlock(void) {
-      try {
-        MDEBUG( "Ask for UNLOCKING for device "<<this->name << " in thread ");
-      } catch (...) {
-      }
+    //unlock the device after a long sequence
+    void device_ledger::unlock() {
+      MDEBUG("Ask for UNLOCKING for device " << name << " in thread ");
       device_locker.unlock();
-      MDEBUG( "Device "<<this->name << " UNLOCKed");
+      MDEBUG("Device " << name << " UNLOCKed");
     }
 
-  
+
     /* ======================================================================= */
     /*                                     IO                                  */
     /* ======================================================================= */
@@ -363,193 +365,216 @@ namespace hw {
 
       void device_ledger::logCMD() {
       if (apdu_verbose) {
-        char  strbuffer[1024];
-        snprintf(strbuffer, sizeof(strbuffer), "%.02x %.02x %.02x %.02x %.02x ",
-          this->buffer_send[0],
-          this->buffer_send[1],
-          this->buffer_send[2],
-          this->buffer_send[3],
-          this->buffer_send[4]
-          );
-        const size_t len = strlen(strbuffer);
-        buffer_to_str(strbuffer+len, sizeof(strbuffer)-len, (char*)(this->buffer_send+5), this->length_send-5);
-        MDEBUG( "CMD  : " << strbuffer);
+        std::ostringstream cmd;
+        cmd << std::hex << std::setfill('0');
+        cmd << "v=0x" << std::setw(2) << +buffer_send[0];
+        cmd << " i=0x" << std::setw(2) << +buffer_send[1];
+#ifndef NDEBUG
+        if (auto it = debug_ins_names.find(buffer_send[1]); it != debug_ins_names.end())
+          cmd << '[' << it->second << ']';
+#endif
+        cmd << " p=(0x" << std::setw(2) << +buffer_send[2] << ",0x" << std::setw(2) << +buffer_send[3] << ')';
+        cmd << " sz=0x" << std::setw(2) << +buffer_send[4] << '[' << std::to_string(buffer_send[4]) << "] ";
+        MDEBUG("CMD: " << cmd.str() << lokimq::to_hex(buffer_send + 5, buffer_send + length_send));
+        last_cmd = std::chrono::steady_clock::now();
       }
     }
 
     void device_ledger::logRESP() {
-      if (apdu_verbose) {
-        char  strbuffer[1024];
-        snprintf(strbuffer, sizeof(strbuffer), "%.04x ", this->sw);
-        const size_t len = strlen(strbuffer);
-        buffer_to_str(strbuffer+len, sizeof(strbuffer)-len, (char*)(this->buffer_recv), this->length_recv);
-        MDEBUG( "RESP : " << strbuffer);
-
-      }
+      if (apdu_verbose)
+        MDEBUG("RESP (+" << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - last_cmd).count() << "ms): "
+              << lokimq::to_hex(std::string_view{reinterpret_cast<const char*>(&sw), sizeof(sw)})
+              << ' ' << lokimq::to_hex(buffer_recv, buffer_recv + length_recv));
     }
 
     int device_ledger::set_command_header(unsigned char ins, unsigned char p1, unsigned char p2) {
       reset_buffer();
-      this->buffer_send[0] = PROTOCOL_VERSION;
-      this->buffer_send[1] = ins;
-      this->buffer_send[2] = p1;
-      this->buffer_send[3] = p2;
-      this->buffer_send[4] = 0x00;
+      buffer_send[0] = PROTOCOL_VERSION;
+      buffer_send[1] = ins;
+      buffer_send[2] = p1;
+      buffer_send[3] = p2;
+      buffer_send[4] = 0x00;
       return 5;
     }
 
     int device_ledger::set_command_header_noopt(unsigned char ins, unsigned char p1, unsigned char p2) {
       int offset = set_command_header(ins, p1, p2);
-      //options
-      this->buffer_send[offset++] = 0;
-      this->buffer_send[4] = offset - 5;
+      buffer_send[offset++] = 0; // options
+      buffer_send[4] = offset - 5;
       return offset;
     }
 
     void device_ledger::send_simple(unsigned char ins, unsigned char p1) {
-      this->length_send = set_command_header_noopt(ins, p1);
-      if (ins == INS_GET_KEY && p1 == IO_SECRET_KEY) {
-        // export view key user input
-        this->exchange_wait_on_input();
-      } else {
-        this->exchange();
-      }
+      length_send = set_command_header_noopt(ins, p1);
+      bool wait = ins == INS_GET_KEY && p1 == IO_SECRET_KEY;
+      exchange(wait);
+    }
+
+    void device_ledger::send_bytes(const void* buf, size_t size, int& offset) {
+      CHECK_AND_ASSERT_THROW_MES(offset + size <= BUFFER_SEND_SIZE, "send_bytes: out of bounds write");
+      std::memmove(buffer_send+offset, buf, size);
+      offset += size;
+    }
+
+    void device_ledger::receive_bytes(void* dest, size_t size, int& offset) {
+      CHECK_AND_ASSERT_THROW_MES(offset + size <= BUFFER_RECV_SIZE, "receive_bytes: out of bounds read");
+      std::memmove(dest, buffer_recv+offset, size);
+      offset += size;
+    }
+
+    void device_ledger::receive_bytes(void* dest, size_t size) {
+      int offset = 0;
+      receive_bytes(dest, size, offset);
+    }
+
+    void device_ledger::send_u32(uint32_t x, int& offset) {
+      boost::endian::native_to_big_inplace(x);
+      send_bytes(&x, 4, offset);
+    }
+
+    void device_ledger::send_u16(uint16_t x, int& offset) {
+      boost::endian::native_to_big_inplace(x);
+      send_bytes(&x, 2, offset);
+    }
+
+    uint32_t device_ledger::receive_u32(int& offset) {
+      uint32_t x;
+      receive_bytes(&x, 4, offset);
+      boost::endian::big_to_native_inplace(x);
+      return x;
+    }
+    uint32_t device_ledger::receive_u32() {
+      int offset = 0;
+      return receive_u32(offset);
     }
 
     void device_ledger::send_secret(const unsigned char sec[32], int &offset) {
-      MDEBUG("send_secret: " << this->tx_in_progress);
-      ASSERT_X(offset + 32 <= BUFFER_SEND_SIZE, "send_secret: out of bounds write (secret)");
-      memmove(this->buffer_send+offset, sec, 32);
-      offset +=32;
-      if (this->tx_in_progress) {
-        ASSERT_X(offset + 32 <= BUFFER_SEND_SIZE, "send_secret: out of bounds write (mac)");
-        this->hmac_map.find_mac((uint8_t*)sec, this->buffer_send+offset);
+      MDEBUG("send_secret: " << tx_in_progress);
+      send_bytes(sec, 32, offset);
+      if (tx_in_progress) {
+        CHECK_AND_ASSERT_THROW_MES(offset + 32 <= BUFFER_SEND_SIZE, "send_secret: out of bounds write (mac)");
+        hmac_map.find_mac((uint8_t*)sec, buffer_send+offset);
         offset += 32;
       }
     }
 
     void device_ledger::receive_secret(unsigned char sec[32], int &offset) {
-      MDEBUG("receive_secret: " << this->tx_in_progress);
-      ASSERT_X(offset + 32 <= BUFFER_RECV_SIZE, "receive_secret: out of bounds read (secret)");
-      memmove(sec, this->buffer_recv+offset, 32);
-      offset += 32;
-      if (this->tx_in_progress) {
-        ASSERT_X(offset + 32 <= BUFFER_RECV_SIZE, "receive_secret: out of bounds read (mac)");
-        this->hmac_map.add_mac((uint8_t*)sec, this->buffer_recv+offset);
+      MDEBUG("receive_secret: " << tx_in_progress);
+      receive_bytes(sec, 32, offset);
+      if (tx_in_progress) {
+        CHECK_AND_ASSERT_THROW_MES(offset + 32 <= BUFFER_RECV_SIZE, "receive_secret: out of bounds read (mac)");
+        hmac_map.add_mac((uint8_t*)sec, buffer_recv+offset);
         offset += 32;
       }
+    }
+
+    void device_ledger::send_finish(int& offset) {
+      buffer_send[4] = offset-5;
+      length_send = offset;
+      offset = 0;
+    }
+
+    unsigned int device_ledger::finish_and_exchange(int& offset, bool wait_on_input) {
+      send_finish(offset);
+      return exchange(wait_on_input);
     }
 
     bool device_ledger::reset() {
       reset_buffer();
       int offset = set_command_header_noopt(INS_RESET);
-      const size_t verlen = strlen(LOKI_VERSION_STR);
-      ASSERT_X(offset + verlen <= BUFFER_SEND_SIZE, "LOKI_VERSION_STR is too long")
-      memmove(this->buffer_send+offset, LOKI_VERSION_STR, verlen);
-      offset += strlen(LOKI_VERSION_STR);
-      this->buffer_send[4] = offset-5;
-      this->length_send = offset;
-      this->exchange();
+      CHECK_AND_ASSERT_THROW_MES(offset + LOKI_VERSION_STR.size() <= BUFFER_SEND_SIZE, "LOKI_VERSION_STR is too long");
+      send_bytes(LOKI_VERSION_STR.data(), LOKI_VERSION_STR.size(), offset);
+      finish_and_exchange(offset);
 
-      ASSERT_X(this->length_recv>=3, "Communication error, less than three bytes received. Check your application version.");
+      CHECK_AND_ASSERT_THROW_MES(length_recv>=3, "Communication error, less than three bytes received. Check your application version.");
 
       unsigned int device_version = 0;
-      device_version = VERSION(this->buffer_recv[0], this->buffer_recv[1], this->buffer_recv[2]);
-  
-      ASSERT_X (device_version >= MINIMAL_APP_VERSION,  
-                "Unsupported device application version: " << VERSION_MAJOR(device_version)<<"."<<VERSION_MINOR(device_version)<<"."<<VERSION_MICRO(device_version) << 
+      device_version = VERSION(buffer_recv[0], buffer_recv[1], buffer_recv[2]);
+
+      CHECK_AND_ASSERT_THROW_MES (device_version >= MINIMAL_APP_VERSION,
+                "Unsupported device application version: " << VERSION_MAJOR(device_version)<<"."<<VERSION_MINOR(device_version)<<"."<<VERSION_MICRO(device_version) <<
                 " At least " << MINIMAL_APP_VERSION_MAJOR<<"."<<MINIMAL_APP_VERSION_MINOR<<"."<<MINIMAL_APP_VERSION_MICRO<<" is required.");
-     
+
       return true;
     }
-     
-    unsigned int device_ledger::exchange(unsigned int ok, unsigned int mask) {
+
+    unsigned int device_ledger::exchange(bool wait_on_input) {
       logCMD();
 
-      this->length_recv =  hw_device.exchange(this->buffer_send, this->length_send, this->buffer_recv, BUFFER_SEND_SIZE, false);
-      ASSERT_X(this->length_recv>=2, "Communication error, less than tow bytes received");
+      length_recv = hw_device.exchange(buffer_send, length_send, buffer_recv, BUFFER_SEND_SIZE, wait_on_input);
+      CHECK_AND_ASSERT_THROW_MES(length_recv >= 2, "Communication error, less than two bytes received");
 
-      this->length_recv -= 2;
-      this->sw = (this->buffer_recv[length_recv]<<8) | this->buffer_recv[length_recv+1];
+      length_recv -= 2;
+      sw = (buffer_recv[length_recv] << 8) | buffer_recv[length_recv+1];
       logRESP();
-      ASSERT_SW(this->sw,ok,msk);
 
-      return this->sw;
-    }
+      // If we are waiting on input then we also want to be able to return a DENY
+      if (wait_on_input && sw == IO_SW_DENY)
+        return sw;
 
-    unsigned int device_ledger::exchange_wait_on_input(unsigned int ok, unsigned int mask) {
-      logCMD();
-      unsigned int deny = 0;
-      this->length_recv =  hw_device.exchange(this->buffer_send, this->length_send, this->buffer_recv, BUFFER_SEND_SIZE, true);
-      ASSERT_X(this->length_recv>=2, "Communication error, less than two bytes received");
+      CHECK_AND_ASSERT_THROW_MES(sw == SW_OK,
+        "Wrong Device Status: " << "0x" << std::hex << sw << " (" << status_string(sw) << "), " <<
+        "EXPECTED 0x" << std::hex << SW_OK << " (" << status_string(SW_OK) << "), ");
 
-      this->length_recv -= 2;
-      this->sw = (this->buffer_recv[length_recv]<<8) | this->buffer_recv[length_recv+1];
-      if (this->sw == IO_SW_DENY) {
-        // cancel on device
-        deny = 1;
-      } else {
-        ASSERT_SW(this->sw,ok,msk);
-      }
-
-      logRESP();
-      return deny;
+      return sw;
     }
 
     void device_ledger::reset_buffer() {
-      this->length_send = 0;
-      memset(this->buffer_send, 0, BUFFER_SEND_SIZE);
-      this->length_recv = 0;
-      memset(this->buffer_recv, 0, BUFFER_RECV_SIZE);
+      length_send = 0;
+      std::memset(buffer_send, 0, BUFFER_SEND_SIZE);
+      length_recv = 0;
+      std::memset(buffer_recv, 0, BUFFER_RECV_SIZE);
     }
 
     /* ======================================================================= */
     /*                              SETUP/TEARDOWN                             */
     /* ======================================================================= */
 
-    bool device_ledger::set_name(const std::string & name) {
+    bool device_ledger::set_name(std::string_view name) {
       this->name = name;
       return true;
     }
 
-    const std::string device_ledger::get_name() const {
-      if (!this->connected()) {
-        return std::string("<disconnected:").append(this->name).append(">");
-      }
-      return this->name;
+    std::string device_ledger::get_name() const {
+      if (!connected())
+        return "<disconnected:" + name + ">";
+      return name;
     }
 
-    bool device_ledger::init(void) {
-      #ifdef DEBUG_HWDEVICE
-      this->controle_device = &hw::get_device("default");
-      #endif
-      this->release();
-      hw_device.init();      
-      MDEBUG( "Device "<<this->id <<" HIDUSB inited");
+    bool device_ledger::init() {
+#ifdef DEBUG_HWDEVICE
+      debug_device = &hw::get_device("default");
+#endif
+      release();
+      hw_device.init();
+      MDEBUG("Device " << id <<" HIDUSB inited");
       return true;
     }
-    
+
     static const std::vector<hw::io::hid_conn_params> known_devices {
-        {0x2c97, 0x0001, 0, 0xffa0}, 
-        {0x2c97, 0x0004, 0, 0xffa0},       
+        {0x2c97, 0x0001, 0, 0xffa0},
+        {0x2c97, 0x0004, 0, 0xffa0},
     };
 
-    bool device_ledger::connect(void) {
-      this->disconnect();
+    bool device_ledger::connect() {
+      disconnect();
       hw_device.connect(known_devices);
-      this->reset();
-      #ifdef DEBUG_HWDEVICE
+      reset();
+
+      check_network_type();
+
+#ifdef DEBUG_HWDEVICE
       cryptonote::account_public_address pubkey;
-      this->get_public_address(pubkey);
-      #endif
+      get_public_address(pubkey);
+#endif
       crypto::secret_key vkey;
       crypto::secret_key skey;
-      this->get_secret_keys(vkey,skey);
+      get_secret_keys(vkey,skey);
 
       return true;
     }
 
-    bool device_ledger::connected(void) const {
+    bool device_ledger::connected() const {
       return hw_device.connected();
     }
 
@@ -559,9 +584,38 @@ namespace hw {
     }
 
     bool device_ledger::release() {
-      this->disconnect();
+      disconnect();
       hw_device.release();
       return true;
+    }
+
+    static std::string nettype_string(cryptonote::network_type n) {
+        switch (n) {
+            case cryptonote::network_type::MAINNET: return "mainnet";
+            case cryptonote::network_type::TESTNET: return "testnet";
+            case cryptonote::network_type::DEVNET: return "devnet";
+            case cryptonote::network_type::FAKECHAIN: return "fakenet";
+            default: return "(unknown)";
+        }
+    }
+
+    void device_ledger::check_network_type() {
+        auto locks = tools::unique_locks(device_locker, command_locker);
+
+        send_simple(INS_GET_NETWORK);
+
+        std::string coin{reinterpret_cast<const char*>(buffer_recv), 4};
+        auto device_nettype = static_cast<cryptonote::network_type>(buffer_recv[4]);
+        MDEBUG("Ledger wallet is set to " << coin << " " << nettype_string(device_nettype));
+        if (coin != COIN_NETWORK)
+            throw std::runtime_error{"Invalid wallet app: expected " + std::string{COIN_NETWORK} + ", got " + coin};
+        if (device_nettype != nettype)
+            throw std::runtime_error{"Ledger wallet is set to the wrong network type: expected " + nettype_string(nettype)
+                + " but the device is set to " + nettype_string(device_nettype)};
+    }
+
+    void device_ledger::set_network_type(cryptonote::network_type set_nettype) {
+        nettype = set_nettype;
     }
 
     bool  device_ledger::set_mode(device_mode mode) {
@@ -573,18 +627,14 @@ namespace hw {
         case TRANSACTION_CREATE_REAL:
         case TRANSACTION_CREATE_FAKE:
           offset = set_command_header_noopt(INS_SET_SIGNATURE_MODE, 1);
-          //account
-          this->buffer_send[offset] = mode;
-          offset += 1;
+          buffer_send[offset++] = mode;
 
-          this->buffer_send[4] = offset-5;
-          this->length_send = offset;
-          this->exchange();
+          finish_and_exchange(offset);
 
           this->mode = mode;
           break;
 
-        case TRANSACTION_PARSE: 
+        case TRANSACTION_PARSE:
         case NONE:
           this->mode = mode;
           break;
@@ -600,64 +650,60 @@ namespace hw {
     /*                             WALLET & ADDRESS                            */
     /* ======================================================================= */
 
-     bool device_ledger::get_public_address(cryptonote::account_public_address &pubkey){
+    bool device_ledger::get_public_address(cryptonote::account_public_address &pubkey){
         auto locks = tools::unique_locks(device_locker, command_locker);
 
         send_simple(INS_GET_KEY, 1);
 
-        memmove(pubkey.m_view_public_key.data, this->buffer_recv, 32);
-        memmove(pubkey.m_spend_public_key.data, this->buffer_recv+32, 32);
- 
+        int offset = 0;
+        receive_bytes(pubkey.m_view_public_key.data, 32, offset);
+        receive_bytes(pubkey.m_spend_public_key.data, 32, offset);
+
         return true;
     }
 
-    bool  device_ledger::get_secret_keys(crypto::secret_key &vkey , crypto::secret_key &skey) {
+    bool device_ledger::get_secret_keys(crypto::secret_key& vkey, crypto::secret_key& skey) {
         auto locks = tools::unique_locks(device_locker, command_locker);
 
         //secret key are represented as fake key on the wallet side
-        memset(vkey.data, 0x00, 32);
-        memset(skey.data, 0xFF, 32);
+        memcpy(vkey.data, dummy_view_key, 32);
+        memcpy(skey.data, dummy_spend_key, 32);
 
         //spcialkey, normal conf handled in decrypt
         send_simple(INS_GET_KEY, 0x02);
 
-        //View key is retrievied, if allowed, to speed up blockchain parsing
-        memmove(this->viewkey.data,  this->buffer_recv+0,  32);
-        if (is_fake_view_key(this->viewkey)) {
-          MDEBUG("Have Not view key");
-          this->has_view_key = false;
-        } else {
-          MDEBUG("Have view key");
-          this->has_view_key = true;
-        }
-      
-        #ifdef DEBUG_HWDEVICE
+        //View key is retrieved, if allowed, to speed up blockchain parsing
+        receive_bytes(viewkey.data, 32);
+        has_view_key = !is_fake_view_key(viewkey);
+        MDEBUG((has_view_key ? "Have view key" : "Have no view key"));
+
+#ifdef DEBUG_HWDEVICE
         send_simple(INS_GET_KEY, 0x04);
-        memmove(dbg_viewkey.data, this->buffer_recv+0, 32);
-        memmove(dbg_spendkey.data, this->buffer_recv+32, 32);
-        #endif
+        int offset = 0;
+        receive_bytes(dbg_viewkey.data, 32, offset);
+        receive_bytes(dbg_spendkey.data, 32, offset);
+#endif
 
         return true;
     }
 
-    bool  device_ledger::generate_chacha_key(const cryptonote::account_keys &keys, crypto::chacha_key &key, uint64_t kdf_rounds) {
+    bool device_ledger::generate_chacha_key(const cryptonote::account_keys &keys, crypto::chacha_key &key, uint64_t kdf_rounds) {
         auto locks = tools::unique_locks(device_locker, command_locker);
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         crypto::chacha_key key_x;
-        cryptonote::account_keys keys_x = hw::ledger::decrypt(keys); 
-        this->controle_device->generate_chacha_key(keys_x, key_x, kdf_rounds);
-        #endif
+        debug_device->generate_chacha_key(hw::ledger::decrypt(keys), key_x, kdf_rounds);
+#endif
 
         send_simple(INS_GET_CHACHA8_PREKEY);
 
         char prekey[200];
-        memmove(prekey, &this->buffer_recv[0], 200);
-        crypto::generate_chacha_key_prehashed(&prekey[0], sizeof(prekey), key, kdf_rounds);
+        receive_bytes(prekey, 200);
+        crypto::generate_chacha_key_prehashed(prekey, sizeof(prekey), key, kdf_rounds);
 
-        #ifdef DEBUG_HWDEVICE
-        hw::ledger::check32("generate_chacha_key_prehashed", "key", (char*)key_x.data(), (char*)key.data());
-        #endif
+#ifdef DEBUG_HWDEVICE
+        hw::ledger::check32("generate_chacha_key_prehashed", "key", key_x.data(), key.data());
+#endif
 
       return true;
     }
@@ -667,20 +713,12 @@ namespace hw {
 
         int offset = set_command_header_noopt(INS_DISPLAY_ADDRESS, payment_id?1:0);
         //index
-        memmove(this->buffer_send+offset, &index, sizeof(cryptonote::subaddress_index));
-        offset +=8 ;
+        send_bytes(&index, sizeof(index), offset);
 
         //payment ID
-        if (payment_id) {
-          memmove(this->buffer_send+offset, (*payment_id).data, 8);
-        } else {
-          memset(this->buffer_send+offset, 0, 8);
-        }
-        offset +=8;
+        send_bytes(payment_id ? payment_id->data : crypto::null_hash8.data, 8, offset);
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        CHECK_AND_ASSERT_THROW_MES(this->exchange_wait_on_input() == 0, "Timeout/Error on display address.");
+        CHECK_AND_ASSERT_THROW_MES(finish_and_exchange(offset, true) == SW_OK, "Timeout/Error on display address.");
     }
 
     /* ======================================================================= */
@@ -688,54 +726,42 @@ namespace hw {
     /* ======================================================================= */
 
     bool device_ledger::derive_subaddress_public_key(const crypto::public_key &pub, const crypto::key_derivation &derivation, const std::size_t output_index, crypto::public_key &derived_pub){
-        auto locks = tools::unique_locks(device_locker, command_locker);
-        #ifdef DEBUG_HWDEVICE
-        const crypto::public_key pub_x = pub;
-        crypto::key_derivation derivation_x;
-         if ((this->mode == TRANSACTION_PARSE) && has_view_key) {    
-          derivation_x = derivation;
-        } else {
-          derivation_x = hw::ledger::decrypt(derivation);
-        }
-        const std::size_t output_index_x = output_index;
-        crypto::public_key derived_pub_x;
-        log_hexbuffer("derive_subaddress_public_key: [[IN]]  pub       ", pub_x.data, 32);
-        log_hexbuffer("derive_subaddress_public_key: [[IN]]  derivation", derivation_x.data, 32);
-        log_message  ("derive_subaddress_public_key: [[IN]]  index     ", std::to_string((int)output_index_x));
-        this->controle_device->derive_subaddress_public_key(pub_x, derivation_x,output_index_x,derived_pub_x);
-        log_hexbuffer("derive_subaddress_public_key: [[OUT]] derived_pub", derived_pub_x.data, 32);
-        #endif
+      auto locks = tools::unique_locks(device_locker, command_locker);
 
-      if ((this->mode == TRANSACTION_PARSE) && has_view_key) {     
+#ifdef DEBUG_HWDEVICE
+      crypto::key_derivation derivation_x =
+        (mode == TRANSACTION_PARSE && has_view_key) ? derivation : hw::ledger::decrypt(derivation);
+      log_hexbuffer("derive_subaddress_public_key: [[IN]]  pub       ", pub.data, 32);
+      log_hexbuffer("derive_subaddress_public_key: [[IN]]  derivation", derivation_x.data, 32);
+      log_message(  "derive_subaddress_public_key: [[IN]]  index     ", std::to_string(output_index));
+      crypto::public_key derived_pub_x;
+      debug_device->derive_subaddress_public_key(pub, derivation_x, output_index, derived_pub_x);
+      log_hexbuffer("derive_subaddress_public_key: [[OUT]] derived_pub", derived_pub_x.data, 32);
+#endif
+
+      if (mode == TRANSACTION_PARSE && has_view_key) {
         //If we are in TRANSACTION_PARSE, the given derivation has been retrieved uncrypted (wihtout the help
         //of the device), so continue that way.
-        MDEBUG( "derive_subaddress_public_key  : PARSE mode with known viewkey");     
-        crypto::derive_subaddress_public_key(pub, derivation, output_index,derived_pub);
+        MDEBUG("derive_subaddress_public_key  : PARSE mode with known viewkey");
+        crypto::derive_subaddress_public_key(pub, derivation, output_index, derived_pub);
       } else {
-       
+
         int offset = set_command_header_noopt(INS_DERIVE_SUBADDRESS_PUBLIC_KEY);
         //pub
-        memmove(this->buffer_send+offset, pub.data, 32);
-        offset += 32;
+        send_bytes(pub.data, 32, offset);
         //derivation
-        this->send_secret((unsigned char*)derivation.data, offset);
+        send_secret(derivation.data, offset);
         //index
-        this->buffer_send[offset+0] = output_index>>24;
-        this->buffer_send[offset+1] = output_index>>16;
-        this->buffer_send[offset+2] = output_index>>8;
-        this->buffer_send[offset+3] = output_index>>0;
-        offset += 4;
+        send_u32(output_index, offset);
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
         //pub key
-        memmove(derived_pub.data, &this->buffer_recv[0], 32);
+        receive_bytes(derived_pub.data, 32);
       }
-      #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
       hw::ledger::check32("derive_subaddress_public_key", "derived_pub", derived_pub_x.data, derived_pub.data);
-      #endif
+#endif
 
       return true;
     }
@@ -744,16 +770,14 @@ namespace hw {
         auto locks = tools::unique_locks(device_locker, command_locker);
         crypto::public_key D;
 
-        #ifdef DEBUG_HWDEVICE
-        const cryptonote::account_keys     keys_x =  hw::ledger::decrypt(keys);
-        const cryptonote::subaddress_index index_x = index;
-        crypto::public_key                 D_x;
-        log_hexbuffer("get_subaddress_spend_public_key: [[IN]]  keys.m_view_secret_key ", keys_x.m_view_secret_key.data,32);
-        log_hexbuffer("get_subaddress_spend_public_key: [[IN]]  keys.m_spend_secret_key", keys_x.m_spend_secret_key.data,32);
-        log_message  ("get_subaddress_spend_public_key: [[IN]]  index               ", std::to_string(index_x.major)+"."+std::to_string(index_x.minor));
-        D_x = this->controle_device->get_subaddress_spend_public_key(keys_x, index_x);
+#ifdef DEBUG_HWDEVICE
+        const cryptonote::account_keys keys_x = hw::ledger::decrypt(keys);
+        log_hexbuffer("get_subaddress_spend_public_key: [[IN]]  keys.m_view_secret_key ", keys_x.m_view_secret_key.data, 32);
+        log_hexbuffer("get_subaddress_spend_public_key: [[IN]]  keys.m_spend_secret_key", keys_x.m_spend_secret_key.data, 32);
+        log_message  ("get_subaddress_spend_public_key: [[IN]]  index               ", std::to_string(index.major)+"."+std::to_string(index.minor));
+        crypto::public_key D_x = debug_device->get_subaddress_spend_public_key(keys_x, index);
         log_hexbuffer("get_subaddress_spend_public_key: [[OUT]] derivation          ", D_x.data, 32);
-        #endif
+#endif
 
         if (index.is_zero()) {
            D = keys.m_account_address.m_spend_public_key;
@@ -761,32 +785,27 @@ namespace hw {
 
           int offset = set_command_header_noopt(INS_GET_SUBADDRESS_SPEND_PUBLIC_KEY);
           //index
-          static_assert(sizeof(cryptonote::subaddress_index) == 8, "cryptonote::subaddress_index shall be 8 bytes length");
-          memmove(this->buffer_send+offset, &index, sizeof(cryptonote::subaddress_index));
-          offset +=8 ;
+          static_assert(sizeof(cryptonote::subaddress_index) == 8);
+          send_bytes(&index, sizeof(index), offset);
 
-          this->buffer_send[4] = offset-5;
-          this->length_send = offset;
-          this->exchange();
+          finish_and_exchange(offset);
 
-          memmove(D.data, &this->buffer_recv[0], 32);
+          receive_bytes(D.data, 32);
         }
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         hw::ledger::check32("get_subaddress_spend_public_key", "D", D_x.data, D.data);
-        #endif
+#endif
 
         return D;
     }
 
-    std::vector<crypto::public_key>  device_ledger::get_subaddress_spend_public_keys(const cryptonote::account_keys &keys, uint32_t account, uint32_t begin, uint32_t end) {
-     std::vector<crypto::public_key> pkeys;
-     cryptonote::subaddress_index index = {account, begin};
-     crypto::public_key D;
-     for (uint32_t idx = begin; idx < end; ++idx) {
+    std::vector<crypto::public_key> device_ledger::get_subaddress_spend_public_keys(const cryptonote::account_keys &keys, uint32_t account, uint32_t begin, uint32_t end) {
+      std::vector<crypto::public_key> pkeys;
+      cryptonote::subaddress_index index{account, begin};
+      for (uint32_t idx = begin; idx < end; ++idx) {
         index.minor = idx;
-        D = this->get_subaddress_spend_public_key(keys, index);
-        pkeys.push_back(D);
+        pkeys.push_back(get_subaddress_spend_public_key(keys, index));
       }
       return pkeys;
     }
@@ -795,41 +814,37 @@ namespace hw {
         auto locks = tools::unique_locks(device_locker, command_locker);
         cryptonote::account_public_address address;
 
-        #ifdef DEBUG_HWDEVICE
-        const cryptonote::account_keys            keys_x =  hw::ledger::decrypt(keys);
-        const cryptonote::subaddress_index        index_x = index;
-        cryptonote::account_public_address  address_x;
+#ifdef DEBUG_HWDEVICE
+        const cryptonote::account_keys keys_x =  hw::ledger::decrypt(keys);
         log_hexbuffer("get_subaddress: [[IN]]  keys.m_view_secret_key ", keys_x.m_view_secret_key.data, 32);
         log_hexbuffer("get_subaddress: [[IN]]  keys.m_view_public_key",  keys_x.m_account_address.m_view_public_key.data, 32);
-        log_hexbuffer("get_subaddress: [[IN]]  keys.m_view_secret_key ", keys_x.m_view_secret_key.data, 32);
+        log_hexbuffer("get_subaddress: [[IN]]  keys.m_spend_secret_key ", keys_x.m_spend_secret_key.data, 32);
         log_hexbuffer("get_subaddress: [[IN]]  keys.m_spend_public_key", keys_x.m_account_address.m_spend_public_key.data, 32);
-        log_message  ("get_subaddress: [[IN]]  index                                ", std::to_string(index_x.major)+"."+std::to_string(index_x.minor));
-        address_x = this->controle_device->get_subaddress(keys_x, index_x);
+        log_message(  "get_subaddress: [[IN]]  index                                ", std::to_string(index.major)+"."+std::to_string(index.minor));
+        cryptonote::account_public_address address_x = debug_device->get_subaddress(keys_x, index);
         log_hexbuffer("get_subaddress: [[OUT]]  keys.m_view_public_key ", address_x.m_view_public_key.data, 32);
         log_hexbuffer("get_subaddress: [[OUT]]  keys.m_spend_public_key", address_x.m_spend_public_key.data, 32);
-        #endif
+#endif
 
         if (index.is_zero()) {
           address = keys.m_account_address;
         } else {
           int offset = set_command_header_noopt(INS_GET_SUBADDRESS);
           //index
-          static_assert(sizeof(cryptonote::subaddress_index) == 8, "cryptonote::subaddress_index shall be 8 bytes length");
-          memmove(this->buffer_send+offset, &index, sizeof(cryptonote::subaddress_index));
-          offset +=8 ;
+          static_assert(sizeof(cryptonote::subaddress_index) == 8);
+          send_bytes(&index, sizeof(index), offset);
 
-          this->buffer_send[4] = offset-5;
-          this->length_send = offset;
-          this->exchange();
+          finish_and_exchange(offset);
 
-          memmove(address.m_view_public_key.data,  &this->buffer_recv[0],  32);
-          memmove(address.m_spend_public_key.data, &this->buffer_recv[32], 32);
+          offset = 0;
+          receive_bytes(address.m_view_public_key.data, 32, offset);
+          receive_bytes(address.m_spend_public_key.data, 32, offset);
         }
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         hw::ledger::check32("get_subaddress", "address.m_view_public_key.data", address_x.m_view_public_key.data, address.m_view_public_key.data);
         hw::ledger::check32("get_subaddress", "address.m_spend_public_key.data", address_x.m_spend_public_key.data, address.m_spend_public_key.data);
-        #endif
+#endif
 
         return address;
     }
@@ -838,35 +853,30 @@ namespace hw {
         auto locks = tools::unique_locks(device_locker, command_locker);
         crypto::secret_key sub_sec;
 
-        #ifdef DEBUG_HWDEVICE
-        const crypto::secret_key            sec_x =  hw::ledger::decrypt(sec);
-        const cryptonote::subaddress_index  index_x = index;
-        crypto::secret_key            sub_sec_x;
+#ifdef DEBUG_HWDEVICE
+        const crypto::secret_key sec_x =  hw::ledger::decrypt(sec);
         log_message  ("get_subaddress_secret_key: [[IN]]  index  ", std::to_string(index.major)+"."+std::to_string(index.minor));
         log_hexbuffer("get_subaddress_secret_key: [[IN]]  sec    ", sec_x.data, 32);
-        sub_sec_x = this->controle_device->get_subaddress_secret_key(sec_x, index_x);
+        crypto::secret_key sub_sec_x = debug_device->get_subaddress_secret_key(sec_x, index);
         log_hexbuffer("get_subaddress_secret_key: [[OUT]] sub_sec", sub_sec_x.data, 32);
-        #endif
+#endif
 
         int offset = set_command_header_noopt(INS_GET_SUBADDRESS_SECRET_KEY);
         //sec
-        this->send_secret((unsigned char*)sec.data, offset);
+        send_secret(sec.data, offset);
         //index
-        static_assert(sizeof(cryptonote::subaddress_index) == 8, "cryptonote::subaddress_index shall be 8 bytes length");
-        memmove(this->buffer_send+offset, &index, sizeof(cryptonote::subaddress_index));
-        offset +=8 ;
+        static_assert(sizeof(cryptonote::subaddress_index) == 8);
+        send_bytes(&index, sizeof(index), offset);
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
         offset = 0;
-        this->receive_secret((unsigned char*)sub_sec.data,  offset);
+        receive_secret(sub_sec.data,  offset);
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         crypto::secret_key            sub_sec_clear =   hw::ledger::decrypt(sub_sec);
         hw::ledger::check32("get_subaddress_secret_key", "sub_sec", sub_sec_x.data, sub_sec_clear.data);
-        #endif
+#endif
 
         return sub_sec;
     }
@@ -881,54 +891,44 @@ namespace hw {
 
         offset = set_command_header_noopt(INS_VERIFY_KEY);
         //sec
-        this->send_secret((unsigned char*)secret_key.data, offset);
+        send_secret(secret_key.data, offset);
         //pub
-        memmove(this->buffer_send+offset, public_key.data, 32);
-        offset += 32;
+        send_bytes(public_key.data, 32, offset);
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
-        uint32_t verified =
-          this->buffer_recv[0] << 24 |
-          this->buffer_recv[1] << 16 |
-          this->buffer_recv[2] << 8  |
-          this->buffer_recv[3] << 0  ;
+        offset = 0;
+        uint32_t verified = receive_u32(offset);
 
         return verified == 1;
     }
 
-    bool device_ledger::scalarmultKey(rct::key & aP, const rct::key &P, const rct::key &a) {
+    bool device_ledger::scalarmultKey(rct::key& aP, const rct::key &P, const rct::key &a) {
         auto locks = tools::unique_locks(device_locker, command_locker);
 
-        #ifdef DEBUG_HWDEVICE
-        const rct::key P_x    =  P;
-        const rct::key a_x    =  hw::ledger::decrypt(a);
+#ifdef DEBUG_HWDEVICE
+        const rct::key a_x = hw::ledger::decrypt(a);
+        log_hexbuffer("scalarmultKey: [[IN]]  P ", P.bytes, 32);
+        log_hexbuffer("scalarmultKey: [[IN]]  a ", a_x.bytes, 32);
         rct::key aP_x;
-        log_hexbuffer("scalarmultKey: [[IN]]  P ", (char*)P_x.bytes, 32);       
-        log_hexbuffer("scalarmultKey: [[IN]]  a ", (char*)a_x.bytes, 32);       
-        this->controle_device->scalarmultKey(aP_x, P_x, a_x);
-        log_hexbuffer("scalarmultKey: [[OUT]] aP", (char*)aP_x.bytes, 32);       
-        #endif
+        debug_device->scalarmultKey(aP_x, P, a_x);
+        log_hexbuffer("scalarmultKey: [[OUT]] aP", aP_x.bytes, 32);
+#endif
 
         int offset = set_command_header_noopt(INS_SECRET_SCAL_MUL_KEY);
         //pub
-        memmove(this->buffer_send+offset, P.bytes, 32);
-        offset += 32;
+        send_bytes(P.bytes, 32, offset);
         //sec
-        this->send_secret(a.bytes, offset);
+        send_secret(a.bytes, offset);
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
         //pub key
-        memmove(aP.bytes, &this->buffer_recv[0], 32);
+        receive_bytes(aP.bytes, 32);
 
-        #ifdef DEBUG_HWDEVICE
-        hw::ledger::check32("scalarmultKey", "mulkey", (char*)aP_x.bytes, (char*)aP.bytes);
-        #endif
+#ifdef DEBUG_HWDEVICE
+        hw::ledger::check32("scalarmultKey", "mulkey", aP_x.bytes, aP.bytes);
+#endif
 
         return true;
     }
@@ -936,28 +936,26 @@ namespace hw {
     bool device_ledger::scalarmultBase(rct::key &aG, const rct::key &a) {
         auto locks = tools::unique_locks(device_locker, command_locker);
 
-        #ifdef DEBUG_HWDEVICE
-        const rct::key a_x    =  hw::ledger::decrypt(a);
+#ifdef DEBUG_HWDEVICE
+        const rct::key a_x =  hw::ledger::decrypt(a);
+        log_hexbuffer("scalarmultKey: [[IN]]  a ", a_x.bytes, 32);
         rct::key aG_x;
-        log_hexbuffer("scalarmultKey: [[IN]]  a ", (char*)a_x.bytes, 32);       
-        this->controle_device->scalarmultBase(aG_x, a_x);
-        log_hexbuffer("scalarmultKey: [[OUT]] aG", (char*)aG_x.bytes, 32);       
-        #endif
+        debug_device->scalarmultBase(aG_x, a_x);
+        log_hexbuffer("scalarmultKey: [[OUT]] aG", aG_x.bytes, 32);
+#endif
 
         int offset = set_command_header_noopt(INS_SECRET_SCAL_MUL_BASE);
         //sec
-        this->send_secret(a.bytes, offset);
+        send_secret(a.bytes, offset);
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
         //pub key
-        memmove(aG.bytes, &this->buffer_recv[0], 32);
+        receive_bytes(aG.bytes, 32);
 
-        #ifdef DEBUG_HWDEVICE
-        hw::ledger::check32("scalarmultBase", "mulkey", (char*)aG_x.bytes, (char*)aG.bytes);
-        #endif
+#ifdef DEBUG_HWDEVICE
+        hw::ledger::check32("scalarmultBase", "mulkey", aG_x.bytes, aG.bytes);
+#endif
 
         return true;
     }
@@ -966,35 +964,33 @@ namespace hw {
         auto locks = tools::unique_locks(device_locker, command_locker);
         int offset;
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         const crypto::secret_key a_x = hw::ledger::decrypt(a);
         const crypto::secret_key b_x = hw::ledger::decrypt(b);
+        log_hexbuffer("sc_secret_add: [[IN]]  a ", a_x.data, 32);
+        log_hexbuffer("sc_secret_add: [[IN]]  b ", b_x.data, 32);
         crypto::secret_key r_x;
         rct::key aG_x;
-        log_hexbuffer("sc_secret_add: [[IN]]  a ", (char*)a_x.data, 32);       
-        log_hexbuffer("sc_secret_add: [[IN]]  b ", (char*)b_x.data, 32);       
-        this->controle_device->sc_secret_add(r_x, a_x, b_x);
-        log_hexbuffer("sc_secret_add: [[OUT]] aG", (char*)r_x.data, 32);       
-        #endif
+        debug_device->sc_secret_add(r_x, a_x, b_x);
+        log_hexbuffer("sc_secret_add: [[OUT]] aG", r_x.data, 32);
+#endif
 
         offset = set_command_header_noopt(INS_SECRET_KEY_ADD);
         //sec key
-        this->send_secret((unsigned char*)a.data, offset);
+        send_secret(a.data, offset);
         //sec key
-        this->send_secret((unsigned char*)b.data, offset);
+        send_secret(b.data, offset);
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
         //sec key
         offset = 0;
-        this->receive_secret((unsigned char*)r.data, offset);
+        receive_secret(r.data, offset);
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         crypto::secret_key r_clear = hw::ledger::decrypt(r);
         hw::ledger::check32("sc_secret_add", "r", r_x.data, r_clear.data);
-        #endif
+#endif
 
         return true;
     }
@@ -1006,33 +1002,32 @@ namespace hw {
            throw std::runtime_error("device generate key does not support recover");
         }
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         crypto::public_key pub_x;
         crypto::secret_key sec_x;
         crypto::secret_key recovery_key_x;
         if (recover) {
          recovery_key_x = hw::ledger::decrypt(recovery_key);
-         log_hexbuffer("generate_keys: [[IN]] pub", (char*)recovery_key_x.data, 32);       
+         log_hexbuffer("generate_keys: [[IN]] pub", recovery_key_x.data, 32);
         }
-        #endif
+#endif
 
         send_simple(INS_GENERATE_KEYPAIR);
 
         offset = 0;
         //pub key
-        memmove(pub.data, &this->buffer_recv[0], 32);
-        offset += 32;
-        this->receive_secret((unsigned char*)sec.data, offset);
+        receive_bytes(pub.data, 32, offset);
+        receive_secret(sec.data, offset);
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         crypto::secret_key sec_clear = hw::ledger::decrypt(sec);
         sec_x = sec_clear;
-        log_hexbuffer("generate_keys: [[OUT]] pub", (char*)pub.data, 32);       
-        log_hexbuffer("generate_keys: [[OUT]] sec", (char*)sec_clear.data, 32);       
+        log_hexbuffer("generate_keys: [[OUT]] pub", pub.data, 32);
+        log_hexbuffer("generate_keys: [[OUT]] sec", sec_clear.data, 32);
 
         crypto::secret_key_to_public_key(sec_x,pub_x);
         hw::ledger::check32("generate_keys", "pub", pub_x.data, pub.data);
-        #endif
+#endif
 
         return sec;
 
@@ -1042,108 +1037,93 @@ namespace hw {
         auto locks = tools::unique_locks(device_locker, command_locker);
         bool r = false;
 
-        #ifdef DEBUG_HWDEVICE
-        const crypto::public_key pub_x = pub;
-        const crypto::secret_key sec_x = (sec == rct::rct2sk(rct::I)) ? sec: hw::ledger::decrypt(sec);
-        crypto::key_derivation derivation_x;
-        log_hexbuffer("generate_key_derivation: [[IN]]  pub       ", pub_x.data, 32);
+#ifdef DEBUG_HWDEVICE
+        log_hexbuffer("generate_key_derivation: [[IN]]  pub       ", pub.data, 32);
+        const crypto::secret_key sec_x = (sec == rct::rct2sk(rct::I)) ? sec : hw::ledger::decrypt(sec);
         log_hexbuffer("generate_key_derivation: [[IN]]  sec       ", sec_x.data, 32);
-        this->controle_device->generate_key_derivation(pub_x, sec_x, derivation_x);
+        crypto::key_derivation derivation_x;
+        debug_device->generate_key_derivation(pub, sec_x, derivation_x);
         log_hexbuffer("generate_key_derivation: [[OUT]] derivation", derivation_x.data, 32);
-        #endif
+#endif
 
-      if ((this->mode == TRANSACTION_PARSE)  && has_view_key) {
-        //A derivation is resquested in PASRE mode and we have the view key,
-        //so do that wihtout the device and return the derivation unencrypted.
-        MDEBUG( "generate_key_derivation  : PARSE mode with known viewkey");     
+      if (mode == TRANSACTION_PARSE && has_view_key) {
+        //A derivation is requested in PARSE mode and we have the view key,
+        //so do that without the device and return the derivation unencrypted.
+        MDEBUG( "generate_key_derivation  : PARSE mode with known viewkey");
         //Note derivation in PARSE mode can only happen with viewkey, so assert it!
         assert(is_fake_view_key(sec));
-        r = crypto::generate_key_derivation(pub, this->viewkey, derivation);
+        r = crypto::generate_key_derivation(pub, viewkey, derivation);
       } else {
         int offset = set_command_header_noopt(INS_GEN_KEY_DERIVATION);
         //pub
-        memmove(this->buffer_send+offset, pub.data, 32);
-        offset += 32;
+        send_bytes(pub.data, 32, offset);
          //sec
-        this->send_secret((unsigned char*)sec.data, offset);
+        send_secret(sec.data, offset);
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
         offset = 0;
-        //derivattion data
-        this->receive_secret((unsigned char*)derivation.data, offset);
+        //derivation data
+        receive_secret(derivation.data, offset);
 
         r = true;
       }
-      #ifdef DEBUG_HWDEVICE
-      crypto::key_derivation derivation_clear ;
-      if ((this->mode == TRANSACTION_PARSE)  && has_view_key) {
-        derivation_clear  = derivation;
-      } else {
-        derivation_clear  = hw::ledger::decrypt(derivation);
-      }
+#ifdef DEBUG_HWDEVICE
+      crypto::key_derivation derivation_clear =
+        (mode == TRANSACTION_PARSE && has_view_key) ? derivation : hw::ledger::decrypt(derivation);
       hw::ledger::check32("generate_key_derivation", "derivation", derivation_x.data, derivation_clear.data);
-      #endif
+#endif
 
       return r;
     }
 
     bool device_ledger::conceal_derivation(crypto::key_derivation &derivation, const crypto::public_key &tx_pub_key, const std::vector<crypto::public_key> &additional_tx_pub_keys, const crypto::key_derivation &main_derivation, const std::vector<crypto::key_derivation> &additional_derivations) {
-      const crypto::public_key *pkey=NULL;
-      if (derivation == main_derivation) {        
+      const crypto::public_key *pkey = nullptr;
+      if (derivation == main_derivation) {
         pkey = &tx_pub_key;
         MDEBUG("conceal derivation with main tx pub key");
       } else {
-        for(size_t n=0; n < additional_derivations.size();++n) {
-          if(derivation == additional_derivations[n]) {
+        for (size_t n = 0; n < additional_derivations.size(); ++n) {
+          if (derivation == additional_derivations[n]) {
             pkey = &additional_tx_pub_keys[n];
             MDEBUG("conceal derivation with additionnal tx pub key");
             break;
           }
         }
       }
-      ASSERT_X(pkey, "Mismatched derivation on scan info");
-      return this->generate_key_derivation(*pkey,  crypto::null_skey, derivation);
-    } 
+      CHECK_AND_ASSERT_THROW_MES(pkey, "Mismatched derivation on scan info");
+      return generate_key_derivation(*pkey,  crypto::null_skey, derivation);
+    }
 
     bool device_ledger::derivation_to_scalar(const crypto::key_derivation &derivation, const size_t output_index, crypto::ec_scalar &res) {
         auto locks = tools::unique_locks(device_locker, command_locker);
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         const crypto::key_derivation derivation_x = hw::ledger::decrypt(derivation);
-        const size_t output_index_x               = output_index;
-        crypto::ec_scalar res_x;
         log_hexbuffer("derivation_to_scalar: [[IN]]  derivation    ", derivation_x.data, 32);
-        log_message  ("derivation_to_scalar: [[IN]]  output_index  ", std::to_string(output_index_x));
-        this->controle_device->derivation_to_scalar(derivation_x, output_index_x, res_x);
+        log_message  ("derivation_to_scalar: [[IN]]  output_index  ", std::to_string(output_index));
+        crypto::ec_scalar res_x;
+        debug_device->derivation_to_scalar(derivation_x, output_index, res_x);
         log_hexbuffer("derivation_to_scalar: [[OUT]] res          ", res_x.data, 32);
-        #endif
+#endif
 
         int offset = set_command_header_noopt(INS_DERIVATION_TO_SCALAR);
         //derivation
-        this->send_secret((unsigned char*)derivation.data, offset);
+        send_secret(derivation.data, offset);
 
         //index
-        this->buffer_send[offset+0] = output_index>>24;
-        this->buffer_send[offset+1] = output_index>>16;
-        this->buffer_send[offset+2] = output_index>>8;
-        this->buffer_send[offset+3] = output_index>>0;
-        offset += 4;
+        send_u32(output_index, offset);
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
         //derivation data
         offset = 0;
-        this->receive_secret((unsigned char*)res.data, offset);
+        receive_secret(res.data, offset);
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         crypto::ec_scalar res_clear  = hw::ledger::decrypt(res);
         hw::ledger::check32("derivation_to_scalar", "res", res_x.data, res_clear.data);
-        #endif
+#endif
 
         return true;
     }
@@ -1151,84 +1131,68 @@ namespace hw {
     bool device_ledger::derive_secret_key(const crypto::key_derivation &derivation, const std::size_t output_index, const crypto::secret_key &sec, crypto::secret_key &derived_sec) {
         auto locks = tools::unique_locks(device_locker, command_locker);
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         const crypto::key_derivation derivation_x   = hw::ledger::decrypt(derivation);
-        const std::size_t            output_index_x = output_index;
         const crypto::secret_key     sec_x          = hw::ledger::decrypt(sec);
-        crypto::secret_key           derived_sec_x;
         log_hexbuffer("derive_secret_key: [[IN]]  derivation ", derivation_x.data, 32);
-        log_message  ("derive_secret_key: [[IN]]  index      ", std::to_string(output_index_x));
+        log_message  ("derive_secret_key: [[IN]]  index      ", std::to_string(output_index));
         log_hexbuffer("derive_secret_key: [[IN]]  sec        ", sec_x.data, 32);
-        this->controle_device->derive_secret_key(derivation_x, output_index_x, sec_x, derived_sec_x);
+        crypto::secret_key derived_sec_x;
+        debug_device->derive_secret_key(derivation_x, output_index, sec_x, derived_sec_x);
         log_hexbuffer("derive_secret_key: [[OUT]] derived_sec", derived_sec_x.data, 32);
-        #endif
+#endif
 
         int offset = set_command_header_noopt(INS_DERIVE_SECRET_KEY);
         //derivation
-        this->send_secret((unsigned char*)derivation.data, offset);
+        send_secret(derivation.data, offset);
         //index
-        this->buffer_send[offset+0] = output_index>>24;
-        this->buffer_send[offset+1] = output_index>>16;
-        this->buffer_send[offset+2] = output_index>>8;
-        this->buffer_send[offset+3] = output_index>>0;
-        offset += 4;
+        send_u32(output_index, offset);
         //sec
-        this->send_secret((unsigned char*)sec.data, offset);
+        send_secret(sec.data, offset);
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
         offset = 0;
         //sec key
-        this->receive_secret((unsigned char*)derived_sec.data, offset);
+        receive_secret(derived_sec.data, offset);
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         crypto::secret_key derived_sec_clear = hw::ledger::decrypt(derived_sec);
         hw::ledger::check32("derive_secret_key", "derived_sec", derived_sec_x.data, derived_sec_clear.data);
-        #endif
+#endif
 
         return true;
     }
 
     bool device_ledger::derive_public_key(const crypto::key_derivation &derivation, const std::size_t output_index, const crypto::public_key &pub, crypto::public_key &derived_pub){
         auto locks = tools::unique_locks(device_locker, command_locker);
-      
-        #ifdef DEBUG_HWDEVICE
-        const crypto::key_derivation derivation_x   = hw::ledger::decrypt(derivation);
-        const std::size_t            output_index_x = output_index;
-        const crypto::public_key     pub_x        = pub;
-        crypto::public_key           derived_pub_x;
+
+#ifdef DEBUG_HWDEVICE
+        const crypto::key_derivation derivation_x = hw::ledger::decrypt(derivation);
         log_hexbuffer("derive_public_key: [[IN]]  derivation  ", derivation_x.data, 32);
-        log_message  ("derive_public_key: [[IN]]  output_index", std::to_string(output_index_x));
-        log_hexbuffer("derive_public_key: [[IN]]  pub         ", pub_x.data, 32);
-        this->controle_device->derive_public_key(derivation_x, output_index_x, pub_x, derived_pub_x);
+        log_message  ("derive_public_key: [[IN]]  output_index", std::to_string(output_index));
+        log_hexbuffer("derive_public_key: [[IN]]  pub         ", pub.data, 32);
+        crypto::public_key derived_pub_x;
+        debug_device->derive_public_key(derivation_x, output_index, pub, derived_pub_x);
         log_hexbuffer("derive_public_key: [[OUT]] derived_pub ", derived_pub_x.data, 32);
-        #endif
+#endif
 
         int offset = set_command_header_noopt(INS_DERIVE_PUBLIC_KEY);
         //derivation
-        this->send_secret((unsigned char*)derivation.data, offset);
+        send_secret(derivation.data, offset);
         //index
-        this->buffer_send[offset+0] = output_index>>24;
-        this->buffer_send[offset+1] = output_index>>16;
-        this->buffer_send[offset+2] = output_index>>8;
-        this->buffer_send[offset+3] = output_index>>0;
-        offset += 4;
+        send_u32(output_index, offset);
         //pub
-        memmove(this->buffer_send+offset, pub.data, 32);
-        offset += 32;
+        send_bytes(pub.data, 32, offset);
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
         //pub key
-        memmove(derived_pub.data, &this->buffer_recv[0], 32);
+        receive_bytes(derived_pub.data, 32);
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         hw::ledger::check32("derive_public_key", "derived_pub", derived_pub_x.data, derived_pub.data);
-        #endif
+#endif
 
         return true;
     }
@@ -1236,31 +1200,29 @@ namespace hw {
     bool device_ledger::secret_key_to_public_key(const crypto::secret_key &sec, crypto::public_key &pub) {
         auto locks = tools::unique_locks(device_locker, command_locker);
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         const crypto::secret_key sec_x = hw::ledger::decrypt(sec);
-        crypto::public_key       pub_x;
         log_hexbuffer("secret_key_to_public_key: [[IN]] sec ", sec_x.data, 32);
-        bool rc = this->controle_device->secret_key_to_public_key(sec_x, pub_x);
+        crypto::public_key pub_x;
+        bool rc = debug_device->secret_key_to_public_key(sec_x, pub_x);
         log_hexbuffer("secret_key_to_public_key: [[OUT]] pub", pub_x.data, 32);
         if (!rc){
           log_message("FAIL secret_key_to_public_key", "secret_key rejected");
         }
-        #endif
+#endif
 
         int offset = set_command_header_noopt(INS_SECRET_KEY_TO_PUBLIC_KEY);
         //sec key
-        this->send_secret((unsigned char*)sec.data, offset);
+        send_secret(sec.data, offset);
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
         //pub key
-        memmove(pub.data, &this->buffer_recv[0], 32);
+        receive_bytes(pub.data, 32);
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         hw::ledger::check32("secret_key_to_public_key", "pub", pub_x.data, pub.data);
-        #endif
+#endif
 
         return true;
     }
@@ -1268,33 +1230,106 @@ namespace hw {
     bool device_ledger::generate_key_image(const crypto::public_key &pub, const crypto::secret_key &sec, crypto::key_image &image){
         auto locks = tools::unique_locks(device_locker, command_locker);
 
-        #ifdef DEBUG_HWDEVICE
-        const crypto::public_key pub_x = pub;
+#ifdef DEBUG_HWDEVICE
         const crypto::secret_key sec_x = hw::ledger::decrypt(sec);
-        crypto::key_image        image_x;
-        log_hexbuffer("generate_key_image: [[IN]]  pub ", pub_x.data, 32);
+        log_hexbuffer("generate_key_image: [[IN]]  pub ", pub.data, 32);
         log_hexbuffer("generate_key_image: [[IN]]  sec ", sec_x.data, 32);
-        this->controle_device->generate_key_image(pub_x, sec_x, image_x);
+        crypto::key_image image_x;
+        debug_device->generate_key_image(pub, sec_x, image_x);
         log_hexbuffer("generate_key_image: [[OUT]] image ", image_x.data, 32);
-        #endif
+#endif
 
         int offset = set_command_header_noopt(INS_GEN_KEY_IMAGE);
         //pub
-        memmove(this->buffer_send+offset, pub.data, 32);
-        offset += 32;
+        send_bytes(pub.data, 32, offset);
         //sec
-        this->send_secret((unsigned char*)sec.data, offset);
+        send_secret(sec.data, offset);
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
-        //pub key
-        memmove(image.data, &this->buffer_recv[0], 32);
+        //key image
+        receive_bytes(image.data, 32);
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         hw::ledger::check32("generate_key_image", "image", image_x.data, image.data);
-        #endif
+#endif
+
+        return true;
+    }
+
+    bool device_ledger::generate_key_image_signature(const crypto::key_image& image, const crypto::public_key& pub, const crypto::secret_key& sec, crypto::signature& sig) {
+        auto locks = tools::unique_locks(device_locker, command_locker);
+
+        int offset = set_command_header_noopt(INS_GEN_KEY_IMAGE_SIGNATURE);
+        send_bytes(image.data, 32, offset);
+        send_bytes(pub.data, 32, offset);
+        send_secret(sec.data, offset);
+
+        finish_and_exchange(offset);
+
+        receive_bytes(reinterpret_cast<char*>(&sig), 64);
+
+#ifdef DEBUG_HWDEVICE
+        // We can't check the actual returned signature byte values because a random component is
+        // involved, but we *can* attempt to verify the signature
+        bool good = crypto::check_key_image_signature(image, pub, sig);
+        log_hexbuffer("generate_key_image_signature: key image", image.data, 32);
+        log_hexbuffer("generate_key_image_signature: pubkey", pub.data, 32);
+        log_hexbuffer("generate_key_image_signature: signature.c", sig.c.data, 32);
+        log_hexbuffer("generate_key_image_signature: signature.r", sig.r.data, 32);
+        log_message("generate_key_image_signature: signature returned from device", good ? "passed" : "FAILED");
+#endif
+
+        return true;
+    }
+
+    bool device_ledger::generate_unlock_signature(const crypto::public_key& pub, const crypto::secret_key& sec, crypto::signature& sig) {
+        auto locks = tools::unique_locks(device_locker, command_locker);
+
+#ifdef DEBUG_HWDEVICE
+        log_hexbuffer("generate_unlock_signature: [[IN]]  pub ", pub.data, 32);
+        const crypto::secret_key sec_x = hw::ledger::decrypt(sec);
+        log_hexbuffer("generate_unlock_signature: [[IN]]  sec ", sec_x.data, 32);
+#endif
+
+        // Ask for confirmation:
+        int offset = set_command_header_noopt(INS_GEN_UNLOCK_SIGNATURE);
+        CHECK_AND_ASSERT_THROW_MES(finish_and_exchange(offset, true) == SW_OK, "Unlock denied on device.");
+
+        // If we got permission then we can ask for the actual signature:
+        offset = set_command_header_noopt(INS_GEN_UNLOCK_SIGNATURE, 1);
+        send_bytes(pub.data, 32, offset);
+        send_secret(sec.data, offset);
+        finish_and_exchange(offset);
+
+        receive_bytes(reinterpret_cast<char*>(&sig), 64);
+
+#ifdef DEBUG_HWDEVICE
+        // We can't check the actual returned signature byte values because a random component is
+        // involved, but we *can* attempt to verify the signature
+        bool good = crypto::check_signature(cryptonote::tx_extra_tx_key_image_unlock::HASH, pub, sig);
+        log_hexbuffer("generate_unlock_signature: signature.c", sig.c.data, 32);
+        log_hexbuffer("generate_unlock_signature: signature.r", sig.r.data, 32);
+        log_message("generate_unlock_signature: signature returned from device", good ? "passed" : "FAILED");
+#endif
+
+        return true;
+    }
+
+    bool device_ledger::generate_lns_signature(std::string_view sig_data, const cryptonote::account_keys& keys, const cryptonote::subaddress_index& index, crypto::signature& sig) {
+        // Initialize (prompts the user):
+        int offset = set_command_header_noopt(INS_GEN_LNS_SIGNATURE);
+        CHECK_AND_ASSERT_THROW_MES(finish_and_exchange(offset, true) == SW_OK, "LNS denied on device.");
+
+        // Send lns signature data to be hashed:
+        exchange_multipart_data(INS_GEN_LNS_SIGNATURE, 1, sig_data, BLAKE2B_HASH_CHUNK_SIZE);
+
+        // Send the subaddr indices and get the signature:
+        offset = set_command_header_noopt(INS_GEN_LNS_SIGNATURE, 2);
+        send_bytes(&index, sizeof(index), offset);
+        finish_and_exchange(offset);
+
+        receive_bytes(reinterpret_cast<char*>(&sig), 64);
 
         return true;
     }
@@ -1303,120 +1338,123 @@ namespace hw {
     /*                               TRANSACTION                               */
     /* ======================================================================= */
 
-    void device_ledger::generate_tx_proof(const crypto::hash &prefix_hash, 
+    void device_ledger::generate_tx_proof(const crypto::hash &prefix_hash,
                                           const crypto::public_key &R, const crypto::public_key &A, const std::optional<crypto::public_key> &B, const crypto::public_key &D, const crypto::secret_key &r,
                                           crypto::signature &sig)  {
 
       auto locks = tools::unique_locks(device_locker, command_locker);
 
-      #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
       const crypto::hash prefix_hash_x = prefix_hash;
       const crypto::public_key R_x = R;
       const crypto::public_key A_x = A;
       const std::optional<crypto::public_key> B_x = B;
       const crypto::public_key D_x = D;
-      const crypto::secret_key r_x = hw::ledger::decrypt(r); 
+      const crypto::secret_key r_x = hw::ledger::decrypt(r);
       crypto::signature sig_x;
       log_hexbuffer("generate_tx_proof: [[IN]]  prefix_hash ", prefix_hash_x.data, 32);
       log_hexbuffer("generate_tx_proof: [[IN]]  R ", R_x.data, 32);
       log_hexbuffer("generate_tx_proof: [[IN]]  A ", A_x.data, 32);
-      if (B_x) {
-        log_hexbuffer("generate_tx_proof: [[IN]]  B ", (*B_x).data, 32);
-      }
+      if (B_x)
+        log_hexbuffer("generate_tx_proof: [[IN]]  B ", B_x->data, 32);
       log_hexbuffer("generate_tx_proof: [[IN]]  D ", D_x.data, 32);
-      log_hexbuffer("generate_tx_proof: [[IN]]  r ", r_x.data, 32);       
-      #endif
+      log_hexbuffer("generate_tx_proof: [[IN]]  r ", r_x.data, 32);
+#endif
 
-         
+
       int offset = set_command_header(INS_GET_TX_PROOF);
       //options
-      this->buffer_send[offset] = B?0x01:0x00;
-      offset += 1;   
-      //prefix_hash
-      memmove(&this->buffer_send[offset], prefix_hash.data, 32);
-      offset += 32;
-      // R
-      memmove(&this->buffer_send[offset], R.data, 32);
-      offset += 32;
-      // A
-      memmove(&this->buffer_send[offset], A.data, 32);
-      offset += 32;
-      // B
-      if (B) {
-        memmove(&this->buffer_send[offset], (*B).data, 32);
-      } else {
-        memset(&this->buffer_send[offset], 0, 32);
-      }
-      offset += 32;
-      // D
-      memmove(&this->buffer_send[offset], D.data, 32);
-      offset += 32;
-      // r
-      this->send_secret((unsigned char*)r.data, offset);
+      buffer_send[offset++] = B ? 0x01 : 0x00;
+      send_bytes(prefix_hash.data, 32, offset);                     // prefix_hash
+      send_bytes(R.data, 32, offset);                               // R
+      send_bytes(A.data, 32, offset);                               // A
+      send_bytes(B ? B->data : crypto::null_pkey.data, 32, offset); // B
+      send_bytes(D.data, 32, offset);                               // D
+      send_secret(r.data, offset);                                  // r
 
-      this->buffer_send[4] = offset-5;
-      this->length_send = offset;
-      this->exchange();
+      finish_and_exchange(offset);
 
-      memmove(sig.c.data, &this->buffer_recv[0], 32);
-      memmove(sig.r.data, &this->buffer_recv[32], 32);
-      #ifdef DEBUG_HWDEVICE      
-      log_hexbuffer("GENERATE_TX_PROOF: **c**   ", sig.c.data, sizeof( sig.c.data));
-      log_hexbuffer("GENERATE_TX_PROOF: **r**   ", sig.r.data, sizeof( sig.r.data));
+      offset = 0;
+      receive_bytes(sig.c.data, 32, offset);
+      receive_bytes(sig.r.data, 32, offset);
+#ifdef DEBUG_HWDEVICE
+      log_hexbuffer("GENERATE_TX_PROOF: **c**   ", sig.c.data, sizeof(sig.c.data));
+      log_hexbuffer("GENERATE_TX_PROOF: **r**   ", sig.r.data, sizeof(sig.r.data));
 
-      this->controle_device->generate_tx_proof(prefix_hash_x, R_x, A_x, B_x, D_x, r_x, sig_x);      
+      debug_device->generate_tx_proof(prefix_hash_x, R_x, A_x, B_x, D_x, r_x, sig_x);
       MDEBUG("FAIL is normal if random is not fixed in proof");
       hw::ledger::check32("generate_tx_proof", "c", sig_x.c.data, sig.c.data);
       hw::ledger::check32("generate_tx_proof", "r", sig_x.r.data, sig.r.data);
 
-      #endif
+#endif
     }
 
-    bool device_ledger::open_tx(crypto::secret_key &tx_key) {
+    bool device_ledger::open_tx(crypto::secret_key &tx_key, cryptonote::txversion txversion, cryptonote::txtype txtype) {
         auto locks = tools::unique_locks(device_locker, command_locker, *this);
 
         key_map.clear();
         hmac_map.clear();
-        this->tx_in_progress = true;
+        tx_in_progress = true;
         int offset = set_command_header_noopt(INS_OPEN_TX, 0x01);
 
-        //account
-        this->buffer_send[offset+0] = 0x00;
-        this->buffer_send[offset+1] = 0x00;
-        this->buffer_send[offset+2] = 0x00;
-        this->buffer_send[offset+3] = 0x00;
-        offset += 4;
+        send_u16(static_cast<uint16_t>(txversion), offset);
+        send_u16(static_cast<uint16_t>(txtype), offset);
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
         //skip R, receive: r, r_hmac, fake_a, a_hmac, fake_b, hmac_b
         unsigned char tmp[32];
         offset = 32;
-        this->receive_secret((unsigned char*)tx_key.data, offset);
-        this->receive_secret(tmp, offset);
-        this->receive_secret(tmp, offset);
+        receive_secret(tx_key.data, offset);
+        receive_secret(tmp, offset);
+        receive_secret(tmp, offset);
 
-        #ifdef DEBUG_HWDEVICE
-        const crypto::secret_key r_x = hw::ledger::decrypt(tx_key); 
-        log_hexbuffer("open_tx: [[OUT]] R ", (char*)&this->buffer_recv[0], 32);
+#ifdef DEBUG_HWDEVICE
+        const crypto::secret_key r_x = hw::ledger::decrypt(tx_key);
+        log_hexbuffer("open_tx: [[OUT]] R ", buffer_recv, 32);
         log_hexbuffer("open_tx: [[OUT]] r ", r_x.data, 32);
-        #endif
+#endif
         return true;
+    }
+
+    // Sends data in chunks using the given ins/p1 values, with p2 set to a sequence
+    // 1->2->....->255->1->...->0 so that the hw device can make sure it didn't miss anything.
+    // (Note the wrapping goes 255->1, not 255->0, as 0 always indicates the last piece).
+    // Max chunk size is 254 bytes.
+    void device_ledger::exchange_multipart_data(uint8_t ins, uint8_t p1, std::string_view data, uint8_t chunk_size) {
+      assert(chunk_size <= 254);
+      size_t cnt = 0;
+      while (!data.empty()) {
+        auto piece = data.substr(0, chunk_size);
+        data.remove_prefix(piece.size());
+        if (data.empty())
+          cnt = 0; // Signals last piece
+        else
+          cnt = cnt == 255 ? 1 : cnt + 1;
+
+        int offset = set_command_header_noopt(ins, p1, cnt);
+        send_bytes(piece.data(), piece.size(), offset);
+        finish_and_exchange(offset);
+      }
     }
 
     void device_ledger::get_transaction_prefix_hash(const cryptonote::transaction_prefix& tx, crypto::hash& h) {
       auto locks = tools::unique_locks(device_locker, command_locker);
-      
-      int pref_length = 0, pref_offset = 0, offset = 0;
 
-      #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
       crypto::hash h_x;
-      this->controle_device->get_transaction_prefix_hash(tx,h_x);
-      MDEBUG("get_transaction_prefix_hash [[IN]] h_x/1 "<<h_x);
-      #endif
-    
+      debug_device->get_transaction_prefix_hash(tx, h_x);
+      MDEBUG("get_transaction_prefix_hash [[IN]] h_x/1 " << h_x);
+#endif
+
+      // As of protocol version 4, we send:
+      // - tx version
+      // - tx type (transfer, registration, stake, lns)
+      // - tx lock time (if the tx has multiple lock times this will be the largest one)
+      // We then wait for confirmation from the device, and if we get it we continue by sending the
+      // data in chunks.  The last chunk will have a p2 subparameter of 0;
+      // otherwise the p2 subparameters are in order starting at 1 (and, if we wrap, we go from 255->1).
+
       std::string tx_prefix;
       try {
         tx_prefix = serialization::dump_binary(const_cast<cryptonote::transaction_prefix&>(tx));
@@ -1424,155 +1462,120 @@ namespace hw {
         ASSERT_MES_AND_THROW("unable to serialize transaction prefix: " << e.what());
       }
 
-      pref_length = tx_prefix.size();
-      const unsigned char* pref = reinterpret_cast<const unsigned char*>(tx_prefix.c_str());
+      unsigned char* send = buffer_send + set_command_header_noopt(INS_PREFIX_HASH, 1);
 
-      offset = set_command_header_noopt(INS_PREFIX_HASH,1);
-      pref_offset = 0;
-      unsigned char v;
+      // version as varint
+      tools::write_varint(send, static_cast<std::underlying_type_t<cryptonote::txversion>>(tx.version));
 
-      //version as varint     
-      do {
-        v = pref[pref_offset];
-        this->buffer_send[offset] = v;
-        offset += 1;
-        pref_offset += 1;
-      } while (v&0x80);
+      // transaction type as varint
+      tools::write_varint(send, static_cast<std::underlying_type_t<cryptonote::txtype>>(tx.type));
 
-      //locktime as var int
-      do {
-        v = pref[pref_offset];
-        this->buffer_send[offset] = v;
-        offset += 1;
-        pref_offset += 1;
-      } while (v&0x80);
+      // Transactions can have multiple unlock times; find the longest one and send that
+      uint64_t max_unlock = 0;
+      for (size_t i = 0; i < tx.vout.size(); i++)
+        max_unlock = std::max(max_unlock, tx.get_unlock_time(i));
+      tools::write_varint(send, max_unlock);
 
-      this->buffer_send[4] = offset-5;
-      this->length_send = offset;
-      this->exchange_wait_on_input();
+      length_send = send - buffer_send;
+      buffer_send[4] = length_send - 5;
+      exchange(true);
 
-      //hash remains
-      int cnt = 0;
-      while (pref_offset < pref_length) {
-        int len;
-        cnt++;
-        offset = set_command_header(INS_PREFIX_HASH,2,cnt);      
-        len = pref_length - pref_offset;
-        //options
-        if (len > (BUFFER_SEND_SIZE-7)) {
-          len = BUFFER_SEND_SIZE-7;
-          this->buffer_send[offset] = 0x80;
-        } else {
-          this->buffer_send[offset] = 0x00;
-        }
-        offset += 1;
-        //send chunk
-        memmove(&this->buffer_send[offset], pref+pref_offset, len);
-        offset += len;
-        pref_offset += len;
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
-      }
-      memmove(h.data, &this->buffer_recv[0], 32);
-      
-      #ifdef DEBUG_HWDEVICE
+      // hash the full prefix
+      exchange_multipart_data(INS_PREFIX_HASH, 2, tx_prefix, KECCAK_HASH_CHUNK_SIZE);
+
+      receive_bytes(h.data, 32);
+
+#ifdef DEBUG_HWDEVICE
       hw::ledger::check8("prefix_hash", "h", h_x.data, h.data);
-      #endif
+#endif
     }
 
     bool device_ledger::encrypt_payment_id(crypto::hash8 &payment_id, const crypto::public_key &public_key, const crypto::secret_key &secret_key) {
         auto locks = tools::unique_locks(device_locker, command_locker);
 
-        #ifdef DEBUG_HWDEVICE
-        const crypto::public_key public_key_x = public_key;
+#ifdef DEBUG_HWDEVICE
         const crypto::secret_key secret_key_x = hw::ledger::decrypt(secret_key);
-        crypto::hash8 payment_id_x = payment_id;
-        log_hexbuffer("encrypt_payment_id: [[IN]] payment_id ", payment_id_x.data, 32);
-        log_hexbuffer("encrypt_payment_id: [[IN]] public_key ", public_key_x.data, 32);
+        log_hexbuffer("encrypt_payment_id: [[IN]] payment_id ", payment_id.data, 32);
+        log_hexbuffer("encrypt_payment_id: [[IN]] public_key ", public_key.data, 32);
         log_hexbuffer("encrypt_payment_id: [[IN]] secret_key ", secret_key_x.data, 32);
-        this->controle_device->encrypt_payment_id(payment_id_x, public_key_x, secret_key_x);
+        crypto::hash8 payment_id_x = payment_id;
+        debug_device->encrypt_payment_id(payment_id_x, public_key, secret_key_x);
         log_hexbuffer("encrypt_payment_id: [[OUT]] payment_id ", payment_id_x.data, 32);
-        #endif
+#endif
 
-        int offset = set_command_header_noopt(INS_STEALTH);
-        //pub
-        memmove(&this->buffer_send[offset], public_key.data, 32);
-        offset += 32;
-        //sec
-        this->send_secret((unsigned char*)secret_key.data, offset);
-        //id
-        memmove(&this->buffer_send[offset], payment_id.data, 8);
-        offset += 8;
+        int offset = set_command_header_noopt(INS_ENCRYPT_PAYMENT_ID);
+        send_bytes(public_key.data, 32, offset); // pub
+        send_secret(secret_key.data, offset); //sec
+        send_bytes(payment_id.data, 8, offset); //id
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
-        memmove(payment_id.data, &this->buffer_recv[0], 8);
+        finish_and_exchange(offset);
+        receive_bytes(payment_id.data, 8);
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         hw::ledger::check8("stealth", "payment_id", payment_id_x.data, payment_id.data);
-        #endif
+#endif
 
         return true;
     }
 
 
-    bool device_ledger::generate_output_ephemeral_keys(const size_t tx_version, bool &found_change, const cryptonote::account_keys &sender_account_keys, const crypto::public_key &txkey_pub,  const crypto::secret_key &tx_key,
-                                                       const cryptonote::tx_destination_entry &dst_entr, const std::optional<cryptonote::tx_destination_entry> &change_addr, const size_t output_index,
-                                                       const bool &need_additional_txkeys,  const std::vector<crypto::secret_key> &additional_tx_keys,
-                                                       std::vector<crypto::public_key> &additional_tx_public_keys,
-                                                       std::vector<rct::key> &amount_keys,
-                                                       crypto::public_key &out_eph_public_key) {
+    bool device_ledger::generate_output_ephemeral_keys(
+        const size_t tx_version,
+        bool& found_change,
+        const cryptonote::account_keys& sender_account_keys,
+        const crypto::public_key& txkey_pub,
+        const crypto::secret_key& tx_key,
+        const cryptonote::tx_destination_entry& dst_entr,
+        const std::optional<cryptonote::tx_destination_entry>& change_addr,
+        const size_t output_index,
+        const bool need_additional_txkeys,
+        const std::vector<crypto::secret_key>& additional_tx_keys,
+        std::vector<crypto::public_key>& additional_tx_public_keys,
+        std::vector<rct::key>& amount_keys,
+        crypto::public_key& out_eph_public_key) {
+
       auto locks = tools::unique_locks(device_locker, command_locker);
 
-      #ifdef DEBUG_HWDEVICE
-      const size_t                             &tx_version_x                   = tx_version;
-      const cryptonote::account_keys           sender_account_keys_x          = hw::ledger::decrypt(sender_account_keys);
-      memmove((void*)sender_account_keys_x.m_view_secret_key.data, dbg_viewkey.data, 32);
+#ifdef DEBUG_HWDEVICE
+      cryptonote::account_keys sender_account_keys_x = hw::ledger::decrypt(sender_account_keys);
+      std::memmove(sender_account_keys_x.m_view_secret_key.data, dbg_viewkey.data, 32);
 
-      const crypto::public_key                 txkey_pub_x                    = txkey_pub;
-      const crypto::secret_key                 tx_key_x                       = hw::ledger::decrypt(tx_key);
-      const cryptonote::tx_destination_entry   dst_entr_x                     = dst_entr;
-      const std::optional<cryptonote::tx_destination_entry> change_addr_x     = change_addr;
-      const size_t                             output_index_x                 = output_index;
-      const bool                               need_additional_txkeys_x       = need_additional_txkeys;
-      
-      std::vector<crypto::secret_key>    additional_tx_keys_x;
-      for (const auto k: additional_tx_keys) {
+      const crypto::secret_key tx_key_x = hw::ledger::decrypt(tx_key);
+
+      std::vector<crypto::secret_key> additional_tx_keys_x;
+      for (const auto& k: additional_tx_keys) {
         additional_tx_keys_x.push_back(hw::ledger::decrypt(k));
       }
-      
-      std::vector<crypto::public_key>          additional_tx_public_keys_x;
-      std::vector<rct::key>                    amount_keys_x;
-      crypto::public_key                       out_eph_public_key_x;
 
-      log_message  ("generate_output_ephemeral_keys: [[IN]] tx_version", std::to_string(tx_version_x));
+      log_message("generate_output_ephemeral_keys: [[IN]] tx_version", std::to_string(tx_version));
       //log_hexbuffer("generate_output_ephemeral_keys: [[IN]] sender_account_keys.view", sender_account_keys.m_sview_secret_key.data, 32);
       //log_hexbuffer("generate_output_ephemeral_keys: [[IN]] sender_account_keys.spend", sender_account_keys.m_spend_secret_key.data, 32);
-      log_hexbuffer("generate_output_ephemeral_keys: [[IN]] txkey_pub", txkey_pub_x.data, 32);
+      log_hexbuffer("generate_output_ephemeral_keys: [[IN]] txkey_pub", txkey_pub.data, 32);
       log_hexbuffer("generate_output_ephemeral_keys: [[IN]] tx_key", tx_key_x.data, 32);
-      log_hexbuffer("generate_output_ephemeral_keys: [[IN]] dst_entr.view", dst_entr_x.addr.m_view_public_key.data, 32);
-      log_hexbuffer("generate_output_ephemeral_keys: [[IN]] dst_entr.spend", dst_entr_x.addr.m_spend_public_key.data, 32);
+      log_hexbuffer("generate_output_ephemeral_keys: [[IN]] dst_entr.view", dst_entr.addr.m_view_public_key.data, 32);
+      log_hexbuffer("generate_output_ephemeral_keys: [[IN]] dst_entr.spend", dst_entr.addr.m_spend_public_key.data, 32);
       if (change_addr) {
-        log_hexbuffer("generate_output_ephemeral_keys: [[IN]] change_addr.view", (*change_addr_x).m_view_public_key.data, 32);
-        log_hexbuffer("generate_output_ephemeral_keys: [[IN]] change_addr.spend", (*change_addr_x).m_spend_public_key.data, 32);
+        log_hexbuffer("generate_output_ephemeral_keys: [[IN]] change_addr.view", change_addr->addr.m_view_public_key.data, 32);
+        log_hexbuffer("generate_output_ephemeral_keys: [[IN]] change_addr.spend", change_addr->addr.m_spend_public_key.data, 32);
       }
-      log_message  ("generate_output_ephemeral_keys: [[IN]] output_index",  std::to_string(output_index_x));
-      log_message  ("generate_output_ephemeral_keys: [[IN]] need_additional_txkeys",  std::to_string(need_additional_txkeys_x));
-      if(need_additional_txkeys_x) {
+      log_message("generate_output_ephemeral_keys: [[IN]] output_index",  std::to_string(output_index));
+      log_message("generate_output_ephemeral_keys: [[IN]] need_additional_txkeys",  std::to_string(need_additional_txkeys));
+      if (need_additional_txkeys) {
         log_hexbuffer("generate_output_ephemeral_keys: [[IN]] additional_tx_keys[oi]", additional_tx_keys_x[output_index].data, 32);
       }
-      this->controle_device->generate_output_ephemeral_keys(tx_version_x, sender_account_keys_x, txkey_pub_x, tx_key_x, dst_entr_x, change_addr_x, output_index_x, need_additional_txkeys_x,  additional_tx_keys_x,
-                                                            additional_tx_public_keys_x, amount_keys_x, out_eph_public_key_x);
-      if(need_additional_txkeys_x) {
+      std::vector<crypto::public_key> additional_tx_public_keys_x;
+      std::vector<rct::key> amount_keys_x;
+      crypto::public_key out_eph_public_key_x;
+      debug_device->generate_output_ephemeral_keys(tx_version, found_change, sender_account_keys_x, txkey_pub, tx_key_x, dst_entr, change_addr, output_index, need_additional_txkeys,  additional_tx_keys_x,
+          additional_tx_public_keys_x, amount_keys_x, out_eph_public_key_x);
+      if(need_additional_txkeys) {
         log_hexbuffer("additional_tx_public_keys_x: [[OUT]] additional_tx_public_keys_x", additional_tx_public_keys_x.back().data, 32);
       }
-      log_hexbuffer("generate_output_ephemeral_keys: [[OUT]] amount_keys ", (char*)amount_keys_x.back().bytes, 32);
+      log_hexbuffer("generate_output_ephemeral_keys: [[OUT]] amount_keys ", amount_keys_x.back().bytes, 32);
       log_hexbuffer("generate_output_ephemeral_keys: [[OUT]] out_eph_public_key ", out_eph_public_key_x.data, 32);
-      #endif
+#endif
 
-      ASSERT_X(tx_version > 1, "TX version not supported"<<tx_version);
+      CHECK_AND_ASSERT_THROW_MES(tx_version > 1, "TX version not supported"<<tx_version);
 
       // make additional tx pubkey if necessary
       cryptonote::keypair additional_txkey;
@@ -1586,88 +1589,58 @@ namespace hw {
         is_change = true; // sending change to yourself; derivation = a*R
 
       int offset = set_command_header_noopt(INS_GEN_TXOUT_KEYS);
-      //tx_version
-      this->buffer_send[offset+0] = tx_version>>24;
-      this->buffer_send[offset+1] = tx_version>>16;
-      this->buffer_send[offset+2] = tx_version>>8;
-      this->buffer_send[offset+3] = tx_version>>0;
-      offset += 4;
-      //tx_key
-      this->send_secret((unsigned char*)tx_key.data, offset);
-      //txkey_pub
-      memmove(&this->buffer_send[offset], txkey_pub.data, 32);
-      offset += 32;
-      //Aout
-      memmove(&this->buffer_send[offset], dst_entr.addr.m_view_public_key.data, 32);
-      offset += 32;
-      //Bout
-      memmove(&this->buffer_send[offset], dst_entr.addr.m_spend_public_key.data, 32);
-      offset += 32;
-      //output index
-      this->buffer_send[offset+0] = output_index>>24;
-      this->buffer_send[offset+1] = output_index>>16;
-      this->buffer_send[offset+2] = output_index>>8;
-      this->buffer_send[offset+3] = output_index>>0;
-      offset += 4;
-      //is_change,
-      this->buffer_send[offset] = is_change;
-      offset++;
-      //is_subaddress
-      this->buffer_send[offset] = dst_entr.is_subaddress;
-      offset++;
-      //need_additional_key
-      this->buffer_send[offset] = need_additional_txkeys;
-      offset++;
+      send_u32(tx_version, offset); //tx_version
+      send_secret(tx_key.data, offset); //tx_key
+      send_bytes(txkey_pub.data, 32, offset); //txkey_pub
+      send_bytes(dst_entr.addr.m_view_public_key.data, 32, offset); //Aout
+      send_bytes(dst_entr.addr.m_spend_public_key.data, 32, offset); //Bout
+      send_u32(output_index, offset); //output index
+      buffer_send[offset++] = is_change; //is_change
+      buffer_send[offset++] = dst_entr.is_subaddress; //is_subaddress
+      buffer_send[offset++] = need_additional_txkeys; //need_additional_key
       //additional_tx_key
-      if (need_additional_txkeys) {
-        this->send_secret((unsigned char*)additional_txkey.sec.data, offset);
-      } else {
-        memset(&this->buffer_send[offset], 0, 32);
-        offset += 32;
-      }
+      if (need_additional_txkeys)
+        send_secret(additional_txkey.sec.data, offset);
 
-      this->buffer_send[4] = offset-5;
-      this->length_send = offset;
-      this->exchange();
+      finish_and_exchange(offset);
 
       offset = 0;
-      unsigned int recv_len = this->length_recv;
-      
+      unsigned int recv_len = length_recv;
+
       //if (tx_version > 1)
       {
-        ASSERT_X(recv_len>=32, "Not enought data from device");
+        CHECK_AND_ASSERT_THROW_MES(recv_len>=32, "Not enough data from device");
         crypto::secret_key scalar1;
-        this->receive_secret((unsigned char*)scalar1.data, offset);
+        receive_secret(scalar1.data, offset);
         amount_keys.push_back(rct::sk2rct(scalar1));
         recv_len -= 32;
       }
-      ASSERT_X(recv_len>=32, "Not enought data from device");
-      memmove(out_eph_public_key.data, &this->buffer_recv[offset], 32);
+      CHECK_AND_ASSERT_THROW_MES(recv_len>=32, "Not enough data from device");
+      receive_bytes(out_eph_public_key.data, 32, offset);
       recv_len -= 32;
-      offset += 32;
 
       if (need_additional_txkeys)
       {
-        ASSERT_X(recv_len>=32, "Not enought data from device");
-        memmove(additional_txkey.pub.data, &this->buffer_recv[offset], 32);
+        CHECK_AND_ASSERT_THROW_MES(recv_len>=32, "Not enough data from device");
+        receive_bytes(additional_txkey.pub.data, 32, offset);
         additional_tx_public_keys.push_back(additional_txkey.pub);
-        offset += 32;
         recv_len -= 32;
       }
 
       // add ABPkeys
-      this->add_output_key_mapping(dst_entr.addr.m_view_public_key, dst_entr.addr.m_spend_public_key, dst_entr.is_subaddress, is_change,
-                                   need_additional_txkeys, output_index,
-                                   amount_keys.back(), out_eph_public_key);
+      add_output_key_mapping(dst_entr.addr.m_view_public_key, dst_entr.addr.m_spend_public_key, dst_entr.is_subaddress, is_change,
+                             need_additional_txkeys, output_index,
+                             amount_keys.back(), out_eph_public_key);
 
-      #ifdef DEBUG_HWDEVICE
-      log_hexbuffer("generate_output_ephemeral_keys: clear amount_key", (const char*)hw::ledger::decrypt(amount_keys.back()).bytes, 32);
-      hw::ledger::check32("generate_output_ephemeral_keys", "amount_key", (const char*)amount_keys_x.back().bytes, (const char*)hw::ledger::decrypt(amount_keys.back()).bytes);
+#ifdef DEBUG_HWDEVICE
+      rct::key amount_back = hw::ledger::decrypt(amount_keys.back());
+      log_hexbuffer("generate_output_ephemeral_keys: clear amount_key", amount_back.bytes, 32);
+      hw::ledger::check32("generate_output_ephemeral_keys", "amount_key", amount_keys_x.back().bytes, amount_back.bytes);
       if (need_additional_txkeys) {
         hw::ledger::check32("generate_output_ephemeral_keys", "additional_tx_key", additional_tx_public_keys_x.back().data, additional_tx_public_keys.back().data);
       }
       hw::ledger::check32("generate_output_ephemeral_keys", "out_eph_public_key", out_eph_public_key_x.data, out_eph_public_key.data);
-      #endif
+#endif
 
       return true;
     }
@@ -1680,455 +1653,193 @@ namespace hw {
     }
 
     rct::key device_ledger::genCommitmentMask(const rct::key &AKout) {
-        #ifdef DEBUG_HWDEVICE
-        const rct::key AKout_x =  hw::ledger::decrypt(AKout);
-        rct::key mask_x;
-        mask_x = this->controle_device->genCommitmentMask(AKout_x);
-        #endif
+#ifdef DEBUG_HWDEVICE
+        rct::key mask_x = debug_device->genCommitmentMask(hw::ledger::decrypt(AKout));
+#endif
 
         rct::key mask;
         int offset = set_command_header_noopt(INS_GEN_COMMITMENT_MASK);
         // AKout
-        this->send_secret(AKout.bytes, offset);
+        send_secret(AKout.bytes, offset);
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
-        memmove(mask.bytes, &this->buffer_recv[0],  32);
+        receive_bytes(mask.bytes, 32);
 
-        #ifdef DEBUG_HWDEVICE
-        hw::ledger::check32("genCommitmentMask", "mask", (const char*)mask_x.bytes, (const char*)mask.bytes);
-        #endif
-        
+#ifdef DEBUG_HWDEVICE
+        hw::ledger::check32("genCommitmentMask", "mask", mask_x.bytes, mask.bytes);
+#endif
+
         return mask;
     }
 
-    bool  device_ledger::ecdhEncode(rct::ecdhTuple & unmasked, const rct::key & AKout, bool short_amount) {
+    bool  device_ledger::ecdhEncode(rct::ecdhTuple& unmasked, const rct::key& AKout, bool short_amount) {
         auto locks = tools::unique_locks(device_locker, command_locker);
 
-        #ifdef DEBUG_HWDEVICE
-        const rct::key AKout_x =   hw::ledger::decrypt(AKout);
+#ifdef DEBUG_HWDEVICE
+        const rct::key AKout_x = hw::ledger::decrypt(AKout);
         rct::ecdhTuple unmasked_x = unmasked;
-        this->controle_device->ecdhEncode(unmasked_x, AKout_x, short_amount);
-        #endif
+        debug_device->ecdhEncode(unmasked_x, AKout_x, short_amount);
+#endif
 
         int offset = set_command_header(INS_BLIND);
-        //options
-        this->buffer_send[offset] = short_amount?0x02:0x00;
-        offset += 1;        
-        // AKout
-        this->send_secret(AKout.bytes, offset);
-        //mask k
-        memmove(this->buffer_send+offset, unmasked.mask.bytes, 32);
-        offset += 32;
-        //value v
-        memmove(this->buffer_send+offset, unmasked.amount.bytes, 32);
-        offset += 32;
+        buffer_send[offset++] = short_amount ? 0x02 : 0x00; //options
+        send_secret(AKout.bytes, offset); // AKout
+        send_bytes(unmasked.mask.bytes, 32, offset); //mask k
+        send_bytes(unmasked.amount.bytes, 32, offset); //value v
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
-        memmove(unmasked.amount.bytes, &this->buffer_recv[0],  32);
-        memmove(unmasked.mask.bytes,  &this->buffer_recv[32], 32);
+        offset = 0;
+        receive_bytes(unmasked.amount.bytes, 32, offset);
+        receive_bytes(unmasked.mask.bytes, 32, offset);
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         MDEBUG("ecdhEncode: Akout: "<<AKout_x);
-        hw::ledger::check32("ecdhEncode", "amount", (char*)unmasked_x.amount.bytes, (char*)unmasked.amount.bytes);
-        hw::ledger::check32("ecdhEncode", "mask", (char*)unmasked_x.mask.bytes, (char*)unmasked.mask.bytes);
+        hw::ledger::check32("ecdhEncode", "amount", unmasked_x.amount.bytes, unmasked.amount.bytes);
+        hw::ledger::check32("ecdhEncode", "mask", unmasked_x.mask.bytes, unmasked.mask.bytes);
 
-        log_hexbuffer("Blind AKV input", (char*)&this->buffer_recv[64], 3*32);
-        #endif
+        log_hexbuffer("Blind AKV input", &buffer_recv[64], 3*32);
+#endif
 
         return true;
     }
 
-    bool  device_ledger::ecdhDecode(rct::ecdhTuple & masked, const rct::key & AKout, bool short_amount) {
+    bool  device_ledger::ecdhDecode(rct::ecdhTuple& masked, const rct::key& AKout, bool short_amount) {
         auto locks = tools::unique_locks(device_locker, command_locker);
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         const rct::key AKout_x =   hw::ledger::decrypt(AKout);
         rct::ecdhTuple masked_x = masked;
-        this->controle_device->ecdhDecode(masked_x, AKout_x, short_amount);
-        #endif
+        debug_device->ecdhDecode(masked_x, AKout_x, short_amount);
+#endif
 
         int offset = set_command_header(INS_UNBLIND);
-        //options
-        this->buffer_send[offset] = short_amount?0x02:0x00;
-        offset += 1;        
-        // AKout
-        this->send_secret(AKout.bytes, offset);
-        //mask k
-        memmove(this->buffer_send+offset, masked.mask.bytes, 32);
-        offset += 32;
-        //value v
-        memmove(this->buffer_send+offset, masked.amount.bytes, 32);
-        offset += 32;
+        buffer_send[offset++] = short_amount ? 0x02 : 0x00; //options
+        send_secret(AKout.bytes, offset); // AKout
+        send_bytes(masked.mask.bytes, 32, offset); //mask k
+        send_bytes(masked.amount.bytes, 32, offset); //value v
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
-        memmove(masked.amount.bytes, &this->buffer_recv[0],  32);
-        memmove(masked.mask.bytes,  &this->buffer_recv[32], 32);
+        offset = 0;
+        receive_bytes(masked.amount.bytes, 32, offset);
+        receive_bytes(masked.mask.bytes, 32, offset);
 
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         MDEBUG("ecdhEncode: Akout: "<<AKout_x);
-        hw::ledger::check32("ecdhDecode", "amount", (char*)masked_x.amount.bytes, (char*)masked.amount.bytes);
-        hw::ledger::check32("ecdhDecode", "mask", (char*)masked_x.mask.bytes,(char*) masked.mask.bytes);
-        #endif
+        hw::ledger::check32("ecdhDecode", "amount", masked_x.amount.bytes, masked.amount.bytes);
+        hw::ledger::check32("ecdhDecode", "mask", masked_x.mask.bytes, masked.mask.bytes);
+#endif
 
         return true;
     }
 
-    bool device_ledger::mlsag_prehash(const std::string &blob, size_t inputs_size, size_t outputs_size,
+    bool device_ledger::clsag_prehash(const std::string &data, size_t inputs_size, size_t outputs_size,
                                      const rct::keyV &hashes, const rct::ctkeyV &outPk,
                                      rct::key &prehash) {
         auto locks = tools::unique_locks(device_locker, command_locker);
-        unsigned int  data_offset, C_offset, kv_offset, i;
-        const char *data;
 
-        #ifdef DEBUG_HWDEVICE
-        const std::string blob_x  = blob;
-        size_t inputs_size_x      = inputs_size;
-        size_t outputs_size_x     = outputs_size;
-        const rct::keyV hashes_x  = hashes;
-        const rct::ctkeyV outPk_x = outPk;
+#ifdef DEBUG_HWDEVICE
         rct::key prehash_x;
-        this->controle_device->mlsag_prehash(blob_x, inputs_size_x, outputs_size_x, hashes_x, outPk_x, prehash_x);
+        debug_device->clsag_prehash(data, inputs_size, outputs_size, hashes, outPk, prehash_x);
         if (inputs_size) {
-          log_message("mlsag_prehash", (std::string("inputs_size not null: ") +  std::to_string(inputs_size)).c_str());
+          log_message("clsag_prehash", (std::string("inputs_size not null: ") +  std::to_string(inputs_size)).c_str());
         }
-        this->key_map.log();
-        #endif
-
-        data = blob.data();
+        key_map.log();
+#endif
 
         // ======  u8 type, varint txnfee ======
         int offset = set_command_header(INS_VALIDATE, 0x01, 0x01);
         //options
-        this->buffer_send[offset] = (inputs_size == 0)?0x00:0x80;
-        offset += 1;
+        buffer_send[offset++] = (inputs_size == 0) ? 0x00 : OPTION_MORE_DATA;
 
-        //type
-        uint8_t type = data[0];
-        this->buffer_send[offset] = data[0];
-        offset += 1;
+        buffer_send[offset++] = data[0];
 
-        //txnfee
-        data_offset = 1;
-        while (data[data_offset]&0x80) {
-          this->buffer_send[offset] = data[data_offset];
-          offset += 1;
-          data_offset += 1;
-        }
-        this->buffer_send[offset] = data[data_offset];
-        offset += 1;
-        data_offset += 1;
+        // txnfee
+        size_t data_offset = 1;
+        while (data[data_offset] & 0x80)
+          buffer_send[offset++] = data[data_offset++];
+        buffer_send[offset++] = data[data_offset++];
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
         // check fee user input
-        CHECK_AND_ASSERT_THROW_MES(this->exchange_wait_on_input() == 0, "Fee denied on device.");
+        CHECK_AND_ASSERT_THROW_MES(finish_and_exchange(offset, true) == SW_OK, "Fee denied on device.");
 
-        //pseudoOuts
-        if (type == rct::RCTTypeSimple) {
-          for ( i = 0; i < inputs_size; i++) {
-            offset = set_command_header(INS_VALIDATE, 0x01, i+2);
-            //options
-            this->buffer_send[offset] = (i==inputs_size-1)? 0x00:0x80;
-            offset += 1;
-            //pseudoOut
-            memmove(this->buffer_send+offset, data+data_offset,32);
-            offset += 32;
-            data_offset += 32;
-
-            this->buffer_send[4] = offset-5;
-            this->length_send = offset;
-            this->exchange();
-          }
-        }
+        auto type = static_cast<rct::RCTType>(data[0]);
+        CHECK_AND_ASSERT_THROW_MES(type == rct::RCTType::CLSAG, "non-CLSAG generation not supported");
 
         // ======  Aout, Bout, AKout, C, v, k ======
-        kv_offset = data_offset;
-        if (type==rct::RCTTypeBulletproof2 || type==rct::RCTTypeCLSAG) {
-          C_offset = kv_offset+ (8)*outputs_size;
-        } else {
-          C_offset = kv_offset+ (32+32)*outputs_size;
-        }
-        for ( i = 0; i < outputs_size; i++) {
+        size_t kv_offset = data_offset;
+        size_t C_offset = kv_offset + 8 * outputs_size;
+        for (size_t i = 0; i < outputs_size; i++) {
           ABPkeys outKeys;
           bool found;
 
-          found = this->key_map.find(outPk[i].dest, outKeys);
+          found = key_map.find(outPk[i].dest, outKeys);
           if (!found) {
-            log_hexbuffer("Pout not found", (char*)outPk[i].dest.bytes, 32);
+            log_hexbuffer("Pout not found", outPk[i].dest.bytes, 32);
             CHECK_AND_ASSERT_THROW_MES(found, "Pout not found");
           }
           offset = set_command_header(INS_VALIDATE, 0x02, i+1);
-          //options
-          this->buffer_send[offset] = (i==outputs_size-1)? 0x00:0x80 ;
-          this->buffer_send[offset] |= (type==rct::RCTTypeBulletproof2 || type==rct::RCTTypeCLSAG)?0x02:0x00;
-          offset += 1;
-          //is_subaddress
-          this->buffer_send[offset] = outKeys.is_subaddress;
-          offset++;
-          //is_change_address
-          this->buffer_send[offset] = outKeys.is_change_address;
-          offset++;
-          //Aout
-          memmove(this->buffer_send+offset, outKeys.Aout.bytes, 32);
-          offset+=32;
-          //Bout
-          memmove(this->buffer_send+offset, outKeys.Bout.bytes, 32);
-          offset+=32;
-          //AKout
-          this->send_secret(outKeys.AKout.bytes, offset);
+          // options
+          buffer_send[offset++] = (i < outputs_size-1 ? OPTION_MORE_DATA : 0) | 0x02;
 
-          //C
-          memmove(this->buffer_send+offset, data+C_offset,32);
-          offset += 32;
+          buffer_send[offset++] = outKeys.is_subaddress; //is_subaddress
+          buffer_send[offset++] = outKeys.is_change_address; //is_change_address
+          send_bytes(outKeys.Aout.bytes, 32, offset); //Aout
+          send_bytes(outKeys.Bout.bytes, 32, offset); //Bout
+          send_secret(outKeys.AKout.bytes, offset); //AKout
+          send_bytes(&data[C_offset], 32, offset); //C
           C_offset += 32;
-          if (type==rct::RCTTypeBulletproof2 || type==rct::RCTTypeCLSAG) {
-            //k
-            memset(this->buffer_send+offset, 0, 32);
-            offset += 32;
-            //v
-            memset(this->buffer_send+offset, 0, 32);
-            memmove(this->buffer_send+offset, data+kv_offset,8);
-            offset += 32;
-            kv_offset += 8;
-          } else {
-            //k
-            memmove(this->buffer_send+offset, data+kv_offset,32);
-            offset += 32;
-            kv_offset += 32;
-            //v
-            memmove(this->buffer_send+offset, data+kv_offset,32);
-            offset += 32;
-            kv_offset += 32;
-          }
+          send_bytes(crypto::null_hash.data, 32, offset); // k
+          send_bytes(&data[kv_offset], 8, offset); // v
+          kv_offset += 8;
+          send_bytes(crypto::null_hash.data, 24, offset); // v padding
 
-          this->buffer_send[4] = offset-5;
-          this->length_send = offset;
           // check transaction user input
-          CHECK_AND_ASSERT_THROW_MES(this->exchange_wait_on_input() == 0, "Transaction denied on device.");
-          #ifdef DEBUG_HWDEVICE
-          log_hexbuffer("Prehash AKV input", (char*)&this->buffer_recv[64], 3*32);
-          #endif
+          CHECK_AND_ASSERT_THROW_MES(finish_and_exchange(offset, true) == SW_OK, "Transaction denied on device.");
+#ifdef DEBUG_HWDEVICE
+          log_hexbuffer("Prehash AKV input", &buffer_recv[64], 3*32);
+#endif
         }
 
         // ======   C[], message, proof======
         C_offset = kv_offset;
-        for (i = 0; i < outputs_size; i++) {
+        for (size_t i = 0; i < outputs_size; i++) {
           offset = set_command_header(INS_VALIDATE, 0x03, i+1);
-          //options
-          this->buffer_send[offset] = 0x80 ;
-          offset += 1;
-          //C
-          memmove(this->buffer_send+offset, data+C_offset,32);
-          offset += 32;
+          buffer_send[offset++] = 0x80; //options
+          send_bytes(&data[C_offset], 32, offset); //C
           C_offset += 32;
 
-          this->buffer_send[4] = offset-5;
-          this->length_send = offset;
-          this->exchange();
-
+          finish_and_exchange(offset);
         }
 
-        offset = set_command_header_noopt(INS_VALIDATE, 0x03, i+1);
-        //message
-        memmove(this->buffer_send+offset, hashes[0].bytes,32);
-        offset += 32;
-        //proof
-        memmove(this->buffer_send+offset,  hashes[2].bytes,32);
-        offset += 32;
+        offset = set_command_header_noopt(INS_VALIDATE, 0x03, outputs_size+1);
+        send_bytes(hashes[0].bytes, 32, offset); //message
+        send_bytes(hashes[2].bytes, 32, offset); //proof
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
-        memmove(prehash.bytes, this->buffer_recv,  32);
+        receive_bytes(prehash.bytes, 32);
 
-        #ifdef DEBUG_HWDEVICE
-        hw::ledger::check32("mlsag_prehash", "prehash", (char*)prehash_x.bytes, (char*)prehash.bytes);
-        #endif
-
-        return true;
-    }
-
-
-    bool device_ledger::mlsag_prepare(const rct::key &H, const rct::key &xx,
-                                     rct::key &a, rct::key &aG, rct::key &aHP, rct::key &II) {
-        auto locks = tools::unique_locks(device_locker, command_locker);
-
-        #ifdef DEBUG_HWDEVICE
-        const rct::key H_x = H;
-        const rct::key xx_x = hw::ledger::decrypt(xx);
-        rct::key a_x;
-        rct::key aG_x;
-        rct::key aHP_x;
-        rct::key II_x;
-        #endif
-
-        int offset = set_command_header_noopt(INS_MLSAG, 0x01);
-        //value H
-        memmove(this->buffer_send+offset, H.bytes, 32);
-        offset += 32;
-        //mask xin
-        this->send_secret(xx.bytes, offset);
-
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
-
-        offset = 0;
-        this->receive_secret(a.bytes, offset);
-        memmove(aG.bytes,  &this->buffer_recv[offset], 32);
-        offset +=32;
-        memmove(aHP.bytes, &this->buffer_recv[offset], 32);
-        offset +=32;
-        memmove(II.bytes,  &this->buffer_recv[offset], 32);
-
-        #ifdef DEBUG_HWDEVICE
-        a_x = hw::ledger::decrypt(a);
-
-        rct::scalarmultBase(aG_x, a_x);
-        rct::scalarmultKey(aHP_x, H_x, a_x);
-        rct::scalarmultKey(II_x, H_x, xx_x);
-        hw::ledger::check32("mlsag_prepare", "AG", (char*)aG_x.bytes, (char*)aG.bytes);
-        hw::ledger::check32("mlsag_prepare", "aHP", (char*)aHP_x.bytes, (char*)aHP.bytes);
-        hw::ledger::check32("mlsag_prepare", "II", (char*)II_x.bytes, (char*)II.bytes);
-        #endif
-
-        return true;
-    }
-
-    bool device_ledger::mlsag_prepare(rct::key &a, rct::key &aG) {
-        auto locks = tools::unique_locks(device_locker, command_locker);
-        int offset;
-
-        #ifdef DEBUG_HWDEVICE
-        rct::key a_x;
-        rct::key aG_x;
-        #endif
-
-        send_simple(INS_MLSAG, 0x01);
-
-        offset = 0;
-        this->receive_secret(a.bytes, offset);
-        memmove(aG.bytes,  &this->buffer_recv[offset], 32);
-
-        #ifdef DEBUG_HWDEVICE
-        a_x = hw::ledger::decrypt(a);
-        rct::scalarmultBase(aG_x, a_x);
-        hw::ledger::check32("mlsag_prepare", "AG", (char*)aG_x.bytes, (char*)aG.bytes);
-        #endif
-
-        return true;
-    }
-
-    bool device_ledger::mlsag_hash(const rct::keyV &long_message, rct::key &c) {
-        auto locks = tools::unique_locks(device_locker, command_locker);
-        size_t cnt;
-
-        #ifdef DEBUG_HWDEVICE
-        const rct::keyV long_message_x = long_message;
-        rct::key c_x;
-        this->controle_device->mlsag_hash(long_message_x, c_x);
-        #endif
-
-        cnt = long_message.size();
-        for (size_t i = 0; i<cnt; i++) {
-          int offset = set_command_header(INS_MLSAG, 0x02, i+1);
-          //options
-          this->buffer_send[offset] =
-              (i==(cnt-1))?0x00:0x80;  //last
-          offset += 1;
-          //msg part
-          memmove(this->buffer_send+offset, long_message[i].bytes, 32);
-          offset += 32;
-
-          this->buffer_send[4] = offset-5;
-          this->length_send = offset;
-          this->exchange();
-        }
-
-        memmove(c.bytes, &this->buffer_recv[0], 32);
-
-        #ifdef DEBUG_HWDEVICE
-        hw::ledger::check32("mlsag_hash", "c", (char*)c_x.bytes, (char*)c.bytes);
-        #endif
-
-        return true;
-    }
-
-    bool device_ledger::mlsag_sign(const rct::key &c, const rct::keyV &xx, const rct::keyV &alpha, const size_t rows, const size_t dsRows, rct::keyV &ss) {
-        auto locks = tools::unique_locks(device_locker, command_locker);
-
-        CHECK_AND_ASSERT_THROW_MES(dsRows<=rows, "dsRows greater than rows");
-        CHECK_AND_ASSERT_THROW_MES(xx.size() == rows, "xx size does not match rows");
-        CHECK_AND_ASSERT_THROW_MES(alpha.size() == rows, "alpha size does not match rows");
-        CHECK_AND_ASSERT_THROW_MES(ss.size() == rows, "ss size does not match rows");
-
-        #ifdef DEBUG_HWDEVICE
-        const rct::key c_x      = c;
-        const rct::keyV xx_x    = hw::ledger::decrypt(xx);
-        const rct::keyV alpha_x = hw::ledger::decrypt(alpha);
-        const int rows_x        = rows;
-        const int dsRows_x      = dsRows;
-        rct::keyV ss_x(ss.size());
-        this->controle_device->mlsag_sign(c_x, xx_x, alpha_x, rows_x, dsRows_x, ss_x);
-        #endif
-
-        for (size_t j = 0; j < dsRows; j++) {
-          int offset = set_command_header(INS_MLSAG, 0x03, j+1);
-          //options
-          this->buffer_send[offset] = 0x00;
-          if (j==(dsRows-1)) {
-            this->buffer_send[offset]  |= 0x80;  //last
-          }
-          offset += 1;
-          //xx
-          this->send_secret(xx[j].bytes, offset);
-          //alpa
-          this->send_secret(alpha[j].bytes, offset);
-
-          this->buffer_send[4] = offset-5;
-          this->length_send = offset;
-          this->exchange();
-
-          //ss
-          memmove(ss[j].bytes, &this->buffer_recv[0], 32);
-        }
-
-        for (size_t j = dsRows; j < rows; j++) {
-          sc_mulsub(ss[j].bytes, c.bytes, xx[j].bytes, alpha[j].bytes);
-        }
-
-        #ifdef DEBUG_HWDEVICE
-        for (size_t j = 0; j < rows; j++) {
-           hw::ledger::check32("mlsag_sign", "ss["+std::to_string(j)+"]", (char*)ss_x[j].bytes, (char*)ss[j].bytes);
-        }
-        #endif
+#ifdef DEBUG_HWDEVICE
+        hw::ledger::check32("clsag_prehash", "prehash", prehash_x.bytes, prehash.bytes);
+#endif
 
         return true;
     }
 
     bool device_ledger::clsag_prepare(const rct::key &p, const rct::key &z, rct::key &I, rct::key &D, const rct::key &H, rct::key &a, rct::key &aG, rct::key &aH) {
         auto locks = tools::unique_locks(device_locker, command_locker);
-        #ifdef DEBUG_HWDEVICE
+#ifdef DEBUG_HWDEVICE
         const rct::key p_x   = hw::ledger::decrypt(p);
-        const rct::key z_x   = z;
         rct::key       I_x;
         rct::key       D_x;
-        const rct::key H_x   = H;
         rct::key       a_x;
         rct::key       aG_x;
         rct::key       aH_x;
-        this->controle_device->clsag_prepare(p_x, z_x, I_x, D_x, H_x, a_x, aG_x, aH_x);
-        #endif
+        hw::get_device("default").clsag_prepare(p_x, z, I_x, D_x, H, a_x, aG_x, aH_x);
+#endif
 
         /*
         rct::skpkGen(a,aG); // aG = a*G
@@ -2136,96 +1847,58 @@ namespace hw {
         rct::scalarmultKey(I,H,p); // I = p*H
         rct::scalarmultKey(D,H,z); // D = z*H
         */
-        int offset = set_command_header_noopt(INS_CLSAG, 0x01);
-        //p
-        this->send_secret(p.bytes, offset);
-        //z
-        memmove(this->buffer_send+offset, z.bytes, 32);
-        offset += 32;
-        //H
-        memmove(this->buffer_send+offset, H.bytes, 32);
-        offset += 32;
+        int offset = set_command_header_noopt(INS_CLSAG, 1);
+        send_secret(p.bytes, offset); //p
+        send_bytes(z.bytes, 32, offset); //z
+        send_bytes(H.bytes, 32, offset); //H
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
         offset = 0;
-        //a
-        this->receive_secret(a.bytes, offset);
-        //aG
-        memmove(aG.bytes, this->buffer_recv+offset, 32);
-        offset +=32;
-        //aH
-        memmove(aH.bytes, this->buffer_recv+offset, 32);
-        offset +=32;
-        //I = pH
-        memmove(I.bytes, this->buffer_recv+offset, 32);
-        offset +=32;
-        //D = zH
-        memmove(D.bytes, this->buffer_recv+offset, 32);
-        offset +=32;
+        receive_secret(a.bytes, offset); //a
+        receive_bytes(aG.bytes, 32, offset); //aG
+        receive_bytes(aH.bytes, 32, offset); //aH
+        receive_bytes(I.bytes, 32, offset); //I = pH
+        receive_bytes(D.bytes, 32, offset); //D = zH
 
-        #ifdef DEBUG_HWDEVICE
-        hw::ledger::check32("clsag_prepare", "I", (char*)I_x.bytes, (char*)I.bytes);
-        hw::ledger::check32("clsag_prepare", "D", (char*)D_x.bytes, (char*)D.bytes);
-        hw::ledger::check32("clsag_prepare", "a", (char*)a_x.bytes, (char*)a.bytes);
-        hw::ledger::check32("clsag_prepare", "aG", (char*)aG_x.bytes, (char*)aG.bytes);
-        hw::ledger::check32("clsag_prepare", "aH", (char*)aH_x.bytes, (char*)aH.bytes);
-        #endif
+#ifdef DEBUG_HWDEVICE
+        hw::ledger::check32("clsag_prepare", "I", I_x.bytes, I.bytes);
+        hw::ledger::check32("clsag_prepare", "D", D_x.bytes, D.bytes);
+        hw::ledger::check32("clsag_prepare", "a", a_x.bytes, a.bytes);
+        hw::ledger::check32("clsag_prepare", "aG", aG_x.bytes, aG.bytes);
+        hw::ledger::check32("clsag_prepare", "aH", aH_x.bytes, aH.bytes);
+#endif
 
         return true;
     }
 
-    bool device_ledger::clsag_hash(const rct::keyV &data, rct::key &hash) {
+    bool device_ledger::clsag_hash(const rct::keyV &keydata, rct::key &hash) {
         auto locks = tools::unique_locks(device_locker, command_locker);
 
-        #ifdef DEBUG_HWDEVICE
-        const rct::keyV data_x  = data;
-        rct::key        hash_x;
-        this->controle_device->mlsag_hash(data_x, hash_x);
-        #endif
+#ifdef DEBUG_HWDEVICE
+        rct::key hash_x;
+        debug_device->clsag_hash(keydata, hash_x);
+#endif
 
-        size_t cnt;
-        int offset;
-
-        cnt = data.size();
-        for (size_t i = 0; i<cnt; i++) {
-          offset = set_command_header(INS_CLSAG, 0x02, i+1);
-          //options
-          this->buffer_send[offset] = (i==(cnt-1))?0x00:0x80;  //last
-          offset += 1;
-          //msg part
-          memmove(this->buffer_send+offset, data[i].bytes, 32);
-          offset += 32;
-
-          this->buffer_send[4] = offset-5;
-          this->length_send = offset;
-          this->exchange();
-        }
+        std::string_view data{reinterpret_cast<const char*>(keydata.data()), sizeof(rct::key)*keydata.size()};
+        exchange_multipart_data(INS_CLSAG, 2, data, KECCAK_HASH_CHUNK_SIZE);
 
         //c/hash
-        memmove(hash.bytes, &this->buffer_recv[0], 32);
+        receive_bytes(hash.bytes, 32);
 
-        #ifdef DEBUG_HWDEVICE
-        hw::ledger::check32("mlsag_hash", "hash", (char*)hash_x.bytes, (char*)hash.bytes);
-        #endif
+#ifdef DEBUG_HWDEVICE
+        hw::ledger::check32("clsag_hash", "hash", hash_x.bytes, hash.bytes);
+#endif
         return true;
     }
 
     bool device_ledger::clsag_sign(const rct::key &c, const rct::key &a, const rct::key &p, const rct::key &z, const rct::key &mu_P, const rct::key &mu_C, rct::key &s) {
         auto locks = tools::unique_locks(device_locker, command_locker);
 
-        #ifdef DEBUG_HWDEVICE
-        const rct::key c_x    = c;
-        const rct::key a_x    = hw::ledger::decrypt(a);
-        const rct::key p_x    = hw::ledger::decrypt(p);
-        const rct::key z_x    = z;
-        const rct::key mu_P_x = mu_P;
-        const rct::key mu_C_x = mu_C;
-        rct::key       s_x;
-        this->controle_device->clsag_sign(c_x, a_x, p_x, z_x, mu_P_x, mu_C_x, s_x);
-        #endif
+#ifdef DEBUG_HWDEVICE
+        rct::key s_x;
+        debug_device->clsag_sign(c, hw::ledger::decrypt(a), hw::ledger::decrypt(p), z, mu_P, mu_C, s_x);
+#endif
 
         /*
         rct::key s0_p_mu_P;
@@ -2235,47 +1908,43 @@ namespace hw {
         sc_mulsub(s.bytes,c.bytes,s0_add_z_mu_C.bytes,a.bytes);
         */
 
-        int offset = set_command_header_noopt(INS_CLSAG, 0x03);
+        int offset = set_command_header_noopt(INS_CLSAG, 3);
 
-        //c
-        //discard, unse internal one
-        //a
-        this->send_secret(a.bytes, offset);
-        //p
-        this->send_secret(p.bytes, offset);
-        //z
-        memmove(this->buffer_send+offset, z.bytes, 32);
-        offset += 32;
-        //mu_P
-        memmove(this->buffer_send+offset, mu_P.bytes, 32);
-        offset += 32;
-        //mu_C
-        memmove(this->buffer_send+offset, mu_C.bytes, 32);
-        offset += 32;
+        send_secret(a.bytes, offset); //a
+        send_secret(p.bytes, offset); //p
+        send_bytes(z.bytes, 32, offset); //z
+        send_bytes(mu_P.bytes, 32, offset); //mu_P
+        send_bytes(mu_C.bytes, 32, offset); //mu_C
 
-        this->buffer_send[4] = offset-5;
-        this->length_send = offset;
-        this->exchange();
+        finish_and_exchange(offset);
 
-        offset = 0;
-        //s
-        memmove(s.bytes, this->buffer_recv+offset, 32);
+        receive_bytes(s.bytes, 32); //s
 
-        #ifdef DEBUG_HWDEVICE
-        hw::ledger::check32("clsag_sign", "s", (char*)s_x.bytes, (char*)s.bytes);
-        #endif
+#ifdef DEBUG_HWDEVICE
+        hw::ledger::check32("clsag_sign", "s", s_x.bytes, s.bytes);
+#endif
 
         return true;
     }
 
+    bool device_ledger::update_staking_tx_secret_key(crypto::secret_key& key) {
+        auto locks = tools::unique_locks(device_locker, command_locker);
+
+        // This will fail if this isn't an open stake tx.
+        send_simple(INS_GET_TX_SECRET_KEY);
+        // The ledger provides us with the (unencrypted) tx secret key if we're allowed to have it
+        receive_bytes(key.data, 32);
+
+        return true;
+    }
 
     bool device_ledger::close_tx() {
         auto locks = tools::unique_locks(device_locker, command_locker);
         send_simple(INS_CLOSE_TX);
         key_map.clear();
         hmac_map.clear();
-        this->tx_in_progress = false;
-        this->unlock();
+        tx_in_progress = false;
+        unlock();
         return true;
     }
 
@@ -2289,9 +1958,9 @@ namespace hw {
       }
       registry.insert(std::make_pair("Ledger", std::unique_ptr<device>(legder_device)));
     }
-  
+
   #else //WITH_DEVICE_LEDGER
-  
+
     void register_all(std::map<std::string, std::unique_ptr<device>> &registry) {
     }
 

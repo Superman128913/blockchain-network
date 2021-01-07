@@ -6,6 +6,7 @@ from nacl.signing import SigningKey, VerifyKey
 import nacl.encoding
 import requests
 import zmq
+import zmq.utils.z85
 import sys
 import re
 import time
@@ -30,13 +31,20 @@ my_privkey, my_pubkey = b'', b''
 if len(sys.argv) > 1 and len(sys.argv[1]) == 64 and all(x in "0123456789abcdefABCDEF" for x in sys.argv[1]):
     curve_pubkey = bytes.fromhex(sys.argv[1])
     del sys.argv[1]
-    socket.setsockopt(zmq.CURVE_SERVERKEY, curve_pubkey)
-if len(sys.argv) > 1 and len(sys.argv[1]) == 64 and all(x in "0123456789abcdefABCDEF" for x in sys.argv[1]):
-    my_privkey = bytes.fromhex(sys.argv[1])
-    del sys.argv[1]
-    my_pubkey = zmq.utils.z85.decode(zmq.curve_public(zmq.utils.z85.encode(my_privkey)))
-    socket.setsockopt(zmq.CURVE_PUBLICKEY, my_pubkey)
-    socket.setsockopt(zmq.CURVE_SECRETKEY, my_privkey)
+    socket.curve_serverkey = curve_pubkey
+    if len(sys.argv) > 1 and len(sys.argv[1]) == 64 and all(x in "0123456789abcdefABCDEF" for x in sys.argv[1]):
+        my_privkey = bytes.fromhex(sys.argv[1])
+        del sys.argv[1]
+        my_pubkey = zmq.utils.z85.decode(zmq.curve_public(zmq.utils.z85.encode(my_privkey)))
+    else:
+        my_privkey = PrivateKey.generate()
+        my_pubkey = my_privkey.public_key.encode()
+        my_privkey = my_privkey.encode()
+
+        print("No curve client privkey given; generated a random one (pubkey: {}, privkey: {})".format(
+            my_pubkey.hex(), my_privkey.hex()), file=sys.stderr)
+    socket.curve_secretkey = my_privkey
+    socket.curve_publickey = my_pubkey
 
 if not 2 <= len(sys.argv) <= 3 or any(x in y for x in ("--help", "-h") for y in sys.argv[1:]):
     print("Usage: {} [ipc:///path/to/sock|tcp://1.2.3.4:5678] [SERVER_CURVE_PUBKEY [LOCAL_CURVE_PRIVKEY]] COMMAND ['JSON']".format(

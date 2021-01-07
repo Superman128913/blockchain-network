@@ -44,22 +44,21 @@
 #include "crypto/hash.h"
 #include "ringct/rctTypes.h"
 #include "device/device.hpp"
+#include "txtypes.h"
 
 namespace service_nodes
 {
   struct quorum_signature
   {
     uint16_t voter_index;
-    char padding[6];
+    char padding[6] = {0};
     crypto::signature signature;
 
     quorum_signature() = default;
-    quorum_signature(uint16_t voter_index, crypto::signature const &signature)
-    : voter_index(voter_index)
-    , signature(signature)
-    {
-      std::memset(padding, 0, sizeof(padding));
-    }
+    quorum_signature(uint16_t voter_index, crypto::signature const &signature) :
+        voter_index(voter_index),
+        signature(signature)
+    {}
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(voter_index)
@@ -89,7 +88,7 @@ namespace cryptonote
 
   struct txout_to_key
   {
-    txout_to_key() { }
+    txout_to_key() = default;
     txout_to_key(const crypto::public_key &_key) : key(_key) { }
     crypto::public_key key;
   };
@@ -166,23 +165,6 @@ namespace cryptonote
 
   };
 
-  enum class txversion : uint16_t {
-    v0 = 0,
-    v1,
-    v2_ringct,
-    v3_per_output_unlock_times,
-    v4_tx_types,
-    _count,
-  };
-  enum class txtype : uint16_t {
-    standard,
-    state_change,
-    key_image_unlock,
-    stake,
-    loki_name_system,
-    _count
-  };
-
   // Blink quorum statuses.  Note that the underlying numeric values is used in the RPC.  `none` is
   // only used in places like the RPC where we return a value even if not a blink at all.
   enum class blink_result { none = 0, rejected, accepted, timeout };
@@ -191,12 +173,12 @@ namespace cryptonote
   {
 
   public:
-    static char const *version_to_string(txversion v);
-    static char const *type_to_string(txtype type);
+    static char const* version_to_string(txversion v);
+    static char const* type_to_string(txtype type);
 
-    static txversion get_min_version_for_hf(uint8_t hf_version);
-    static txversion get_max_version_for_hf(uint8_t hf_version);
-    static txtype    get_max_type_for_hf   (uint8_t hf_version);
+    static constexpr txversion get_min_version_for_hf(uint8_t hf_version);
+    static           txversion get_max_version_for_hf(uint8_t hf_version);
+    static constexpr txtype    get_max_type_for_hf   (uint8_t hf_version);
 
     // tx information
     txversion version;
@@ -232,20 +214,12 @@ namespace cryptonote
         ENUM_FIELD_N("type", type, type < txtype::_count);
     END_SERIALIZE()
 
-    transaction_prefix(){ set_null(); }
-    void set_null()
-    {
-      version = txversion::v1;
-      unlock_time = 0;
-      vin.clear();
-      vout.clear();
-      extra.clear();
-      output_unlock_times.clear();
-      type = txtype::standard;
-    }
+    transaction_prefix() { set_null(); }
+    void set_null();
 
-    uint64_t get_unlock_time(size_t out_index) const
-    {
+    // This function is inlined because device_ledger code needs to call it, but doesn't link
+    // against cryptonote_basic.
+    uint64_t get_unlock_time(size_t out_index) const {
       if (version >= txversion::v3_per_output_unlock_times)
       {
         if (out_index >= output_unlock_times.size())
@@ -257,9 +231,10 @@ namespace cryptonote
       }
       return unlock_time;
     }
+
   };
 
-  class transaction: public transaction_prefix
+  class transaction final : public transaction_prefix
   {
   private:
     // hash cache
@@ -267,7 +242,7 @@ namespace cryptonote
     mutable std::atomic<bool> blob_size_valid;
 
   public:
-    std::vector<std::vector<crypto::signature> > signatures; //count signatures  always the same as inputs count
+    std::vector<std::vector<crypto::signature>> signatures; //count signatures  always the same as inputs count
     rct::rctSig rct_signatures;
 
     // hash cache
@@ -279,10 +254,9 @@ namespace cryptonote
     std::atomic<unsigned int> unprunable_size;
     std::atomic<unsigned int> prefix_size;
 
-    transaction();
-    transaction(const transaction &t): transaction_prefix(t), hash_valid(false), blob_size_valid(false), signatures(t.signatures), rct_signatures(t.rct_signatures), pruned(t.pruned), unprunable_size(t.unprunable_size.load()), prefix_size(t.prefix_size.load()) { if (t.is_hash_valid()) { hash = t.hash; set_hash_valid(true); } if (t.is_blob_size_valid()) { blob_size = t.blob_size; set_blob_size_valid(true); } }
-    transaction &operator=(const transaction &t) { transaction_prefix::operator=(t); set_hash_valid(false); set_blob_size_valid(false); signatures = t.signatures; rct_signatures = t.rct_signatures; if (t.is_hash_valid()) { hash = t.hash; set_hash_valid(true); } if (t.is_blob_size_valid()) { blob_size = t.blob_size; set_blob_size_valid(true); } pruned = t.pruned; unprunable_size = t.unprunable_size.load(); prefix_size = t.prefix_size.load(); return *this; }
-    virtual ~transaction();
+    transaction() { set_null(); }
+    transaction(const transaction &t);
+    transaction& operator=(const transaction& t);
     void set_null();
     void invalidate_hashes();
     bool is_hash_valid() const { return hash_valid.load(std::memory_order_acquire); }
@@ -353,7 +327,7 @@ namespace cryptonote
           if (Binary)
             unprunable_size = ar.streampos() - start_pos;
 
-          if (!pruned && rct_signatures.type != rct::RCTTypeNull)
+          if (!pruned && rct_signatures.type != rct::RCTType::Null)
           {
             ar.tag("rctsig_prunable");
             auto obj = ar.begin_object();
@@ -388,46 +362,6 @@ namespace cryptonote
     static size_t get_signature_size(const txin_v& tx_in);
   };
 
-
-  inline
-  transaction::transaction()
-  {
-    set_null();
-  }
-
-  inline
-  transaction::~transaction()
-  {
-  }
-
-  inline
-  void transaction::set_null()
-  {
-    transaction_prefix::set_null();
-    signatures.clear();
-    rct_signatures = {};
-    rct_signatures.type = rct::RCTTypeNull;
-    set_hash_valid(false);
-    set_blob_size_valid(false);
-    pruned = false;
-    unprunable_size = 0;
-    prefix_size = 0;
-  }
-
-  inline
-  void transaction::invalidate_hashes()
-  {
-    set_hash_valid(false);
-    set_blob_size_valid(false);
-  }
-
-  inline
-  size_t transaction::get_signature_size(const txin_v& tx_in)
-  {
-    if (std::holds_alternative<txin_to_key>(tx_in))
-      return var::get<txin_to_key>(tx_in).key_offsets.size();
-    return 0;
-  }
 
   /************************************************************************/
   /*                                                                      */
@@ -485,13 +419,13 @@ namespace cryptonote
 
   public:
     block() = default;
-    block(const block &b): block_header(b), miner_tx{b.miner_tx}, tx_hashes{b.tx_hashes}, signatures{b.signatures} { copy_hash(b); }
-    block &operator=(const block &b) { block_header::operator=(b); miner_tx = b.miner_tx; tx_hashes = b.tx_hashes; signatures = b.signatures; copy_hash(b); return *this; }
-    block(block &&b) : block_header(std::move(b)), miner_tx{std::move(b.miner_tx)}, tx_hashes{std::move(b.tx_hashes)}, signatures{std::move(b.signatures)} { copy_hash(b); }
-    block &operator=(block &&b) { block_header::operator=(std::move(b)); miner_tx = std::move(b.miner_tx); tx_hashes = std::move(b.tx_hashes); signatures = std::move(b.signatures); copy_hash(b); return *this; }
+    block(const block& b);
+    block(block&& b);
+    block& operator=(const block& b);
+    block& operator=(block&& b);
     void invalidate_hashes() { set_hash_valid(false); }
-    bool is_hash_valid() const { return hash_valid.load(std::memory_order_acquire); }
-    void set_hash_valid(bool v) const { hash_valid.store(v,std::memory_order_release); }
+    bool is_hash_valid() const;
+    void set_hash_valid(bool v) const;
 
     transaction miner_tx;
     std::vector<crypto::hash> tx_hashes;
@@ -544,43 +478,55 @@ namespace cryptonote
       return !(*this == rhs);
     }
   };
-  constexpr account_public_address const null_address{};
+  inline constexpr account_public_address null_address{};
 
   struct keypair
   {
     crypto::public_key pub;
     crypto::secret_key sec;
 
-    static inline keypair generate(hw::device &hwdev)
-    {
-      keypair k;
-      hwdev.generate_keys(k.pub, k.sec);
-      return k;
-    }
+    keypair() = default;
+
+    // Constructs from a copied public/secret key
+    keypair(const crypto::public_key& pub, const crypto::secret_key& sec) : pub{pub}, sec{sec} {}
+    // Default copy and move
+    keypair(const keypair&) = default;
+    keypair(keypair&&) = default;
+    keypair& operator=(const keypair&) = default;
+    keypair& operator=(keypair&&) = default;
+
+    // Constructs by generating a keypair via the given hardware device:
+    explicit keypair(hw::device& hwdev) { hwdev.generate_keys(pub, sec); }
   };
 
   using byte_and_output_fees = std::pair<uint64_t, uint64_t>;
 
   //---------------------------------------------------------------
-  inline txversion transaction_prefix::get_min_version_for_hf(uint8_t hf_version)
+  constexpr txversion transaction_prefix::get_min_version_for_hf(uint8_t hf_version)
   {
     if (hf_version >= cryptonote::network_version_7 && hf_version <= cryptonote::network_version_10_bulletproofs)
       return txversion::v2_ringct;
     return txversion::v4_tx_types;
   }
 
+  // Used in the test suite to disable the older max version values below so that some test suite
+  // tests can still use particular hard forks without needing to actually generate pre-v4 txes.
+  namespace hack { inline bool test_suite_permissive_txes = false; }
+
   inline txversion transaction_prefix::get_max_version_for_hf(uint8_t hf_version)
   {
-    if (hf_version >= cryptonote::network_version_7 && hf_version <= cryptonote::network_version_8)
-      return txversion::v2_ringct;
+    if (!hack::test_suite_permissive_txes) {
+      if (hf_version >= cryptonote::network_version_7 && hf_version <= cryptonote::network_version_8)
+        return txversion::v2_ringct;
 
-    if (hf_version >= cryptonote::network_version_9_service_nodes && hf_version <= cryptonote::network_version_10_bulletproofs)
-      return txversion::v3_per_output_unlock_times;
+      if (hf_version >= cryptonote::network_version_9_service_nodes && hf_version <= cryptonote::network_version_10_bulletproofs)
+        return txversion::v3_per_output_unlock_times;
+    }
 
     return txversion::v4_tx_types;
   }
 
-  inline txtype transaction_prefix::get_max_type_for_hf(uint8_t hf_version)
+  constexpr txtype transaction_prefix::get_max_type_for_hf(uint8_t hf_version)
   {
     txtype result = txtype::standard;
     if      (hf_version >= network_version_15_lns)              result = txtype::loki_name_system;
@@ -591,7 +537,7 @@ namespace cryptonote
     return result;
   }
 
-  inline char const *transaction_prefix::version_to_string(txversion v)
+  inline const char* transaction_prefix::version_to_string(txversion v)
   {
     switch(v)
     {
@@ -603,7 +549,7 @@ namespace cryptonote
     }
   }
 
-  inline char const *transaction_prefix::type_to_string(txtype type)
+  inline const char* transaction_prefix::type_to_string(txtype type)
   {
     switch(type)
     {

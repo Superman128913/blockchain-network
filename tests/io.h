@@ -33,28 +33,13 @@
 #include <iostream>
 #include <type_traits>
 #include <vector>
+#include <lokimq/hex.h>
 
 inline bool hexdecode(const char *from, std::size_t length, void *to) {
-  std::size_t i;
-  for (i = 0; i < length; i++) {
-    int v = 0;
-    if (from[2 * i] >= '0' && from[2 * i] <= '9') {
-      v = from[2 * i] - '0';
-    } else if (from[2 * i] >= 'a' && from[2 * i] <= 'f') {
-      v = from[2 * i] - 'a' + 10;
-    } else {
-      return false;
-    }
-    v <<= 4;
-    if (from[2 * i + 1] >= '0' && from[2 * i + 1] <= '9') {
-      v |= from[2 * i + 1] - '0';
-    } else if (from[2 * i + 1] >= 'a' && from[2 * i + 1] <= 'f') {
-      v |= from[2 * i + 1] - 'a' + 10;
-    } else {
-      return false;
-    }
-    *(reinterpret_cast<unsigned char *>(to) + i) = v;
-  }
+  const char* end = from + 2*length;
+  if (!lokimq::is_hex(from, end))
+    return false;
+  lokimq::from_hex(from, end, reinterpret_cast<char*>(to));
   return true;
 }
 

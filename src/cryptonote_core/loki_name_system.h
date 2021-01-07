@@ -162,12 +162,11 @@ std::optional<std::string> name_hash_input_to_base64(std::string_view input);
 
 bool validate_lns_name(mapping_type type, std::string name, std::string *reason = nullptr);
 
-generic_signature  make_monero_signature(crypto::hash const &hash, crypto::public_key const &pkey, crypto::secret_key const &skey);
 generic_signature  make_ed25519_signature(crypto::hash const &hash, crypto::ed25519_secret_key const &skey);
 generic_owner      make_monero_owner(cryptonote::account_public_address const &owner, bool is_subaddress);
 generic_owner      make_ed25519_owner(crypto::ed25519_public_key const &pkey);
 bool               parse_owner_to_generic_owner(cryptonote::network_type nettype, std::string_view owner, generic_owner &key, std::string *reason);
-crypto::hash       tx_extra_signature_hash(std::string_view value, generic_owner const *owner, generic_owner const *backup_owner, crypto::hash const &prev_txid);
+std::string        tx_extra_signature(std::string_view value, generic_owner const *owner, generic_owner const *backup_owner, crypto::hash const &prev_txid);
 
 enum struct lns_tx_type { lookup, buy, update, renew };
 // Converts a human readable case-insensitive string denoting the mapping type into a value suitable for storing into the LNS DB.

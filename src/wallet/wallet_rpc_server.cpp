@@ -497,7 +497,7 @@ namespace tools
 
     m_restricted = command_line::get_arg(m_vm, arg_restricted);
 
-    m_server_header = "loki-wallet-rpc/"s + (m_restricted ? std::to_string(LOKI_VERSION[0]) : LOKI_VERSION_STR);
+    m_server_header = "loki-wallet-rpc/"s + (m_restricted ? std::to_string(LOKI_VERSION[0]) : std::string{LOKI_VERSION_STR});
 
     m_cors = {rpc_config.access_control_origins.begin(), rpc_config.access_control_origins.end()};
 
@@ -1695,6 +1695,9 @@ namespace tools
   SIGN::response wallet_rpc_server::invoke(SIGN::request&& req)
   {
     require_open();
+    if (m_wallet->watch_only())
+      throw wallet_rpc_error{error_code::WATCH_ONLY, "Unable to sign a value using a watch-only wallet."};
+
     SIGN::response res{};
 
     res.signature = m_wallet->sign(req.data, {req.account_index, req.address_index});
@@ -2365,6 +2368,7 @@ namespace {
     if (ptr)
       throw wallet_rpc_error{error_code::UNKNOWN_ERROR, "Invalid filename"};
     fs::path wallet_file = req.filename.empty() ? fs::path{} : m_wallet_dir / fs::u8path(req.filename);
+    if (!req.hardware_wallet)
     {
       std::vector<std::string> languages;
       crypto::ElectrumWords::get_language_list(languages, false);
@@ -2383,15 +2387,21 @@ namespace {
     std::unique_ptr<tools::wallet2> wal = tools::wallet2::make_new(vm2, true, nullptr).first;
     if (!wal)
       throw wallet_rpc_error{error_code::UNKNOWN_ERROR, "Failed to create wallet"};
-    wal->set_seed_language(req.language);
+
+    if (!req.hardware_wallet)
+      wal->set_seed_language(req.language);
+
     rpc::GET_HEIGHT::request hreq{};
     rpc::GET_HEIGHT::response hres{};
     hres.height = 0;
     bool r = wal->invoke_http<rpc::GET_HEIGHT>(hreq, hres);
     if (r)
       wal->set_refresh_from_block_height(hres.height);
-    crypto::secret_key dummy_key;
-    wal->generate(wallet_file, req.password, dummy_key, false, false);
+
+    if (req.hardware_wallet)
+      wal->restore_from_device(wallet_file, req.password, req.device_name.empty() ? "Ledger" : req.device_name);
+    else
+      wal->generate(wallet_file, req.password);
 
     if (m_wallet)
       m_wallet->store();
@@ -2945,8 +2955,7 @@ namespace {
     if (!tools::hex_to_type(req.service_node_key, snode_key))
       throw wallet_rpc_error{error_code::WRONG_KEY, std::string("Unparsable service node key given: ") + req.service_node_key};
 
-    // NOTE(loki): Pre-emptively set subaddr_account to 0. We don't support onwards from Infinite Staking which is when this call was implemented.
-    tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(snode_key, addr_info, req.amount, 0 /*amount_fraction*/, req.priority, 0 /*subaddr_account*/, req.subaddr_indices);
+    tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(snode_key, req.amount, 0 /*amount_fraction*/, req.priority, req.subaddr_indices);
     if (stake_result.status != tools::wallet2::stake_result_status::success)
       throw wallet_rpc_error{error_code::TX_NOT_POSSIBLE, stake_result.msg};
 

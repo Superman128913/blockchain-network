@@ -66,23 +66,21 @@ namespace trezor {
       return false;
     }
 
-    bool device_trezor_base::set_name(const std::string & name) {
-      this->m_full_name = name;
-      this->name = "";
+    bool device_trezor_base::set_name(std::string_view name) {
+      m_full_name = name;
 
-      auto delim = name.find(':');
-      if (delim != std::string::npos && delim + 1 < name.length()) {
+      if (auto delim = name.find(':'); delim != std::string::npos && delim + 1 < name.length())
         this->name = name.substr(delim + 1);
-      }
+      else
+        this->name = "";
 
       return true;
     }
 
-    const std::string device_trezor_base::get_name() const {
-      if (this->m_full_name.empty()) {
-        return std::string("<disconnected:").append(this->name).append(">");
-      }
-      return this->m_full_name;
+    std::string device_trezor_base::get_name() const {
+      if (m_full_name.empty())
+        return "<disconnected:" + name + ">";
+      return m_full_name;
     }
 
     bool device_trezor_base::init() {
@@ -124,7 +122,7 @@ namespace trezor {
 
         for (auto &cur : trans) {
           std::string cur_path = cur->get_path();
-          if (tools::starts_with(cur_path, this->name)) {
+          if (tools::starts_with(cur_path, name)) {
             MDEBUG("Device Match: " << cur_path);
             m_transport = cur;
             break;
@@ -132,7 +130,7 @@ namespace trezor {
         }
 
         if (!m_transport) {
-          MERROR("No matching Trezor device found. Device specifier: \"" + this->name + "\"");
+          MERROR("No matching Trezor device found. Device specifier: \"" << name << "\"");
           return false;
         }
 
@@ -181,28 +179,28 @@ namespace trezor {
 
     //lock the device for a long sequence
     void device_trezor_base::lock() {
-      MTRACE("Ask for LOCKING for device " << this->name << " in thread ");
+      MTRACE("Ask for LOCKING for device " << name << " in thread ");
       device_locker.lock();
-      MTRACE("Device " << this->name << " LOCKed");
+      MTRACE("Device " << name << " LOCKed");
     }
 
     //lock the device for a long sequence
     bool device_trezor_base::try_lock() {
-      MTRACE("Ask for LOCKING(try) for device " << this->name << " in thread ");
+      MTRACE("Ask for LOCKING(try) for device " << name << " in thread ");
       bool r = device_locker.try_lock();
       if (r) {
-        MTRACE("Device " << this->name << " LOCKed(try)");
+        MTRACE("Device " << name << " LOCKed(try)");
       } else {
-        MDEBUG("Device " << this->name << " not LOCKed(try)");
+        MDEBUG("Device " << name << " not LOCKed(try)");
       }
       return r;
     }
 
     //unlock the device
     void device_trezor_base::unlock() {
-      MTRACE("Ask for UNLOCKING for device " << this->name << " in thread ");
+      MTRACE("Ask for UNLOCKING for device " << name << " in thread ");
       device_locker.unlock();
-      MTRACE("Device " << this->name << " UNLOCKed");
+      MTRACE("Device " << name << " UNLOCKed");
     }
 
     /* ======================================================================= */
@@ -238,7 +236,7 @@ namespace trezor {
       auto pingMsg = std::make_shared<messages::management::Ping>();
       pingMsg->set_message("PING");
 
-      auto success = this->client_exchange<messages::common::Success>(pingMsg);  // messages::MessageType_Success
+      auto success = client_exchange<messages::common::Success>(pingMsg);  // messages::MessageType_Success
       MDEBUG("Ping response " << success->message());
       (void)success;
     }
@@ -247,7 +245,7 @@ namespace trezor {
       require_connected();
 
       try {
-        this->call_ping_unsafe();
+        call_ping_unsafe();
 
       } catch(exc::TrezorException const& e){
         MINFO("Trezor does not respond: " << e.what());
@@ -258,7 +256,7 @@ namespace trezor {
     void device_trezor_base::write_raw(const google::protobuf::Message * msg){
       require_connected();
       CHECK_AND_ASSERT_THROW_MES(msg, "Empty message");
-      this->get_transport()->write(*msg);
+      get_transport()->write(*msg);
     }
 
     GenericMessage device_trezor_base::read_raw(){
@@ -266,7 +264,7 @@ namespace trezor {
       std::shared_ptr<google::protobuf::Message> msg_resp;
       hw::trezor::messages::MessageType msg_resp_type;
 
-      this->get_transport()->read(msg_resp, &msg_resp_type);
+      get_transport()->read(msg_resp, &msg_resp_type);
       return GenericMessage(msg_resp_type, msg_resp);
     }
 
@@ -310,7 +308,7 @@ namespace trezor {
     }
 
     void device_trezor_base::set_derivation_path(const std::string &deriv_path){
-      this->m_wallet_deriv_path.clear();
+      m_wallet_deriv_path.clear();
 
       if (deriv_path.empty() || deriv_path == "-"){
         ensure_derivation_path();
@@ -322,7 +320,7 @@ namespace trezor {
       std::vector<std::string_view> fields = tools::split(deriv_path, "/");
       CHECK_AND_ASSERT_THROW_MES(fields.size() <= 10, "Derivation path is too long");
 
-      this->m_wallet_deriv_path.reserve(fields.size());
+      m_wallet_deriv_path.reserve(fields.size());
       for (auto& cur : fields) {
         // Required pattern: [0-9]+'? but this is simple enough we can avoid using a regex
         if (!cur.empty() && cur.back() == '\'') cur.remove_suffix(1);
@@ -348,7 +346,7 @@ namespace trezor {
       }
 
       try {
-        this->call_ping_unsafe();
+        call_ping_unsafe();
         return true;
 
       } catch(std::exception const& e) {
@@ -365,16 +363,16 @@ namespace trezor {
       require_connected();
       std::string tmp_session_id;
       auto initMsg = std::make_shared<messages::management::Initialize>();
-      const auto data_cleaner = epee::misc_utils::create_scope_leave_handler([&]() {
+      LOKI_DEFER {
         memwipe(&tmp_session_id[0], tmp_session_id.size());
-      });
+      };
 
       if(!m_device_session_id.empty()) {
         tmp_session_id.assign(m_device_session_id.data(), m_device_session_id.size());
         initMsg->set_allocated_session_id(&tmp_session_id);
       }
 
-      m_features = this->client_exchange<messages::management::Features>(initMsg);
+      m_features = client_exchange<messages::management::Features>(initMsg);
       if (m_features->has_session_id()){
         m_device_session_id = m_features->session_id();
       } else {
@@ -458,12 +456,12 @@ namespace trezor {
         m.set_allocated_pin(&pin_field);
       }
 
-      const auto data_cleaner = epee::misc_utils::create_scope_leave_handler([&]() {
+      LOKI_DEFER {
         m.release_pin();
         if (!pin_field.empty()){
           memwipe(&pin_field[0], pin_field.size());
         }
-      });
+      };
 
       resp = call_raw(&m);
     }
@@ -515,12 +513,12 @@ namespace trezor {
         }
       }
 
-      const auto data_cleaner = epee::misc_utils::create_scope_leave_handler([&]() {
+      LOKI_DEFER {
         m.release_passphrase();
         if (!passphrase_field.empty()){
           memwipe(&passphrase_field[0], passphrase_field.size());
         }
-      });
+      };
 
       resp = call_raw(&m);
     }

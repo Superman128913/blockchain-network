@@ -41,7 +41,6 @@
 #if defined(PER_BLOCK_CHECKPOINT)
 #include "blocks/blocks.h"
 #endif
-#include "rpc/daemon_handler.h"
 #include "rpc/rpc_args.h"
 #include "rpc/http_server.h"
 #include "rpc/lmq_server.h"
@@ -319,9 +318,6 @@ bool daemon::run(bool interactive)
       MGINFO("Starting public HTTP RPC server");
       http_rpc_public->start();
     }
-
-    MGINFO("Starting RPC daemon handler");
-    cryptonote::rpc::DaemonHandler rpc_daemon_handler(*core, *p2p);
 
     std::unique_ptr<daemonize::command_server> rpc_commands;
     if (interactive)

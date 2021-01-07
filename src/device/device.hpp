@@ -33,6 +33,8 @@
 #include "crypto/chacha.h"
 #include "ringct/rctTypes.h"
 #include "cryptonote_config.h"
+#include "epee/wipeable_string.h"
+#include "cryptonote_basic/txtypes.h"
 
 
 #ifndef USE_DEVICE_LEDGER
@@ -118,10 +120,10 @@ namespace hw {
         /* ======================================================================= */
         /*                              SETUP/TEARDOWN                             */
         /* ======================================================================= */
-        virtual bool set_name(const std::string &name) = 0;
-        virtual const std::string get_name() const = 0;
+        virtual bool set_name(std::string_view name) = 0;
+        virtual std::string get_name() const = 0;
 
-        virtual  bool init(void) = 0;
+        virtual bool init(void) = 0;
         virtual bool release() = 0;
 
         virtual bool connect(void) = 0;
@@ -178,6 +180,9 @@ namespace hw {
         virtual bool  derive_public_key(const crypto::key_derivation &derivation, const std::size_t output_index, const crypto::public_key &pub,  crypto::public_key &derived_pub) = 0;
         virtual bool  secret_key_to_public_key(const crypto::secret_key &sec, crypto::public_key &pub) = 0;
         virtual bool  generate_key_image(const crypto::public_key &pub, const crypto::secret_key &sec, crypto::key_image &image) = 0;
+        virtual bool  generate_key_image_signature(const crypto::key_image& image, const crypto::public_key& pub, const crypto::secret_key& sec, crypto::signature& sig) = 0;
+        virtual bool  generate_unlock_signature(const crypto::public_key& pub, const crypto::secret_key& sec, crypto::signature& sig) = 0;
+        virtual bool  generate_lns_signature(std::string_view signature_data, const cryptonote::account_keys& keys, const cryptonote::subaddress_index& index, crypto::signature& sig) = 0;
 
         // alternative prototypes available in libringct
         rct::key scalarmultKey(const rct::key &P, const rct::key &a)
@@ -202,7 +207,7 @@ namespace hw {
                                        const crypto::public_key &R, const crypto::public_key &A, const std::optional<crypto::public_key> &B, const crypto::public_key &D, const crypto::secret_key &r,
                                        crypto::signature &sig) = 0;
 
-        virtual bool  open_tx(crypto::secret_key &tx_key) = 0;
+        virtual bool  open_tx(crypto::secret_key &tx_key, cryptonote::txversion txversion, cryptonote::txtype txtype) = 0;
 
         virtual void get_transaction_prefix_hash(const cryptonote::transaction_prefix& tx, crypto::hash& h) = 0;
         
@@ -218,22 +223,31 @@ namespace hw {
         virtual bool  ecdhEncode(rct::ecdhTuple & unmasked, const rct::key & sharedSec, bool short_amount) = 0;
         virtual bool  ecdhDecode(rct::ecdhTuple & masked, const rct::key & sharedSec, bool short_amount) = 0;
 
-        virtual bool  generate_output_ephemeral_keys(const size_t tx_version, bool &found_change, const cryptonote::account_keys &sender_account_keys, const crypto::public_key &txkey_pub,  const crypto::secret_key &tx_key,
-                                                     const cryptonote::tx_destination_entry &dst_entr, const std::optional<cryptonote::tx_destination_entry> &change_addr, const size_t output_index,
-                                                     const bool &need_additional_txkeys, const std::vector<crypto::secret_key> &additional_tx_keys,
-                                                     std::vector<crypto::public_key> &additional_tx_public_keys,
-                                                     std::vector<rct::key> &amount_keys,
-                                                     crypto::public_key &out_eph_public_key) = 0;
+        virtual bool generate_output_ephemeral_keys(
+                size_t tx_version,
+                bool& found_change,
+                const cryptonote::account_keys& sender_account_keys,
+                const crypto::public_key& txkey_pub,
+                const crypto::secret_key& tx_key,
+                const cryptonote::tx_destination_entry& dst_entr,
+                const std::optional<cryptonote::tx_destination_entry>& change_addr,
+                size_t output_index,
+                bool need_additional_txkeys,
+                const std::vector<crypto::secret_key>& additional_tx_keys,
+                std::vector<crypto::public_key>& additional_tx_public_keys,
+                std::vector<rct::key>& amount_keys,
+                crypto::public_key& out_eph_public_key) = 0;
 
-        virtual bool  mlsag_prehash(const std::string &blob, size_t inputs_size, size_t outputs_size, const rct::keyV &hashes, const rct::ctkeyV &outPk, rct::key &prehash) = 0;
-        virtual bool  mlsag_prepare(const rct::key &H, const rct::key &xx, rct::key &a, rct::key &aG, rct::key &aHP, rct::key &rvII) = 0;
-        virtual bool  mlsag_prepare(rct::key &a, rct::key &aG) = 0;
-        virtual bool  mlsag_hash(const rct::keyV &long_message, rct::key &c) = 0;
-        virtual bool  mlsag_sign(const rct::key &c, const rct::keyV &xx, const rct::keyV &alpha, const size_t rows, const size_t dsRows, rct::keyV &ss) = 0;
-
+        virtual bool clsag_prehash(const std::string &blob, size_t inputs_size, size_t outputs_size, const rct::keyV &hashes, const rct::ctkeyV &outPk, rct::key &prehash) = 0;
         virtual bool clsag_prepare(const rct::key &p, const rct::key &z, rct::key &I, rct::key &D, const rct::key &H, rct::key &a, rct::key &aG, rct::key &aH) = 0;
         virtual bool clsag_hash(const rct::keyV &data, rct::key &hash) = 0;
         virtual bool clsag_sign(const rct::key &c, const rct::key &a, const rct::key &p, const rct::key &z, const rct::key &mu_P, const rct::key &mu_C, rct::key &s) = 0;
+
+        // Retrieves the tx secret key from the device; this should only be called for staking
+        // transactions.  `key` will be whatever we got back from the device, but for hardware
+        // devices that value may be encrypted or null; this call should update it to the actual
+        // secret key value, if necessary.
+        virtual bool update_staking_tx_secret_key(crypto::secret_key& key) = 0;
 
         virtual bool  close_tx(void) = 0;
 
@@ -249,10 +263,10 @@ namespace hw {
         device_mode mode;
     } ;
 
-    struct reset_mode {
+    struct mode_resetter {
         device& hwref;
-        reset_mode(hw::device& dev) : hwref(dev) { }
-        ~reset_mode() { hwref.set_mode(hw::device::NONE);}
+        mode_resetter(hw::device& dev) : hwref(dev) { }
+        ~mode_resetter() { hwref.set_mode(hw::device::NONE);}
     };
 
     class device_registry {

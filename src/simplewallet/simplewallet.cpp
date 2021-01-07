@@ -144,6 +144,7 @@ namespace
   const command_line::arg_descriptor<std::string> arg_restore_date = {"restore-date", sw::tr("Restore from estimated blockchain height on specified date"), ""};
   const command_line::arg_descriptor<bool> arg_do_not_relay = {"do-not-relay", sw::tr("The newly created transaction will not be relayed to the loki network"), false};
   const command_line::arg_descriptor<bool> arg_create_address_file = {"create-address-file", sw::tr("Create an address file for new wallets"), false};
+  const command_line::arg_descriptor<std::string> arg_create_hwdev_txt = {"create-hwdev-txt", sw::tr("Create a .hwdev.txt file for new hardware-backed wallets containing the given comment")};
   const command_line::arg_descriptor<std::string> arg_subaddress_lookahead = {"subaddress-lookahead", tools::wallet2::tr("Set subaddress lookahead sizes to <major>:<minor>"), ""};
   const command_line::arg_descriptor<bool> arg_use_english_language_names = {"use-english-language-names", sw::tr("Display English language names"), false};
 
@@ -3497,6 +3498,8 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     if(!ask_wallet_create_if_needed()) return false;
   }
 
+  std::string default_restore_value = "0";
+
   if (!m_generate_new.empty() || m_restoring)
   {
     if (!m_subaddress_lookahead.empty() && !parse_subaddress_lookahead(m_subaddress_lookahead))
@@ -3901,26 +3904,11 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     {
       m_wallet_file = m_generate_from_device;
       // create wallet
-      auto r = new_wallet(vm);
+      auto r = new_device_wallet(vm);
       CHECK_AND_ASSERT_MES(r, false, tr("account creation failed"));
       password = *r;
       welcome = true;
-      // if no block_height is specified, assume its a new account and start it "now"
-      if(m_wallet->get_refresh_from_block_height() == 0) {
-        {
-          tools::scoped_message_writer wrt = tools::msg_writer();
-          wrt << tr("No restore height is specified.") << " ";
-          wrt << tr("Assumed you are creating a new account, restore will be done from current estimated blockchain height.") << " ";
-          wrt << tr("Use --restore-height or --restore-date if you want to restore an already setup account from a specific height.");
-        }
-        std::string confirm = input_line(tr("Is this okay?"), true);
-        if (std::cin.eof() || !command_line::is_yes(confirm))
-          CHECK_AND_ASSERT_MES(false, false, tr("account creation aborted"));
-
-        m_wallet->set_refresh_from_block_height(m_wallet->estimate_blockchain_height() > 0 ? m_wallet->estimate_blockchain_height() - 1 : 0);
-        m_wallet->explicit_refresh_from_block_height(true);
-        m_restore_height = m_wallet->get_refresh_from_block_height();
-      }
+      default_restore_value = "curr";
     }
     else
     {
@@ -3939,7 +3927,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       welcome = true;
     }
 
-    if (m_restoring && m_generate_from_json.empty() && m_generate_from_device.empty())
+    if (m_restoring && m_generate_from_json.empty())
     {
       m_wallet->explicit_refresh_from_block_height(!(command_line::is_arg_defaulted(vm, arg_restore_height) &&
         command_line::is_arg_defaulted(vm, arg_restore_date)));
@@ -3968,18 +3956,24 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       bool connected = try_connect_to_daemon(false, &version);
       while (true)
       {
-        std::string heightstr;
-        if (!connected || version < rpc::version_t{1, 6})
-          heightstr = input_line("Restore from specific blockchain height (optional, default 0)");
-        else
-          heightstr = input_line("Restore from specific blockchain height (optional, default 0),\nor alternatively from specific date (YYYY-MM-DD)");
+        std::string prompt =
+            "\nEnter wallet restore blockchain height (e.g. 123456) or restore date\n"
+            "(e.g. 2020-07-21). Enter \"curr\" to use the current blockchain height.\n"
+            "NOTE: transactions before the restore height will not be detected.\n"
+            "[";
+        prompt += default_restore_value;
+        prompt += "]";
+        std::string heightstr = input_line(prompt);
         if (std::cin.eof())
           return false;
         if (heightstr.empty())
-        {
-          m_restore_height = 0;
+          heightstr = default_restore_value;
+        if (heightstr == "curr") {
+          m_restore_height = m_wallet->estimate_blockchain_height();
+          if (m_restore_height) --m_restore_height;
           break;
         }
+
         try
         {
           m_restore_height = boost::lexical_cast<uint64_t>(heightstr);
@@ -4367,7 +4361,7 @@ std::optional<epee::wipeable_string> simple_wallet::new_wallet(const boost::prog
 }
 
 //----------------------------------------------------------------------------------------------------
-std::optional<epee::wipeable_string> simple_wallet::new_wallet(const boost::program_options::variables_map& vm)
+std::optional<epee::wipeable_string> simple_wallet::new_device_wallet(const boost::program_options::variables_map& vm)
 {
   std::pair<std::unique_ptr<tools::wallet2>, tools::password_container> rc;
   try { rc = tools::wallet2::make_new(vm, false, password_prompter); }
@@ -4395,10 +4389,18 @@ std::optional<epee::wipeable_string> simple_wallet::new_wallet(const boost::prog
   try
   {
     bool create_address_file = command_line::get_arg(vm, arg_create_address_file);
+    std::optional<std::string> create_hwdev_txt;
+    if (!command_line::is_arg_defaulted(vm, arg_create_hwdev_txt))
+      create_hwdev_txt = command_line::get_arg(vm, arg_create_hwdev_txt);
     m_wallet->device_derivation_path(device_derivation_path);
-    m_wallet->restore(m_wallet_file, std::move(rc.second).password(), device_desc.empty() ? "Ledger" : device_desc, create_address_file);
-    message_writer(epee::console_color_white, true) << tr("Generated new wallet on hw device: ")
-      << m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+    message_writer(epee::console_color_white, true) << tr("Connecting to hardware device");
+    message_writer() << tr("Your hardware device will ask for permission to export your wallet view key.\n"
+                           "This is optional, but will significantly improve wallet syncing speed. Your\n"
+                           "spend key (needed to spend funds) does not leave the device.");
+    m_wallet->restore_from_device(
+            m_wallet_file, std::move(rc.second).password(), device_desc.empty() ? "Ledger" : device_desc, create_address_file,
+            std::move(create_hwdev_txt), [](const std::string& msg) { message_writer(epee::console_color_green, true) << msg; });
+    message_writer(epee::console_color_white, true) << tr("Finished setting up wallet from hw device");
   }
   catch (const std::exception& e)
   {
@@ -4504,7 +4506,7 @@ std::optional<epee::wipeable_string> simple_wallet::open_wallet(const boost::pro
       prefix = (boost::format(tr("Opened %u/%u multisig wallet%s")) % threshold % total % (ready ? "" : " (not yet finalized)")).str();
     else
       prefix = tr("Opened wallet");
-    message_writer(epee::console_color_white, true) <<
+    message_writer(epee::console_color_green, true) <<
       prefix << ": " << m_wallet->get_account().get_public_address_str(m_wallet->nettype());
     if (m_wallet->get_account().get_device()) {
        message_writer(epee::console_color_white, true) << "Wallet is on device: " << m_wallet->get_account().get_device().get_name();
@@ -6150,12 +6152,10 @@ bool simple_wallet::stake(const std::vector<std::string> &args_)
     m_wallet->refresh(false);
     try
     {
-      address_parse_info info = {};
-      info.address            = m_wallet->get_address();
 
       time_t begin_construct_time = time(nullptr);
 
-      tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(service_node_key, info, amount, amount_fraction, priority, m_current_subaddress_account, subaddr_indices);
+      tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(service_node_key, amount, amount_fraction, priority, subaddr_indices);
       if (stake_result.status != tools::wallet2::stake_result_status::success)
       {
         fail_msg_writer() << stake_result.msg;
@@ -6166,6 +6166,8 @@ bool simple_wallet::stake(const std::vector<std::string> &args_)
         tools::msg_writer() << stake_result.msg;
 
       std::vector<tools::wallet2::pending_tx> ptx_vector = {stake_result.ptx};
+      cryptonote::address_parse_info info = {};
+      info.address = m_wallet->get_address();
       if (!sweep_main_internal(sweep_type_t::stake, ptx_vector, info, false /* don't blink */))
       {
         fail_msg_writer() << tr("Sending stake transaction failed");
@@ -6271,12 +6273,7 @@ bool simple_wallet::query_locked_stakes(bool print_result)
   std::string msg_buf;
   {
     using namespace cryptonote;
-    auto [success, response] = m_wallet->get_all_service_nodes();
-    if (!success)
-    {
-      fail_msg_writer() << "Connection to daemon failed when requesting full service node list";
-      return has_locked_stakes;
-    }
+    auto response = m_wallet->list_current_stakes();
 
     cryptonote::account_public_address const primary_address = m_wallet->get_address();
     for (rpc::GET_SERVICE_NODES::response::entry const &node_info : response)
@@ -6284,16 +6281,6 @@ bool simple_wallet::query_locked_stakes(bool print_result)
       bool only_once = true;
       for (const auto& contributor : node_info.contributors)
       {
-        address_parse_info address_info = {};
-        if (!cryptonote::get_account_address_from_str(address_info, m_wallet->nettype(), contributor.address))
-        {
-          fail_msg_writer() << tr("Failed to parse string representation of address: ") << contributor.address;
-          continue;
-        }
-
-        if (primary_address != address_info.address)
-          continue;
-
         for (size_t i = 0; i < contributor.locked_contributions.size(); ++i)
         {
           const auto& contribution = contributor.locked_contributions[i];
@@ -8825,7 +8812,7 @@ bool simple_wallet::rescan_blockchain(const std::vector<std::string> &args_)
   }
 
   m_in_manual_refresh.store(true, std::memory_order_relaxed);
-  epee::misc_utils::auto_scope_leave_caller scope_exit_handler = epee::misc_utils::create_scope_leave_handler([&](){m_in_manual_refresh.store(false, std::memory_order_relaxed);});
+  LOKI_DEFER { m_in_manual_refresh.store(false, std::memory_order_relaxed); };
   return refresh_main(start_height, reset_type, true);
 }
 //----------------------------------------------------------------------------------------------------
@@ -10255,6 +10242,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_restore_date);
   command_line::add_arg(desc_params, arg_do_not_relay);
   command_line::add_arg(desc_params, arg_create_address_file);
+  command_line::add_arg(desc_params, arg_create_hwdev_txt);
   command_line::add_arg(desc_params, arg_subaddress_lookahead);
   command_line::add_arg(desc_params, arg_use_english_language_names);
 

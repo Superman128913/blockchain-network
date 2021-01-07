@@ -43,7 +43,6 @@ target_link_libraries(daemon
     p2p
     cryptonote_protocol
     daemonizer
-    serialization
     daemon_rpc_server
     version
     filesystem

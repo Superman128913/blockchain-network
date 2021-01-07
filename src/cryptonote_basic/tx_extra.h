@@ -35,6 +35,7 @@
 #include "serialization/binary_utils.h"
 #include "serialization/variant.h"
 #include "crypto/crypto.h"
+#include "common/hex.h"
 #include "loki_economy.h"
 #include "cryptonote_basic.h"
 
@@ -146,9 +147,13 @@ struct generic_signature
     FIELD(ed25519);
   END_SERIALIZE()
 };
+
 static_assert(sizeof(crypto::ed25519_signature) == sizeof(crypto::signature), "LNS allows storing either ed25519 or monero style signatures, we store all signatures into crypto::signature in LNS");
-inline std::ostream &operator<<(std::ostream &o, const generic_signature &v) { epee::to_hex::formatted(o, epee::as_byte_span(v.data)); return o; }
+inline std::ostream &operator<<(std::ostream &o, const generic_signature &v) {
+    return o << '<' << tools::type_to_hex(v.data) << '>';
 }
+
+} // namespace lns
 
 namespace std {
   static_assert(sizeof(lns::generic_owner) >= sizeof(std::size_t) && alignof(lns::generic_owner) >= alignof(std::size_t),
@@ -431,7 +436,20 @@ namespace cryptonote
   {
     crypto::key_image key_image;
     crypto::signature signature;
-    uint32_t          nonce;
+    uint32_t          nonce; // TODO: remove this nonce value if we ever have to make other changes to this structure
+
+    // The value we sign when signing an unlock request.  For backwards compatibility we send this as a
+    // "nonce" (although it isn't and never was a nonce), which is required to be an unsigned 32-bit
+    // value.  We could just as easily sign with crypto::null_hash, but using a distinct value makes it
+    // slightly less likely that we could end up using the same message as some other signing process.
+    static constexpr crypto::hash HASH{
+      'U','N','L','K','U','N','L','K','U','N','L','K','U','N','L','K',
+      'U','N','L','K','U','N','L','K','U','N','L','K','U','N','L','K'};
+    // For now, we still have to send that (not a) "nonce" value in the unlock tx on the wire, but
+    // future HF versions could remove it from the wire (though at 4 bytes it isn't worth doing
+    // until we also need to make some other change to unlocks here).  So for now, we always send
+    // this in `nonce`.
+    static constexpr uint32_t FAKE_NONCE = 0x4B4C4E55;
 
     // Compares equal if this represents the same key image unlock (but does *not* require equality of signature/nonce)
     bool operator==(const tx_extra_tx_key_image_unlock &other) const { return key_image == other.key_image; }
@@ -475,71 +493,24 @@ namespace cryptonote
     // and has a non-null txid set (which should point to the most recent registration or update).
     bool is_renewing() const { return fields == lns::extra_field::none && prev_txid && is_lokinet_type(type); }
 
-    static tx_extra_loki_name_system make_buy(lns::generic_owner const &owner, lns::generic_owner const *backup_owner, lns::mapping_type type, crypto::hash const &name_hash, std::string const &encrypted_value, crypto::hash const &prev_txid)
-    {
-      tx_extra_loki_name_system result = {};
-      result.fields                    = lns::extra_field::buy;
-      result.owner                     = owner;
+    static tx_extra_loki_name_system make_buy(
+        lns::generic_owner const& owner,
+        lns::generic_owner const* backup_owner,
+        lns::mapping_type type,
+        const crypto::hash& name_hash,
+        const std::string& encrypted_value,
+        const crypto::hash& prev_txid);
 
-      if (backup_owner)
-        result.backup_owner = *backup_owner;
-      else
-        result.fields = lns::extra_field::buy_no_backup;
+    static tx_extra_loki_name_system make_renew(lns::mapping_type type, const crypto::hash& name_hash, const crypto::hash& prev_txid);
 
-      result.type            = type;
-      result.name_hash       = name_hash;
-      result.encrypted_value = encrypted_value;
-      result.prev_txid       = prev_txid;
-      return result;
-    }
-
-    static tx_extra_loki_name_system make_renew(lns::mapping_type type, crypto::hash const &name_hash, crypto::hash const &prev_txid)
-    {
-      assert(is_lokinet_type(type) && prev_txid);
-
-      tx_extra_loki_name_system result{};
-      result.fields = lns::extra_field::none;
-      result.type = type;
-      result.name_hash = name_hash;
-      result.prev_txid = prev_txid;
-      return result;
-    }
-
-    static tx_extra_loki_name_system make_update(lns::generic_signature const &signature,
-                                                 lns::mapping_type type,
-                                                 crypto::hash const &name_hash,
-                                                 std::string_view encrypted_value,
-                                                 lns::generic_owner const *owner,
-                                                 lns::generic_owner const *backup_owner,
-                                                 crypto::hash const &prev_txid)
-    {
-      tx_extra_loki_name_system result = {};
-      result.signature                 = signature;
-      result.type                      = type;
-      result.name_hash                 = name_hash;
-      result.fields |= lns::extra_field::signature;
-
-      if (encrypted_value.size())
-      {
-        result.fields |= lns::extra_field::encrypted_value;
-        result.encrypted_value = std::string(reinterpret_cast<char const *>(encrypted_value.data()), encrypted_value.size());
-      }
-
-      if (owner)
-      {
-        result.fields |= lns::extra_field::owner;
-        result.owner = *owner;
-      }
-
-      if (backup_owner)
-      {
-        result.fields |= lns::extra_field::backup_owner;
-        result.backup_owner = *backup_owner;
-      }
-
-      result.prev_txid = prev_txid;
-      return result;
-    }
+    static tx_extra_loki_name_system make_update(
+        const lns::generic_signature& signature,
+        lns::mapping_type type,
+        const crypto::hash& name_hash,
+        std::string_view encrypted_value,
+        const lns::generic_owner* owner,
+        const lns::generic_owner* backup_owner,
+        const crypto::hash& prev_txid);
 
     BEGIN_SERIALIZE()
       FIELD(version)

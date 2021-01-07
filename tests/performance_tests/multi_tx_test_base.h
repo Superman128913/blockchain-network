@@ -87,5 +87,5 @@ protected:
 
   std::vector<cryptonote::tx_source_entry> m_sources;
   crypto::public_key m_public_keys[ring_size];
-  const crypto::public_key* m_public_key_ptrs[ring_size];
+  std::vector<const crypto::public_key*> m_public_key_ptrs{ring_size};
 };

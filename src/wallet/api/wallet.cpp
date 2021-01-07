@@ -681,7 +681,7 @@ bool WalletImpl::recoverFromDevice(std::string_view path_, const std::string &pa
     m_recoveringFromDevice = true;
     try
     {
-        m_wallet->restore(path, password, device_name);
+        m_wallet->restore_from_device(path, password, device_name);
         LOG_PRINT_L1("Generated new wallet from device: " + device_name);
     }
     catch (const std::exception& e) {
@@ -992,6 +992,22 @@ uint64_t WalletImpl::balance(uint32_t accountIndex) const
 uint64_t WalletImpl::unlockedBalance(uint32_t accountIndex) const
 {
     return m_wallet->unlocked_balance(accountIndex, false);
+}
+
+std::vector<std::pair<std::string, uint64_t>>* WalletImpl::listCurrentStakes() const
+{
+    std::vector<std::pair<std::string, uint64_t>>* stakes = new std::vector<std::pair<std::string, uint64_t>>;
+
+    auto response = m_wallet->list_current_stakes();
+
+    for (rpc::GET_SERVICE_NODES::response::entry const &node_info : response)
+    {
+        for (const auto& contributor : node_info.contributors)
+        {
+            stakes->push_back(std::make_pair(node_info.service_node_pubkey, contributor.amount));
+        }
+    }
+    return stakes;
 }
 
 uint64_t WalletImpl::blockChainHeight() const
@@ -2422,42 +2438,28 @@ bool WalletImpl::isKeysFileLocked()
     return m_wallet->is_keys_file_locked();
 }
 
-PendingTransaction* WalletImpl::stakePending(const std::string& sn_key_str, const std::string& address_str, const std::string& amount_str, std::string& error_msg)
+PendingTransaction* WalletImpl::stakePending(const std::string& sn_key_str, const uint64_t& amount)
 {
+  /// Note(maxim): need to be careful to call `WalletImpl::disposeTransaction` when it is no longer needed
+  PendingTransactionImpl * transaction = new PendingTransactionImpl(*this);
+  std::string error_msg;
+
   crypto::public_key sn_key;
   if (!tools::hex_to_type(sn_key_str, sn_key))
   {
     error_msg = "Failed to parse service node pubkey";
     LOG_ERROR(error_msg);
-    return nullptr;
+    transaction->setError(error_msg);
+    return transaction;
   }
 
-  cryptonote::address_parse_info addr_info;
-  if (!cryptonote::get_account_address_from_str_or_url(addr_info, m_wallet->nettype(), address_str))
-  {
-    error_msg = "Failed to parse the contributor's address";
-    LOG_ERROR(error_msg);
-    return nullptr;
-  }
-
-  uint64_t amount;
-  if (!cryptonote::parse_amount(amount, amount_str))
-  {
-      std::stringstream str;
-    str << boost::format("Incorrect amount: %1%, expected a nubmber from %2% to %3%") % amount_str % print_money(1) % print_money(std::numeric_limits<uint64_t>::max());
-    error_msg = str.str();
-    LOG_ERROR(error_msg);
-    return nullptr;
-  }
-
-  /// Note(maxim): need to be careful to call `WalletImpl::disposeTransaction` when it is no longer needed
-  PendingTransactionImpl * transaction = new PendingTransactionImpl(*this);
-
-  tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(sn_key, addr_info, amount);
+  tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(sn_key, amount);
   if (stake_result.status != tools::wallet2::stake_result_status::success)
   {
     error_msg = "Failed to create a stake transaction: " + stake_result.msg;
-    return nullptr;
+    LOG_ERROR(error_msg);
+    transaction->setError(error_msg);
+    return transaction;
   }
 
   transaction->m_pending_tx = {stake_result.ptx};
@@ -2466,17 +2468,16 @@ PendingTransaction* WalletImpl::stakePending(const std::string& sn_key_str, cons
 
 StakeUnlockResult* WalletImpl::canRequestStakeUnlock(const std::string &sn_key)
 {
-    tools::wallet2::request_stake_unlock_result res = {};
-
     crypto::public_key snode_key;
     if (!tools::hex_to_type(sn_key, snode_key))
     {
+      tools::wallet2::request_stake_unlock_result res{};
       res.success = false;
       res.msg = "Failed to Parse Service Node Key";
-      return new StakeUnlockResultImpl(res);
+      return new StakeUnlockResultImpl(*this, res);
     }
 
-    return new StakeUnlockResultImpl(m_wallet->can_request_stake_unlock(snode_key));
+    return new StakeUnlockResultImpl(*this, m_wallet->can_request_stake_unlock(snode_key));
 }
 
 StakeUnlockResult* WalletImpl::requestStakeUnlock(const std::string &sn_key)
@@ -2488,7 +2489,7 @@ StakeUnlockResult* WalletImpl::requestStakeUnlock(const std::string &sn_key)
     {
       res.success = false;
       res.msg = "Failed to Parse Service Node Key";
-      return new StakeUnlockResultImpl(res);
+      return new StakeUnlockResultImpl(*this, res);
     }
     tools::wallet2::request_stake_unlock_result unlock_result = m_wallet->can_request_stake_unlock(snode_key);
     if (unlock_result.success)
@@ -2501,17 +2502,17 @@ StakeUnlockResult* WalletImpl::requestStakeUnlock(const std::string &sn_key)
       {
         res.success = false;
         res.msg = "Failed to commit tx.";
-        return new StakeUnlockResultImpl(res);
+        return new StakeUnlockResultImpl(*this, res);
       }
     }
     else
     {
       res.success = false;
       res.msg = tr("Cannot request stake unlock: " + unlock_result.msg);
-      return new StakeUnlockResultImpl(res);
+      return new StakeUnlockResultImpl(*this, res);
     }
 
-    return new StakeUnlockResultImpl(unlock_result);
+    return new StakeUnlockResultImpl(*this, unlock_result);
 }
 
 uint64_t WalletImpl::coldKeyImageSync(uint64_t &spent, uint64_t &unspent)

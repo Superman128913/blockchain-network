@@ -10,7 +10,7 @@ class WalletImpl;
 class StakeUnlockResultImpl : public StakeUnlockResult
 {
 public:
-    StakeUnlockResultImpl(tools::wallet2::request_stake_unlock_result res);
+    StakeUnlockResultImpl(WalletImpl& w, tools::wallet2::request_stake_unlock_result res);
     StakeUnlockResultImpl();
     ~StakeUnlockResultImpl();
 
@@ -19,6 +19,7 @@ public:
     PendingTransaction* ptx() override;
 
 private:
+    WalletImpl& wallet;
     tools::wallet2::request_stake_unlock_result result;
 };
 

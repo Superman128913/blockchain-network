@@ -58,7 +58,7 @@ crypto::chacha_key generate_chacha_key()
 crypto::key_image generate_key_image()
 {
   crypto::key_image key_image;
-  cryptonote::keypair keypair = cryptonote::keypair::generate(hw::get_device("default"));
+  cryptonote::keypair keypair{hw::get_device("default")};
   crypto::generate_key_image(keypair.pub, keypair.sec, key_image);
   return key_image;
 }
