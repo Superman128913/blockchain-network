@@ -292,28 +292,6 @@ namespace tools {
   }
 #endif
 
-  bool create_directories_if_necessary(const fs::path& path)
-  {
-    std::error_code ec;
-    if (fs::is_directory(path, ec))
-    {
-      return true;
-    }
-
-
-    bool res = fs::create_directories(path, ec);
-    if (res)
-    {
-      LOG_PRINT_L2("Created directory: " << path);
-    }
-    else
-    {
-      LOG_PRINT_L2("Can't create directory: " << path << ", err: "<< ec.message());
-    }
-
-    return res;
-  }
-
   void set_strict_default_file_permissions(bool strict)
   {
 #if defined(__MINGW32__) || defined(__MINGW__)

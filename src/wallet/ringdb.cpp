@@ -211,7 +211,9 @@ ringdb::ringdb(fs::path fn_, const std::string &genesis) : filename_{std::move(f
   bool tx_active = false;
   int dbr;
 
-  tools::create_directories_if_necessary(filename_);
+  std::error_code ec;
+  if (fs::create_directories(filename_, ec); ec)
+    MWARNING("Failed to create ringdb directory " << filename_ << ": " << ec.message());
 
   dbr = mdb_env_create(&env);
   THROW_WALLET_EXCEPTION_IF(dbr, tools::error::wallet_internal_error, "Failed to create LDMB environment: " + std::string(mdb_strerror(dbr)));
