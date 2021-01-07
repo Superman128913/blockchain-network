@@ -902,7 +902,8 @@ namespace nodetool
   {
     TRY_ENTRY();
 
-    if (!tools::create_directories_if_necessary(m_config_folder))
+    std::error_code ec;
+    if (fs::create_directories(m_config_folder); ec)
     {
       MWARNING("Failed to create data directory " << m_config_folder);
       return false;

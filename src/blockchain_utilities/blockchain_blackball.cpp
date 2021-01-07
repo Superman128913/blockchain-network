@@ -228,7 +228,8 @@ static void init(fs::path cache_filename)
 
   MINFO("Creating spent output cache in " << cache_filename);
 
-  if (std::error_code ec; !fs::create_directories(cache_filename, ec))
+  std::error_code ec;
+  if (fs::create_directories(cache_filename, ec); ec)
     MWARNING("Failed to create output cache directory " << cache_filename << ": " << ec.message());
 
   int flags = 0;
@@ -951,7 +952,9 @@ static void inc_stat(MDB_txn *txn, const char *key)
 
 static void open_db(const fs::path& filename, MDB_env** env, MDB_txn** txn, MDB_cursor** cur, MDB_dbi* dbi)
 {
-  tools::create_directories_if_necessary(filename);
+  std::error_code ec;
+  if (fs::create_directories(filename, ec); ec)
+    MWARNING("Failed to create lmdb path " << filename << ": " << ec.message());
 
   int flags = MDB_RDONLY;
   if (db_flags & DBF_FAST)
