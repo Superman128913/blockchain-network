@@ -163,11 +163,15 @@ uint64_t PendingTransactionImpl::amount() const
         for (const auto &dest : ptx.dests) {
             result += dest.amount;
         }
-        //TODO(sean)
         service_nodes::staking_components sc;
-        if (service_nodes::tx_get_staking_components_and_amounts(nettype, hf_version, ptx.tx, ptx.block_height, &sc)
-        && sc.transferred > 0)
-        result = sc.transferred;
+        uint64_t height = m_wallet.blockChainHeight();
+        std::optional<uint8_t> hf_version = m_wallet.hardForkVersion();
+        if (hf_version)
+        {
+          if (service_nodes::tx_get_staking_components_and_amounts(static_cast<cryptonote::network_type>(m_wallet.nettype()), *hf_version, ptx.tx, height, &sc)
+          && sc.transferred > 0)
+            result = sc.transferred;
+        }
     }
     return result;
 }
