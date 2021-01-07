@@ -194,7 +194,8 @@ int main(int argc, char const * argv[])
     // Create data dir if it doesn't exist
     auto data_dir = fs::absolute(fs::u8path(command_line::get_arg(vm, cryptonote::arg_data_dir)));
 
-    // Will check if the default data directory is used and if it exists. Then will ensure that migration from the old data directory (.loki) has occurred if it exists.
+    // Will check if the default data directory is used and if it exists. 
+    // Then will ensure that migration from the old data directory (.loki) has occurred if it exists.
     if (command_line::is_arg_defaulted(vm, cryptonote::arg_data_dir) && !fs::exists(data_dir)){
       auto old_data_dir = tools::get_depreciated_default_data_dir();
       if (testnet) old_data_dir /= "testnet";
