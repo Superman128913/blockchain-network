@@ -128,7 +128,11 @@ lmq_rpc::lmq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
     // windows.  In theory we could do some runtime detection to see if the Windows version is new
     // enough to support unix domain sockets, but for now the Windows default is just "don't listen"
 #ifndef _WIN32
-    locals.push_back("ipc://" + core.get_config_directory().u8string() + "/oxend.sock");
+    // Push default .oxen/oxend.sock
+    locals.push_back("ipc://" + core.get_config_directory().u8string() + "/" + CRYPTONOTE_NAME + "d.sock");
+    // Pushing old default lokid.sock onto the list. A symlink from .loki -> .oxen so the user should be able
+    // to communicate via the old .loki/lokid.sock
+    locals.push_back("ipc://" + core.get_config_directory().u8string() + "/lokid.sock");
 #endif
   } else if (locals.size() == 1 && locals[0] == "none") {
     locals.clear();

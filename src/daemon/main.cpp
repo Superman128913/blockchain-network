@@ -61,7 +61,6 @@ using namespace std::literals;
 int main(int argc, char const * argv[])
 {
   try {
-
     // TODO parse the debug options like set log level right here at start
 
     tools::on_startup();
@@ -195,6 +194,24 @@ int main(int argc, char const * argv[])
     // Create data dir if it doesn't exist
     auto data_dir = fs::absolute(fs::u8path(command_line::get_arg(vm, cryptonote::arg_data_dir)));
 
+    // Will check if the default data directory is used and if it exists. Then will ensure that migration from the old data directory (.loki) has occurred if it exists.
+    if (command_line::is_arg_defaulted(vm, cryptonote::arg_data_dir) && !fs::exists(data_dir)){
+      auto old_data_dir = tools::get_depreciated_default_data_dir();
+      if (testnet) old_data_dir /= "testnet";
+      else if (devnet) old_data_dir /= "devnet";
+
+      if (fs::is_directory(old_data_dir))
+      {
+        if (!tools::create_directories_if_necessary(data_dir.parent_path()))
+          throw std::runtime_error{"Data-directory migration failed: can't create " + data_dir.parent_path().u8string()};
+        fs::rename(old_data_dir, data_dir);
+        MGINFO_CYAN("Migrated data directory from " << old_data_dir << " to " << data_dir);
+#ifndef WIN32
+        fs::create_directory_symlink(data_dir, old_data_dir);
+#endif
+      }
+    }
+
     // FIXME: not sure on windows implementation default, needs further review
     //fs::path relative_path_base = daemonizer::get_relative_path_base(vm);
     fs::path relative_path_base = data_dir;
@@ -219,24 +236,7 @@ int main(int argc, char const * argv[])
       mlog_set_log(command_line::get_arg(vm, daemon_args::arg_log_level).c_str());
     }
 
-    // after logs initialized create the data directory. Will check if the default data directory is used and if it exists. Then will ensure that migration from the old data directory (.loki) has occurred if it exists.
-    if (command_line::is_arg_defaulted(vm, cryptonote::arg_data_dir) && !fs::exists(data_dir)){
-      auto old_data_dir = tools::get_depreciated_default_data_dir();
-      if (testnet) old_data_dir /= "testnet";
-      else if (devnet) old_data_dir /= "devnet";
-
-      if (fs::is_directory(old_data_dir))
-      {
-        if (!tools::create_directories_if_necessary(data_dir.parent_path()))
-          throw std::runtime_error{"Data-directory migration failed: can't create " + data_dir.parent_path().u8string()};
-        fs::rename(old_data_dir, data_dir);
-        MGINFO_CYAN("Migrated data directory from " << old_data_dir << " to " << data_dir)
-#ifdef WIN32
-        fs::create_directory_symlink(data_dir, old_data_dir);
-#endif
-        return true;
-      }
-    }
+    // After logs initialized create the data directory.
     tools::create_directories_if_necessary(data_dir);
 
 #ifdef STACK_TRACE
