@@ -350,6 +350,7 @@ namespace rpc {
       bool relayed;
       bool blink;                           // True if this is an approved, blink transaction (only available for in_pool transactions or txes in recent blocks)
       std::optional<extra_entry> extra;     // Parsed tx_extra information (only if requested)
+      std::optional<uint64_t> stake_amount; // Calculated transaction stake amount, if a staking/registration transaction and `stake_info=true` is requested.
 
       KV_MAP_SERIALIZABLE
     };
@@ -361,6 +362,7 @@ namespace rpc {
       bool tx_extra;                       // Parse tx-extra information
       bool split;                          // Always split transactions into non-prunable and prunable parts in the response.  `False` by default.
       bool prune;                          // Like `split`, but also omits the prunable part (or details, for decode_as_json) of transactions from the response.  `False` by default.
+      bool stake_info;                     // If true, calculate staking amount for staking/registration transactions
 
       KV_MAP_SERIALIZABLE
     };
@@ -1102,6 +1104,7 @@ namespace rpc {
     std::string tx_blob;                // Hexadecimal blob represnting the transaction.
     bool blink;                         // True if this is a signed blink transaction
     std::optional<GET_TRANSACTIONS::extra_entry> extra; // Parsed tx_extra information (only if requested)
+    std::optional<uint64_t> stake_amount; // Will be set to the staked amount if the transaction is a staking transaction *and* stake amounts were requested.
 
     KV_MAP_SERIALIZABLE
   };
@@ -1125,6 +1128,7 @@ namespace rpc {
     struct request
     {
       bool tx_extra;                       // Parse tx-extra information and adds it to the `extra` field.
+      bool stake_info;                     // Calculate and include staking contribution amount for registration/staking transactions
 
       KV_MAP_SERIALIZABLE
     };
