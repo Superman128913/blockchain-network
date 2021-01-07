@@ -32,7 +32,7 @@ TEST(oxen_name_system, name_tests)
       {" a.loki ", false},
       {"localhost.loki", false},
       {"localhost", false},
-      {"oxen.loki", false},
+      {"loki.loki", false},
       {"snode.loki", false},
       {"abcdefghijklmnopqrstuvwxyz1234567.loki", false}, // Too long (no hyphen)
       {"a-cdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz0123456789ab.loki", false}, // Too long with hyphen
