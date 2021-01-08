@@ -264,45 +264,11 @@ uint64_t WalletManagerImpl::blockchainTargetHeight()
     return std::max(res->target_height, res->height);
 }
 
-uint64_t WalletManagerImpl::networkDifficulty()
-{
-    auto res = get_info(m_http_client);
-    return res ? res->difficulty : 0;
-}
-
-double WalletManagerImpl::miningHashRate()
-{
-    auto mres = json_rpc<cryptonote::rpc::MINING_STATUS>(m_http_client);
-    return mres && mres->active ? mres->speed : 0.0;
-}
-
 EXPORT
 uint64_t WalletManagerImpl::blockTarget()
 {
     auto res = get_info(m_http_client);
     return res ? res->target : 0;
-}
-
-bool WalletManagerImpl::isMining()
-{
-    auto mres = json_rpc<cryptonote::rpc::MINING_STATUS>(m_http_client);
-    return mres && mres->active;
-}
-
-bool WalletManagerImpl::startMining(const std::string &address, uint32_t threads)
-{
-    cryptonote::rpc::START_MINING::request mreq{};
-    mreq.miner_address = address;
-    mreq.threads_count = threads;
-
-    auto mres = json_rpc<cryptonote::rpc::START_MINING>(m_http_client, mreq);
-    return mres && mres->status == cryptonote::rpc::STATUS_OK;
-}
-
-bool WalletManagerImpl::stopMining()
-{
-    auto mres = json_rpc<cryptonote::rpc::STOP_MINING>(m_http_client);
-    return mres && mres->status == cryptonote::rpc::STATUS_OK;
 }
 
 EXPORT
