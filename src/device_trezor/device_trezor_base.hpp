@@ -154,7 +154,7 @@ namespace trezor {
         }
 
         // Scoped session closer
-        LOKI_DEFER {
+        OXEN_DEFER {
           if (open_session){
             this->get_transport()->close();
           }
@@ -267,9 +267,9 @@ namespace trezor {
     /* ======================================================================= */
     /*                              SETUP/TEARDOWN                             */
     /* ======================================================================= */
-    bool set_name(const std::string &name) override;
+    bool set_name(std::string_view name) override;
 
-    const std::string get_name() const override;
+    std::string get_name() const override;
     bool init() override;
     bool release() override;
     bool connect() override;

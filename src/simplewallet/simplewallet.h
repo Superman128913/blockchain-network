@@ -55,8 +55,8 @@
 #include "common/password.h"
 #include "crypto/crypto.h"  // for definition of crypto::secret_key
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "wallet.simplewallet"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "wallet.simplewallet"
 
 /*!
  * \namespace cryptonote
@@ -110,7 +110,7 @@ namespace cryptonote
         const std::optional<crypto::secret_key>& spendkey, const crypto::secret_key& viewkey);
     std::optional<epee::wipeable_string> new_wallet(const boost::program_options::variables_map& vm,
         const epee::wipeable_string &multisig_keys, const std::string &old_language);
-    std::optional<epee::wipeable_string> new_wallet(const boost::program_options::variables_map& vm);
+    std::optional<epee::wipeable_string> new_device_wallet(const boost::program_options::variables_map& vm);
     std::optional<epee::wipeable_string> open_wallet(const boost::program_options::variables_map& vm);
     bool close_wallet();
 

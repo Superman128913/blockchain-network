@@ -120,7 +120,7 @@ bool gen_rct_tx_validation_base::generate_with_full(std::vector<test_event_entry
     std::vector<crypto::secret_key> additional_tx_keys;
     std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddresses;
     subaddresses[miner_accounts[n].get_keys().m_account_address.m_spend_public_key] = {0,0};
-    loki_construct_tx_params tx_params;
+    oxen_construct_tx_params tx_params;
     tx_params.hf_version = cryptonote::network_version_8;
     bool r = construct_tx_and_get_tx_key(miner_accounts[n].get_keys(), subaddresses, sources, destinations, cryptonote::tx_destination_entry{}, std::vector<uint8_t>(), rct_txes[n], 0, tx_key, additional_tx_keys, {}, nullptr, tx_params);
     CHECK_AND_ASSERT_MES(r, false, "failed to construct transaction");
@@ -134,8 +134,8 @@ bool gen_rct_tx_validation_base::generate_with_full(std::vector<test_event_entry
       CHECK_AND_ASSERT_MES(r, false, "Failed to generate key derivation");
       crypto::secret_key amount_key;
       crypto::derivation_to_scalar(derivation, o, amount_key);
-      const uint8_t type = rct_txes[n].rct_signatures.type;
-      if (type == rct::RCTTypeSimple || type == rct::RCTTypeBulletproof || type == rct::RCTTypeBulletproof2 || type == rct::RCTTypeCLSAG)
+      const auto type = rct_txes[n].rct_signatures.type;
+      if (type == rct::RCTType::Simple || type == rct::RCTType::Bulletproof || type == rct::RCTType::Bulletproof2 || type == rct::RCTType::CLSAG)
         rct::decodeRctSimple(rct_txes[n].rct_signatures, rct::sk2rct(amount_key), o, rct_tx_masks[o+n*4], hw::get_device("default"));
       else
         rct::decodeRct(rct_txes[n].rct_signatures, rct::sk2rct(amount_key), o, rct_tx_masks[o+n*4], hw::get_device("default"));
@@ -226,7 +226,7 @@ bool gen_rct_tx_validation_base::generate_with_full(std::vector<test_event_entry
   std::vector<crypto::secret_key> additional_tx_keys;
   std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddresses;
   subaddresses[miner_accounts[0].get_keys().m_account_address.m_spend_public_key] = {0,0};
-  loki_construct_tx_params tx_params;
+  oxen_construct_tx_params tx_params;
   tx_params.hf_version = cryptonote::network_version_8;
   bool r = construct_tx_and_get_tx_key(miner_accounts[0].get_keys(), subaddresses, sources, destinations, cryptonote::tx_destination_entry{}, std::vector<uint8_t>(), tx, 0, tx_key, additional_tx_keys, rct_config, nullptr, tx_params);
   CHECK_AND_ASSERT_MES(r, false, "failed to construct transaction");
@@ -247,7 +247,7 @@ bool gen_rct_tx_validation_base::generate_with(std::vector<test_event_entry>& ev
     const std::function<void(std::vector<tx_source_entry> &sources, std::vector<tx_destination_entry> &destinations)> &pre_tx,
     const std::function<void(transaction &tx)> &post_tx) const
 {
-  const rct::RCTConfig rct_config { rct::RangeProofBorromean, 0 };
+  const rct::RCTConfig rct_config { rct::RangeProofType::Borromean, 0 };
   return generate_with_full(events, out_idx, mixin, amount_paid, CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE, 4, rct_config, valid, pre_tx, post_tx);
 }
 
@@ -526,6 +526,6 @@ bool gen_rct_tx_uses_output_too_early::generate(std::vector<test_event_entry>& e
   const int mixin = 10;
   const int out_idx[] = {1, -1};
   const uint64_t amount_paid = 10000;
-  const rct::RCTConfig rct_config { rct::RangeProofPaddedBulletproof, 2 };
+  const rct::RCTConfig rct_config { rct::RangeProofType::PaddedBulletproof, 2 };
   return generate_with_full(events, out_idx, mixin, amount_paid, CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE-3, HF_VERSION_ENFORCE_MIN_AGE, rct_config, false, NULL, NULL);
 }

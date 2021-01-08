@@ -42,8 +42,8 @@
 #include "cryptonote_protocol/cryptonote_protocol_handler.h"
 #include "epee/misc_log_ex.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "daemon"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "daemon"
 
 namespace daemonize
 {

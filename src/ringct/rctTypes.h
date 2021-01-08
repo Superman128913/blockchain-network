@@ -32,8 +32,7 @@
 
 #include <cstddef>
 #include <vector>
-#include <iostream>
-#include <cinttypes>
+#include <cstdint>
 #include <sodium/crypto_verify_32.h>
 
 extern "C" {
@@ -44,8 +43,7 @@ extern "C" {
 #include "crypto/generic-ops.h"
 #include "crypto/crypto.h"
 
-#include "epee/hex.h"
-#include "epee/span.h"
+#include "common/hex.h"
 #include "serialization/variant.h"
 #include "common/util.h"
 
@@ -105,6 +103,8 @@ namespace rct {
         key L;
         key R;
         key ki;
+
+        ~multisig_kLRki() { memwipe(&k, sizeof(k)); }
     };
 
     struct multisig_out {
@@ -245,7 +245,7 @@ namespace rct {
       if (Archive::is_deserializer)
         v.resize(size);
       else if (v.size() != size)
-        throw std::invalid_argument{"invalid "s + std::string{tag} + " size"s};
+        throw std::invalid_argument{"invalid " + std::string{tag} + " size: " + std::to_string(size) + " (given size) != " + std::to_string(v.size()) + " (# elements)"};
       return ar.begin_array();
     }
 
@@ -256,26 +256,26 @@ namespace rct {
     // ecdhInfo holds an encoded mask / amount to be passed to each receiver
     // outPk contains public keypairs which are destinations (P, C),
     //  P = address, C = commitment to amount
-    enum {
-      RCTTypeNull = 0,
-      RCTTypeFull = 1,
-      RCTTypeSimple = 2,
-      RCTTypeBulletproof = 3,
-      RCTTypeBulletproof2 = 4,
-      RCTTypeCLSAG = 5,
+    enum class RCTType : uint8_t {
+      Null = 0,
+      Full = 1,
+      Simple = 2,
+      Bulletproof = 3,
+      Bulletproof2 = 4,
+      CLSAG = 5,
     };
 
-    inline bool is_rct_simple(int type) { return tools::equals_any(type, RCTTypeSimple, RCTTypeBulletproof, RCTTypeBulletproof2, RCTTypeCLSAG); }
-    inline bool is_rct_bulletproof(int type) { return tools::equals_any(type, RCTTypeBulletproof, RCTTypeBulletproof2, RCTTypeCLSAG); }
-    inline bool is_rct_borromean(int type) { return tools::equals_any(type, RCTTypeSimple, RCTTypeFull); }
+    inline bool is_rct_simple(RCTType type) { return tools::equals_any(type, RCTType::Simple, RCTType::Bulletproof, RCTType::Bulletproof2, RCTType::CLSAG); }
+    inline bool is_rct_bulletproof(RCTType type) { return tools::equals_any(type, RCTType::Bulletproof, RCTType::Bulletproof2, RCTType::CLSAG); }
+    inline bool is_rct_borromean(RCTType type) { return tools::equals_any(type, RCTType::Simple, RCTType::Full); }
 
-    enum RangeProofType { RangeProofBorromean, RangeProofBulletproof, RangeProofMultiOutputBulletproof, RangeProofPaddedBulletproof };
+    enum class RangeProofType : uint8_t { Borromean = 0, Bulletproof = 1, MultiOutputBulletproof = 2, PaddedBulletproof = 3 };
     struct RCTConfig {
       RangeProofType range_proof_type;
       int bp_version;
     };
     struct rctSigBase {
-        uint8_t type;
+        RCTType type;
         key message;
         ctkeyM mixRing; //the set of all pubkeys / copy
         //pairs that you mix with
@@ -287,10 +287,10 @@ namespace rct {
         template <typename Archive>
         void serialize_rctsig_base(Archive &ar, size_t inputs, size_t outputs)
         {
-          field(ar, "type", type);
-          if (type == RCTTypeNull)
+          field_varint(ar, "type", type, [](const RCTType& x) { return x <= RCTType::CLSAG; });
+          if (type == RCTType::Null)
             return;
-          if (!tools::equals_any(type, RCTTypeFull, RCTTypeSimple, RCTTypeBulletproof, RCTTypeBulletproof2, RCTTypeCLSAG))
+          if (!tools::equals_any(type, RCTType::Full, RCTType::Simple, RCTType::Bulletproof, RCTType::Bulletproof2, RCTType::CLSAG))
             throw std::invalid_argument{"invalid ringct type"};
 
           field_varint(ar, "txnFee", txnFee);
@@ -298,7 +298,7 @@ namespace rct {
           // inputs/outputs not saved, only here for serialization help
           // FIELD(message) - not serialized, it can be reconstructed
           // FIELD(mixRing) - not serialized, it can be reconstructed
-          if (type == RCTTypeSimple) // moved to prunable with bulletproofs
+          if (type == RCTType::Simple) // moved to prunable with bulletproofs
           {
             auto arr = start_array(ar, "pseudoOuts", pseudoOuts, inputs);
             for (auto& e : pseudoOuts)
@@ -307,7 +307,7 @@ namespace rct {
 
           {
             auto arr = start_array(ar, "ecdhInfo", ecdhInfo, outputs);
-            if (tools::equals_any(type, RCTTypeBulletproof2, RCTTypeCLSAG))
+            if (tools::equals_any(type, RCTType::Bulletproof2, RCTType::CLSAG))
             {
               for (auto& e : ecdhInfo) {
                 auto obj = arr.element().begin_object();
@@ -337,16 +337,16 @@ namespace rct {
 
         // when changing this function, update cryptonote::get_pruned_transaction_weight
         template<typename Archive>
-        void serialize_rctsig_prunable(Archive &ar, uint8_t type, size_t inputs, size_t outputs, size_t mixin)
+        void serialize_rctsig_prunable(Archive &ar, RCTType type, size_t inputs, size_t outputs, size_t mixin)
         {
-          if (type == RCTTypeNull)
+          if (type == RCTType::Null)
             return;
-          if (!tools::equals_any(type, RCTTypeFull, RCTTypeSimple, RCTTypeBulletproof, RCTTypeBulletproof2, RCTTypeCLSAG))
+          if (!tools::equals_any(type, RCTType::Full, RCTType::Simple, RCTType::Bulletproof, RCTType::Bulletproof2, RCTType::CLSAG))
             throw std::invalid_argument{"invalid ringct type"};
           if (rct::is_rct_bulletproof(type))
           {
             uint32_t nbp = bulletproofs.size();
-            if (tools::equals_any(type, RCTTypeBulletproof2, RCTTypeCLSAG))
+            if (tools::equals_any(type, RCTType::Bulletproof2, RCTType::CLSAG))
               field_varint(ar, "nbp", nbp);
             else
               field(ar, "nbp", nbp);
@@ -367,7 +367,7 @@ namespace rct {
               value(arr.element(), s);
           }
 
-          if (type == RCTTypeCLSAG)
+          if (type == RCTType::CLSAG)
           {
             auto arr = start_array(ar, "CLSAGs", CLSAGs, inputs);
 
@@ -392,7 +392,7 @@ namespace rct {
             // a simple or full rct signature, and it's starting to annoy the hell out of me
 
             size_t mg_elements = 1, mg_ss2_elements = inputs + 1;
-            if (tools::equals_any(type, RCTTypeSimple, RCTTypeBulletproof, RCTTypeBulletproof2)) {
+            if (tools::equals_any(type, RCTType::Simple, RCTType::Bulletproof, RCTType::Bulletproof2)) {
               mg_elements = inputs;
               mg_ss2_elements = 2;
             }
@@ -425,7 +425,7 @@ namespace rct {
               }
             }
           }
-          if (tools::equals_any(type, RCTTypeBulletproof, RCTTypeBulletproof2, RCTTypeCLSAG))
+          if (tools::equals_any(type, RCTType::Bulletproof, RCTType::Bulletproof2, RCTType::CLSAG))
           {
             auto arr = start_array(ar, "pseudoOuts", pseudoOuts, inputs);
             for (auto& o : pseudoOuts)
@@ -572,7 +572,7 @@ namespace cryptonote {
 
 namespace rct {
 inline std::ostream &operator <<(std::ostream &o, const rct::key &v) {
-  epee::to_hex::formatted(o, epee::as_byte_span(v)); return o;
+  return o << '<' << tools::type_to_hex(v) << '>';
 }
 }
 

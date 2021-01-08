@@ -29,7 +29,7 @@ generate [--overwrite] FILENAME
     FILENAME.  If FILENAME contains the string "PUBKEY" it will be replaced
     with the generated public key value (in hex).
 
-    For an active service node this file is named `key_ed25519` in the lokid
+    For an active service node this file is named `key_ed25519` in the oxend
     data directory.
 
     If FILENAME already exists the command will fail unless the `--overwrite`
@@ -44,7 +44,7 @@ legacy [--overwrite] FILENAME
     If FILENAME already exists the command will fail unless the `--overwrite`
     flag is specified.
 
-    Note that legacy keypairs are not needed as of Loki 8.x; you can use just a
+    Note that legacy keypairs are not needed as of Oxen 8.x; you can use just a
     Ed25519 keypair (and this is the default for new service node
     installations).
 
@@ -76,7 +76,7 @@ restore-legacy [--overwrite] FILENAME
     return exit_code;
 }
 
-int error(int exit_code, std::string_view msg) {
+[[nodiscard]] int error(int exit_code, std::string_view msg) {
     std::cout << "\n" << msg << "\n\n";
     return exit_code;
 }
@@ -282,15 +282,16 @@ int restore(bool ed25519, std::list<std::string_view> args) {
         return error(7, "Invalid input: provide the secret key as 64 hex characters");
     std::array<unsigned char, crypto_sign_SECRETKEYBYTES> skey;
     std::array<unsigned char, crypto_sign_PUBLICKEYBYTES> pubkey;
+    std::array<unsigned char, crypto_sign_SEEDBYTES> seed;
     std::optional<std::array<unsigned char, crypto_sign_PUBLICKEYBYTES>> pubkey_expected;
-    lokimq::from_hex(skey_hex.begin(), skey_hex.begin() + 64, skey.begin());
+    lokimq::from_hex(skey_hex.begin(), skey_hex.begin() + 64, seed.begin());
     if (skey_hex.size() == 128)
         lokimq::from_hex(skey_hex.begin() + 64, skey_hex.end(), pubkey_expected.emplace().begin());
 
     if (ed25519) {
-        crypto_sign_seed_keypair(pubkey.data(), skey.data(), skey.data());
+        crypto_sign_seed_keypair(pubkey.data(), skey.data(), seed.data());
     } else {
-        pubkey = pubkey_from_privkey(skey);
+        pubkey = pubkey_from_privkey(seed);
     }
 
     std::cout << "\nPublic key:      " << lokimq::to_hex(pubkey.begin(), pubkey.end()) << "\n";
@@ -310,7 +311,7 @@ int restore(bool ed25519, std::list<std::string_view> args) {
         std::cout << "\nIs this correct?  Press Enter to continue, Ctrl-C to cancel.\n";
         std::cin.getline(buf, 129);
         if (!std::cin.good())
-            error(99, "Aborted");
+            return error(99, "Aborted");
     }
 
     if (pubkey_pos != std::string::npos)
@@ -326,7 +327,7 @@ int restore(bool ed25519, std::list<std::string_view> args) {
     if (ed25519)
         out.write(reinterpret_cast<const char*>(skey.data()), skey.size());
     else
-        out.write(reinterpret_cast<const char*>(skey.data()), 32);
+        out.write(reinterpret_cast<const char*>(seed.data()), seed.size());
 
     if (!out.good())
         return error(2, "Failed to write to output file '" + filename + "': " + std::strerror(errno));

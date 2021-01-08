@@ -29,6 +29,13 @@ typedef uint64_t uint64;
 #endif
 
 
+// Some versions of GCC produce warnings in here, which seems completely justifiable given how dirty
+// this code is.  Switch the triggering warnings off.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+
+
 typedef struct {
 	int hashbitlen;	   	              /*the message digest size*/
 	unsigned long long databitlen;    /*the message size in bits*/

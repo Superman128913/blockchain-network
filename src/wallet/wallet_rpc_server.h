@@ -44,8 +44,8 @@
 #include "wallet2.h"
 #include "rpc/http_server_base.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "wallet.rpc"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "wallet.rpc"
 
 namespace tools
 {

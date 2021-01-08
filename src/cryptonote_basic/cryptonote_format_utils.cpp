@@ -48,10 +48,10 @@
 #include "ringct/rctSigs.h"
 #include "cryptonote_basic/verification_context.h"
 #include "cryptonote_core/service_node_voting.h"
-#include "cryptonote_core/loki_name_system.h"
+#include "cryptonote_core/oxen_name_system.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "cn"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "cn"
 
 using namespace crypto;
 
@@ -134,7 +134,7 @@ namespace cryptonote
     if (tx.version >= txversion::v2_ringct && !is_coinbase(tx))
     {
       rct::rctSig &rv = tx.rct_signatures;
-      if (rv.type == rct::RCTTypeNull)
+      if (rv.type == rct::RCTType::Null)
         return true;
       if (rv.outPk.size() != tx.vout.size())
       {
@@ -452,7 +452,7 @@ namespace cryptonote
   {
     CHECK_AND_ASSERT_MES(tx.pruned, std::numeric_limits<uint64_t>::max(), "get_pruned_transaction_weight does not support non pruned txes");
     CHECK_AND_ASSERT_MES(tx.version >= txversion::v2_ringct, std::numeric_limits<uint64_t>::max(), "get_pruned_transaction_weight does not support v1 txes");
-    CHECK_AND_ASSERT_MES(tx.rct_signatures.type >= rct::RCTTypeBulletproof2,
+    CHECK_AND_ASSERT_MES(tx.rct_signatures.type >= rct::RCTType::Bulletproof2,
         std::numeric_limits<uint64_t>::max(), "get_pruned_transaction_weight does not support older range proof types");
     CHECK_AND_ASSERT_MES(!tx.vin.empty(), std::numeric_limits<uint64_t>::max(), "empty vin");
     CHECK_AND_ASSERT_MES(std::holds_alternative<cryptonote::txin_to_key>(tx.vin[0]), std::numeric_limits<uint64_t>::max(), "empty vin");
@@ -473,7 +473,7 @@ namespace cryptonote
 
     // calculate deterministic CLSAG/MLSAG data size
     const size_t ring_size = var::get<cryptonote::txin_to_key>(tx.vin[0]).key_offsets.size();
-    if (tx.rct_signatures.type == rct::RCTTypeCLSAG)
+    if (tx.rct_signatures.type == rct::RCTType::CLSAG)
       extra = tx.vin.size() * (ring_size + 2) * 32;
     else
       extra = tx.vin.size() * (ring_size * (1 + 1) * 32 + 32 /* cc */);
@@ -787,7 +787,7 @@ namespace cryptonote
     return crypto::null_pkey;
   }
   //---------------------------------------------------------------
-  void add_loki_name_system_to_tx_extra(std::vector<uint8_t> &tx_extra, tx_extra_loki_name_system const &entry)
+  void add_oxen_name_system_to_tx_extra(std::vector<uint8_t> &tx_extra, tx_extra_oxen_name_system const &entry)
   {
     tx_extra_field field = entry;
     add_tx_extra_field_to_tx_extra(tx_extra, field);
@@ -1058,7 +1058,7 @@ namespace cryptonote
     switch (decimal_point)
     {
       case 9:
-        return "loki";
+        return "oxen";
       case 6:
         return "megarok";
       case 3:
@@ -1185,15 +1185,13 @@ namespace cryptonote
     }
     else
     {
-      transaction &tt = const_cast<transaction&>(t);
       serialization::binary_string_archiver ba;
-      const size_t inputs = t.vin.size();
-      const size_t outputs = t.vout.size();
       size_t mixin = 0;
       if (t.vin.size() > 0 && std::holds_alternative<txin_to_key>(t.vin[0]))
         mixin = var::get<txin_to_key>(t.vin[0]).key_offsets.size() - 1;
       try {
-        tt.rct_signatures.p.serialize_rctsig_prunable(ba, t.rct_signatures.type, inputs, outputs, mixin);
+        const_cast<transaction&>(t).rct_signatures.p.serialize_rctsig_prunable(
+                ba, t.rct_signatures.type, t.vin.size(), t.vout.size(), mixin);
       } catch (const std::exception& e) {
         LOG_ERROR("Failed to serialize rct signatures (prunable): " << e.what());
         return false;
@@ -1234,7 +1232,7 @@ namespace cryptonote
     }
 
     // prunable rct
-    if (t.rct_signatures.type == rct::RCTTypeNull)
+    if (t.rct_signatures.type == rct::RCTType::Null)
       hashes[2] = crypto::null_hash;
     else
       hashes[2] = pruned_data_hash;
@@ -1262,7 +1260,7 @@ namespace cryptonote
     const blobdata blob = tx_to_blob(t);
     CHECK_AND_ASSERT_MES(!blob.empty(), false, "Failed to convert tx to blob");
 
-    // TODO(loki): Not sure if this is the right fix, we may just want to set
+    // TODO(oxen): Not sure if this is the right fix, we may just want to set
     // unprunable size to the size of the prefix because technically that is
     // what it is and then keep this code path.
     if (t.is_transfer())
@@ -1289,7 +1287,7 @@ namespace cryptonote
     }
 
     // prunable rct
-    if (t.rct_signatures.type == rct::RCTTypeNull)
+    if (t.rct_signatures.type == rct::RCTType::Null)
     {
       hashes[2] = crypto::null_hash;
     }

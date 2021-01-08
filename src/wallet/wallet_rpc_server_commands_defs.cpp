@@ -857,6 +857,9 @@ KV_SERIALIZE_MAP_CODE_BEGIN(CREATE_WALLET::request)
   KV_SERIALIZE(filename)
   KV_SERIALIZE(password)
   KV_SERIALIZE(language)
+  KV_SERIALIZE(hardware_wallet)
+  KV_SERIALIZE(device_name)
+  KV_SERIALIZE(device_label)
 KV_SERIALIZE_MAP_CODE_END()
 
 

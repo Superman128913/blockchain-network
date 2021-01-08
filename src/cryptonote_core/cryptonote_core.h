@@ -56,7 +56,7 @@
 PUSH_WARNINGS
 DISABLE_VS_WARNINGS(4355)
 
-#include "common/loki_integration_test_hooks.h"
+#include "common/oxen_integration_test_hooks.h"
 namespace cryptonote
 {
    struct test_options {
@@ -1018,7 +1018,7 @@ namespace cryptonote
      bool relay_txpool_transactions();
 
      /**
-      * @brief returns the lokid config directory
+      * @brief returns the oxend config directory
       */
      const fs::path& get_config_directory() const { return m_config_folder; }
 

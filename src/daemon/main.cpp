@@ -51,8 +51,8 @@
 #include "common/stack_trace.h"
 #endif // STACK_TRACE
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "daemon"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "daemon"
 
 namespace po = boost::program_options;
 
@@ -61,7 +61,6 @@ using namespace std::literals;
 int main(int argc, char const * argv[])
 {
   try {
-
     // TODO parse the debug options like set log level right here at start
 
     tools::on_startup();
@@ -118,27 +117,105 @@ int main(int argc, char const * argv[])
     });
     if (!ok) return 1;
 
+    // Some ANSI color sequences that we use here (before the log system is initialized):
+    constexpr auto RESET = "\033[0m";
+    constexpr auto RED = "\033[31;1m";
+    constexpr auto YELLOW = "\033[33;1m";
+    constexpr auto CYAN = "\033[36;1m";
+
     if (command_line::get_arg(vm, command_line::arg_help))
     {
-      std::cout << "Loki '" << LOKI_RELEASE_NAME << "' (v" << LOKI_VERSION_FULL << ")\n\n";
+      std::cout << CYAN << "Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")" << RESET << "\n\n";
       std::cout << "Usage: " + std::string{argv[0]} + " [options|settings] [daemon_command...]" << std::endl << std::endl;
       std::cout << visible_options << std::endl;
       return 0;
     }
 
-    // Loki Version
+    // Oxen Version
     if (command_line::get_arg(vm, command_line::arg_version))
     {
-      std::cout << "Loki '" << LOKI_RELEASE_NAME << "' (v" << LOKI_VERSION_FULL << ")\n\n";
+      std::cout << CYAN << "Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")" << RESET << "\n\n";
       return 0;
     }
 
-    auto config = fs::u8path(command_line::get_arg(vm, daemon_args::arg_config_file));
-    if (std::error_code ec; fs::exists(config, ec))
+    std::optional<fs::path> load_config;
+
+    if (command_line::is_arg_defaulted(vm, daemon_args::arg_config_file)) {
+      // We are using the default config file, which will be in the data directory, as determined
+      // *only* by the command-line arguments but *not* config file arguments, unlike pretty much
+      // all other command line options (where we load from both, with cli options taking
+      // precendence).  Thus it's possible that the data-dir isn't specified on the command-line
+      // which means *for the purpose of loading the config file* that we use `~/.oxen`, but that
+      // after we load the config file it could be something else.  (In such an edge case, we simply
+      // ignore a <final-data-dir>/oxen.conf).
+      auto data_dir = fs::absolute(fs::u8path(command_line::get_arg(vm, cryptonote::arg_data_dir)));
+
+      // --regtest should append a /regtest to the data-dir, but this is done here rather than in the
+      // defaults because this is a dev-only option that we don't really want the user to need to
+      // worry about.
+      if (command_line::get_arg(vm, cryptonote::arg_regtest_on))
+        data_dir /= "regtest";
+
+      // We also have to worry about migrating loki.conf -> oxen.conf *and* about a potential
+      // ~/.loki -> ~/.oxen migration, so build a list of possible options along with whether we
+      // want to rename if we find one (the data-dir migration happens later):
+      std::list<std::pair<fs::path, bool>> potential;
+      if (std::error_code ec; fs::exists(data_dir, ec)) {
+        potential.emplace_back(data_dir / CRYPTONOTE_NAME ".conf", false);
+        potential.emplace_back(data_dir / "loki.conf", true);
+      } else if (command_line::is_arg_defaulted(vm, cryptonote::arg_data_dir)) {
+        // If we weren't given an explict command-line data-dir then we also need to check the
+        // legacy data directory.  (We will rename it, later, but we have to check it *first*
+        // because it might have a data-dir inside it that affects the data dir rename logic).
+        auto old_data_dir = tools::get_depreciated_default_data_dir();
+        // If we *have* a --testnet or --devnet arg then we can use it, but it's possible that the
+        // config file itself will set and change that, which is why we retrieve those arguments
+        // again later, after parsing the config.
+        if (command_line::get_arg(vm, cryptonote::arg_testnet_on)) old_data_dir /= "testnet";
+        else if (command_line::get_arg(vm, cryptonote::arg_devnet_on)) old_data_dir /= "devnet";
+        else if (command_line::get_arg(vm, cryptonote::arg_regtest_on)) old_data_dir /= "regtest";
+
+        potential.emplace_back(old_data_dir / CRYPTONOTE_NAME ".conf", false);
+        potential.emplace_back(old_data_dir / "loki.conf", true);
+      }
+      for (auto& [conf, rename] : potential) {
+        if (std::error_code ec; fs::exists(conf, ec)) {
+          if (rename) {
+            fs::path renamed = conf;
+            renamed.replace_filename(CRYPTONOTE_NAME ".conf");
+            assert(renamed != conf);
+            if (fs::rename(conf, renamed, ec); ec) {
+              std::cerr << RED << "Failed to migrate " << conf << " -> " << renamed <<
+                ": " << ec.message() << RESET << "\n";
+              return 1;
+            }
+            if (fs::create_symlink(renamed.filename(), conf, ec); ec) {
+              std::cerr << YELLOW << "Failed to create post-migration " << conf << " -> " << renamed <<
+                " symlink: " << ec.message() << RESET << "\n";
+              // Continue anyway as this isn't fatal
+            }
+            std::cerr << CYAN << "Renamed " << conf << " -> " << renamed << RESET << "\n";
+            load_config = std::move(renamed);
+          } else {
+            load_config = std::move(conf);
+          }
+          break;
+        }
+      }
+    } else {
+      // config file explicitly given, no migration
+      load_config = fs::u8path(command_line::get_arg(vm, daemon_args::arg_config_file));
+      if (std::error_code ec; !fs::exists(*load_config, ec)) {
+        std::cerr << RED << "Can't find config file " << *load_config << RESET << "\n";
+        return 1;
+      }
+    }
+
+    if (load_config)
     {
       try
       {
-        fs::ifstream cfg{config};
+        fs::ifstream cfg{*load_config};
         if (!cfg.is_open())
           throw std::runtime_error{"Unable to open file"};
         po::store(po::parse_config_file<char>(
@@ -148,15 +225,9 @@ int main(int argc, char const * argv[])
       }
       catch (const std::exception &e)
       {
-        // log system isn't initialized yet
-        std::cerr << "Error parsing config file: " << e.what() << std::endl;
-        throw;
+        std::cerr << RED << "Error parsing config file: " << e.what() << RESET << "\n";
+        return 1;
       }
-    }
-    else if (!command_line::is_arg_defaulted(vm, daemon_args::arg_config_file))
-    {
-      std::cerr << "Can't find config file " << config << std::endl;
-      return 1;
     }
 
     const bool testnet = command_line::get_arg(vm, cryptonote::arg_testnet_on);
@@ -164,12 +235,12 @@ int main(int argc, char const * argv[])
     const bool regtest = command_line::get_arg(vm, cryptonote::arg_regtest_on);
     if (testnet + devnet + regtest > 1)
     {
-      std::cerr << "Can't specify more than one of --testnet and --devnet and --regtest\n";
+      std::cerr << RED << "Can't specify more than one of --testnet and --devnet and --regtest" << RESET << "\n";
       return 1;
     }
 
     // data_dir
-    //   default: e.g. ~/.loki/ or ~/.loki/testnet
+    //   default: e.g. ~/.oxen/ or ~/.oxen/testnet
     //   if data-dir argument given:
     //     absolute path
     //     relative path: relative to cwd
@@ -177,9 +248,43 @@ int main(int argc, char const * argv[])
     // Create data dir if it doesn't exist
     auto data_dir = fs::absolute(fs::u8path(command_line::get_arg(vm, cryptonote::arg_data_dir)));
 
-    // FIXME: not sure on windows implementation default, needs further review
-    //fs::path relative_path_base = daemonizer::get_relative_path_base(vm);
-    fs::path relative_path_base = data_dir;
+    // --regtest should append a /regtest to the data-dir, but this is done here rather than in the
+    // defaults because this is a dev-only option that we don't really want the user to need to
+    // worry about.
+    if (command_line::get_arg(vm, cryptonote::arg_regtest_on))
+      data_dir /= "regtest";
+
+    // Will check if the default data directory is used and if it exists. 
+    // Then will ensure that migration from the old data directory (.loki) has occurred if it exists.
+    if (command_line::is_arg_defaulted(vm, cryptonote::arg_data_dir) && !fs::exists(data_dir)) {
+      auto old_data_dir = tools::get_depreciated_default_data_dir();
+      if (testnet) old_data_dir /= "testnet";
+      else if (devnet) old_data_dir /= "devnet";
+      else if (regtest) old_data_dir /= "regtest";
+
+      if (fs::is_directory(old_data_dir))
+      {
+        std::error_code ec;
+        if (fs::create_directories(data_dir.parent_path(), ec); ec) {
+          std::cerr << RED << "Data directory migration failed: cannot create "  << data_dir.parent_path()
+            << ": " << ec.message() << RESET << "\n";
+          return 1;
+        }
+        if (fs::rename(old_data_dir, data_dir, ec); ec) {
+          std::cerr << RED << "Data directory migrate failed: could not rename " << old_data_dir << " to " << data_dir
+            << ": " << ec.message() << RESET << "\n";
+          return 1;
+        }
+        if (fs::create_directory_symlink(data_dir, old_data_dir, ec); ec)
+          std::cerr << YELLOW << "Failed to create " << old_data_dir << " -> " << data_dir << " symlink" << RESET << "\n";
+        std::cerr << CYAN << "Migrated data directory from " << old_data_dir << " to " << data_dir << RESET << "\n";
+      }
+    }
+
+    // Create the data directory; we have to do this before initializing the logs because the log
+    // likely goes inside the data dir.
+    if (std::error_code ec; !fs::create_directories(data_dir, ec) && ec)
+      MWARNING("Failed to create data directory " << data_dir << ": " << ec.message());
 
     po::notify(vm);
 
@@ -192,7 +297,7 @@ int main(int argc, char const * argv[])
     if (!command_line::is_arg_defaulted(vm, daemon_args::arg_log_file))
       log_file_path = command_line::get_arg(vm, daemon_args::arg_log_file);
     if (log_file_path.is_relative())
-      log_file_path = fs::absolute(fs::relative(log_file_path, relative_path_base));
+      log_file_path = fs::absolute(fs::relative(log_file_path, data_dir));
     mlog_configure(log_file_path.string(), true, command_line::get_arg(vm, daemon_args::arg_max_log_file_size), command_line::get_arg(vm, daemon_args::arg_max_log_files));
 
     // Set log level
@@ -200,9 +305,6 @@ int main(int argc, char const * argv[])
     {
       mlog_set_log(command_line::get_arg(vm, daemon_args::arg_log_level).c_str());
     }
-
-    // after logs initialized
-    tools::create_directories_if_necessary(data_dir);
 
 #ifdef STACK_TRACE
     tools::set_stack_trace_log(log_file_path.filename().string());
@@ -213,7 +315,7 @@ int main(int argc, char const * argv[])
 
     // logging is now set up
     // FIXME: only print this when starting up as a daemon but not when running rpc commands
-    MGINFO_GREEN("Loki '" << LOKI_RELEASE_NAME << "' (v" << LOKI_VERSION_FULL << ")");
+    MGINFO_CYAN("Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")");
 
     // If there are positional options, we're running a daemon command
     {
@@ -223,7 +325,7 @@ int main(int argc, char const * argv[])
       {
         auto rpc_config = cryptonote::rpc_args::process(vm);
         std::string rpc_addr;
-        // TODO: remove this in loki 9.x and only use rpc-admin
+        // TODO: remove this in oxen 9.x and only use rpc-admin
         if (!is_arg_defaulted(vm, cryptonote::rpc::http_server::arg_rpc_bind_port) ||
             rpc_config.bind_ip.has_value()) {
           auto rpc_port = command_line::get_arg(vm, cryptonote::rpc::http_server::arg_rpc_bind_port);
@@ -236,7 +338,7 @@ int main(int argc, char const * argv[])
         } else {
           rpc_addr = command_line::get_arg(vm, cryptonote::rpc::http_server::arg_rpc_admin)[0];
           if (rpc_addr == "none")
-            throw std::runtime_error{"Cannot invoke lokid command: --rpc-admin is disabled"};
+            throw std::runtime_error{"Cannot invoke oxend command: --rpc-admin is disabled"};
         }
 
         {
@@ -252,7 +354,7 @@ int main(int argc, char const * argv[])
 
     MINFO("Moving from main() into the daemonize now.");
 
-    return daemonizer::daemonize<daemonize::daemon>("Loki Daemon", argc, argv, std::move(vm))
+    return daemonizer::daemonize<daemonize::daemon>("Oxen Daemon", argc, argv, std::move(vm))
         ? 0 : 1;
   }
   catch (std::exception const & ex)

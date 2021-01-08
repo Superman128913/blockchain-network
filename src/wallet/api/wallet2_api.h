@@ -69,6 +69,8 @@ struct PendingTransaction
     /// returns true if the status is currently set to Status_Ok, false otherwise.
     /// For more details, call status() instead.
     virtual bool good() const = 0;
+    /// sets error status to true with reason
+    virtual void setError(std::string error_msg) = 0;
     /// returns error status code (Status_Ok, Status_Error, or Status_Critical) and error string.
     virtual std::pair<int, std::string> status() const = 0;
     // commit transaction or save to file if filename (utf-8) is provided.
@@ -599,6 +601,12 @@ struct Wallet
     }
 
    /**
+    * @brief listCurrentStakes - returns a list of the wallets locked stakes, provides both service node address and the staked amount
+    * @return
+    */
+    virtual std::vector<std::pair<std::string, uint64_t>>* listCurrentStakes() const = 0;
+
+   /**
     * @brief watchOnly - checks if wallet is watch only
     * @return - true if watch only
     */
@@ -1009,7 +1017,7 @@ struct Wallet
     virtual Device getDeviceType() const = 0;
 
     /// Prepare a staking transaction; return nullptr on failure
-    virtual PendingTransaction* stakePending(const std::string& service_node_key, const std::string& address, const std::string& amount, std::string& error_msg) = 0;
+    virtual PendingTransaction* stakePending(const std::string& service_node_key, const uint64_t& amount) = 0;
 
     virtual StakeUnlockResult* canRequestStakeUnlock(const std::string &sn_key) = 0;
 

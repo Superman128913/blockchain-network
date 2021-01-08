@@ -30,12 +30,11 @@
 
 #pragma once
 
-#include <stddef.h>
-#include <iostream>
+#include <cstddef>
+#include <ostream>
 
 #include "generic-ops.h"
-#include "epee/hex.h"
-#include "epee/span.h"
+#include "common/hex.h"
 #include "crypto/cn_heavy_hash.hpp"
 
 namespace crypto {
@@ -158,10 +157,10 @@ namespace crypto {
   }
 
   inline std::ostream &operator <<(std::ostream &o, const crypto::hash &v) {
-    epee::to_hex::formatted(o, epee::as_byte_span(v)); return o;
+    return o << '<' << tools::type_to_hex(v) << '>';
   }
   inline std::ostream &operator <<(std::ostream &o, const crypto::hash8 &v) {
-    epee::to_hex::formatted(o, epee::as_byte_span(v)); return o;
+    return o << '<' << tools::type_to_hex(v) << '>';
   }
 
   constexpr inline crypto::hash null_hash = {};

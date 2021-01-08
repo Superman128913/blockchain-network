@@ -50,8 +50,8 @@
 #include "common/perf_timer.h"
 #include "crypto/hash.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "txpool"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "txpool"
 
 DISABLE_VS_WARNINGS(4244 4345 4503) //'boost::foreach_detail_::or_' : decorated name length exceeded, name was truncated
 
@@ -186,9 +186,9 @@ namespace cryptonote
       }
 
     }
-    else if (tx.type == txtype::loki_name_system)
+    else if (tx.type == txtype::oxen_name_system)
     {
-      tx_extra_loki_name_system data;
+      tx_extra_oxen_name_system data;
       if (!cryptonote::get_field_from_tx_extra(tx.extra, data))
       {
         MERROR("Could not get acquire name service from tx: " << get_transaction_hash(tx) << ", tx to add is possibly invalid, rejecting");
@@ -202,7 +202,7 @@ namespace cryptonote
         if (pool_tx.type != tx.type)
           continue;
 
-        tx_extra_loki_name_system pool_data;
+        tx_extra_oxen_name_system pool_data;
         if (!cryptonote::get_field_from_tx_extra(pool_tx.extra, pool_data))
         {
           LOG_PRINT_L1("Could not get acquire name service from tx: " << get_transaction_hash(tx) << ", possibly corrupt tx in the pool");
@@ -220,7 +220,7 @@ namespace cryptonote
     {
       if (tx.type != txtype::standard && tx.type != txtype::stake)
       {
-        // NOTE(loki): This is a developer error. If we come across this in production, be conservative and just reject
+        // NOTE(oxen): This is a developer error. If we come across this in production, be conservative and just reject
         MERROR("Unrecognised transaction type: " << tx.type << " for tx: " << get_transaction_hash(tx));
         return true;
       }
@@ -1332,53 +1332,6 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::get_pool_for_rpc(std::vector<cryptonote::rpc::tx_in_pool>& tx_infos, cryptonote::rpc::key_images_with_tx_hashes& key_image_infos) const
-  {
-    auto locks = tools::unique_locks(m_transactions_lock, m_blockchain);
-
-    tx_infos.reserve(m_blockchain.get_txpool_tx_count());
-    key_image_infos.reserve(m_blockchain.get_txpool_tx_count());
-    m_blockchain.for_all_txpool_txes([&tx_infos, key_image_infos](const crypto::hash &txid, const txpool_tx_meta_t &meta, const cryptonote::blobdata *bd){
-      cryptonote::rpc::tx_in_pool txi;
-      txi.tx_hash = txid;
-      if (!parse_and_validate_tx_from_blob(*bd, txi.tx))
-      {
-        MERROR("Failed to parse tx from txpool");
-        // continue
-        return true;
-      }
-      txi.tx.set_hash(txid);
-      txi.blob_size = bd->size();
-      txi.weight = meta.weight;
-      txi.fee = meta.fee;
-      txi.kept_by_block = meta.kept_by_block;
-      txi.max_used_block_height = meta.max_used_block_height;
-      txi.max_used_block_hash = meta.max_used_block_id;
-      txi.last_failed_block_height = meta.last_failed_height;
-      txi.last_failed_block_hash = meta.last_failed_id;
-      txi.receive_time = meta.receive_time;
-      txi.relayed = meta.relayed;
-      txi.last_relayed_time = meta.last_relayed_time;
-      txi.do_not_relay = meta.do_not_relay;
-      txi.double_spend_seen = meta.double_spend_seen;
-      tx_infos.push_back(txi);
-      return true;
-    }, true, false);
-
-    for (const key_images_container::value_type& kee : m_spent_key_images) {
-      std::vector<crypto::hash> tx_hashes;
-      const std::unordered_set<crypto::hash>& kei_image_set = kee.second;
-      for (const crypto::hash& tx_id_hash : kei_image_set)
-      {
-        tx_hashes.push_back(tx_id_hash);
-      }
-
-      const crypto::key_image& k_image = kee.first;
-      key_image_infos[k_image] = std::move(tx_hashes);
-    }
-    return true;
-  }
-  //---------------------------------------------------------------------------------
   bool tx_memory_pool::check_for_key_images(const std::vector<crypto::key_image>& key_images, std::vector<bool>& spent) const
   {
     auto locks = tools::unique_locks(m_transactions_lock, m_blockchain);
@@ -1451,7 +1404,7 @@ namespace cryptonote
       if (pool_tx.type == txtype::state_change &&
           get_service_node_state_change_from_tx_extra(pool_tx.extra, state_change, blk.major_version))
       {
-        // TODO(loki): PERF(loki): On pop_blocks we return all the TXs to the
+        // TODO(oxen): PERF(oxen): On pop_blocks we return all the TXs to the
         // pool. The greater the pop_blocks, the more txs that are queued in the
         // pool, and for every subsequent block you sync, get_transactions has
         // to allocate these transactions and we have to search every
@@ -1815,11 +1768,11 @@ end:
     uint64_t best_reward = 0;
     {
       // NOTE: Calculate base line empty block reward
-      loki_block_reward_context block_reward_context = {};
+      oxen_block_reward_context block_reward_context = {};
       block_reward_context.height                    = height;
 
       block_reward_parts reward_parts = {};
-      if (!get_loki_block_reward(median_weight, total_weight, already_generated_coins, version, reward_parts, block_reward_context))
+      if (!get_oxen_block_reward(median_weight, total_weight, already_generated_coins, version, reward_parts, block_reward_context))
       {
         MERROR("Failed to get block reward for empty block");
         return false;
@@ -1856,12 +1809,12 @@ end:
       }
 
       // NOTE: Calculate the next block reward for the block producer
-      loki_block_reward_context next_block_reward_context = {};
+      oxen_block_reward_context next_block_reward_context = {};
       next_block_reward_context.height                    = height;
       next_block_reward_context.fee                       = raw_fee + meta.fee;
 
       block_reward_parts next_reward_parts           = {};
-      if(!get_loki_block_reward(median_weight, total_weight + meta.weight, already_generated_coins, version, next_reward_parts, next_block_reward_context))
+      if(!get_oxen_block_reward(median_weight, total_weight + meta.weight, already_generated_coins, version, next_reward_parts, next_block_reward_context))
       {
         LOG_PRINT_L2("Block reward calculation bug");
         return false;

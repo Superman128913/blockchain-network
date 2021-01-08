@@ -48,7 +48,7 @@ namespace
       m_tx.version = version;
       m_tx.unlock_time = unlock_time;
 
-      m_tx_key = keypair::generate(hw::get_device("default"));
+      m_tx_key = keypair{hw::get_device("default")};
       add_tx_extra<tx_extra_pub_key>(m_tx, m_tx_key.pub);
     }
 
@@ -180,27 +180,6 @@ namespace
 //----------------------------------------------------------------------------------------------------------------------
 // Tests
 
-bool gen_tx_big_version::generate(std::vector<test_event_entry>& events) const
-{
-  uint64_t ts_start = 1338224400;
-
-  GENERATE_ACCOUNT(miner_account);
-  MAKE_GENESIS_BLOCK(events, blk_tail, miner_account, ts_start);
-  REWIND_BLOCKS_N(events, blk_money_unlocked, blk_tail, miner_account, 30);
-  REWIND_BLOCKS(events, blk_head, blk_money_unlocked, miner_account);
-
-  std::vector<tx_source_entry> sources;
-  std::vector<tx_destination_entry> destinations;
-  fill_tx_sources_and_destinations(events, blk_money_unlocked, miner_account, get_address(miner_account), MK_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
-
-  transaction tx = {};
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), -1).build();
-  DO_CALLBACK(events, "mark_invalid_tx");
-  events.push_back(tx);
-
-  return true;
-}
-
 bool gen_tx_unlock_time::generate(std::vector<test_event_entry>& events) const
 {
   uint64_t ts_start = 1338224400;
@@ -214,43 +193,43 @@ bool gen_tx_unlock_time::generate(std::vector<test_event_entry>& events) const
 
   transaction tx       = {};
   uint64_t unlock_time = 0;
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).with_unlock_time(unlock_time).build();
+  oxen_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).with_unlock_time(unlock_time).build();
   events.push_back(tx);
   txs_0.push_back(tx);
 
   tx          = {};
   unlock_time = get_block_height(blk_money_unlocked) - 1;
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).with_unlock_time(unlock_time).build();
+  oxen_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).with_unlock_time(unlock_time).build();
   events.push_back(tx);
   txs_0.push_back(tx);
 
   tx          = {};
   unlock_time = get_block_height(blk_money_unlocked);
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).with_unlock_time(unlock_time).build();
+  oxen_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).with_unlock_time(unlock_time).build();
   events.push_back(tx);
   txs_0.push_back(tx);
 
   tx          = {};
   unlock_time = get_block_height(blk_money_unlocked) + 1;
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).with_unlock_time(unlock_time).build();
+  oxen_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).with_unlock_time(unlock_time).build();
   events.push_back(tx);
   txs_0.push_back(tx);
 
   tx          = {};
   unlock_time = get_block_height(blk_money_unlocked) + 2;
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).with_unlock_time(unlock_time).build();
+  oxen_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).with_unlock_time(unlock_time).build();
   events.push_back(tx);
   txs_0.push_back(tx);
 
   tx          = {};
   unlock_time = ts_start - 1;
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).with_unlock_time(unlock_time).build();
+  oxen_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).with_unlock_time(unlock_time).build();
   events.push_back(tx);
   txs_0.push_back(tx);
 
   tx          = {};
   unlock_time = time(0) + 60 * 60;
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).with_unlock_time(unlock_time).build();
+  oxen_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).with_unlock_time(unlock_time).build();
   events.push_back(tx);
   txs_0.push_back(tx);
 
@@ -304,7 +283,7 @@ bool gen_tx_no_inputs_no_outputs::generate(std::vector<test_event_entry>& events
 
   transaction tx = {};
   tx.version     = cryptonote::txversion::v2_ringct;
-  add_tx_extra<tx_extra_pub_key>(tx, keypair::generate(hw::get_device("default")).pub);
+  add_tx_extra<tx_extra_pub_key>(tx, keypair{hw::get_device("default")}.pub);
 
   DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(tx);
@@ -321,7 +300,7 @@ bool gen_tx_no_inputs_has_outputs::generate(std::vector<test_event_entry>& event
   REWIND_BLOCKS     (events, blk_head,           blk_money_unlocked, miner_account);
 
   transaction tx = {};
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
+  oxen_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
   tx.vin.clear();
 
   DO_CALLBACK(events, "mark_invalid_tx");
@@ -339,10 +318,10 @@ bool gen_tx_has_inputs_no_outputs::generate(std::vector<test_event_entry>& event
   REWIND_BLOCKS     (events, blk_head,           blk_money_unlocked, miner_account);
 
   transaction tx = {};
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
+  oxen_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
   tx.vout.clear();
 
-  DO_CALLBACK(events, "mark_invalid_tx"); // NOTE(loki): This used to be valid in Monero pre RCT, but not anymore with our transactions because we start with RCT type TXs
+  DO_CALLBACK(events, "mark_invalid_tx"); // NOTE(oxen): This used to be valid in Monero pre RCT, but not anymore with our transactions because we start with RCT type TXs
   events.push_back(tx);
   return true;
 }
@@ -385,7 +364,7 @@ bool gen_tx_input_wo_key_offsets::generate(std::vector<test_event_entry>& events
   fill_tx_sources_and_destinations(events, blk_money_unlocked, miner_account, get_address(miner_account), MK_COINS(1), TESTS_DEFAULT_FEE, CRYPTONOTE_DEFAULT_TX_MIXIN, sources, destinations);
 
   transaction tx = {};
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
+  oxen_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
   txin_to_key& in_to_key = var::get<txin_to_key>(tx.vin.front());
   while (!in_to_key.key_offsets.empty())
     in_to_key.key_offsets.pop_back();
@@ -412,7 +391,7 @@ bool gen_tx_key_offset_points_to_foreign_key::generate(std::vector<test_event_en
   REWIND_BLOCKS          (events, blk_head,           blk_money_unlocked, miner_account);
 
   transaction bob_tx = {};
-  loki_tx_builder(events, bob_tx, blk_money_unlocked, bob_account, miner_account.get_keys().m_account_address, MK_COINS(15) + 1 - TESTS_DEFAULT_FEE, cryptonote::network_version_7).with_fee(TESTS_DEFAULT_FEE).build();
+  oxen_tx_builder(events, bob_tx, blk_money_unlocked, bob_account, miner_account.get_keys().m_account_address, MK_COINS(15) + 1 - TESTS_DEFAULT_FEE, cryptonote::network_version_7).with_fee(TESTS_DEFAULT_FEE).build();
 
   std::vector<tx_source_entry>      sources_alice;
   std::vector<tx_destination_entry> destinations_alice;
@@ -421,7 +400,7 @@ bool gen_tx_key_offset_points_to_foreign_key::generate(std::vector<test_event_en
   txin_to_key& bob_in_to_key        = var::get<txin_to_key>(bob_tx.vin.front());
   bob_in_to_key.key_offsets.front() = sources_alice.front().outputs.back().first;
 
-  // TODO(loki): This used to be first(), but in the debugger bob's front() is
+  // TODO(oxen): This used to be first(), but in the debugger bob's front() is
   // 0 and alice's front() is 0 .. sooo ??  Reassigning the first offset
   // wouldn't change the test.  Now this test returns the same error as
   // gen_tx_sender_key_offset_not_exist so I don't think this test is correct
@@ -443,7 +422,7 @@ bool gen_tx_sender_key_offset_not_exist::generate(std::vector<test_event_entry>&
   REWIND_BLOCKS     (events, blk_head,           blk_money_unlocked, miner_account);
 
   transaction tx = {};
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
+  oxen_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
   txin_to_key& in_to_key        = var::get<txin_to_key>(tx.vin.front());
   in_to_key.key_offsets.front() = std::numeric_limits<uint64_t>::max();
 
@@ -456,7 +435,7 @@ bool gen_tx_mixed_key_offset_not_exist::generate(std::vector<test_event_entry>& 
 {
   uint64_t ts_start = 1338224400;
 
-  // TODO(loki): This test looks broken. step2_fill_inputs calls
+  // TODO(oxen): This test looks broken. step2_fill_inputs calls
   // generate_key_image_helper() which returns false and doesn't write to the TX
   // if it fails. This test fails and early outs before the the key image is
   // even made so, we can't really test putting this onto the chain? This would
@@ -531,11 +510,11 @@ bool gen_tx_key_image_not_derive_from_tx_key::generate(std::vector<test_event_en
   REWIND_BLOCKS     (events, blk_head,           blk_money_unlocked, miner_account);
 
   transaction tx = {};
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
+  oxen_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
   txin_to_key& in_to_key        = var::get<txin_to_key>(tx.vin.front());
 
   // Use fake key image
-  keypair keys = keypair::generate(hw::get_device("default"));
+  keypair keys{hw::get_device("default")};
   key_image fake_key_image;
   crypto::generate_key_image(keys.pub, keys.sec, fake_key_image);
   in_to_key.k_image = fake_key_image;
@@ -559,7 +538,7 @@ bool gen_tx_key_image_is_invalid::generate(std::vector<test_event_entry>& events
   REWIND_BLOCKS     (events, blk_head,           blk_money_unlocked, miner_account);
 
   transaction tx = {};
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
+  oxen_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
   txin_to_key& in_to_key = var::get<txin_to_key>(tx.vin.front());
   in_to_key.k_image      = generate_invalid_key_image();
 
@@ -643,7 +622,7 @@ bool gen_tx_txout_to_key_has_invalid_key::generate(std::vector<test_event_entry>
   REWIND_BLOCKS     (events, blk_head,           blk_money_unlocked, miner_account);
 
   transaction tx           = {};
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
+  oxen_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
   txout_to_key& out_to_key = var::get<txout_to_key>(tx.vout.front().target);
   out_to_key.key           = generate_invalid_pub_key();
 
@@ -660,7 +639,7 @@ bool gen_tx_output_with_zero_amount::generate(std::vector<test_event_entry>& eve
   REWIND_BLOCKS_N   (events, blk_money_unlocked, blk_tail,           miner_account, 40);
   REWIND_BLOCKS     (events, blk_head,           blk_money_unlocked, miner_account);
 
-  // TODO(loki): Hmm. Can't use loki_tx_builder approach because RCT masks amounts
+  // TODO(oxen): Hmm. Can't use oxen_tx_builder approach because RCT masks amounts
   // after it's constructed, so vout amounts is already zero. It seems to be
   // valid to be able to send a transaction whos output is zero, so this test
   // might not be valid anymore post RCT.
@@ -679,7 +658,7 @@ bool gen_tx_output_with_zero_amount::generate(std::vector<test_event_entry>& eve
 
 #else
   transaction tx           = {};
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
+  oxen_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
   tx.vout.front().amount = 0;
 
 #endif
@@ -698,14 +677,14 @@ bool gen_tx_output_is_not_txout_to_key::generate(std::vector<test_event_entry>& 
   REWIND_BLOCKS     (events, blk_head,           blk_money_unlocked, miner_account);
 
   transaction tx = {};
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
+  oxen_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
   tx.vout.back().target = txout_to_script();
 
   DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(tx);
 
   tx = {};
-  loki_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
+  oxen_tx_builder(events, tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).build();
   tx.vout.back().target = txout_to_scripthash();
 
   DO_CALLBACK(events, "mark_invalid_tx");
@@ -730,7 +709,7 @@ bool gen_tx_signatures_are_invalid::generate(std::vector<test_event_entry>& even
   REWIND_BLOCKS          (events, blk_head,           blk_money_unlocked, miner_account);
 
   transaction miner_tx = {};
-  loki_tx_builder(events, miner_tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(60), cryptonote::network_version_7).with_fee(TESTS_DEFAULT_FEE).build();
+  oxen_tx_builder(events, miner_tx, blk_money_unlocked, miner_account, miner_account.get_keys().m_account_address, MK_COINS(60), cryptonote::network_version_7).with_fee(TESTS_DEFAULT_FEE).build();
 
   // TX without signatures
   DO_CALLBACK(events, "mark_invalid_tx");
@@ -750,7 +729,7 @@ bool gen_tx_signatures_are_invalid::generate(std::vector<test_event_entry>& even
   events.push_back(serialized_transaction(sr_tx));
 
   transaction bob_tx = {};
-  loki_tx_builder(events, bob_tx, blk_money_unlocked, bob_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).with_fee(TESTS_DEFAULT_FEE).build();
+  oxen_tx_builder(events, bob_tx, blk_money_unlocked, bob_account, miner_account.get_keys().m_account_address, MK_COINS(1), cryptonote::network_version_7).with_fee(TESTS_DEFAULT_FEE).build();
 
   // TX without signatures
   DO_CALLBACK(events, "mark_invalid_tx");

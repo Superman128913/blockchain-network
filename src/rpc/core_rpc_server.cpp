@@ -41,13 +41,13 @@
 #include <lokimq/base64.h>
 #include "crypto/crypto.h"
 #include "cryptonote_basic/tx_extra.h"
-#include "cryptonote_core/loki_name_system.h"
+#include "cryptonote_core/oxen_name_system.h"
 #include "cryptonote_core/pulse.h"
-#include "loki_economy.h"
+#include "oxen_economy.h"
 #include "epee/string_tools.h"
 #include "core_rpc_server.h"
 #include "common/command_line.h"
-#include "common/loki.h"
+#include "common/oxen.h"
 #include "common/sha256sum.h"
 #include "common/perf_timer.h"
 #include "common/random.h"
@@ -60,13 +60,12 @@
 #include "net/parse.h"
 #include "crypto/hash.h"
 #include "rpc/rpc_args.h"
-#include "rpc/rpc_handler.h"
 #include "core_rpc_server_error_codes.h"
 #include "p2p/net_node.h"
 #include "version.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "daemon.rpc"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "daemon.rpc"
 
 
 namespace cryptonote { namespace rpc {
@@ -436,9 +435,9 @@ namespace cryptonote { namespace rpc {
     res.database_size = m_core.get_blockchain_storage().get_db().get_database_size();
     if (!context.admin)
       res.database_size = round_up(res.database_size, 1'000'000'000);
-    res.version = context.admin ? LOKI_VERSION_FULL : std::to_string(LOKI_VERSION[0]);
+    res.version = context.admin ? OXEN_VERSION_FULL : std::to_string(OXEN_VERSION[0]);
     res.status_line = context.admin ? m_core.get_status_string() :
-      "v" + std::to_string(LOKI_VERSION[0]) + "; Height: " + std::to_string(res.height);
+      "v" + std::to_string(OXEN_VERSION[0]) + "; Height: " + std::to_string(res.height);
 
     res.status = STATUS_OK;
     return res;
@@ -775,7 +774,7 @@ namespace cryptonote { namespace rpc {
         else if (owner.type == lns::generic_owner_sig_type::ed25519)
           entry = tools::type_to_hex(owner.ed25519);
       }
-      void operator()(const tx_extra_loki_name_system& x) {
+      void operator()(const tx_extra_oxen_name_system& x) {
         auto& lns = entry.lns.emplace();
         lns.blocks = lns::expiry_blocks(nettype, x.type);
         switch (x.type)
@@ -962,9 +961,9 @@ namespace cryptonote { namespace rpc {
           e.as_hex = lokimq::to_hex(tx_data);
       }
 
-      if (req.decode_as_json || req.tx_extra)
+      cryptonote::transaction t;
+      if (req.decode_as_json || req.tx_extra || req.stake_info)
       {
-        cryptonote::transaction t;
         if (req.prune || pruned)
         {
           if (!cryptonote::parse_and_validate_tx_base_from_blob(tx_data, t))
@@ -1008,6 +1007,14 @@ namespace cryptonote { namespace rpc {
         e.relayed = false;
         if (e.block_height <= immutable_height)
             might_be_blink = false;
+      }
+
+      if (req.stake_info) {
+        auto hf_version = m_core.get_hard_fork_version(e.in_pool ? m_core.get_current_blockchain_height() : e.block_height);
+        service_nodes::staking_components sc;
+        if (service_nodes::tx_get_staking_components_and_amounts(nettype(), hf_version, t, e.block_height, &sc)
+            && sc.transferred > 0)
+          e.stake_amount = sc.transferred;
       }
 
       if (might_be_blink)
@@ -1293,7 +1300,7 @@ namespace cryptonote { namespace rpc {
     const uint8_t major_version = m_core.get_blockchain_storage().get_current_hard_fork_version();
 
     res.pow_algorithm =
-        major_version >= network_version_12_checkpointing    ? "RandomX (LOKI variant)"               :
+        major_version >= network_version_12_checkpointing    ? "RandomX (OXEN variant)"               :
         major_version == network_version_11_infinite_staking ? "Cryptonight Turtle Light (Variant 2)" :
                                                                "Cryptonight Heavy (Variant 2)";
 
@@ -1443,8 +1450,19 @@ namespace cryptonote { namespace rpc {
       return res;
 
     std::function<void(const transaction& tx, tx_info& txi)> load_extra;
-    if (req.tx_extra)
-        load_extra = [this](const transaction& tx, tx_info& txi) { load_tx_extra_data(txi.extra.emplace(), tx, nettype()); };
+    if (req.tx_extra || req.stake_info)
+        load_extra = [this, &req](const transaction& tx, tx_info& txi) {
+            if (req.tx_extra)
+                load_tx_extra_data(txi.extra.emplace(), tx, nettype());
+            if (req.stake_info) {
+                auto height = m_core.get_current_blockchain_height();
+                auto hf_version = m_core.get_hard_fork_version(height);
+                service_nodes::staking_components sc;
+                if (service_nodes::tx_get_staking_components_and_amounts(nettype(), hf_version, tx, height, &sc)
+                        && sc.transferred > 0)
+                    txi.stake_amount = sc.transferred;
+            }
+        };
 
     m_core.get_pool().get_transactions_and_spent_keys_info(res.transactions, res.spent_key_images, load_extra, context.admin);
     for (tx_info& txi : res.transactions)
@@ -1523,7 +1541,7 @@ namespace cryptonote { namespace rpc {
   //------------------------------------------------------------------------------------------------------------------------------
 
   //
-  // Loki
+  // Oxen
   //
   GET_OUTPUT_BLACKLIST::response core_rpc_server::invoke(GET_OUTPUT_BLACKLIST::request&& req, rpc_context context)
   {
@@ -2309,7 +2327,7 @@ namespace cryptonote { namespace rpc {
       res.service_node_state.quorumnet_port       = m_core.quorumnet_port();
       res.service_node_state.pubkey_ed25519       = std::move(get_service_node_key_res.service_node_ed25519_pubkey);
       res.service_node_state.pubkey_x25519        = std::move(get_service_node_key_res.service_node_x25519_pubkey);
-      res.service_node_state.service_node_version = LOKI_VERSION;
+      res.service_node_state.service_node_version = OXEN_VERSION;
     }
     else
     {
@@ -2550,6 +2568,118 @@ namespace cryptonote { namespace rpc {
     res.status = STATUS_OK;
     return res;
   }
+
+  namespace {
+    output_distribution_data process_distribution(
+        bool cumulative,
+        std::uint64_t start_height,
+        std::vector<std::uint64_t> distribution,
+        std::uint64_t base)
+    {
+      if (!cumulative && !distribution.empty())
+      {
+        for (std::size_t n = distribution.size() - 1; 0 < n; --n)
+          distribution[n] -= distribution[n - 1];
+        distribution[0] -= base;
+      }
+
+      return {std::move(distribution), start_height, base};
+    }
+
+    static struct {
+      std::mutex mutex;
+      std::vector<std::uint64_t> cached_distribution;
+      std::uint64_t cached_from = 0, cached_to = 0, cached_start_height = 0, cached_base = 0;
+      crypto::hash cached_m10_hash = crypto::null_hash;
+      crypto::hash cached_top_hash = crypto::null_hash;
+      bool cached = false;
+    } output_dist_cache;
+  }
+
+  namespace detail {
+    std::optional<output_distribution_data> get_output_distribution(
+        const std::function<bool(uint64_t, uint64_t, uint64_t, uint64_t&, std::vector<uint64_t>&, uint64_t&)>& f,
+        uint64_t amount,
+        uint64_t from_height,
+        uint64_t to_height,
+        const std::function<crypto::hash(uint64_t)>& get_hash,
+        bool cumulative,
+        uint64_t blockchain_height)
+    {
+      auto& d = output_dist_cache;
+      const std::unique_lock lock{d.mutex};
+
+      crypto::hash top_hash = crypto::null_hash;
+      if (d.cached_to < blockchain_height)
+        top_hash = get_hash(d.cached_to);
+      if (d.cached && amount == 0 && d.cached_from == from_height && d.cached_to == to_height && d.cached_top_hash == top_hash)
+        return process_distribution(cumulative, d.cached_start_height, d.cached_distribution, d.cached_base);
+
+      std::vector<std::uint64_t> distribution;
+      std::uint64_t start_height, base;
+
+      // see if we can extend the cache - a common case
+      bool can_extend = d.cached && amount == 0 && d.cached_from == from_height && to_height > d.cached_to && top_hash == d.cached_top_hash;
+      if (!can_extend)
+      {
+        // we kept track of the hash 10 blocks below, if it exists, so if it matches,
+        // we can still pop the last 10 cached slots and try again
+        if (d.cached && amount == 0 && d.cached_from == from_height && d.cached_to - d.cached_from >= 10 && to_height > d.cached_to - 10)
+        {
+          crypto::hash hash10 = get_hash(d.cached_to - 10);
+          if (hash10 == d.cached_m10_hash)
+          {
+            d.cached_to -= 10;
+            d.cached_top_hash = hash10;
+            d.cached_m10_hash = crypto::null_hash;
+            CHECK_AND_ASSERT_MES(d.cached_distribution.size() >= 10, std::nullopt, "Cached distribution size does not match cached bounds");
+            for (int p = 0; p < 10; ++p)
+              d.cached_distribution.pop_back();
+            can_extend = true;
+          }
+        }
+      }
+      if (can_extend)
+      {
+        std::vector<std::uint64_t> new_distribution;
+        if (!f(amount, d.cached_to + 1, to_height, start_height, new_distribution, base))
+          return std::nullopt;
+        distribution = d.cached_distribution;
+        distribution.reserve(distribution.size() + new_distribution.size());
+        for (const auto &e: new_distribution)
+          distribution.push_back(e);
+        start_height = d.cached_start_height;
+        base = d.cached_base;
+      }
+      else
+      {
+        if (!f(amount, from_height, to_height, start_height, distribution, base))
+          return std::nullopt;
+      }
+
+      if (to_height > 0 && to_height >= from_height)
+      {
+        const std::uint64_t offset = std::max(from_height, start_height);
+        if (offset <= to_height && to_height - offset + 1 < distribution.size())
+          distribution.resize(to_height - offset + 1);
+      }
+
+      if (amount == 0)
+      {
+        d.cached_from = from_height;
+        d.cached_to = to_height;
+        d.cached_top_hash = get_hash(d.cached_to);
+        d.cached_m10_hash = d.cached_to >= 10 ? get_hash(d.cached_to - 10) : crypto::null_hash;
+        d.cached_distribution = distribution;
+        d.cached_start_height = start_height;
+        d.cached_base = base;
+        d.cached = true;
+      }
+
+      return process_distribution(cumulative, start_height, std::move(distribution), base);
+    }
+  }
+
   //------------------------------------------------------------------------------------------------------------------------------
   GET_OUTPUT_DISTRIBUTION::response core_rpc_server::invoke(GET_OUTPUT_DISTRIBUTION::request&& req, rpc_context context, bool binary)
   {
@@ -2565,7 +2695,7 @@ namespace cryptonote { namespace rpc {
       const uint64_t req_to_height = req.to_height ? req.to_height : (m_core.get_current_blockchain_height() - 1);
       for (uint64_t amount: req.amounts)
       {
-        auto data = RpcHandler::get_output_distribution(
+        auto data = detail::get_output_distribution(
             [this](auto&&... args) { return m_core.get_output_distribution(std::forward<decltype(args)>(args)...); },
             amount,
             req.from_height,
@@ -3452,7 +3582,7 @@ namespace cryptonote { namespace rpc {
       if (!lns::parse_owner_to_generic_owner(m_core.get_nettype(), owner, lns_owner, &errmsg))
         throw rpc_error{ERROR_WRONG_PARAM, std::move(errmsg)};
 
-      // TODO(loki): We now serialize both owner and backup_owner, since if
+      // TODO(oxen): We now serialize both owner and backup_owner, since if
       // we specify an owner that is backup owner, we don't show the (other)
       // owner. For RPC compatibility we keep the request_index around until the
       // next hard fork (16)

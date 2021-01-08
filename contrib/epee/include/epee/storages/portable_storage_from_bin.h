@@ -129,8 +129,8 @@ namespace epee
       CHECK_AND_ASSERT_THROW_MES(size <= m_count, "Size sanity check failed");
       storage_entry se{std::in_place_type<array_entry>, std::in_place_type<array_t<T>>};
       auto& arr = var::get<array_t<T>>(var::get<array_entry>(se));
-      if constexpr (!std::is_same_v<T, bool>) // bool uses a std::deque instead of vector because
-        arr.reserve(size);                    // std::vector<bool> is broken by design
+      if constexpr (!std::is_same_v<T, bool>) // bool uses a std::deque, which isn't reserveable
+        arr.reserve(std::min<size_t>(size, 4096));
 
       while(size--)
         read(arr.emplace_back());

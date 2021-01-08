@@ -98,6 +98,7 @@ public:
     bool trustedDaemon() const override;
     uint64_t balance(uint32_t accountIndex = 0) const override;
     uint64_t unlockedBalance(uint32_t accountIndex = 0) const override;
+    std::vector<std::pair<std::string, uint64_t>>* listCurrentStakes() const override;
     uint64_t blockChainHeight() const override;
     uint64_t approximateBlockChainHeight() const override;
     uint64_t estimateBlockChainHeight() const override;
@@ -128,7 +129,7 @@ public:
     std::string getSubaddressLabel(uint32_t accountIndex, uint32_t addressIndex) const override;
     void setSubaddressLabel(uint32_t accountIndex, uint32_t addressIndex, const std::string &label) override;
 
-    PendingTransaction* stakePending(const std::string& service_node_key, const std::string& address, const std::string& amount, std::string& error_msg) override;
+    PendingTransaction* stakePending(const std::string& service_node_key, const uint64_t& amount) override;
 
     StakeUnlockResult* canRequestStakeUnlock(const std::string &sn_key) override;
 

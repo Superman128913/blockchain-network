@@ -59,8 +59,8 @@
 
 #include "cryptonote_config.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "util"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "util"
 
 namespace tools {
 
@@ -274,6 +274,10 @@ namespace tools {
   {
     return get_special_folder_path(CSIDL_COMMON_APPDATA, true) / fs::u8path(CRYPTONOTE_NAME);
   }
+  fs::path get_depreciated_default_data_dir()
+  {
+    return get_special_folder_path(CSIDL_COMMON_APPDATA, true) / fs::u8path("loki");
+  }
 #else
   // Non-windows: ~/.CRYPTONOTE_NAME
   fs::path get_default_data_dir()
@@ -281,28 +285,12 @@ namespace tools {
     char* home = std::getenv("HOME");
     return (home && std::strlen(home) ? fs::u8path(home) : fs::current_path()) / fs::u8path("." CRYPTONOTE_NAME);
   }
-#endif
-
-  bool create_directories_if_necessary(const fs::path& path)
+  fs::path get_depreciated_default_data_dir()
   {
-    std::error_code ec;
-    if (fs::is_directory(path, ec))
-    {
-      return true;
-    }
-
-    bool res = fs::create_directories(path, ec);
-    if (res)
-    {
-      LOG_PRINT_L2("Created directory: " << path);
-    }
-    else
-    {
-      LOG_PRINT_L2("Can't create directory: " << path << ", err: "<< ec.message());
-    }
-
-    return res;
+    char* home = std::getenv("HOME");
+    return (home && std::strlen(home) ? fs::u8path(home) : fs::current_path()) / fs::u8path(".loki");
   }
+#endif
 
   void set_strict_default_file_permissions(bool strict)
   {

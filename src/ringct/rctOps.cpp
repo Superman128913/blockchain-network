@@ -35,8 +35,8 @@
 using namespace crypto;
 using namespace std;
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "ringct"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "ringct"
 
 #define CHECK_AND_ASSERT_THROW_MES_L1(expr, message) {if(!(expr)) {MWARNING(message); throw std::runtime_error(message);}}
 
@@ -251,7 +251,7 @@ namespace rct {
 
     //generates a random scalar which can be used as a secret key or mask
     void skGen(key &sk) {
-        random32_unbiased(sk.bytes);
+        random_scalar(sk.bytes);
     }
 
     //generates a random scalar which can be used as a secret key or mask

@@ -36,7 +36,7 @@
 #include "epee/net/net_utils_base.h"
 #include "cryptonote_basic/blobdatatype.h"
 
-#include "common/loki.h"
+#include "common/oxen.h"
 
 namespace service_nodes
 {
@@ -99,7 +99,7 @@ namespace cryptonote
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct serializable_blink_metadata {
     crypto::hash tx_hash;
     uint64_t height;
@@ -112,7 +112,7 @@ namespace cryptonote
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct block_complete_entry
   {
     blobdata block;

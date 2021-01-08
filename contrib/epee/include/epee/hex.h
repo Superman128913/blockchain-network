@@ -61,9 +61,6 @@ namespace epee
     //! Append `src` as hex to `out`.
     static void buffer(std::ostream& out, const span<const std::uint8_t> src);
 
-    //! Append `< + src + >` as hex to `out`.
-    static void formatted(std::ostream& out, const span<const std::uint8_t> src);
-
   private:
     template<typename T> T static convert(const span<const std::uint8_t> src);
 

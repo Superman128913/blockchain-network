@@ -7,7 +7,7 @@
 
 namespace service_nodes {
   constexpr size_t PULSE_QUORUM_ENTROPY_LAG    = 21; // How many blocks back from the tip of the Blockchain to source entropy for the Pulse quorums.
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
   constexpr auto PULSE_ROUND_TIME                                   = 20s;
   constexpr auto PULSE_WAIT_FOR_HANDSHAKES_DURATION                 = 3s;
   constexpr auto PULSE_WAIT_FOR_OTHER_VALIDATOR_HANDSHAKES_DURATION = 3s;
@@ -151,7 +151,7 @@ namespace service_nodes {
   constexpr size_t   STATE_CHANGE_MIN_NODES_TO_TEST          = 50;
   constexpr uint64_t VOTE_LIFETIME                           = BLOCKS_EXPECTED_IN_HOURS(2);
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
   constexpr size_t STATE_CHANGE_QUORUM_SIZE               = 5;
   constexpr size_t STATE_CHANGE_MIN_VOTES_TO_CHANGE_STATE = 1;
   constexpr int    MIN_TIME_IN_S_BEFORE_VOTING            = 0;
@@ -172,7 +172,7 @@ namespace service_nodes {
   static_assert(STATE_CHANGE_MIN_VOTES_TO_CHANGE_STATE <= STATE_CHANGE_QUORUM_SIZE, "The number of votes required to kick can't exceed the actual quorum size, otherwise we never kick.");
   static_assert(CHECKPOINT_MIN_VOTES <= CHECKPOINT_QUORUM_SIZE, "The number of votes required to add a checkpoint can't exceed the actual quorum size, otherwise we never add checkpoints.");
   static_assert(BLINK_MIN_VOTES <= BLINK_SUBQUORUM_SIZE, "The number of votes required can't exceed the actual blink subquorum size, otherwise we never approve.");
-#ifndef LOKI_ENABLE_INTEGRATION_TEST_HOOKS
+#ifndef OXEN_ENABLE_INTEGRATION_TEST_HOOKS
   static_assert(BLINK_MIN_VOTES > BLINK_SUBQUORUM_SIZE / 2, "Blink approvals must require a majority of quorum members to prevent conflicting, signed blinks.");
 #endif
 
@@ -260,7 +260,7 @@ namespace service_nodes {
   }
 
 static_assert(STAKING_PORTIONS != UINT64_MAX, "UINT64_MAX is used as the invalid value for failing to calculate the min_node_contribution");
-// return: UINT64_MAX if (num_contributions > the max number of contributions), otherwise the amount in loki atomic units
+// return: UINT64_MAX if (num_contributions > the max number of contributions), otherwise the amount in oxen atomic units
 uint64_t get_min_node_contribution            (uint8_t version, uint64_t staking_requirement, uint64_t total_reserved, size_t num_contributions);
 uint64_t get_min_node_contribution_in_portions(uint8_t version, uint64_t staking_requirement, uint64_t total_reserved, size_t num_contributions);
 

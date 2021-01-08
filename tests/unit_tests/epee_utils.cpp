@@ -483,25 +483,6 @@ TEST(ToHex, Ostream)
   EXPECT_EQ(expected, out.str());
 }
 
-TEST(ToHex, Formatted)
-{
-  std::stringstream out;
-  std::string expected{"<>"};
-
-  epee::to_hex::formatted(out, nullptr);
-  EXPECT_EQ(expected, out.str());
-
-  expected.append("<ffab0100>");
-  epee::to_hex::formatted(out, epee::as_byte_span("\xFF\xAB\x01"));
-  EXPECT_EQ(expected, out.str());
-
-  const std::vector<unsigned char> all_bytes = get_all_bytes();
-
-  expected.append("<").append(std_to_hex(all_bytes)).append(">");
-  epee::to_hex::formatted(out, epee::to_span(all_bytes));
-  EXPECT_EQ(expected, out.str());
-}
-
 TEST(StringTools, ParseNotHex)
 {
   std::string res;

@@ -43,7 +43,7 @@
 #include "checkpoints/checkpoints.h"
 #include <boost/format.hpp>
 
-#include "common/loki_integration_test_hooks.h"
+#include "common/oxen_integration_test_hooks.h"
 
 #include <fstream>
 #include <ctime>
@@ -51,8 +51,8 @@
 #include <numeric>
 #include <stack>
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "daemon"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "daemon"
 
 using namespace cryptonote::rpc;
 
@@ -65,7 +65,7 @@ namespace {
   {
     std::cout << prompt << std::flush;
     std::string result;
-#if defined (LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined (OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     integration_test::write_buffered_stdout();
     result = integration_test::read_from_pipe();
 #else
@@ -608,7 +608,7 @@ bool rpc_command_executor::mining_status() {
   if (!mining_busy && mres.active && mres.speed > 0 && mres.block_target > 0 && mres.difficulty > 0)
   {
     uint64_t daily = 86400 / (double)mres.difficulty * mres.speed * mres.block_reward;
-    tools::msg_writer() << "Expected: " << cryptonote::print_money(daily) << " LOKI daily, " << cryptonote::print_money(7*daily) << " weekly";
+    tools::msg_writer() << "Expected: " << cryptonote::print_money(daily) << " OXEN daily, " << cryptonote::print_money(7*daily) << " weekly";
   }
 
   return true;
@@ -928,7 +928,7 @@ static void print_pool(const std::vector<cryptonote::rpc::tx_info> &transactions
     w << "blob_size: " << tx_info.blob_size << "\n"
       << "weight: " << tx_info.weight << "\n"
       << "fee: " << cryptonote::print_money(tx_info.fee) << "\n"
-      /// NB(Loki): in v13 we have min_fee = per_out*outs + per_byte*bytes, only the total fee/byte matters for
+      /// NB(Oxen): in v13 we have min_fee = per_out*outs + per_byte*bytes, only the total fee/byte matters for
       /// the purpose of building a block template from the pool, so we still print the overall fee / byte here.
       /// (we can't back out the individual per_out and per_byte that got used anyway).
       << "fee/byte: " << cryptonote::print_money(tx_info.fee / (double)tx_info.weight) << "\n"
@@ -1116,8 +1116,8 @@ bool rpc_command_executor::print_status()
 
   // Make a request to get_height because it is public and relatively simple
   GET_HEIGHT::response res;
-  if (invoke<GET_HEIGHT>({}, res, "lokid is NOT running")) {
-    tools::success_msg_writer() << "lokid is running (height: " << res.height << ")";
+  if (invoke<GET_HEIGHT>({}, res, "oxend is NOT running")) {
+    tools::success_msg_writer() << "oxend is running (height: " << res.height << ")";
     return true;
   }
   return false;
@@ -1227,7 +1227,7 @@ bool rpc_command_executor::ban(const std::string &address, time_t seconds, bool 
     // TODO(doyle): Work around because integration tests break when using
     // mlog_set_categories(""), so emit the block message using msg writer
     // instead of the logging system.
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     tools::success_msg_writer() << "Host " << address << (clear_ban ? " unblocked." : " blocked.");
 #endif
 
@@ -1922,7 +1922,7 @@ bool rpc_command_executor::prepare_registration()
 
   uint64_t block_height = std::max(res.height, res.target_height);
   uint8_t hf_version = hf_res.version;
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
   cryptonote::network_type const nettype = cryptonote::FAKECHAIN;
 #else
   cryptonote::network_type const nettype =
@@ -2047,7 +2047,7 @@ bool rpc_command_executor::prepare_registration()
       case register_step::is_solo_stake__operator_address_to_reserve:
       {
         std::string address_str;
-        last_input_result = input_line_back_cancel_get_input("Enter the loki address for the solo staker", address_str);
+        last_input_result = input_line_back_cancel_get_input("Enter the oxen address for the solo staker", address_str);
         if (last_input_result == input_line_result::back)
           continue;
 
@@ -2152,7 +2152,7 @@ bool rpc_command_executor::prepare_registration()
       case register_step::is_open_stake__operator_address_to_reserve:
       {
         std::string address_str;
-        last_input_result = input_line_back_cancel_get_input("Enter the loki address for the operator", address_str);
+        last_input_result = input_line_back_cancel_get_input("Enter the oxen address for the operator", address_str);
         if (last_input_result == input_line_result::back)
           continue;
 
@@ -2176,7 +2176,7 @@ bool rpc_command_executor::prepare_registration()
         std::cout << "Minimum amount that can be reserved: " << cryptonote::print_money(min_contribution) << " " << cryptonote::get_unit() << std::endl;
 
         std::string contribution_str;
-        last_input_result = input_line_back_cancel_get_input("How much loki does the operator want to reserve in the stake?", contribution_str);
+        last_input_result = input_line_back_cancel_get_input("How much oxen does the operator want to reserve in the stake?", contribution_str);
         if (last_input_result == input_line_result::back)
           continue;
 
@@ -2227,7 +2227,7 @@ bool rpc_command_executor::prepare_registration()
 
       case register_step::is_open_stake__contributor_address_to_reserve:
       {
-        std::string const prompt = "Enter the loki address for contributor " + std::to_string(state.contributions.size() + 1);
+        std::string const prompt = "Enter the oxen address for contributor " + std::to_string(state.contributions.size() + 1);
         std::string address_str;
         last_input_result = input_line_back_cancel_get_input(prompt.c_str(), address_str);
         if (last_input_result == input_line_result::back)
@@ -2257,7 +2257,7 @@ bool rpc_command_executor::prepare_registration()
         std::cout << "There is " << cryptonote::print_money(amount_left) << " " << cryptonote::get_unit() << " left to meet the staking requirement." << std::endl;
 
         std::string contribution_str;
-        std::string const prompt = "How much loki does contributor " + std::to_string(state.contributions.size() + 1) + " want to reserve in the stake?";
+        std::string const prompt = "How much oxen does contributor " + std::to_string(state.contributions.size() + 1) + " want to reserve in the stake?";
         last_input_result        = input_line_back_cancel_get_input(prompt.c_str(), contribution_str);
         if (last_input_result == input_line_result::back)
           continue;
@@ -2432,7 +2432,7 @@ bool rpc_command_executor::prune_blockchain()
 
     tools::success_msg_writer() << "Blockchain pruned";
 #else
-    tools::fail_msg_writer() << "Blockchain pruning is not supported in Loki yet";
+    tools::fail_msg_writer() << "Blockchain pruning is not supported in Oxen yet";
 #endif
     return true;
 }

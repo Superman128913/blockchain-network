@@ -31,13 +31,13 @@
 #include "cryptonote_basic/tx_extra.h"
 #include "cryptonote_core/blockchain.h"
 #include "common/command_line.h"
-#include "loki_economy.h"
+#include "oxen_economy.h"
 #include "common/hex.h"
 #include "version.h"
 #include <lokimq/hex.h>
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "debugtools.deserialize"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "debugtools.deserialize"
 
 namespace po = boost::program_options;
 
@@ -76,7 +76,7 @@ struct extra_printer {
   void operator()(const tx_extra_tx_key_image_proofs& x) { std::cout << "TX key image proofs (" << x.proofs.size() << ")"; }
   void operator()(const tx_extra_tx_key_image_unlock& x) { std::cout << "TX key image unlock: " << x.key_image; }
   void operator()(const tx_extra_burn& x) { std::cout << "Transaction burned fee/payment: " << print_money(x.amount); }
-  void operator()(const tx_extra_loki_name_system& x) {
+  void operator()(const tx_extra_oxen_name_system& x) {
     std::cout << "LNS " << (x.is_buying() ? "registration" : x.is_updating() ? "update" : "(unknown)");
     switch (x.type)
     {
@@ -155,7 +155,7 @@ int main(int argc, char* argv[])
 
   if (command_line::get_arg(vm, command_line::arg_help))
   {
-    std::cout << "Loki '" << LOKI_RELEASE_NAME << "' (v" << LOKI_VERSION_FULL << ")\n\n";
+    std::cout << "Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")\n\n";
     std::cout << desc_options << std::endl;
     return 1;
   }

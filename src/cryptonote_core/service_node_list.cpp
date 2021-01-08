@@ -61,8 +61,8 @@ extern "C" {
 #include "service_node_swarm.h"
 #include "version.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "service_nodes"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "service_nodes"
 
 namespace service_nodes
 {
@@ -386,18 +386,18 @@ namespace service_nodes
     {
       switch (tx.rct_signatures.type)
       {
-      case rct::RCTTypeSimple:
-      case rct::RCTTypeBulletproof:
-      case rct::RCTTypeBulletproof2:
-      case rct::RCTTypeCLSAG:
-        money_transferred = rct::decodeRctSimple(tx.rct_signatures, rct::sk2rct(scalar1), i, mask, hwdev);
-        break;
-      case rct::RCTTypeFull:
-        money_transferred = rct::decodeRct(tx.rct_signatures, rct::sk2rct(scalar1), i, mask, hwdev);
-        break;
-      default:
-        LOG_PRINT_L0(__func__ << ": Unsupported rct type: " << (int)tx.rct_signatures.type);
-        return 0;
+          case rct::RCTType::Simple:
+          case rct::RCTType::Bulletproof:
+          case rct::RCTType::Bulletproof2:
+          case rct::RCTType::CLSAG:
+              money_transferred = rct::decodeRctSimple(tx.rct_signatures, rct::sk2rct(scalar1), i, mask, hwdev);
+              break;
+          case rct::RCTType::Full:
+              money_transferred = rct::decodeRct(tx.rct_signatures, rct::sk2rct(scalar1), i, mask, hwdev);
+              break;
+          default:
+              LOG_PRINT_L0(__func__ << ": Unsupported rct type: " << (int)tx.rct_signatures.type);
+              return 0;
       }
     }
     catch (const std::exception &e)
@@ -538,10 +538,9 @@ namespace service_nodes
         // The signer can try falsify the key image, but the equation used to
         // construct the key image is re-derived by the verifier, false key
         // images will not match the re-derived key image.
-        crypto::public_key const *ephemeral_pub_key_ptr = &ephemeral_pub_key;
         for (auto proof = key_image_proofs.proofs.begin(); proof != key_image_proofs.proofs.end(); proof++)
         {
-          if (!crypto::check_ring_signature((const crypto::hash &)(proof->key_image), proof->key_image, &ephemeral_pub_key_ptr, 1, &proof->signature))
+          if (!crypto::check_key_image_signature(proof->key_image, ephemeral_pub_key, proof->signature))
             continue;
 
           contribution->locked_contributions.emplace_back(service_node_info::contribution_t::version_t::v0, ephemeral_pub_key, proof->key_image, transferred);
@@ -834,9 +833,9 @@ namespace service_nodes
                               });
       if (cit != contributor.locked_contributions.end())
       {
-        // NOTE(loki): This should be checked in blockchain check_tx_inputs already
-        crypto::hash const hash = service_nodes::generate_request_stake_unlock_hash(unlock.nonce);
-        if (crypto::check_signature(hash, cit->key_image_pub_key, unlock.signature))
+        // NOTE(oxen): This should be checked in blockchain check_tx_inputs already
+        if (crypto::check_signature(service_nodes::generate_request_stake_unlock_hash(unlock.nonce),
+                    cit->key_image_pub_key, unlock.signature))
         {
           duplicate_info(it->second).requested_unlock_height = unlock_height;
           return true;
@@ -1003,7 +1002,7 @@ namespace service_nodes
 
     if (hf_version >= cryptonote::network_version_11_infinite_staking)
     {
-      // NOTE(loki): Grace period is not used anymore with infinite staking. So, if someone somehow reregisters, we just ignore it
+      // NOTE(oxen): Grace period is not used anymore with infinite staking. So, if someone somehow reregisters, we just ignore it
       const auto iter = service_nodes_infos.find(key);
       if (iter != service_nodes_infos.end())
         return false;
@@ -1902,7 +1901,7 @@ namespace service_nodes
 
           size_t total_nodes = active_snode_list.size();
 
-          // TODO(loki): Soft fork, remove when testnet gets reset
+          // TODO(oxen): Soft fork, remove when testnet gets reset
           if (nettype == cryptonote::TESTNET && state.height < 85357)
             total_nodes = active_snode_list.size() + decomm_snode_list.size();
 
@@ -2178,7 +2177,7 @@ namespace service_nodes
         m_transient.state_history.erase(std::next(it), m_transient.state_history.end());
     }
 
-    // TODO(loki): We should loop through the prev 10k heights for robustness, but avoid for v4.0.5. Already enough changes going in
+    // TODO(oxen): We should loop through the prev 10k heights for robustness, but avoid for v4.0.5. Already enough changes going in
     if (reinitialise) // Try finding the next closest old state at 10k intervals
     {
       uint64_t prev_interval = revert_to_height - (revert_to_height % STORE_LONG_TERM_STATE_INTERVAL);
@@ -2214,7 +2213,7 @@ namespace service_nodes
     std::vector<crypto::public_key> expired_nodes;
     uint64_t const lock_blocks = staking_num_lock_blocks(nettype);
 
-    // TODO(loki): This should really use the registration height instead of getting the block and expiring nodes.
+    // TODO(oxen): This should really use the registration height instead of getting the block and expiring nodes.
     // But there's something subtly off when using registration height causing syncing problems.
     if (hf_version == cryptonote::network_version_9_service_nodes)
     {
@@ -2331,7 +2330,7 @@ namespace service_nodes
     // Because FP math is involved in reward calculations (and compounded by CPUs, compilers,
     // expression contraction, and RandomX fiddling with the rounding modes) we can end up with a
     // 1 ULP difference in the reward calculations.
-    // TODO(loki): eliminate all FP math from reward calculations
+    // TODO(oxen): eliminate all FP math from reward calculations
     if (!within_one(output.amount, reward))
     {
       MGINFO_RED("Service node reward amount incorrect. Should be " << cryptonote::print_money(reward) << ", is: " << cryptonote::print_money(output.amount));
@@ -2375,7 +2374,7 @@ namespace service_nodes
     cryptonote::transaction const &miner_tx = block.miner_tx;
 
     // NOTE: Basic queued service node list winner checks
-    // NOTE(loki): Service node reward distribution is calculated from the
+    // NOTE(oxen): Service node reward distribution is calculated from the
     // original amount, i.e. 50% of the original base reward goes to service
     // nodes not 50% of the reward after removing the governance component (the
     // adjusted base reward post hardfork 10).
@@ -2700,7 +2699,7 @@ namespace service_nodes
          it != m_transient.state_history.end() && it->height <= max_short_term_height;
          it++)
     {
-      // TODO(loki): There are 2 places where we convert a state_t to be a serialized state_t without quorums. We should only do this in one location for clarity.
+      // TODO(oxen): There are 2 places where we convert a state_t to be a serialized state_t without quorums. We should only do this in one location for clarity.
       m_transient.cache_short_term_data.states.push_back(serialize_service_node_state_object(hf_version, *it, it->height < max_short_term_height /*only_serialize_quorums*/));
     }
 
@@ -2762,7 +2761,7 @@ namespace service_nodes
     assert(m_service_node_keys);
     const auto& keys = *m_service_node_keys;
     cryptonote::NOTIFY_UPTIME_PROOF::request result = {};
-    result.snode_version                            = LOKI_VERSION;
+    result.snode_version                            = OXEN_VERSION;
     result.timestamp                                = time(nullptr);
     result.pubkey                                   = keys.pub;
     result.public_ip                                = public_ip;
@@ -2870,7 +2869,7 @@ namespace service_nodes
 
     for (auto const &min : MIN_UPTIME_PROOF_VERSIONS)
       if (hf_version >= min.hardfork && proof.snode_version < min.version)
-        REJECT_PROOF("v" << min.version[0] << "." << min.version[1] << "." << min.version[2] << "+ loki version is required for v" << std::to_string(hf_version) << "+ network proofs");
+        REJECT_PROOF("v" << min.version[0] << "." << min.version[1] << "." << min.version[2] << "+ oxen version is required for v" << std::to_string(hf_version) << "+ network proofs");
 
     if (!debug_allow_local_ips && !epee::net_utils::is_ip_public(proof.public_ip))
       REJECT_PROOF("public_ip is not actually public");
@@ -3114,7 +3113,7 @@ namespace service_nodes
       }
       if (info.version < version_t::v5_pulse_recomm_credit)
       {
-        // If it's an old record then assume it's from before loki 8, in which case there were only
+        // If it's an old record then assume it's from before oxen 8, in which case there were only
         // two valid values here: initial for a node that has never been recommissioned, or 0 for a recommission.
 
         auto was = info.recommission_credit;
@@ -3424,7 +3423,7 @@ namespace service_nodes
     }
 
     //
-    // FIXME(doyle): FIXME(loki) !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    // FIXME(doyle): FIXME(oxen) !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     // This is temporary code to redistribute the insufficient portion dust
     // amounts between contributors. It should be removed in HF12.
     //
@@ -3432,13 +3431,13 @@ namespace service_nodes
     std::array<uint64_t, MAX_NUMBER_OF_CONTRIBUTORS> min_contributions;
     {
       // NOTE: Calculate excess portions from each contributor
-      uint64_t loki_reserved = 0;
+      uint64_t oxen_reserved = 0;
       for (size_t index = 0; index < addr_to_portions.size(); ++index)
       {
         addr_to_portion_t const &addr_to_portion = addr_to_portions[index];
-        uint64_t min_contribution_portions       = service_nodes::get_min_node_contribution_in_portions(hf_version, staking_requirement, loki_reserved, index);
-        uint64_t loki_amount                     = service_nodes::portions_to_amount(staking_requirement, addr_to_portion.portions);
-        loki_reserved                           += loki_amount;
+        uint64_t min_contribution_portions       = service_nodes::get_min_node_contribution_in_portions(hf_version, staking_requirement, oxen_reserved, index);
+        uint64_t oxen_amount                     = service_nodes::portions_to_amount(staking_requirement, addr_to_portion.portions);
+        oxen_reserved                           += oxen_amount;
 
         uint64_t excess = 0;
         if (addr_to_portion.portions > min_contribution_portions)
@@ -3507,8 +3506,8 @@ namespace service_nodes
       portions_left += portions_to_steal;
       result.addresses.push_back(addr_to_portion.info.address);
       result.portions.push_back(addr_to_portion.portions);
-      uint64_t loki_amount = service_nodes::portions_to_amount(addr_to_portion.portions, staking_requirement);
-      total_reserved      += loki_amount;
+      uint64_t oxen_amount = service_nodes::portions_to_amount(addr_to_portion.portions, staking_requirement);
+      total_reserved      += oxen_amount;
     }
 
     result.success = true;
@@ -3580,60 +3579,70 @@ namespace service_nodes
   bool service_node_info::can_be_voted_on(uint64_t height) const
   {
     // If the SN expired and was reregistered since the height we'll be voting on it prematurely
-    if (!this->is_fully_funded() || this->registration_height >= height) return false;
-    if (this->is_decommissioned() && this->last_decommission_height >= height) return false;
-
-    if (this->is_active())
-    {
-      // NOTE: This cast is safe. The definition of is_active() is that active_since_height >= 0
-      assert(this->active_since_height >= 0);
-      if (static_cast<uint64_t>(this->active_since_height) >= height) return false;
+    if (!is_fully_funded()) {
+      MDEBUG("SN vote at height " << height << " invalid: not fully funded");
+      return false;
+    } else if (height <= registration_height) {
+      MDEBUG("SN vote at height " << height << " invalid: height <= reg height (" << registration_height << ")");
+      return false;
+    } else if (is_decommissioned() && height <= last_decommission_height) {
+      MDEBUG("SN vote at height " << height << " invalid: height <= last decomm height (" << last_decommission_height << ")");
+      return false;
+    } else if (is_active()) {
+      assert(active_since_height >= 0); // should be satisfied whenever is_active() is true
+      if (height <= static_cast<uint64_t>(active_since_height)) {
+        MDEBUG("SN vote at height " << height << " invalid: height <= active-since height (" << active_since_height << ")");
+        return false;
+      }
     }
 
+    MTRACE("SN vote at height " << height << " is valid.");
     return true;
   }
 
   bool service_node_info::can_transition_to_state(uint8_t hf_version, uint64_t height, new_state proposed_state) const
   {
-    if (hf_version >= cryptonote::network_version_13_enforce_checkpoints)
-    {
-      if (!can_be_voted_on(height))
+    if (hf_version >= cryptonote::network_version_13_enforce_checkpoints) {
+      if (!can_be_voted_on(height)) {
+        MDEBUG("SN state transition invalid: " << height << " is not a valid vote height");
         return false;
+      }
 
-      if (proposed_state == new_state::deregister)
-      {
-        if (height <= this->registration_height)
+      if (proposed_state == new_state::deregister) {
+        if (height <= registration_height) {
+          MDEBUG("SN deregister invalid: vote height (" << height << ") <= registration_height (" << registration_height << ")");
           return false;
-      }
-      else if (proposed_state == new_state::ip_change_penalty)
-      {
-        if (height <= this->last_ip_change_height)
+        }
+      } else if (proposed_state == new_state::ip_change_penalty) {
+        if (height <= last_ip_change_height) {
+          MDEBUG("SN ip change penality invalid: vote height (" << height << ") <= last_ip_change_height (" << last_ip_change_height << ")");
           return false;
+        }
       }
-
-      if (this->is_decommissioned())
-      {
-        return proposed_state != new_state::decommission && proposed_state != new_state::ip_change_penalty;
-      }
-
-      return (proposed_state != new_state::recommission);
-    }
-    else
-    {
-      if (proposed_state == new_state::deregister)
-      {
-        if (height < this->registration_height) return false;
-      }
-
-      if (this->is_decommissioned())
-      {
-        return proposed_state != new_state::decommission && proposed_state != new_state::ip_change_penalty;
-      }
-      else
-      {
-        return (proposed_state != new_state::recommission);
+    } else { // pre-HF13
+      if (proposed_state == new_state::deregister) {
+        if (height < registration_height) {
+          MDEBUG("SN deregister invalid: vote height (" << height << ") < registration_height (" << registration_height << ")");
+          return false;
+        }
       }
     }
+
+    if (is_decommissioned()) {
+      if (proposed_state == new_state::decommission) {
+        MDEBUG("SN decommission invalid: already decommissioned");
+        return false;
+      } else if (proposed_state == new_state::ip_change_penalty) {
+        MDEBUG("SN ip change penalty invalid: currently decommissioned");
+        return false;
+      }
+      return true; // recomm or dereg
+    } else if (proposed_state == new_state::recommission) {
+      MDEBUG("SN recommission invalid: not recommissioned");
+      return false;
+    }
+    MTRACE("SN state change is valid");
+    return true;
   }
 
   payout service_node_info_to_payout(crypto::public_key const &key, service_node_info const &info)

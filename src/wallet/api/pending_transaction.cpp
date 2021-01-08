@@ -52,9 +52,17 @@ PendingTransactionImpl::PendingTransactionImpl(WalletImpl &wallet)
 {
 }
 
+PendingTransactionImpl::PendingTransactionImpl(WalletImpl& wallet, std::vector<tools::wallet2::pending_tx> pending_tx)
+    : m_wallet{wallet}, m_status{Status_Ok, ""}, m_pending_tx{std::move(pending_tx)}
+{}
+
 PendingTransactionImpl::~PendingTransactionImpl()
 {
 
+}
+
+void PendingTransactionImpl::setError(std::string error_msg) {
+  m_status = {Status_Error, tr(error_msg)};
 }
 
 std::vector<std::string> PendingTransactionImpl::txid() const

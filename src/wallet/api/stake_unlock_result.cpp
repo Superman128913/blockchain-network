@@ -1,11 +1,10 @@
 #include "stake_unlock_result.h"
+#include "pending_transaction.h"
 
 namespace Wallet {
 
-StakeUnlockResult::~StakeUnlockResult() {}
-
-StakeUnlockResultImpl::StakeUnlockResultImpl(tools::wallet2::request_stake_unlock_result res)
-    : result(std::move(res))
+StakeUnlockResultImpl::StakeUnlockResultImpl(WalletImpl& w, tools::wallet2::request_stake_unlock_result res)
+    : wallet{w}, result(std::move(res))
 {
 }
 
@@ -27,10 +26,9 @@ std::string StakeUnlockResultImpl::msg()
 }
 
 //----------------------------------------------------------------------------------------------------
-std::string StakeUnlockResultImpl::msg()
-PendingTransaction* StakeUnlockResultImpl:: ptx();
+PendingTransaction* StakeUnlockResultImpl::ptx()
 {
-    return &result.ptx;
+    return new PendingTransactionImpl{wallet, {{result.ptx}}};
 }
 
 } // namespace

@@ -36,10 +36,10 @@
  */
 
 #include "common/string_util.h"
-#include "loki_economy.h"
+#include "oxen_economy.h"
 #include <chrono>
 #ifdef _WIN32
- #define __STDC_FORMAT_MACROS // NOTE(loki): Explicitly define the PRIu64 macro on Mingw
+ #define __STDC_FORMAT_MACROS // NOTE(oxen): Explicitly define the PRIu64 macro on Mingw
 #endif
 
 #include <locale.h>
@@ -62,11 +62,11 @@
 #include "common/dns_utils.h"
 #include "common/base58.h"
 #include "common/scoped_message_writer.h"
-#include "common/loki_integration_test_hooks.h"
+#include "common/oxen_integration_test_hooks.h"
 #include "cryptonote_protocol/cryptonote_protocol_handler.h"
 #include "cryptonote_core/service_node_voting.h"
 #include "cryptonote_core/service_node_list.h"
-#include "cryptonote_core/loki_name_system.h"
+#include "cryptonote_core/oxen_name_system.h"
 #include "simplewallet.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "rpc/core_rpc_server_commands_defs.h"
@@ -95,8 +95,8 @@ namespace po = boost::program_options;
 namespace string_tools = epee::string_tools;
 using sw = cryptonote::simple_wallet;
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "wallet.simplewallet"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "wallet.simplewallet"
 
 #define EXTENDED_LOGS_FILE "wallet_details.log"
 
@@ -109,7 +109,7 @@ using sw = cryptonote::simple_wallet;
   m_wallet->stop(); \
   std::unique_lock lock{m_idle_mutex}; \
   m_idle_cond.notify_all(); \
-  LOKI_DEFER { \
+  OXEN_DEFER { \
       m_auto_refresh_enabled.store(auto_refresh_enabled, std::memory_order_relaxed); \
       m_idle_cond.notify_one(); \
   }
@@ -142,8 +142,9 @@ namespace
   const command_line::arg_descriptor<bool> arg_allow_mismatched_daemon_version = {"allow-mismatched-daemon-version", sw::tr("Allow communicating with a daemon that uses a different RPC version"), false};
   const command_line::arg_descriptor<uint64_t> arg_restore_height = {"restore-height", sw::tr("Restore from specific blockchain height"), 0};
   const command_line::arg_descriptor<std::string> arg_restore_date = {"restore-date", sw::tr("Restore from estimated blockchain height on specified date"), ""};
-  const command_line::arg_descriptor<bool> arg_do_not_relay = {"do-not-relay", sw::tr("The newly created transaction will not be relayed to the loki network"), false};
+  const command_line::arg_descriptor<bool> arg_do_not_relay = {"do-not-relay", sw::tr("The newly created transaction will not be relayed to the oxen network"), false};
   const command_line::arg_descriptor<bool> arg_create_address_file = {"create-address-file", sw::tr("Create an address file for new wallets"), false};
+  const command_line::arg_descriptor<std::string> arg_create_hwdev_txt = {"create-hwdev-txt", sw::tr("Create a .hwdev.txt file for new hardware-backed wallets containing the given comment")};
   const command_line::arg_descriptor<std::string> arg_subaddress_lookahead = {"subaddress-lookahead", tools::wallet2::tr("Set subaddress lookahead sizes to <major>:<minor>"), ""};
   const command_line::arg_descriptor<bool> arg_use_english_language_names = {"use-english-language-names", sw::tr("Display English language names"), false};
 
@@ -214,7 +215,7 @@ namespace
   const char* USAGE_MMS("mms [<subcommand> [<subcommand_parameters>]]");
   const char* USAGE_MMS_INIT("mms init <required_signers>/<authorized_signers> <own_label> <own_transport_address>");
   const char* USAGE_MMS_INFO("mms info");
-  const char* USAGE_MMS_SIGNER("mms signer [<number> <label> [<transport_address> [<loki_address>]]]");
+  const char* USAGE_MMS_SIGNER("mms signer [<number> <label> [<transport_address> [<oxen_address>]]]");
   const char* USAGE_MMS_LIST("mms list");
   const char* USAGE_MMS_NEXT("mms next [sync]");
   const char* USAGE_MMS_SYNC("mms sync");
@@ -247,7 +248,7 @@ namespace
   const char* USAGE_HELP("help [<command>]");
 
   //
-  // Loki
+  // Oxen
   //
   const char* USAGE_REGISTER_SERVICE_NODE("register_service_node [index=<N1>[,<N2>,...]] [<priority>] <operator cut> <address1> <fraction1> [<address2> <fraction2> [...]] <expiration timestamp> <pubkey> <signature>");
   const char* USAGE_STAKE("stake [index=<N1>[,<N2>,...]] [<priority>] <service node pubkey> <amount|percent%>");
@@ -263,7 +264,7 @@ namespace
   const char* USAGE_LNS_PRINT_OWNERS_TO_NAMES("lns_print_owners_to_names [<owner> ...]");
   const char* USAGE_LNS_PRINT_NAME_TO_OWNERS("lns_print_name_to_owners [type=session|lokinet] <name> [<name> ...]");
 
-#if defined (LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined (OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
   std::string input_line(const std::string &prompt, bool yesno = false)
   {
     if (yesno) std::cout << prompt << " (Y/Yes/N/No): ";
@@ -273,7 +274,7 @@ namespace
     epee::string_tools::trim(buf);
     return buf;
   }
-#else // LOKI_ENABLE_INTEGRATION_TEST_HOOKS
+#else // OXEN_ENABLE_INTEGRATION_TEST_HOOKS
   std::string input_line(const std::string& prompt, bool yesno = false)
   {
     std::string buf;
@@ -293,11 +294,11 @@ namespace
     epee::string_tools::trim(buf);
     return buf;
   }
-#endif // LOKI_ENABLE_INTEGRATION_TEST_HOOKS
+#endif // OXEN_ENABLE_INTEGRATION_TEST_HOOKS
 
   epee::wipeable_string input_secure_line(const char *prompt)
   {
-#if defined (LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined (OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     std::cout << prompt;
     integration_test::write_buffered_stdout();
     epee::wipeable_string buf = integration_test::read_from_pipe();
@@ -320,8 +321,8 @@ namespace
 
   std::optional<tools::password_container> password_prompter(const char *prompt, bool verify)
   {
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
-    std::cout << prompt << ": NOTE(loki): Passwords not supported, defaulting to empty password";
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
+    std::cout << prompt << ": NOTE(oxen): Passwords not supported, defaulting to empty password";
     integration_test::write_buffered_stdout();
     tools::password_container pwd_container(std::string(""));
 #else
@@ -462,7 +463,7 @@ namespace
     std::stringstream prompt;
     prompt << sw::tr("For URL: ") << url
            << ", " << dnssec_str << std::endl
-           << sw::tr(" Loki Address = ") << addresses[0]
+           << sw::tr(" Oxen Address = ") << addresses[0]
            << std::endl
            << sw::tr("Is this OK?")
     ;
@@ -1286,7 +1287,7 @@ bool simple_wallet::import_multisig_main(const std::vector<std::string> &args, b
   try
   {
     m_in_manual_refresh.store(true, std::memory_order_relaxed);
-    LOKI_DEFER { m_in_manual_refresh.store(false, std::memory_order_relaxed); };
+    OXEN_DEFER { m_in_manual_refresh.store(false, std::memory_order_relaxed); };
     size_t n_outputs = m_wallet->import_multisig(info);
     // Clear line "Height xxx of xxx"
     std::cout << "\r                                                                \r";
@@ -1579,7 +1580,7 @@ bool simple_wallet::export_raw_multisig(const std::vector<std::string> &args)
     for (auto &ptx: txs.m_ptx)
     {
       const crypto::hash txid = cryptonote::get_transaction_hash(ptx.tx);
-      const fs::path fn = fs::u8path("raw_multisig_loki_tx_" + tools::type_to_hex(txid));
+      const fs::path fn = fs::u8path("raw_multisig_oxen_tx_" + tools::type_to_hex(txid));
       if (!filenames.empty())
         filenames += ", ";
       filenames += fn.u8string();
@@ -2115,25 +2116,25 @@ bool simple_wallet::net_stats(const std::vector<std::string> &args)
 
 bool simple_wallet::welcome(const std::vector<std::string> &args)
 {
-  message_writer() << tr("Welcome to Loki, the private cryptocurrency based on Monero");
+  message_writer() << tr("Welcome to Oxen, the private cryptocurrency based on Monero");
   message_writer() << "";
-  message_writer() << tr("Loki, like Bitcoin, is a cryptocurrency. That is, it is digital money.");
-  message_writer() << tr("Unlike Bitcoin, your Loki transactions and balance stay private and are not visible to the world by default.");
+  message_writer() << tr("Oxen, like Bitcoin, is a cryptocurrency. That is, it is digital money.");
+  message_writer() << tr("Unlike Bitcoin, your Oxen transactions and balance stay private and are not visible to the world by default.");
   message_writer() << tr("However, you have the option of making those available to select parties if you choose to.");
   message_writer() << "";
-  message_writer() << tr("Loki protects your privacy on the blockchain, and while Loki strives to improve all the time,");
-  message_writer() << tr("no privacy technology can be 100% perfect, Monero and consequently Loki included.");
-  message_writer() << tr("Loki cannot protect you from malware, and it may not be as effective as we hope against powerful adversaries.");
-  message_writer() << tr("Flaws in Loki may be discovered in the future, and attacks may be developed to peek under some");
-  message_writer() << tr("of the layers of privacy Loki provides. Be safe and practice defense in depth.");
+  message_writer() << tr("Oxen protects your privacy on the blockchain, and while Oxen strives to improve all the time,");
+  message_writer() << tr("no privacy technology can be 100% perfect, Monero and consequently Oxen included.");
+  message_writer() << tr("Oxen cannot protect you from malware, and it may not be as effective as we hope against powerful adversaries.");
+  message_writer() << tr("Flaws in Oxen may be discovered in the future, and attacks may be developed to peek under some");
+  message_writer() << tr("of the layers of privacy Oxen provides. Be safe and practice defense in depth.");
   message_writer() << "";
-  message_writer() << tr("Welcome to Loki and financial privacy. For more information, see https://loki.network");
+  message_writer() << tr("Welcome to Oxen and financial privacy. For more information, see https://oxen.network");
   return true;
 }
 
 bool simple_wallet::version(const std::vector<std::string> &args)
 {
-  message_writer() << "Loki '" << LOKI_RELEASE_NAME << "' (v" << LOKI_VERSION_FULL << ")";
+  message_writer() << "Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")";
   return true;
 }
 
@@ -2769,12 +2770,12 @@ simple_wallet::simple_wallet()
  refresh-from-block-height [n]
    Set the height before which to ignore blocks.
  segregate-pre-fork-outputs <1|0>
-   Set this if you intend to spend outputs on both Loki AND a key reusing fork.
+   Set this if you intend to spend outputs on both Oxen AND a key reusing fork.
  key-reuse-mitigation2 <1|0>
-   Set this if you are not sure whether you will spend on a key reusing Loki fork later.
+   Set this if you are not sure whether you will spend on a key reusing Oxen fork later.
  subaddress-lookahead <major>:<minor>
    Set the lookahead sizes for the subaddress hash table.
-   Set this if you are not sure whether you will spend on a key reusing Loki fork later.
+   Set this if you are not sure whether you will spend on a key reusing Oxen fork later.
  segregation-height <n>
    Set to the height of a key reusing fork you want to use, 0 to use default.
  ignore-outputs-above <amount>
@@ -2986,7 +2987,7 @@ Pending or Failed: "failed"|"pending",  "out", Lock, Checkpointed, Time, Amount*
   m_cmd_binder.set_handler("mms signer",
                            [this](const auto& x) { return mms(x); },
                            tr(USAGE_MMS_SIGNER),
-                           tr("Set or modify authorized signer info (single-word label, transport address, Loki address), or list all signers"));
+                           tr("Set or modify authorized signer info (single-word label, transport address, Oxen address), or list all signers"));
   m_cmd_binder.set_handler("mms list",
                            [this](const auto& x) { return mms(x); },
                            tr(USAGE_MMS_LIST),
@@ -3116,12 +3117,12 @@ Pending or Failed: "failed"|"pending",  "out", Lock, Checkpointed, Time, Amount*
   m_cmd_binder.set_cancel_handler([this] { return on_cancelled_command(); });
 
   //
-  // Loki
+  // Oxen
   //
   m_cmd_binder.set_handler("register_service_node",
                            [this](const auto& x) { return register_service_node(x); },
                            tr(USAGE_REGISTER_SERVICE_NODE),
-                           tr("Send <amount> to this wallet's main account and lock it as an operator stake for a new Service Node. This command is typically generated on the Service Node via the `prepare_registration' lokid command. The optional index= and <priority> parameters work as in the `transfer' command."));
+                           tr("Send <amount> to this wallet's main account and lock it as an operator stake for a new Service Node. This command is typically generated on the Service Node via the `prepare_registration' oxend command. The optional index= and <priority> parameters work as in the `transfer' command."));
   m_cmd_binder.set_handler("stake",
                            [this](const auto& x) { return stake(x); },
                            tr(USAGE_STAKE),
@@ -3158,12 +3159,12 @@ Pending or Failed: "failed"|"pending",  "out", Lock, Checkpointed, Time, Amount*
   m_cmd_binder.set_handler("lns_print_owners_to_names",
                            [this](const auto& x) { return lns_print_owners_to_names(x); },
                            tr(USAGE_LNS_PRINT_OWNERS_TO_NAMES),
-                           tr("Query the Loki Name Service names that the keys have purchased. If no keys are specified, it defaults to the current wallet."));
+                           tr("Query the Oxen Name Service names that the keys have purchased. If no keys are specified, it defaults to the current wallet."));
 
   m_cmd_binder.set_handler("lns_print_name_to_owners",
                            [this](const auto& x) { return lns_print_name_to_owners(x); },
                            tr(USAGE_LNS_PRINT_NAME_TO_OWNERS),
-                           tr("Query the ed25519 public keys that own the Loki Name System names."));
+                           tr("Query the ed25519 public keys that own the Oxen Name System names."));
 
   m_cmd_binder.set_handler("lns_make_update_mapping_signature",
                            [this](const auto& x) { return lns_make_update_mapping_signature(x); },
@@ -3462,7 +3463,7 @@ static bool datestr_to_int(const std::string &heightstr, uint16_t &year, uint8_t
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::init(const boost::program_options::variables_map& vm)
 {
-  LOKI_DEFER { m_electrum_seed.wipe(); };
+  OXEN_DEFER { m_electrum_seed.wipe(); };
 
   if (auto deprecations = tools::wallet2::has_deprecated_options(vm); !deprecations.empty())
   {
@@ -3496,6 +3497,8 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
   {
     if(!ask_wallet_create_if_needed()) return false;
   }
+
+  std::string default_restore_value = "0";
 
   if (!m_generate_new.empty() || m_restoring)
   {
@@ -3901,26 +3904,11 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     {
       m_wallet_file = m_generate_from_device;
       // create wallet
-      auto r = new_wallet(vm);
+      auto r = new_device_wallet(vm);
       CHECK_AND_ASSERT_MES(r, false, tr("account creation failed"));
       password = *r;
       welcome = true;
-      // if no block_height is specified, assume its a new account and start it "now"
-      if(m_wallet->get_refresh_from_block_height() == 0) {
-        {
-          tools::scoped_message_writer wrt = tools::msg_writer();
-          wrt << tr("No restore height is specified.") << " ";
-          wrt << tr("Assumed you are creating a new account, restore will be done from current estimated blockchain height.") << " ";
-          wrt << tr("Use --restore-height or --restore-date if you want to restore an already setup account from a specific height.");
-        }
-        std::string confirm = input_line(tr("Is this okay?"), true);
-        if (std::cin.eof() || !command_line::is_yes(confirm))
-          CHECK_AND_ASSERT_MES(false, false, tr("account creation aborted"));
-
-        m_wallet->set_refresh_from_block_height(m_wallet->estimate_blockchain_height() > 0 ? m_wallet->estimate_blockchain_height() - 1 : 0);
-        m_wallet->explicit_refresh_from_block_height(true);
-        m_restore_height = m_wallet->get_refresh_from_block_height();
-      }
+      default_restore_value = "curr";
     }
     else
     {
@@ -3939,7 +3927,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       welcome = true;
     }
 
-    if (m_restoring && m_generate_from_json.empty() && m_generate_from_device.empty())
+    if (m_restoring && m_generate_from_json.empty())
     {
       m_wallet->explicit_refresh_from_block_height(!(command_line::is_arg_defaulted(vm, arg_restore_height) &&
         command_line::is_arg_defaulted(vm, arg_restore_date)));
@@ -3968,18 +3956,24 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       bool connected = try_connect_to_daemon(false, &version);
       while (true)
       {
-        std::string heightstr;
-        if (!connected || version < rpc::version_t{1, 6})
-          heightstr = input_line("Restore from specific blockchain height (optional, default 0)");
-        else
-          heightstr = input_line("Restore from specific blockchain height (optional, default 0),\nor alternatively from specific date (YYYY-MM-DD)");
+        std::string prompt =
+            "\nEnter wallet restore blockchain height (e.g. 123456) or restore date\n"
+            "(e.g. 2020-07-21). Enter \"curr\" to use the current blockchain height.\n"
+            "NOTE: transactions before the restore height will not be detected.\n"
+            "[";
+        prompt += default_restore_value;
+        prompt += "]";
+        std::string heightstr = input_line(prompt);
         if (std::cin.eof())
           return false;
         if (heightstr.empty())
-        {
-          m_restore_height = 0;
+          heightstr = default_restore_value;
+        if (heightstr == "curr") {
+          m_restore_height = m_wallet->estimate_blockchain_height();
+          if (m_restore_height) --m_restore_height;
           break;
         }
+
         try
         {
           m_restore_height = boost::lexical_cast<uint64_t>(heightstr);
@@ -4057,7 +4051,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     bool ssl = false;
     if (m_wallet->check_connection(nullptr, &ssl) && !ssl)
       message_writer(epee::console_color_yellow, true) << tr("Using your own without SSL exposes your RPC traffic to monitoring");
-    message_writer(epee::console_color_yellow, true) << tr("You are strongly encouraged to connect to the Loki network using your own daemon");
+    message_writer(epee::console_color_yellow, true) << tr("You are strongly encouraged to connect to the Oxen network using your own daemon");
     message_writer(epee::console_color_yellow, true) << tr("If you or someone you trust are operating this daemon, you can use --trusted-daemon");
     message_writer();
 
@@ -4075,7 +4069,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
   m_wallet->callback(this);
 
   if (welcome)
-    message_writer(epee::console_color_yellow, true) << tr("If you are new to Loki, type \"welcome\" for a brief overview.");
+    message_writer(epee::console_color_yellow, true) << tr("If you are new to Oxen, type \"welcome\" for a brief overview.");
 
   m_last_activity_time = time(NULL);
   return true;
@@ -4303,7 +4297,7 @@ std::optional<epee::wipeable_string> simple_wallet::new_wallet(const boost::prog
     "To start synchronizing with the daemon, use the \"refresh\" command.\n"
     "Use the \"help\" command to see the list of available commands.\n"
     "Use \"help <command>\" to see a command's documentation.\n"
-    "Always use the \"exit\" command when closing loki-wallet-cli to save \n"
+    "Always use the \"exit\" command when closing oxen-wallet-cli to save \n"
     "your current session's state. Otherwise, you might need to synchronize \n"
     "your wallet again (your wallet keys are NOT at risk in any case).\n")
   ;
@@ -4367,7 +4361,7 @@ std::optional<epee::wipeable_string> simple_wallet::new_wallet(const boost::prog
 }
 
 //----------------------------------------------------------------------------------------------------
-std::optional<epee::wipeable_string> simple_wallet::new_wallet(const boost::program_options::variables_map& vm)
+std::optional<epee::wipeable_string> simple_wallet::new_device_wallet(const boost::program_options::variables_map& vm)
 {
   std::pair<std::unique_ptr<tools::wallet2>, tools::password_container> rc;
   try { rc = tools::wallet2::make_new(vm, false, password_prompter); }
@@ -4395,10 +4389,18 @@ std::optional<epee::wipeable_string> simple_wallet::new_wallet(const boost::prog
   try
   {
     bool create_address_file = command_line::get_arg(vm, arg_create_address_file);
+    std::optional<std::string> create_hwdev_txt;
+    if (!command_line::is_arg_defaulted(vm, arg_create_hwdev_txt))
+      create_hwdev_txt = command_line::get_arg(vm, arg_create_hwdev_txt);
     m_wallet->device_derivation_path(device_derivation_path);
-    m_wallet->restore(m_wallet_file, std::move(rc.second).password(), device_desc.empty() ? "Ledger" : device_desc, create_address_file);
-    message_writer(epee::console_color_white, true) << tr("Generated new wallet on hw device: ")
-      << m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+    message_writer(epee::console_color_white, true) << tr("Connecting to hardware device");
+    message_writer() << tr("Your hardware device will ask for permission to export your wallet view key.\n"
+                           "This is optional, but will significantly improve wallet syncing speed. Your\n"
+                           "spend key (needed to spend funds) does not leave the device.");
+    m_wallet->restore_from_device(
+            m_wallet_file, std::move(rc.second).password(), device_desc.empty() ? "Ledger" : device_desc, create_address_file,
+            std::move(create_hwdev_txt), [](const std::string& msg) { message_writer(epee::console_color_green, true) << msg; });
+    message_writer(epee::console_color_white, true) << tr("Finished setting up wallet from hw device");
   }
   catch (const std::exception& e)
   {
@@ -4504,7 +4506,7 @@ std::optional<epee::wipeable_string> simple_wallet::open_wallet(const boost::pro
       prefix = (boost::format(tr("Opened %u/%u multisig wallet%s")) % threshold % total % (ready ? "" : " (not yet finalized)")).str();
     else
       prefix = tr("Opened wallet");
-    message_writer(epee::console_color_white, true) <<
+    message_writer(epee::console_color_green, true) <<
       prefix << ": " << m_wallet->get_account().get_public_address_str(m_wallet->nettype());
     if (m_wallet->get_account().get_device()) {
        message_writer(epee::console_color_white, true) << "Wallet is on device: " << m_wallet->get_account().get_device().get_name();
@@ -5000,7 +5002,7 @@ bool simple_wallet::refresh_main(uint64_t start_height, enum ResetType reset, bo
   try
   {
     m_in_manual_refresh.store(true, std::memory_order_relaxed);
-    LOKI_DEFER { m_in_manual_refresh.store(false, std::memory_order_relaxed); };
+    OXEN_DEFER { m_in_manual_refresh.store(false, std::memory_order_relaxed); };
     m_wallet->refresh(m_wallet->is_trusted_daemon(), start_height, fetched_blocks, received_money, true /*check_pool*/);
 
     if (reset == ResetSoftKeepKI)
@@ -5624,18 +5626,15 @@ void simple_wallet::check_for_inactivity_lock(bool user)
     if (!user)
     {
         tools::msg_writer() << R"(
-        .
-      oooo
-    oooo
-  oooo   .           You Loki Wallet has been locked to
-oooo    oooo         protect you while you were away.
-  oooo    oooo
-    oooo    oooo     (Use `set inactivity-lock-timeout 0`
-      oooo    oooo   to disable this inactivity timeout)
-        .   oooo
-          oooo
-        oooo
-         .
+      ...........
+    ...............
+  ....OOOOOOOOOOO....   Your Oxen Wallet was locked to
+ .......OOOOOOO.......  protect you while you were away.
+ ..........O..........
+ .......OOOOOOO.......  (Use `set inactivity-lock-timeout 0`
+  ....OOOOOOOOOOO....   to disable this inactivity timeout)
+    ...............
+      ...........
 )";
     }
 
@@ -5762,7 +5761,7 @@ bool simple_wallet::confirm_and_send_tx(std::vector<cryptonote::address_parse_in
   }
   else if (m_wallet->multisig())
   {
-    bool r = m_wallet->save_multisig_tx(ptx_vector, "multisig_loki_tx");
+    bool r = m_wallet->save_multisig_tx(ptx_vector, "multisig_oxen_tx");
     if (!r)
     {
       fail_msg_writer() << tr("Failed to write transaction(s) to file");
@@ -5770,7 +5769,7 @@ bool simple_wallet::confirm_and_send_tx(std::vector<cryptonote::address_parse_in
     }
     else
     {
-      success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "multisig_loki_tx";
+      success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "multisig_oxen_tx";
     }
   }
   else if (m_wallet->get_account().get_device().has_tx_cold_sign())
@@ -5799,7 +5798,7 @@ bool simple_wallet::confirm_and_send_tx(std::vector<cryptonote::address_parse_in
   }
   else if (m_wallet->watch_only())
   {
-    bool r = m_wallet->save_tx(ptx_vector, "unsigned_loki_tx");
+    bool r = m_wallet->save_tx(ptx_vector, "unsigned_oxen_tx");
     if (!r)
     {
       fail_msg_writer() << tr("Failed to write transaction(s) to file");
@@ -5807,7 +5806,7 @@ bool simple_wallet::confirm_and_send_tx(std::vector<cryptonote::address_parse_in
     }
     else
     {
-      success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "unsigned_loki_tx";
+      success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "unsigned_oxen_tx";
     }
   }
   else
@@ -5915,7 +5914,7 @@ bool simple_wallet::transfer_main(Transfer transfer_type, const std::vector<std:
     }
     else
     {
-      if (boost::starts_with(local_args[i], "loki:"))
+      if (boost::starts_with(local_args[i], "oxen:"))
         fail_msg_writer() << tr("Invalid last argument: ") << local_args.back() << ": " << error;
       else
         fail_msg_writer() << tr("Invalid last argument: ") << local_args.back();
@@ -5993,7 +5992,7 @@ bool simple_wallet::transfer_main(Transfer transfer_type, const std::vector<std:
       return false;
     }
 
-    loki_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, txtype::standard, priority);
+    oxen_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, txtype::standard, priority);
     ptx_vector = m_wallet->create_transactions_2(dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, unlock_block, priority, extra, m_current_subaddress_account, subaddr_indices, tx_params);
 
     if (ptx_vector.empty())
@@ -6150,12 +6149,10 @@ bool simple_wallet::stake(const std::vector<std::string> &args_)
     m_wallet->refresh(false);
     try
     {
-      address_parse_info info = {};
-      info.address            = m_wallet->get_address();
 
       time_t begin_construct_time = time(nullptr);
 
-      tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(service_node_key, info, amount, amount_fraction, priority, m_current_subaddress_account, subaddr_indices);
+      tools::wallet2::stake_result stake_result = m_wallet->create_stake_tx(service_node_key, amount, amount_fraction, priority, subaddr_indices);
       if (stake_result.status != tools::wallet2::stake_result_status::success)
       {
         fail_msg_writer() << stake_result.msg;
@@ -6166,6 +6163,8 @@ bool simple_wallet::stake(const std::vector<std::string> &args_)
         tools::msg_writer() << stake_result.msg;
 
       std::vector<tools::wallet2::pending_tx> ptx_vector = {stake_result.ptx};
+      cryptonote::address_parse_info info = {};
+      info.address = m_wallet->get_address();
       if (!sweep_main_internal(sweep_type_t::stake, ptx_vector, info, false /* don't blink */))
       {
         fail_msg_writer() << tr("Sending stake transaction failed");
@@ -6237,8 +6236,8 @@ bool simple_wallet::request_stake_unlock(const std::vector<std::string> &args_)
   std::vector<tools::wallet2::pending_tx> ptx_vector = {unlock_result.ptx};
   if (m_wallet->watch_only())
   {
-    if (m_wallet->save_tx(ptx_vector, "unsigned_loki_tx"))
-      success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "unsigned_loki_tx";
+    if (m_wallet->save_tx(ptx_vector, "unsigned_oxen_tx"))
+      success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "unsigned_oxen_tx";
     else
       fail_msg_writer() << tr("Failed to write transaction(s) to file");
 
@@ -6271,12 +6270,7 @@ bool simple_wallet::query_locked_stakes(bool print_result)
   std::string msg_buf;
   {
     using namespace cryptonote;
-    auto [success, response] = m_wallet->get_all_service_nodes();
-    if (!success)
-    {
-      fail_msg_writer() << "Connection to daemon failed when requesting full service node list";
-      return has_locked_stakes;
-    }
+    auto response = m_wallet->list_current_stakes();
 
     cryptonote::account_public_address const primary_address = m_wallet->get_address();
     for (rpc::GET_SERVICE_NODES::response::entry const &node_info : response)
@@ -6284,16 +6278,6 @@ bool simple_wallet::query_locked_stakes(bool print_result)
       bool only_once = true;
       for (const auto& contributor : node_info.contributors)
       {
-        address_parse_info address_info = {};
-        if (!cryptonote::get_account_address_from_str(address_info, m_wallet->nettype(), contributor.address))
-        {
-          fail_msg_writer() << tr("Failed to parse string representation of address: ") << contributor.address;
-          continue;
-        }
-
-        if (primary_address != address_info.address)
-          continue;
-
         for (size_t i = 0; i < contributor.locked_contributions.size(); ++i)
         {
           const auto& contribution = contributor.locked_contributions[i];
@@ -6521,7 +6505,7 @@ bool simple_wallet::lns_buy_mapping(std::vector<std::string> args)
     info.is_subaddress                  = m_current_subaddress_account != 0;
     dsts.push_back(info);
 
-    std::cout << std::endl << tr("Buying Loki Name System Record") << std::endl << std::endl;
+    std::cout << std::endl << tr("Buying Oxen Name System Record") << std::endl << std::endl;
     if (*type == lns::mapping_type::session)
       std::cout << boost::format(tr("Session Name: %s")) % name << std::endl;
     else if (lns::is_lokinet_type(*type))
@@ -6617,7 +6601,7 @@ bool simple_wallet::lns_renew_mapping(std::vector<std::string> args)
     info.is_subaddress                  = m_current_subaddress_account != 0;
     dsts.push_back(info);
 
-    std::cout << "\n" << tr("Renew Loki Name System Record") << "\n\n";
+    std::cout << "\n" << tr("Renew Oxen Name System Record") << "\n\n";
     if (lns::is_lokinet_type(type))
       std::cout << boost::format(tr("Lokinet Name:  %s")) % name << "\n";
     else
@@ -6699,8 +6683,8 @@ bool simple_wallet::lns_update_mapping(std::vector<std::string> args)
     auto& enc_hex = response[0].encrypted_value;
     if (!lokimq::is_hex(enc_hex) || enc_hex.size() % 2 != 0 || enc_hex.size() > 2*lns::mapping_value::BUFFER_SIZE)
     {
-      LOG_ERROR("invalid LNS data returned from lokid");
-      fail_msg_writer() << tr("invalid LNS data returned from lokid");
+      LOG_ERROR("invalid LNS data returned from oxend");
+      fail_msg_writer() << tr("invalid LNS data returned from oxend");
       return true;
     }
 
@@ -6721,7 +6705,7 @@ bool simple_wallet::lns_update_mapping(std::vector<std::string> args)
     info.is_subaddress                  = m_current_subaddress_account != 0;
     dsts.push_back(info);
 
-    std::cout << std::endl << tr("Updating Loki Name System Record") << std::endl << std::endl;
+    std::cout << std::endl << tr("Updating Oxen Name System Record") << std::endl << std::endl;
     if (type == lns::mapping_type::session)
       std::cout << boost::format(tr("Session Name:     %s")) % name << std::endl;
     else if (lns::is_lokinet_type(type))
@@ -6939,7 +6923,7 @@ bool simple_wallet::lns_print_name_to_owners(std::vector<std::string> args)
     auto& enc_hex = mapping.encrypted_value;
     if (mapping.entry_index >= args.size() || !lokimq::is_hex(enc_hex) || enc_hex.size() % 2 != 0 || enc_hex.size() > 2*lns::mapping_value::BUFFER_SIZE)
     {
-      fail_msg_writer() << "Received invalid LNS mapping data from lokid";
+      fail_msg_writer() << "Received invalid LNS mapping data from oxend";
       return false;
     }
 
@@ -7149,26 +7133,26 @@ bool simple_wallet::sweep_unmixable(const std::vector<std::string> &args_)
     // actually commit the transactions
     if (m_wallet->multisig())
     {
-      bool r = m_wallet->save_multisig_tx(ptx_vector, "multisig_loki_tx");
+      bool r = m_wallet->save_multisig_tx(ptx_vector, "multisig_oxen_tx");
       if (!r)
       {
         fail_msg_writer() << tr("Failed to write transaction(s) to file");
       }
       else
       {
-        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "multisig_loki_tx";
+        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "multisig_oxen_tx";
       }
     }
     else if (m_wallet->watch_only())
     {
-      bool r = m_wallet->save_tx(ptx_vector, "unsigned_loki_tx");
+      bool r = m_wallet->save_tx(ptx_vector, "unsigned_oxen_tx");
       if (!r)
       {
         fail_msg_writer() << tr("Failed to write transaction(s) to file");
       }
       else
       {
-        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "unsigned_loki_tx";
+        success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "unsigned_oxen_tx";
       }
     }
     else
@@ -7274,14 +7258,14 @@ bool simple_wallet::sweep_main_internal(sweep_type_t sweep_type, std::vector<too
   bool submitted_to_network = false;
   if (m_wallet->multisig())
   {
-    bool r = m_wallet->save_multisig_tx(ptx_vector, "multisig_loki_tx");
+    bool r = m_wallet->save_multisig_tx(ptx_vector, "multisig_oxen_tx");
     if (!r)
     {
       fail_msg_writer() << tr("Failed to write transaction(s) to file");
     }
     else
     {
-      success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "multisig_loki_tx";
+      success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "multisig_oxen_tx";
     }
   }
   else if (m_wallet->get_account().get_device().has_tx_cold_sign())
@@ -7311,14 +7295,14 @@ bool simple_wallet::sweep_main_internal(sweep_type_t sweep_type, std::vector<too
   }
   else if (m_wallet->watch_only())
   {
-    bool r = m_wallet->save_tx(ptx_vector, "unsigned_loki_tx");
+    bool r = m_wallet->save_tx(ptx_vector, "unsigned_oxen_tx");
     if (!r)
     {
       fail_msg_writer() << tr("Failed to write transaction(s) to file");
     }
     else
     {
-      success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "unsigned_loki_tx";
+      success_msg_writer(true) << tr("Unsigned transaction(s) successfully written to file: ") << "unsigned_oxen_tx";
     }
   }
   else
@@ -7823,7 +7807,7 @@ bool simple_wallet::sign_transfer(const std::vector<std::string> &args_)
   std::vector<tools::wallet2::pending_tx> ptx;
   try
   {
-    bool r = m_wallet->sign_tx("unsigned_loki_tx", "signed_loki_tx", ptx, [&](const tools::wallet2::unsigned_tx_set &tx){ return accept_loaded_tx(tx); }, export_raw);
+    bool r = m_wallet->sign_tx("unsigned_oxen_tx", "signed_oxen_tx", ptx, [&](const tools::wallet2::unsigned_tx_set &tx){ return accept_loaded_tx(tx); }, export_raw);
     if (!r)
     {
       fail_msg_writer() << tr("Failed to sign transaction");
@@ -7843,7 +7827,7 @@ bool simple_wallet::sign_transfer(const std::vector<std::string> &args_)
       txids_as_text += (", ");
     txids_as_text += tools::type_to_hex(get_transaction_hash(t.tx));
   }
-  success_msg_writer(true) << tr("Transaction successfully signed to file ") << "signed_loki_tx" << ", txid " << txids_as_text;
+  success_msg_writer(true) << tr("Transaction successfully signed to file ") << "signed_oxen_tx" << ", txid " << txids_as_text;
   if (export_raw)
   {
     std::string rawfiles_as_text;
@@ -7851,7 +7835,7 @@ bool simple_wallet::sign_transfer(const std::vector<std::string> &args_)
     {
       if (i > 0)
         rawfiles_as_text += ", ";
-      rawfiles_as_text += "signed_loki_tx_raw" + (ptx.size() == 1 ? "" : ("_" + std::to_string(i)));
+      rawfiles_as_text += "signed_oxen_tx_raw" + (ptx.size() == 1 ? "" : ("_" + std::to_string(i)));
     }
     success_msg_writer(true) << tr("Transaction raw hex data exported to ") << rawfiles_as_text;
   }
@@ -7871,14 +7855,14 @@ bool simple_wallet::submit_transfer(const std::vector<std::string> &args_)
   try
   {
     std::vector<tools::wallet2::pending_tx> ptx_vector;
-    bool r = m_wallet->load_tx("signed_loki_tx", ptx_vector, [&](const tools::wallet2::signed_tx_set &tx){ return accept_loaded_tx(tx); });
+    bool r = m_wallet->load_tx("signed_oxen_tx", ptx_vector, [&](const tools::wallet2::signed_tx_set &tx){ return accept_loaded_tx(tx); });
     if (!r)
     {
       fail_msg_writer() << tr("Failed to load transaction from file");
       return true;
     }
 
-    // FIXME: store the blink status in the signed_loki_tx somehow?
+    // FIXME: store the blink status in the signed_oxen_tx somehow?
     constexpr bool FIXME_blink = false;
 
     commit_or_save(ptx_vector, false, FIXME_blink);
@@ -8024,7 +8008,7 @@ bool simple_wallet::get_tx_proof(const std::vector<std::string> &args)
   try
   {
     std::string sig_str = m_wallet->get_tx_proof(txid, info.address, info.is_subaddress, args.size() == 3 ? args[2] : "");
-    const fs::path filename{"loki_tx_proof"};
+    const fs::path filename{"oxen_tx_proof"};
     if (m_wallet->save_to_file(filename, sig_str, true))
       success_msg_writer() << tr("signature file saved to: ") << filename.u8string();
     else
@@ -8236,7 +8220,7 @@ bool simple_wallet::get_spend_proof(const std::vector<std::string> &args)
   try
   {
     const std::string sig_str = m_wallet->get_spend_proof(txid, args.size() == 2 ? args[1] : "");
-    const fs::path filename{"loki_spend_proof"};
+    const fs::path filename{"oxen_spend_proof"};
     if (m_wallet->save_to_file(filename, sig_str, true))
       success_msg_writer() << tr("signature file saved to: ") << filename.u8string();
     else
@@ -8325,7 +8309,7 @@ bool simple_wallet::get_reserve_proof(const std::vector<std::string> &args)
   try
   {
     const std::string sig_str = m_wallet->get_reserve_proof(account_minreserve, args.size() == 2 ? args[1] : "");
-    const fs::path filename{"loki_reserve_proof"};
+    const fs::path filename{"oxen_reserve_proof"};
     if (m_wallet->save_to_file(filename, sig_str, true))
       success_msg_writer() << tr("signature file saved to: ") << filename.u8string();
     else
@@ -8825,7 +8809,7 @@ bool simple_wallet::rescan_blockchain(const std::vector<std::string> &args_)
   }
 
   m_in_manual_refresh.store(true, std::memory_order_relaxed);
-  epee::misc_utils::auto_scope_leave_caller scope_exit_handler = epee::misc_utils::create_scope_leave_handler([&](){m_in_manual_refresh.store(false, std::memory_order_relaxed);});
+  OXEN_DEFER { m_in_manual_refresh.store(false, std::memory_order_relaxed); };
   return refresh_main(start_height, reset_type, true);
 }
 //----------------------------------------------------------------------------------------------------
@@ -8958,13 +8942,13 @@ std::string simple_wallet::get_prompt() const
 }
 //----------------------------------------------------------------------------------------------------
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
 #include <thread>
 #endif
 
 bool simple_wallet::run()
 {
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
   integration_test::use_redirected_cout();
 #endif
   // check and display warning, but go on anyway
@@ -8994,7 +8978,7 @@ bool simple_wallet::run()
 
   message_writer(epee::console_color_green, false) << "Background refresh thread started";
 
-#if defined(LOKI_ENABLE_INTEGRATION_TEST_HOOKS)
+#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
   for (;;)
   {
     integration_test::write_buffered_stdout();
@@ -10181,7 +10165,7 @@ void simple_wallet::interrupt()
 void simple_wallet::commit_or_save(std::vector<tools::wallet2::pending_tx>& ptx_vector, bool do_not_relay, bool blink)
 {
   size_t i = 0;
-  std::string msg_buf; // NOTE(loki): Buffer output so integration tests read the entire output
+  std::string msg_buf; // NOTE(oxen): Buffer output so integration tests read the entire output
   msg_buf.reserve(128);
 
   while (!ptx_vector.empty())
@@ -10194,7 +10178,7 @@ void simple_wallet::commit_or_save(std::vector<tools::wallet2::pending_tx>& ptx_
       cryptonote::blobdata blob;
       tx_to_blob(ptx.tx, blob);
       const std::string blob_hex = lokimq::to_hex(blob);
-      fs::path filename = fs::u8path("raw_loki_tx");
+      fs::path filename = fs::u8path("raw_oxen_tx");
       if (ptx_vector.size() > 1) filename += "_" + std::to_string(i++);
       bool success = m_wallet->save_to_file(filename, blob_hex, true);
 
@@ -10255,6 +10239,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_restore_date);
   command_line::add_arg(desc_params, arg_do_not_relay);
   command_line::add_arg(desc_params, arg_create_address_file);
+  command_line::add_arg(desc_params, arg_create_hwdev_txt);
   command_line::add_arg(desc_params, arg_subaddress_lookahead);
   command_line::add_arg(desc_params, arg_use_english_language_names);
 
@@ -10263,13 +10248,13 @@ int main(int argc, char* argv[])
 
   auto [vm, should_terminate] = wallet_args::main(
    argc, argv,
-   "loki-wallet-cli [--wallet-file=<filename>|--generate-new-wallet=<filename>] [<COMMAND>]",
-    sw::tr("This is the command line Loki wallet. It needs to connect to a Loki\ndaemon to work correctly.\n\nWARNING: Do not reuse your Loki keys on a contentious fork, doing so will harm your privacy.\n Only consider reusing your key on a contentious fork if the fork has key reuse mitigations built in."),
+   "oxen-wallet-cli [--wallet-file=<filename>|--generate-new-wallet=<filename>] [<COMMAND>]",
+    sw::tr("This is the command line Oxen wallet. It needs to connect to a Oxen\ndaemon to work correctly.\n\nWARNING: Do not reuse your Oxen keys on a contentious fork, doing so will harm your privacy.\n Only consider reusing your key on a contentious fork if the fork has key reuse mitigations built in."),
     desc_params,
     hidden_params,
     positional_options,
     [](const std::string &s, bool emphasis){ tools::scoped_message_writer(emphasis ? epee::console_color_white : epee::console_color_default, true) << s; },
-    "loki-wallet-cli.log"
+    "oxen-wallet-cli.log"
   );
 
   if (!vm)
@@ -10446,7 +10431,7 @@ void simple_wallet::list_mms_messages(const std::vector<mms::message> &messages)
 void simple_wallet::list_signers(const std::vector<mms::authorized_signer> &signers)
 {
   message_writer() << boost::format("%2s %-20s %-s") % tr("#") % tr("Label") % tr("Transport Address");
-  message_writer() << boost::format("%2s %-20s %-s") % "" % tr("Auto-Config Token") % tr("Loki Address");
+  message_writer() << boost::format("%2s %-20s %-s") % "" % tr("Auto-Config Token") % tr("Oxen Address");
   for (size_t i = 0; i < signers.size(); ++i)
   {
     const mms::authorized_signer &signer = signers[i];
@@ -10652,7 +10637,7 @@ void simple_wallet::mms_signer(const std::vector<std::string> &args)
   }
   if ((args.size() < 2) || (args.size() > 4))
   {
-    fail_msg_writer() << tr("mms signer [<number> <label> [<transport_address> [<loki_address>]]]");
+    fail_msg_writer() << tr("mms signer [<number> <label> [<transport_address> [<oxen_address>]]]");
     return;
   }
 
@@ -10671,14 +10656,14 @@ void simple_wallet::mms_signer(const std::vector<std::string> &args)
     bool ok = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), args[3], oa_prompter);
     if (!ok)
     {
-      fail_msg_writer() << tr("Invalid Loki address");
+      fail_msg_writer() << tr("Invalid Oxen address");
       return;
     }
     monero_address = info.address;
     const std::vector<mms::message> &messages = ms.get_all_messages();
     if ((messages.size() > 0) || state.multisig)
     {
-      fail_msg_writer() << tr("Wallet state does not allow changing Loki addresses anymore");
+      fail_msg_writer() << tr("Wallet state does not allow changing Oxen addresses anymore");
       return;
     }
   }

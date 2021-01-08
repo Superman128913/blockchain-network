@@ -41,7 +41,6 @@
 #include "crypto/hash.h"
 #include "cryptonote_config.h"
 #include "cryptonote_core/service_node_voting.h"
-#include "rpc/rpc_handler.h"
 #include "common/varint.h"
 #include "common/perf_timer.h"
 #include "common/meta.h"
@@ -50,7 +49,7 @@
 
 #include "cryptonote_core/service_node_quorum_cop.h"
 #include "cryptonote_core/service_node_list.h"
-#include "common/loki.h"
+#include "common/oxen.h"
 
 namespace cryptonote {
 
@@ -134,7 +133,7 @@ namespace rpc {
     KV_MAP_SERIALIZABLE
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get the node's current height.
   struct GET_HEIGHT : PUBLIC, LEGACY
   {
@@ -154,7 +153,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get all blocks info. Binary request.
   struct GET_BLOCKS_FAST : PUBLIC, BINARY
   {
@@ -199,7 +198,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get blocks by height. Binary request.
   struct GET_BLOCKS_BY_HEIGHT : PUBLIC, BINARY
   {
@@ -223,7 +222,7 @@ namespace rpc {
   };
 
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get the known blocks hashes which are not on the main chain.
   struct GET_ALT_BLOCKS_HASHES : PUBLIC, BINARY
   {
@@ -240,7 +239,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get hashes. Binary request.
   struct GET_HASHES_FAST : PUBLIC, BINARY
   {
@@ -266,7 +265,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Look up one or more transactions by hash.
   struct GET_TRANSACTIONS : PUBLIC, LEGACY
   {
@@ -315,7 +314,7 @@ namespace rpc {
       };
 
       std::optional<std::string> pubkey;            // The tx extra public key
-      std::optional<uint64_t> burn_amount;          // The amount of LOKI that this transaction burns
+      std::optional<uint64_t> burn_amount;          // The amount of OXEN that this transaction burns
       std::optional<std::string> extra_nonce;       // Optional extra nonce value (in hex); will be empty if nonce is recognized as a payment id
       std::optional<std::string> payment_id;        // The payment ID, if present. This is either a 16 hex character (8-byte) encrypted payment id, or a 64 hex character (32-byte) deprecated, unencrypted payment ID
       std::optional<uint32_t> mm_depth;             // (Merge-mining) the merge-mined depth
@@ -351,6 +350,7 @@ namespace rpc {
       bool relayed;
       bool blink;                           // True if this is an approved, blink transaction (only available for in_pool transactions or txes in recent blocks)
       std::optional<extra_entry> extra;     // Parsed tx_extra information (only if requested)
+      std::optional<uint64_t> stake_amount; // Calculated transaction stake amount, if a staking/registration transaction and `stake_info=true` is requested.
 
       KV_MAP_SERIALIZABLE
     };
@@ -362,6 +362,7 @@ namespace rpc {
       bool tx_extra;                       // Parse tx-extra information
       bool split;                          // Always split transactions into non-prunable and prunable parts in the response.  `False` by default.
       bool prune;                          // Like `split`, but also omits the prunable part (or details, for decode_as_json) of transactions from the response.  `False` by default.
+      bool stake_info;                     // If true, calculate staking amount for staking/registration transactions
 
       KV_MAP_SERIALIZABLE
     };
@@ -378,7 +379,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Check if outputs have been spent using the key image associated with the output.
   struct IS_KEY_IMAGE_SPENT : PUBLIC, LEGACY
   {
@@ -410,7 +411,7 @@ namespace rpc {
   };
 
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get global outputs of transactions. Binary request.
   struct GET_TX_GLOBAL_OUTPUTS_INDEXES : PUBLIC, BINARY
   {
@@ -434,7 +435,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct get_outputs_out
   {
     uint64_t amount; // Amount of Loki in TXID.
@@ -443,7 +444,7 @@ namespace rpc {
     KV_MAP_SERIALIZABLE
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get outputs. Binary request.
   struct GET_OUTPUTS_BIN : PUBLIC, BINARY
   {
@@ -481,7 +482,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct GET_OUTPUTS : PUBLIC, LEGACY
   {
     static constexpr auto names() { return NAMES("get_outs"); }
@@ -518,7 +519,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Broadcast a raw transaction to the network.
   struct SEND_RAW_TX : PUBLIC, LEGACY
   {
@@ -548,7 +549,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Start mining on the daemon.
   struct START_MINING : LEGACY
   {
@@ -567,7 +568,7 @@ namespace rpc {
     struct response : STATUS {};
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Stop mining on the daemon.
   struct STOP_MINING : LEGACY
   {
@@ -577,7 +578,7 @@ namespace rpc {
     struct response : STATUS {};
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get the mining status of the daemon.
   struct MINING_STATUS : LEGACY
   {
@@ -600,7 +601,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Retrieve general information about the state of your node and the network.
   // Note that all of the std::optional<> fields here are not included if the request is a public
   // (restricted) RPC request.
@@ -656,7 +657,7 @@ namespace rpc {
   };
 
   //-----------------------------------------------
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct GET_NET_STATS : LEGACY
   {
     static constexpr auto names() { return NAMES("get_net_stats"); }
@@ -676,7 +677,7 @@ namespace rpc {
   };
 
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Save the blockchain. The blockchain does not need saving and is always saved when modified,
   // however it does a sync to flush the filesystem cache onto the disk for safety purposes against Operating System or Hardware crashes.
   struct SAVE_BC : LEGACY
@@ -687,7 +688,7 @@ namespace rpc {
     struct response : STATUS {};
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Look up how many blocks are in the longest chain known to the node.
   struct GETBLOCKCOUNT : PUBLIC
   {
@@ -703,7 +704,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Look up a block's hash by its height.
   struct GETBLOCKHASH : PUBLIC
   {
@@ -720,7 +721,7 @@ namespace rpc {
     using response = std::string;          // Block hash (string).
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get a block template on which mining a new block.
   struct GETBLOCKTEMPLATE : PUBLIC
   {
@@ -754,7 +755,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Submit a mined block to the network.
   struct SUBMITBLOCK : PUBLIC
   {
@@ -770,7 +771,7 @@ namespace rpc {
     struct response : STATUS {};
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Developer only.
   struct GENERATEBLOCKS : RPC_COMMAND
   {
@@ -796,11 +797,11 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct block_header_response
   {
-      uint8_t major_version;                  // The major version of the loki protocol at this block height.
-      uint8_t minor_version;                  // The minor version of the loki protocol at this block height.
+      uint8_t major_version;                  // The major version of the oxen protocol at this block height.
+      uint8_t minor_version;                  // The minor version of the oxen protocol at this block height.
       uint64_t timestamp;                     // The unix time at which the block was recorded into the blockchain.
       std::string prev_hash;                  // The hash of the block immediately preceding this block in the chain.
       uint32_t nonce;                         // A cryptographic random one-time number used in mining a Loki block.
@@ -810,8 +811,8 @@ namespace rpc {
       std::string hash;                       // The hash of this block.
       difficulty_type difficulty;             // The strength of the Loki network based on mining power.
       difficulty_type cumulative_difficulty;  // The cumulative strength of the Loki network based on mining power.
-      uint64_t reward;                        // The amount of new generated in this block and rewarded to the miner, foundation and service Nodes. Note: 1 LOKI = 1e9 atomic units.
-      uint64_t miner_reward;                  // The amount of new generated in this block and rewarded to the miner. Note: 1 LOKI = 1e9 atomic units.
+      uint64_t reward;                        // The amount of new generated in this block and rewarded to the miner, foundation and service Nodes. Note: 1 OXEN = 1e9 atomic units.
+      uint64_t miner_reward;                  // The amount of new generated in this block and rewarded to the miner. Note: 1 OXEN = 1e9 atomic units.
       uint64_t block_size;                    // The block size in bytes.
       uint64_t block_weight;                  // The block weight in bytes.
       uint64_t num_txes;                      // Number of transactions in the block, not counting the coinbase tx.
@@ -824,7 +825,7 @@ namespace rpc {
       KV_MAP_SERIALIZABLE
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Block header information for the most recent block is easily retrieved with this method. No inputs are needed.
   struct GET_LAST_BLOCK_HEADER : PUBLIC
   {
@@ -848,7 +849,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Block header information can be retrieved using either a block's hash or height. This method includes a block's hash as an input parameter to retrieve basic information about the block.
   struct GET_BLOCK_HEADER_BY_HASH : PUBLIC
   {
@@ -875,7 +876,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Similar to get_block_header_by_hash above, this method includes a block's height as an input parameter to retrieve basic information about the block.
   struct GET_BLOCK_HEADER_BY_HEIGHT : PUBLIC
   {
@@ -902,7 +903,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Full block information can be retrieved by either block height or hash, like with the above block header calls.
   // For full block information, both lookups use the same method, but with different input parameters.
   struct GET_BLOCK : PUBLIC
@@ -931,7 +932,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get the known peers list.
   struct GET_PEER_LIST : LEGACY
   {
@@ -948,7 +949,7 @@ namespace rpc {
       uint64_t id;           // Peer id.
       std::string host;      // IP address in string format.
       uint32_t ip;           // IP address in integer format.
-      uint16_t port;         // TCP port the peer is using to connect to loki network.
+      uint16_t port;         // TCP port the peer is using to connect to oxen network.
       uint16_t rpc_port;     // RPC port the peer is using
       uint64_t last_seen;    // Unix time at which the peer has been seen for the last time
       uint32_t pruning_seed; //
@@ -978,7 +979,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct public_node
   {
     std::string host;
@@ -991,7 +992,7 @@ namespace rpc {
     KV_MAP_SERIALIZABLE
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Query the daemon's peerlist and retrieve peers who have set their public rpc port.
   struct GET_PUBLIC_NODES : PUBLIC
   {
@@ -1015,7 +1016,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Set the log hash rate display mode.
   struct SET_LOG_HASH_RATE : LEGACY
   {
@@ -1031,7 +1032,7 @@ namespace rpc {
     struct response : STATUS {};
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Set the daemon log level. By default, log level is set to `0`.  For more fine-tuned logging
   // control set the set_log_categories command instead.
   struct SET_LOG_LEVEL : LEGACY
@@ -1048,7 +1049,7 @@ namespace rpc {
     struct response : STATUS {};
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Set the daemon log categories. Categories are represented as a comma separated list of `<Category>:<level>` (similarly to syslog standard `<Facility>:<Severity-level>`), where:
   // Category is one of the following: * (all facilities), default, net, net.http, net.p2p, logging, net.trottle, blockchain.db, blockchain.db.lmdb, bcutil, checkpoints, net.dns, net.dl,
   // i18n, perf,stacktrace, updates, account, cn ,difficulty, hardfork, miner, blockchain, txpool, cn.block_queue, net.cn, daemon, debugtools.deserialize, debugtools.objectsizes, device.ledger,
@@ -1082,7 +1083,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct tx_info
   {
     std::string id_hash;                // The transaction ID hash.
@@ -1103,11 +1104,12 @@ namespace rpc {
     std::string tx_blob;                // Hexadecimal blob represnting the transaction.
     bool blink;                         // True if this is a signed blink transaction
     std::optional<GET_TRANSACTIONS::extra_entry> extra; // Parsed tx_extra information (only if requested)
+    std::optional<uint64_t> stake_amount; // Will be set to the staked amount if the transaction is a staking transaction *and* stake amounts were requested.
 
     KV_MAP_SERIALIZABLE
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct spent_key_image_info
   {
     std::string id_hash;                 // Key image.
@@ -1116,7 +1118,7 @@ namespace rpc {
     KV_MAP_SERIALIZABLE
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Show information about valid transactions seen by the node but not yet mined into a block,
   // as well as spent key image information for the txpool in the node's memory.
   struct GET_TRANSACTION_POOL : PUBLIC, LEGACY
@@ -1126,6 +1128,7 @@ namespace rpc {
     struct request
     {
       bool tx_extra;                       // Parse tx-extra information and adds it to the `extra` field.
+      bool stake_info;                     // Calculate and include staking contribution amount for registration/staking transactions
 
       KV_MAP_SERIALIZABLE
     };
@@ -1141,7 +1144,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get hashes from transaction pool. Binary request.
   struct GET_TRANSACTION_POOL_HASHES_BIN : PUBLIC, BINARY
   {
@@ -1167,7 +1170,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get hashes from transaction pool.
   struct GET_TRANSACTION_POOL_HASHES : PUBLIC, LEGACY
   {
@@ -1184,7 +1187,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct tx_backlog_entry
   {
     uint64_t weight;       //
@@ -1192,7 +1195,7 @@ namespace rpc {
     uint64_t time_in_pool;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get all transaction pool backlog.
   struct GET_TRANSACTION_POOL_BACKLOG : PUBLIC
   {
@@ -1210,7 +1213,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct txpool_histo
   {
     uint32_t txs;   // Number of transactions.
@@ -1219,7 +1222,7 @@ namespace rpc {
     KV_MAP_SERIALIZABLE
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct txpool_stats
   {
     uint64_t bytes_total;            // Total size of all transactions in pool.
@@ -1241,7 +1244,7 @@ namespace rpc {
     KV_MAP_SERIALIZABLE
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get the transaction pool statistics.
   struct GET_TRANSACTION_POOL_STATS : PUBLIC, LEGACY
   {
@@ -1259,7 +1262,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Retrieve information about incoming and outgoing connections to your node.
   struct GET_CONNECTIONS : RPC_COMMAND
   {
@@ -1276,7 +1279,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Similar to get_block_header_by_height above, but for a range of blocks.
   // This method includes a starting block height and an ending block height as
   // parameters to retrieve basic information about the range of blocks.
@@ -1304,7 +1307,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Set the bootstrap daemon to use for data on the blockchain whilst syncing the chain.
   struct SET_BOOTSTRAP_DAEMON : RPC_COMMAND
   {
@@ -1322,7 +1325,7 @@ namespace rpc {
     struct response : STATUS {};
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Send a command to the daemon to safely disconnect and shut down.
   struct STOP_DAEMON : LEGACY
   {
@@ -1332,7 +1335,7 @@ namespace rpc {
     struct response : STATUS {};
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get daemon bandwidth limits.
   struct GET_LIMIT : LEGACY
   {
@@ -1351,7 +1354,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Set daemon bandwidth limits.
   struct SET_LIMIT : LEGACY
   {
@@ -1375,7 +1378,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Limit number of Outgoing peers.
   struct OUT_PEERS : LEGACY
   {
@@ -1395,7 +1398,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Limit number of Incoming peers.
   struct IN_PEERS : LEGACY
   {
@@ -1415,7 +1418,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Look up information regarding hard fork voting and readiness.
   struct HARD_FORK_INFO : PUBLIC
   {
@@ -1445,7 +1448,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get list of banned IPs.
   struct GETBANS : RPC_COMMAND
   {
@@ -1471,7 +1474,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Ban another node by IP.
   struct SETBANS : RPC_COMMAND
   {
@@ -1497,7 +1500,7 @@ namespace rpc {
     struct response : STATUS {};
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Determine whether a given IP address is banned
   struct BANNED : RPC_COMMAND
   {
@@ -1520,7 +1523,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Flush tx ids from transaction pool..
   struct FLUSH_TRANSACTION_POOL : RPC_COMMAND
   {
@@ -1536,7 +1539,7 @@ namespace rpc {
     struct response : STATUS {};
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get a histogram of output amounts. For all amounts (possibly filtered by parameters),
   // gives the number of outputs on the chain for that amount. RingCT outputs counts as 0 amount.
   struct GET_OUTPUT_HISTOGRAM : PUBLIC
@@ -1578,7 +1581,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get current RPC protocol version.
   struct GET_VERSION : PUBLIC
   {
@@ -1596,7 +1599,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get the coinbase amount and the fees amount for n last blocks starting at particular height.
   struct GET_COINBASE_TX_SUM : RPC_COMMAND
   {
@@ -1615,13 +1618,13 @@ namespace rpc {
       std::string status;       // General RPC error code. "OK" means everything looks good.
       uint64_t emission_amount; // Amount of coinbase reward in atomic units.
       uint64_t fee_amount;      // Amount of fees in atomic units.
-      uint64_t burn_amount;      // Amount of burnt loki.
+      uint64_t burn_amount;      // Amount of burnt oxen.
 
       KV_MAP_SERIALIZABLE
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Gives an estimation of per-output + per-byte fees
   struct GET_BASE_FEE_ESTIMATE : PUBLIC
   {
@@ -1649,7 +1652,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Display alternative chains seen by the node.
   struct GET_ALTERNATE_CHAINS : RPC_COMMAND
   {
@@ -1678,7 +1681,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Relay a list of transaction IDs.
   struct RELAY_TX : RPC_COMMAND
   {
@@ -1694,7 +1697,7 @@ namespace rpc {
     struct response : STATUS {};
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get synchronisation information.
   struct SYNC_INFO : RPC_COMMAND
   {
@@ -1736,7 +1739,15 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  struct output_distribution_data
+  {
+    std::vector<std::uint64_t> distribution;
+    std::uint64_t start_height;
+    std::uint64_t base;
+  };
+
+
+  OXEN_RPC_DOC_INTROSPECT
   struct GET_OUTPUT_DISTRIBUTION : PUBLIC
   {
     static constexpr auto names() { return NAMES("get_output_distribution"); }
@@ -1774,7 +1785,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Exactly like GET_OUTPUT_DISTRIBUTION, but does a binary RPC transfer instead of JSON
   struct GET_OUTPUT_DISTRIBUTION_BIN : PUBLIC, BINARY
   {
@@ -1784,7 +1795,7 @@ namespace rpc {
     using response = GET_OUTPUT_DISTRIBUTION::response;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct POP_BLOCKS : LEGACY
   {
     static constexpr auto names() { return NAMES("pop_blocks"); }
@@ -1805,7 +1816,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct PRUNE_BLOCKCHAIN : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("prune_blockchain"); }
@@ -1828,7 +1839,7 @@ namespace rpc {
   };
 
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Accesses the list of public keys of the nodes who are participating or being tested in a quorum.
   struct GET_QUORUM_STATE : PUBLIC
   {
@@ -1884,7 +1895,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct GET_SERVICE_NODE_REGISTRATION_CMD_RAW : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("get_service_node_registration_cmd_raw"); }
@@ -1907,7 +1918,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct GET_SERVICE_NODE_REGISTRATION_CMD : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("get_service_node_registration_cmd"); }
@@ -1932,7 +1943,7 @@ namespace rpc {
     using response = GET_SERVICE_NODE_REGISTRATION_CMD_RAW::response;
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get the service public keys of the queried daemon, encoded in hex.  All three keys are used
   // when running as a service node; when running as a regular node only the x25519 key is regularly
   // used for some RPC and and node-to-SN communication requests.
@@ -1953,7 +1964,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get the service private keys of the queried daemon, encoded in hex.  Do not ever share
   // these keys: they would allow someone to impersonate your service node.  All three keys are used
   // when running as a service node; when running as a regular node only the x25519 key is regularly
@@ -1975,7 +1986,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // TODO: Undocumented, -- unused
   struct PERFORM_BLOCKCHAIN_TEST : RPC_COMMAND
   {
@@ -1998,7 +2009,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct service_node_contribution
   {
     std::string key_image;         // The contribution's key image that is locked on the network.
@@ -2008,7 +2019,7 @@ namespace rpc {
     KV_MAP_SERIALIZABLE
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct service_node_contributor
   {
     uint64_t amount;                                             // The total amount of locked Loki in atomic units for this contributor.
@@ -2019,7 +2030,7 @@ namespace rpc {
     KV_MAP_SERIALIZABLE
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get information on some, all, or a random subset of Service Nodes.
   struct GET_SERVICE_NODES : PUBLIC
   {
@@ -2138,7 +2149,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get information on the queried daemon's Service Node state.
   struct GET_SERVICE_NODE_STATUS : RPC_COMMAND
   {
@@ -2163,7 +2174,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct STORAGE_SERVER_PING : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("storage_server_ping"); }
@@ -2180,7 +2191,7 @@ namespace rpc {
     struct response : STATUS {};
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct LOKINET_PING : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("lokinet_ping"); }
@@ -2194,7 +2205,7 @@ namespace rpc {
     struct response : STATUS {};
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get the required amount of Loki to become a Service Node at the queried height.
   // For devnet and testnet values, ensure the daemon is started with the
   // `--devnet` or `--testnet` flags respectively.
@@ -2219,7 +2230,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get information on blacklisted Service Node key images.
   struct GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES : PUBLIC
   {
@@ -2245,7 +2256,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get information on output blacklist.
   struct GET_OUTPUT_BLACKLIST : PUBLIC, BINARY
   {
@@ -2263,7 +2274,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Query hardcoded/service node checkpoints stored for the blockchain. Omit all arguments to retrieve the latest "count" checkpoints.
   struct GET_CHECKPOINTS : PUBLIC
   {
@@ -2343,7 +2354,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Query hardcoded/service node checkpoints stored for the blockchain. Omit all arguments to retrieve the latest "count" checkpoints.
   struct GET_SN_STATE_CHANGES : PUBLIC
   {
@@ -2376,7 +2387,7 @@ namespace rpc {
   };
 
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   struct REPORT_PEER_SS_STATUS : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("report_peer_storage_server_status"); }
@@ -2410,7 +2421,7 @@ namespace rpc {
     struct response : STATUS {};
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get the name mapping for a Loki Name Service entry. Loki currently supports mappings
   // for Session and Lokinet.
   struct LNS_NAMES_TO_OWNERS : PUBLIC
@@ -2459,7 +2470,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Get all the name mappings for the queried owner. The owner can be either a ed25519 public key or Monero style
   // public key; by default purchases are owned by the spend public key of the purchasing wallet.
   struct LNS_OWNERS_TO_NAMES : PUBLIC
@@ -2499,13 +2510,13 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Performs a simple LNS lookup of a BLAKE2b-hashed name.  This RPC method is meant for simple,
   // single-value resolutions that do not care about registration details, etc.; if you need more
   // information use LNS_NAMES_TO_OWNERS instead.
   //
   // Technical details: the returned value is encrypted using the name itself so that neither this
-  // lokid responding to the RPC request nor any other blockchain observers can (easily) obtain the
+  // oxend responding to the RPC request nor any other blockchain observers can (easily) obtain the
   // name of registered addresses or the registration details.  Thus, from a client's point of view,
   // resolving an LNS record involves:
   //
@@ -2539,7 +2550,7 @@ namespace rpc {
     };
   };
 
-  LOKI_RPC_DOC_INTROSPECT
+  OXEN_RPC_DOC_INTROSPECT
   // Clear TXs from the daemon cache, currently only the cache storing TX hashes that were previously verified bad by the daemon.
   struct FLUSH_CACHE : RPC_COMMAND
   {
