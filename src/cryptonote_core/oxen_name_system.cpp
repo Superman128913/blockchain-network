@@ -105,7 +105,7 @@ std::string lns::mapping_value::to_readable_value(cryptonote::network_type netty
   std::string result;
   if (is_lokinet_type(type))
   {
-    result = lokimq::to_base32z(to_view()) + ".oxen";
+    result = lokimq::to_base32z(to_view()) + ".loki";
   }
   else if (type == lns::mapping_type::wallet)
   {
@@ -775,14 +775,14 @@ bool validate_lns_name(mapping_type type, std::string name, std::string *reason)
   if (is_lokinet)
   {
     // LOKINET
-    // Domain has to start with an alphanumeric, and can have (alphanumeric or hyphens) in between, the character before the suffix <char>'.oxen' must be alphanumeric followed by the suffix '.oxen'
+    // Domain has to start with an alphanumeric, and can have (alphanumeric or hyphens) in between, the character before the suffix <char>'.loki' must be alphanumeric followed by the suffix '.loki'
     // It's *approximately* this regex, but there are some extra restrictions below
-    // ^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.oxen$
+    // ^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.loki$
 
     // Reserved names:
-    // - localhost.oxen has special meaning within lokinet (it is always a CNAME to the local
+    // - localhost.loki has special meaning within lokinet (it is always a CNAME to the local
     //   address)
-    // - loki.loki and snode.oxen are prohibited in case someone added .loki or .snode as search
+    // - loki.loki and snode.loki are prohibited in case someone added .loki or .snode as search
     //   domains (in which case the user looking up "foo.loki" would try end up trying to resolve
     //   "foo.loki.loki").
     for (auto& reserved : {"localhost.loki"sv, "loki.loki"sv, "snode.loki"sv})
@@ -912,7 +912,7 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
     // We need a 52 char base32z string that decodes to a 32-byte value, which really means we need
     // 51 base32z chars (=255 bits) followed by a 1-bit value ('y'=0, or 'o'=0b10000); anything else
     // in the last spot isn't a valid lokinet address.
-    if (check_condition(value.size() != 57 || !tools::ends_with(value, ".oxen") || !lokimq::is_base32z(value.substr(0, 52)) || !(value[51] == 'y' || value[51] == 'o'),
+    if (check_condition(value.size() != 57 || !tools::ends_with(value, ".loki") || !lokimq::is_base32z(value.substr(0, 52)) || !(value[51] == 'y' || value[51] == 'o'),
                 reason, "'", value, "' is not a valid lokinet address"))
       return false;
 
