@@ -242,9 +242,8 @@ local gui_wallet_step_darwin = {
                     + android_build_steps('armeabi-v7a', cmake_extra='-DARCH=armv7-a -DARCH_ID=arm32')
                     + android_build_steps('arm64-v8a', cmake_extra='-DARCH=armv8-a -DARCH_ID=arm64')
                     + android_build_steps('x86_64', cmake_extra='-DARCH="x86-64 -msse4.2 -mpopcnt" -DARCH_ID=x86-64')
-                    + android_build_steps('x86', cmake_extra='-DARCH="i686 -mssse3 -mfpmath=sse" -DARCH_ID=i386')
                     + [
-                    './utils/build_scripts/drone-android-static-upload.sh armeabi-v7a arm64-v8a x86_64 x86'
+                    './utils/build_scripts/drone-android-static-upload.sh armeabi-v7a arm64-v8a x86_64'
                 ]
             }
         ]
