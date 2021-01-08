@@ -28,7 +28,7 @@ mkdir -p $tmpdir/lib
 mkdir -p $tmpdir/include
 
 # Merge the arm64 and simulator libs into a single multi-arch merged lib:
-lipo -create build/{arm64,sim64}/src/wallet/api/libwallet_merged.a -o $tmpdir/lib/libwallet_merged.a
+lipo -create build/{arm64,sim64}/src/wallet/api/libwallet_merged.a -o $tmpdir/lib/libwallet_api.a
 
 cp src/wallet/api/wallet2_api.h $tmpdir/include
 
