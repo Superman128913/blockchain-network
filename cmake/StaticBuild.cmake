@@ -540,25 +540,27 @@ endif()
 
 
 
-set(protobuf_extra "")
-if(ANDROID)
-  set(protobuf_extra "LDFLAGS=-llog")
+if(USE_DEVICE_TREZOR)
+  set(protobuf_extra "")
+  if(ANDROID)
+    set(protobuf_extra "LDFLAGS=-llog")
+  endif()
+  build_external(protobuf
+    CONFIGURE_COMMAND
+      ./configure ${cross_host} --disable-shared --prefix=${DEPS_DESTDIR} --with-pic
+        "CC=${deps_cc}" "CXX=${deps_cxx}" "CFLAGS=${deps_CFLAGS}" "CXXFLAGS=${deps_CXXFLAGS}"
+        ${cross_extra} ${protobuf_extra}
+        "CPP=${deps_cc} -E" "CXXCPP=${deps_cxx} -E"
+        "CC_FOR_BUILD=${deps_cc}" "CXX_FOR_BUILD=${deps_cxx}"  # Thanks Google for making people hunt for undocumented magic variables
+    BUILD_BYPRODUCTS
+      ${DEPS_DESTDIR}/lib/libprotobuf-lite.a
+      ${DEPS_DESTDIR}/lib/libprotobuf.a
+      ${DEPS_DESTDIR}/lib/libprotoc.a
+      ${DEPS_DESTDIR}/include/google/protobuf
+  )
+  add_static_target(protobuf_lite protobuf_external libprotobuf-lite.a)
+  add_static_target(protobuf_bloated protobuf_external libprotobuf.a)
 endif()
-build_external(protobuf
-  CONFIGURE_COMMAND
-    ./configure ${cross_host} --disable-shared --prefix=${DEPS_DESTDIR} --with-pic
-      "CC=${deps_cc}" "CXX=${deps_cxx}" "CFLAGS=${deps_CFLAGS}" "CXXFLAGS=${deps_CXXFLAGS}"
-      ${cross_extra} ${protobuf_extra}
-      "CPP=${deps_cc} -E" "CXXCPP=${deps_cxx} -E"
-      "CC_FOR_BUILD=${deps_cc}" "CXX_FOR_BUILD=${deps_cxx}"  # Thanks Google for making people hunt for undocumented magic variables
-  BUILD_BYPRODUCTS
-    ${DEPS_DESTDIR}/lib/libprotobuf-lite.a
-    ${DEPS_DESTDIR}/lib/libprotobuf.a
-    ${DEPS_DESTDIR}/lib/libprotoc.a
-    ${DEPS_DESTDIR}/include/google/protobuf
-)
-add_static_target(protobuf_lite protobuf_external libprotobuf-lite.a)
-add_static_target(protobuf_bloated protobuf_external libprotobuf.a)
 
 
 

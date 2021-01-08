@@ -1,6 +1,6 @@
 local default_deps_base='libsystemd-dev libboost-thread-dev libgtest-dev ' +
     'libboost-serialization-dev libboost-program-options-dev libunbound-dev nettle-dev libevent-dev libminiupnpc-dev ' +
-    'libunwind8-dev libsodium-dev libssl-dev libreadline-dev libhidapi-dev libusb-1.0-0-dev libprotobuf-dev protobuf-compiler python3 ' +
+    'libunwind8-dev libsodium-dev libssl-dev libreadline-dev libhidapi-dev libusb-1.0-0-dev python3 ' +
     'pkg-config libsqlite3-dev qttools5-dev libcurl4-openssl-dev';
 local default_deps='g++ ' + default_deps_base; // g++ sometimes needs replacement
 
@@ -242,9 +242,8 @@ local gui_wallet_step_darwin = {
                     + android_build_steps('armeabi-v7a', cmake_extra='-DARCH=armv7-a -DARCH_ID=arm32')
                     + android_build_steps('arm64-v8a', cmake_extra='-DARCH=armv8-a -DARCH_ID=arm64')
                     + android_build_steps('x86_64', cmake_extra='-DARCH="x86-64 -msse4.2 -mpopcnt" -DARCH_ID=x86-64')
-                    + android_build_steps('x86', cmake_extra='-DARCH="i686 -mssse3 -mfpmath=sse" -DARCH_ID=i386')
                     + [
-                    './utils/build_scripts/drone-android-static-upload.sh armeabi-v7a arm64-v8a x86_64 x86'
+                    './utils/build_scripts/drone-android-static-upload.sh armeabi-v7a arm64-v8a x86_64'
                 ]
             }
         ]
