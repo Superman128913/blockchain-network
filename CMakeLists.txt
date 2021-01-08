@@ -247,6 +247,8 @@ if (BUILD_TESTS)
   add_definitions(-DUNIT_TEST)
 endif()
 
+OPTION(USE_DEVICE_TREZOR "Build Trezor support (currently non-functional)" OFF)
+
 find_package(Git)
 if(NOT MANUAL_SUBMODULES)
   if(GIT_FOUND)
@@ -496,8 +498,9 @@ add_subdirectory(external)
 
 target_compile_definitions(easylogging PRIVATE AUTO_INITIALIZE_EASYLOGGINGPP)
 
-# Trezor support check
-include(CheckTrezor)
+if(USE_DEVICE_TREZOR)
+  include(CheckTrezor)
+endif()
 
 if(MSVC)
   add_definitions("/bigobj /MP /W3 /GS- /D_CRT_SECURE_NO_WARNINGS /wd4996 /wd4345 /D_WIN32_WINNT=0x0600 /DWIN32_LEAN_AND_MEAN /DGTEST_HAS_TR1_TUPLE=0 /FIinline_c.h /D__SSE4_1__")
@@ -983,7 +986,16 @@ set(git_tag "-unknown")
 if(GIT_FOUND)
   execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse --abbrev-ref HEAD RESULT_VARIABLE ret OUTPUT_VARIABLE branch OUTPUT_STRIP_TRAILING_WHITESPACE)
   if(NOT ret AND branch STREQUAL "stable")
-    set(git_tag "") # No tag if we're building the stable branch
+    # Get the tag description; for a tagged release this will be just the tag (v1.2.3); for
+    # something following a tag this will be something like "v1.2.3-2-abcdef" for something 2
+    # commits beyond the tag, currently at commit "abcdef".
+    execute_process(COMMAND "${GIT_EXECUTABLE}" describe --tags --abbrev=6 HEAD RESULT_VARIABLE ret OUTPUT_VARIABLE tag OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(NOT ret AND tag MATCHES "v[0-9]+\\.[0-9]+\\.[0-9]+(-.*)")
+      # We're building something following a tagged release, so append the post-version git tag info
+      set(git_tag "${CMAKE_MATCH_1}")
+    else()
+      set(git_tag "") # No tag appended if we're building a tagged stable branch release
+    endif()
   else()
     execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse --short=9 HEAD RESULT_VARIABLE ret OUTPUT_VARIABLE commithash OUTPUT_STRIP_TRAILING_WHITESPACE)
     if(NOT ret)
