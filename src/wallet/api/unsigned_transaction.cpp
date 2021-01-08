@@ -42,19 +42,23 @@
 
 namespace Wallet {
 
+EXPORT
 UnsignedTransaction::~UnsignedTransaction() {}
 
 
+EXPORT
 UnsignedTransactionImpl::UnsignedTransactionImpl(WalletImpl &wallet)
     : m_wallet(wallet), m_status{Status_Ok, ""}
 {
 }
 
+EXPORT
 UnsignedTransactionImpl::~UnsignedTransactionImpl()
 {
     LOG_PRINT_L3("Unsigned tx deleted");
 }
 
+EXPORT
 bool UnsignedTransactionImpl::sign(std::string_view signedFileName_)
 {
   auto signedFileName = fs::u8path(signedFileName_);
@@ -82,6 +86,7 @@ bool UnsignedTransactionImpl::sign(std::string_view signedFileName_)
 }
 
 //----------------------------------------------------------------------------------------------------
+EXPORT
 bool UnsignedTransactionImpl::checkLoadedTx(const std::function<size_t()> get_num_txes, const std::function<const wallet::tx_construction_data&(size_t)> &get_tx, const std::string &extra_message)
 {
   // gather info to ask the user
@@ -197,6 +202,7 @@ bool UnsignedTransactionImpl::checkLoadedTx(const std::function<size_t()> get_nu
   return true;
 }
 
+EXPORT
 std::vector<uint64_t> UnsignedTransactionImpl::amount() const
 {
     std::vector<uint64_t> result;
@@ -208,6 +214,7 @@ std::vector<uint64_t> UnsignedTransactionImpl::amount() const
     return result;
 }
 
+EXPORT
 std::vector<uint64_t> UnsignedTransactionImpl::fee() const
 {
     std::vector<uint64_t> result;
@@ -220,6 +227,7 @@ std::vector<uint64_t> UnsignedTransactionImpl::fee() const
     return result;
 } 
 
+EXPORT
 std::vector<uint64_t> UnsignedTransactionImpl::mixin() const
 {
     std::vector<uint64_t> result;    
@@ -236,11 +244,13 @@ std::vector<uint64_t> UnsignedTransactionImpl::mixin() const
     return result;
 }    
 
+EXPORT
 uint64_t UnsignedTransactionImpl::txCount() const
 {
     return m_unsigned_tx_set.txes.size();
 }
 
+EXPORT
 std::vector<std::string> UnsignedTransactionImpl::paymentId() const 
 {
     std::vector<std::string> result;
@@ -270,6 +280,7 @@ std::vector<std::string> UnsignedTransactionImpl::paymentId() const
     return result;
 }
 
+EXPORT
 std::vector<std::string> UnsignedTransactionImpl::recipientAddress() const 
 {
     // TODO: return integrated address if short payment ID exists
@@ -284,6 +295,7 @@ std::vector<std::string> UnsignedTransactionImpl::recipientAddress() const
     return result;
 }
 
+EXPORT
 uint64_t UnsignedTransactionImpl::minMixinCount() const
 {    
     uint64_t min_mixin = ~0;  
