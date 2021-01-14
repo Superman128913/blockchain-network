@@ -3894,6 +3894,10 @@ bool wallet2::store_keys(const fs::path& keys_file_name, const epee::wipeable_st
 
   unlock_keys_file();
   std::error_code e;
+#ifdef WIN32
+  // std::filesystem::rename is broken on Windows and fails if the file already exists
+  fs::remove(keys_file_name, e);
+#endif
   fs::rename(tmp_file_name, keys_file_name, e);
   lock_keys_file();
 
