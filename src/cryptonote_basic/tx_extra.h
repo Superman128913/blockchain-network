@@ -350,7 +350,8 @@ namespace cryptonote
     service_nodes::new_state state;
     uint64_t                 block_height;
     uint32_t                 service_node_index;
-    uint16_t                 reason;
+    uint16_t                 reason_consensus_all;
+    uint16_t                 reason_consensus_any;
     std::vector<vote>        votes;
 
     tx_extra_service_node_state_change() = default;
@@ -368,7 +369,8 @@ namespace cryptonote
       ENUM_FIELD(state, state < service_nodes::new_state::_count);
       VARINT_FIELD(block_height);
       VARINT_FIELD(service_node_index);
-      VARINT_FIELD(reason);
+      VARINT_FIELD(reason_consensus_all);
+      VARINT_FIELD(reason_consensus_any);
       FIELD(votes);
     END_SERIALIZE()
   };

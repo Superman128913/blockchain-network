@@ -368,8 +368,6 @@ namespace service_nodes
                 auto test_results = check_service_node(obligations_height_hf_version, node_key, info);
                 bool passed       = test_results.passed();
 
-
-
                 new_state vote_for_state;
                 uint16_t reason = 0;
                 if (passed) {
@@ -559,10 +557,25 @@ namespace service_nodes
     }
 
     cryptonote::tx_extra_service_node_state_change state_change{vote.state_change.state, vote.block_height, vote.state_change.worker_index};
-    state_change.votes.reserve(votes.size());
 
+    uint16_t reason_consensus_all = vote.state_change.reason;
+    uint16_t reason_consensus_any = vote.state_change.reason;
     for (const auto &pool_vote : votes)
+    {
+      if (hf_version > HF_VERSION_CLSAG) {
+        reason_consensus_any |= pool_vote.vote.state_change.reason;
+        reason_consensus_all &= pool_vote.vote.state_change.reason;
+      }
       state_change.votes.emplace_back(pool_vote.vote.signature, pool_vote.vote.index_in_group);
+    }
+
+    //TODO remove after hard fork 17
+    //if (hf_version > HF_VERSION_PROOF_BTENC) {
+    if (hf_version > HF_VERSION_CLSAG) {
+      state_change.reason_consensus_all = reason_consensus_all;
+      state_change.reason_consensus_any = reason_consensus_any;
+    }
+    state_change.votes.reserve(votes.size());
 
     cryptonote::transaction state_change_tx{};
     if (cryptonote::add_service_node_state_change_to_tx_extra(state_change_tx.extra, state_change, hf_version))
