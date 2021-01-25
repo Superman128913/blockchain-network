@@ -43,6 +43,7 @@ extern "C" {
 #include "cryptonote_tx_utils.h"
 #include "cryptonote_basic/tx_extra.h"
 #include "cryptonote_basic/hardfork.h"
+#include "cryptonote_core/uptime_proof.h"
 #include "epee/int-util.h"
 #include "common/scoped_message_writer.h"
 #include "common/i18n.h"
@@ -2820,6 +2821,8 @@ namespace service_nodes
                           uint16_t s_lmq_port,
                           uint16_t q_port,
                           std::array<uint16_t, 3> ver,
+                          std::array<uint16_t, 3> ss_ver,
+                          std::array<uint16_t, 3> lokinet_ver,
                           const crypto::ed25519_public_key& pk_ed,
                           const crypto::x25519_public_key& pk_x2)
   {
@@ -2830,6 +2833,8 @@ namespace service_nodes
     update_db |= update_val(storage_lmq_port, s_lmq_port);
     update_db |= update_val(quorumnet_port, q_port);
     update_db |= update_val(version, ver);
+    update_db |= update_val(storage_server_version, ss_ver);
+    update_db |= update_val(lokinet_version, lokinet_ver);
     update_db |= update_val(pubkey_ed25519, pk_ed);
     effective_timestamp = timestamp;
     pubkey_x25519 = pk_x2;
@@ -2869,6 +2874,7 @@ namespace service_nodes
   //TODO remove after HF17
   bool service_node_list::handle_uptime_proof(cryptonote::NOTIFY_UPTIME_PROOF::request const &proof, bool &my_uptime_proof_confirmation, crypto::x25519_public_key &x25519_pkey)
   {
+    MGINFO("Received uptime proof from: " << x25519_pkey);
     uint8_t const hf_version = m_blockchain.get_current_hard_fork_version();
     uint64_t const now       = time(nullptr);
 
@@ -2931,7 +2937,7 @@ namespace service_nodes
     }
 
     auto old_x25519 = iproof.pubkey_x25519;
-    if (iproof.update(now, proof.public_ip, proof.storage_port, proof.storage_lmq_port, proof.qnet_port, proof.snode_version, proof.pubkey_ed25519, derived_x25519_pubkey))
+    if (iproof.update(now, proof.public_ip, proof.storage_port, proof.storage_lmq_port, proof.qnet_port, proof.snode_version, std::array<uint16_t,3>{0,0,0}, std::array<uint16_t,3>{0,0,0}, proof.pubkey_ed25519, derived_x25519_pubkey))
       iproof.store(proof.pubkey, m_blockchain);
 
     if ((uint64_t) x25519_map_last_pruned + X25519_MAP_PRUNING_INTERVAL <= now)
@@ -2955,6 +2961,11 @@ namespace service_nodes
 
   bool service_node_list::handle_btencoded_uptime_proof(const uptime_proof::Proof &proof, bool &my_uptime_proof_confirmation, crypto::x25519_public_key &x25519_pkey)
   {
+    MGINFO("Received btencoded uptime proof from: " << proof.pubkey);
+    MGINFO("Timestamp: " << proof.timestamp);
+    MGINFO("Public IP: " << proof.public_ip );
+    MGINFO("Storage Server Version: " << tools::join(".", proof.storage_server_version) );
+    MGINFO("Lokinet Router Version: " << tools::join(".", proof.lokinet_version) );
     uint8_t const hf_version = m_blockchain.get_current_hard_fork_version();
     uint64_t const now       = time(nullptr);
 
@@ -2963,7 +2974,7 @@ namespace service_nodes
       REJECT_PROOF("timestamp is too far from now");
 
     for (auto const &min : MIN_UPTIME_PROOF_VERSIONS)
-      if (hf_version >= min.hardfork && proof.snode_version < min.version)
+      if (hf_version >= min.hardfork && proof.version < min.version)
         REJECT_PROOF("v" << min.version[0] << "." << min.version[1] << "." << min.version[2] << "+ oxen version is required for v" << std::to_string(hf_version) << "+ network proofs");
 
     if (!debug_allow_local_ips && !epee::net_utils::is_ip_public(proof.public_ip))
@@ -3017,7 +3028,7 @@ namespace service_nodes
     }
 
     auto old_x25519 = iproof.pubkey_x25519;
-    if (iproof.update(now, proof.public_ip, proof.storage_port, proof.storage_lmq_port, proof.qnet_port, proof.snode_version, proof.pubkey_ed25519, derived_x25519_pubkey))
+    if (iproof.update(now, proof.public_ip, proof.storage_port, proof.storage_lmq_port, proof.qnet_port, proof.version, proof.storage_server_version, proof.lokinet_version, proof.pubkey_ed25519, derived_x25519_pubkey))
       iproof.store(proof.pubkey, m_blockchain);
 
     if ((uint64_t) x25519_map_last_pruned + X25519_MAP_PRUNING_INTERVAL <= now)

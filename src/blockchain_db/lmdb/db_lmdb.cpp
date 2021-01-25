@@ -6240,10 +6240,10 @@ void BlockchainLMDB::clear_service_node_data()
   }
 }
 
-struct service_node_proof_serialized
+struct service_node_proof_serialized_old
 {
-  service_node_proof_serialized() = default;
-  service_node_proof_serialized(const service_nodes::proof_info &info)
+  service_node_proof_serialized_old() = default;
+  service_node_proof_serialized_old(const service_nodes::proof_info &info)
     : timestamp{native_to_little(info.timestamp)},
       ip{native_to_little(info.public_ip)},
       storage_port{native_to_little(info.storage_port)},
@@ -6262,7 +6262,9 @@ struct service_node_proof_serialized
     info.storage_lmq_port = little_to_native(storage_lmq_port);
     info.quorumnet_port = little_to_native(quorumnet_port);
     for (size_t i = 0; i < info.version.size(); i++)
+    {
       info.version[i] = little_to_native(version[i]);
+    }
     info.update_pubkey(pubkey_ed25519);
   }
   operator service_nodes::proof_info() const
@@ -6280,7 +6282,30 @@ struct service_node_proof_serialized
   uint16_t storage_lmq_port;
   crypto::ed25519_public_key pubkey_ed25519;
 };
-static_assert(sizeof(service_node_proof_serialized) == 56, "service node serialization struct has unexpected size and/or padding");
+static_assert(sizeof(service_node_proof_serialized_old) == 56, "service node serialization struct has unexpected size and/or padding");
+
+struct service_node_proof_serialized : service_node_proof_serialized_old {
+  service_node_proof_serialized() = default;
+  service_node_proof_serialized(const service_nodes::proof_info &info)
+    : service_node_proof_serialized_old{info},
+      storage_server_version{native_to_little(info.storage_server_version[0]), native_to_little(info.storage_server_version[1]), native_to_little(info.storage_server_version[2])},
+      lokinet_version{native_to_little(info.lokinet_version[0]), native_to_little(info.lokinet_version[1]), native_to_little(info.lokinet_version[2])}
+  {}
+  uint16_t storage_server_version[3];
+  uint16_t lokinet_version[3];
+  char _padding[4];
+
+  void update(service_nodes::proof_info& info) const {
+    service_node_proof_serialized_old::update(info);
+    for (size_t i = 0; i < info.storage_server_version.size(); i++)
+    {
+      info.storage_server_version[i] = little_to_native(storage_server_version[i]);
+      info.lokinet_version[i] = little_to_native(lokinet_version[i]);
+    }
+  }
+};
+
+static_assert(sizeof(service_node_proof_serialized) == 72, "service node serialization struct has unexpected size and/or padding");
 
 bool BlockchainLMDB::get_service_node_proof(const crypto::public_key &pubkey, service_nodes::proof_info &proof) const
 {
@@ -6298,7 +6323,11 @@ bool BlockchainLMDB::get_service_node_proof(const crypto::public_key &pubkey, se
   else if (result != MDB_SUCCESS)
     throw0(DB_ERROR(lmdb_error("DB error attempting to get service node data", result)));
 
-  static_cast<const service_node_proof_serialized *>(v.mv_data)->update(proof);
+  if (v.mv_size == sizeof(service_node_proof_serialized_old))
+    static_cast<const service_node_proof_serialized_old*>(v.mv_data)->update(proof);
+  else
+    static_cast<const service_node_proof_serialized*>(v.mv_data)->update(proof);
+
   return true;
 }
 
