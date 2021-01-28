@@ -45,6 +45,7 @@
 #include "rpc/http_server.h"
 #include "rpc/lmq_server.h"
 #include "cryptonote_protocol/quorumnet.h"
+#include "cryptonote_core/uptime_proof.h"
 
 #include "common/password.h"
 #include "common/signal_handler.h"

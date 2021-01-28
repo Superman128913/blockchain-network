@@ -1671,7 +1671,7 @@ namespace cryptonote
     std::array<uint16_t,3> proofversion;
     m_service_node_list.access_proof(pubkey, [&](auto &proof) { 
       x_pkey = proof.pubkey_x25519; 
-      proofversion = proof.version;
+      proofversion = proof.proof->version;
     });
 
     if (proofversion >= MIN_TIMESTAMP_VERSION && x_pkey) {
@@ -1937,11 +1937,9 @@ namespace cryptonote
     auto hf_version = get_hard_fork_version(height);
     //TODO: remove after HF17
     if (hf_version < HF_VERSION_PROOF_BTENC) {
-      MGINFO("Generating Uptime Proof");
       NOTIFY_UPTIME_PROOF::request req = m_service_node_list.generate_uptime_proof(m_sn_public_ip, m_storage_port, m_storage_lmq_port, m_quorumnet_port);
       relayed = get_protocol()->relay_uptime_proof(req, fake_context);
     } else {
-      MGINFO("Generating BT-Encoded Uptime Proof");
       auto proof = m_service_node_list.generate_uptime_proof(m_sn_public_ip, m_storage_port, m_storage_lmq_port, ss_version, m_quorumnet_port, lokinet_version);
       NOTIFY_BTENCODED_UPTIME_PROOF::request req = proof.generate_request();
       relayed = get_protocol()->relay_btencoded_uptime_proof(req, fake_context);
@@ -1968,11 +1966,12 @@ namespace cryptonote
   bool core::handle_btencoded_uptime_proof(const NOTIFY_BTENCODED_UPTIME_PROOF::request &req, bool &my_uptime_proof_confirmation)
   {
     crypto::x25519_public_key pkey = {};
-    auto proof = uptime_proof::Proof(req.proof);
-    proof.sig = tools::make_from_guts<crypto::signature>(req.sig);
-    proof.sig_ed25519 = tools::make_from_guts<crypto::ed25519_signature>(req.ed_sig);
-    bool result = m_service_node_list.handle_btencoded_uptime_proof(proof, my_uptime_proof_confirmation, pkey);
-    if (result && m_service_node_list.is_service_node(proof.pubkey, true /*require_active*/) && pkey)
+    auto proof = std::make_unique<uptime_proof::Proof>(req.proof);
+    proof->sig = tools::make_from_guts<crypto::signature>(req.sig);
+    proof->sig_ed25519 = tools::make_from_guts<crypto::ed25519_signature>(req.ed_sig);
+    auto pubkey = proof->pubkey;
+    bool result = m_service_node_list.handle_btencoded_uptime_proof(std::move(proof), my_uptime_proof_confirmation, pkey);
+    if (result && m_service_node_list.is_service_node(pubkey, true /*require_active*/) && pkey)
     {
       oxenmq::pubkey_set added;
       added.insert(tools::copy_guts(pkey));
@@ -2329,12 +2328,12 @@ namespace cryptonote
             sn_pks.push_back(sni.pubkey);
 
           m_service_node_list.for_each_service_node_info_and_proof(sn_pks.begin(), sn_pks.end(), [&](auto& pk, auto& sni, auto& proof) {
-            if (pk != m_service_keys.pub && proof.public_ip == m_sn_public_ip &&
-                (proof.quorumnet_port == m_quorumnet_port || proof.storage_port == m_storage_port || proof.storage_port == m_storage_lmq_port))
+            if (pk != m_service_keys.pub && proof.proof->public_ip == m_sn_public_ip &&
+                (proof.proof->qnet_port == m_quorumnet_port || proof.proof->storage_port == m_storage_port || proof.proof->storage_port == m_storage_lmq_port))
             MGINFO_RED(
                 "Another service node (" << pk << ") is broadcasting the same public IP and ports as this service node (" <<
-                epee::string_tools::get_ip_string_from_int32(m_sn_public_ip) << ":" << proof.quorumnet_port << "[qnet], :" <<
-                proof.storage_port << "[SS-HTTP], :" << proof.storage_lmq_port << "[SS-LMQ]). "
+                epee::string_tools::get_ip_string_from_int32(m_sn_public_ip) << ":" << proof.proof->qnet_port << "[qnet], :" <<
+                proof.proof->storage_port << "[SS-HTTP], :" << proof.proof->storage_lmq_port << "[SS-LMQ]). "
                 "This will lead to deregistration of one or both service nodes if not corrected. "
                 "(Do both service nodes have the correct IP for the service-node-public-ip setting?)");
           });

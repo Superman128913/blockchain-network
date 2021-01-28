@@ -33,6 +33,8 @@
 #include <boost/endian/conversion.hpp>
 #include <memory>
 #include <cstring>
+#include <type_traits>
+#include <variant>
 
 #include "epee/string_tools.h"
 #include "common/file.h"
@@ -46,6 +48,7 @@
 #include "checkpoints/checkpoints.h"
 #include "cryptonote_core/service_node_rules.h"
 #include "cryptonote_core/service_node_list.h"
+#include "cryptonote_core/uptime_proof.h"
 #include "cryptonote_basic/hardfork.h"
 
 #undef OXEN_DEFAULT_LOG_CATEGORY
@@ -269,8 +272,15 @@ void lmdb_db_open(MDB_txn* txn, const char* name, int flags, MDB_dbi& dbi, const
     throw0(cryptonote::DB_OPEN_FAILURE((lmdb_error(error_string + " : ", res) + std::string(" - you may want to start with --db-salvage")).c_str()));
 }
 
+template <typename T, typename...>
+struct first_type { using type = T; };
+template <typename... T>
+using first_type_t = typename first_type<T...>::type;
+
 // Lets you iterator over all the pairs of K/V pairs in a database
-template <typename K, typename V>
+// If multiple V are provided then value will be a variant<V1*, V2*, ...> with the populated pointer
+// matched by size of the record.
+template <typename K, typename... V>
 class iterable_db {
 private:
   MDB_cursor* cursor;
@@ -281,13 +291,13 @@ public:
 
   class iterator {
   public:
-    using value_type = std::pair<K*, V*>;
+    using value_type = std::pair<K*, std::conditional_t<sizeof...(V) == 1, first_type_t<V...>*, std::variant<V*...>>>;
     using reference = value_type&;
     using pointer = value_type*;
     using difference_type = ptrdiff_t;
     using iterator_category = std::input_iterator_tag;
 
-    constexpr iterator() : element{nullptr, nullptr} {}
+    constexpr iterator() : element{} {}
     iterator(MDB_cursor* c, MDB_cursor_op op_start, MDB_cursor_op op_incr) : cursor{c}, op_incr{op_incr} {
       next(op_start);
     }
@@ -302,14 +312,29 @@ public:
     bool operator!=(const iterator& i) const { return !(*this == i); }
 
   private:
+    template <typename T, typename... More>
+    void load_variant() {
+      if (v.mv_size == sizeof(T))
+        element.second = static_cast<T*>(v.mv_data);
+      else if constexpr (sizeof...(More))
+        load_variant<More...>();
+      else {
+        MWARNING("Invalid stored type size in iterable_db: stored size (" << v.mv_size <<
+            ") matched none of " << tools::type_name<value_type>());
+        var::get<0>(element.second) = nullptr;
+      }
+    }
+
     void next(MDB_cursor_op op) {
       int result = mdb_cursor_get(cursor, &k, &v, op);
       if (result == MDB_NOTFOUND) {
-        element.first = nullptr;
-        element.second = nullptr;
+        element = {};
       } else if (result == MDB_SUCCESS) {
         element.first = static_cast<K*>(k.mv_data);
-        element.second = static_cast<V*>(v.mv_data);
+        if constexpr (sizeof...(V) == 1)
+          element.second = static_cast<typename value_type::second_type*>(v.mv_data);
+        else
+          load_variant<V...>();
       } else {
         throw0(cryptonote::DB_ERROR(lmdb_error("enumeration failed: ", result)));
       }
@@ -318,7 +343,7 @@ public:
     MDB_cursor* cursor = nullptr;
     const MDB_cursor_op op_incr = MDB_NEXT;
     MDB_val k, v;
-    std::pair<K*, V*> element;
+    value_type element;
   };
 
   iterator begin() { return {cursor, op_start, op_incr}; }
@@ -6240,33 +6265,47 @@ void BlockchainLMDB::clear_service_node_data()
   }
 }
 
+template <typename C>
+C native_to_little_container(const C& c) {
+  C result{c};
+  for (auto& x : result) native_to_little_inplace(x);
+  return result;
+}
+template <typename C>
+C little_to_native_container(const C& c) {
+  C result{c};
+  for (auto& x : result) little_to_native_inplace(x);
+  return result;
+}
+
 struct service_node_proof_serialized_old
 {
   service_node_proof_serialized_old() = default;
   service_node_proof_serialized_old(const service_nodes::proof_info &info)
-    : timestamp{native_to_little(info.timestamp)},
-      ip{native_to_little(info.public_ip)},
-      storage_port{native_to_little(info.storage_port)},
-      storage_lmq_port{native_to_little(info.storage_lmq_port)},
-      quorumnet_port{native_to_little(info.quorumnet_port)},
-      version{native_to_little(info.version[0]), native_to_little(info.version[1]), native_to_little(info.version[2])},
-      pubkey_ed25519{info.pubkey_ed25519}
+    : timestamp{native_to_little(info.proof->timestamp)},
+      ip{native_to_little(info.proof->public_ip)},
+      storage_port{native_to_little(info.proof->storage_port)},
+      storage_lmq_port{native_to_little(info.proof->storage_lmq_port)},
+      quorumnet_port{native_to_little(info.proof->qnet_port)},
+      version{native_to_little_container(info.proof->version)},
+      pubkey_ed25519{info.proof->pubkey_ed25519}
   {}
+
   void update(service_nodes::proof_info &info) const
   {
-    info.timestamp = little_to_native(timestamp);
-    if (info.timestamp > info.effective_timestamp)
-      info.effective_timestamp = info.timestamp;
-    info.public_ip = little_to_native(ip);
-    info.storage_port = little_to_native(storage_port);
-    info.storage_lmq_port = little_to_native(storage_lmq_port);
-    info.quorumnet_port = little_to_native(quorumnet_port);
-    for (size_t i = 0; i < info.version.size(); i++)
-    {
-      info.version[i] = little_to_native(version[i]);
-    }
+    info.proof->timestamp = little_to_native(timestamp);
+    if (info.proof->timestamp > info.effective_timestamp)
+      info.effective_timestamp = info.proof->timestamp;
+    info.proof->public_ip = little_to_native(ip);
+    info.proof->storage_port = little_to_native(storage_port);
+    info.proof->storage_lmq_port = little_to_native(storage_lmq_port);
+    info.proof->qnet_port = little_to_native(quorumnet_port);
+    info.proof->version = little_to_native_container(version);
+    info.proof->storage_server_version = {0, 0, 0};
+    info.proof->lokinet_version = {0, 0, 0};
     info.update_pubkey(pubkey_ed25519);
   }
+
   operator service_nodes::proof_info() const
   {
     service_nodes::proof_info info{};
@@ -6278,7 +6317,7 @@ struct service_node_proof_serialized_old
   uint32_t ip;
   uint16_t storage_port;
   uint16_t quorumnet_port;
-  uint16_t version[3];
+  std::array<uint16_t, 3> version;
   uint16_t storage_lmq_port;
   crypto::ed25519_public_key pubkey_ed25519;
 };
@@ -6288,20 +6327,25 @@ struct service_node_proof_serialized : service_node_proof_serialized_old {
   service_node_proof_serialized() = default;
   service_node_proof_serialized(const service_nodes::proof_info &info)
     : service_node_proof_serialized_old{info},
-      storage_server_version{native_to_little(info.storage_server_version[0]), native_to_little(info.storage_server_version[1]), native_to_little(info.storage_server_version[2])},
-      lokinet_version{native_to_little(info.lokinet_version[0]), native_to_little(info.lokinet_version[1]), native_to_little(info.lokinet_version[2])}
+      storage_server_version{native_to_little_container(info.proof->storage_server_version)},
+      lokinet_version{native_to_little_container(info.proof->lokinet_version)}
   {}
-  uint16_t storage_server_version[3];
-  uint16_t lokinet_version[3];
+  std::array<uint16_t, 3> storage_server_version;
+  std::array<uint16_t, 3> lokinet_version;
   char _padding[4];
 
   void update(service_nodes::proof_info& info) const {
+    if (!info.proof) info.proof = std::unique_ptr<uptime_proof::Proof>(new uptime_proof::Proof());
     service_node_proof_serialized_old::update(info);
-    for (size_t i = 0; i < info.storage_server_version.size(); i++)
-    {
-      info.storage_server_version[i] = little_to_native(storage_server_version[i]);
-      info.lokinet_version[i] = little_to_native(lokinet_version[i]);
-    }
+    info.proof->storage_server_version = little_to_native_container(storage_server_version);
+    info.proof->lokinet_version = little_to_native_container(lokinet_version);
+  }
+
+  operator service_nodes::proof_info() const
+  {
+    service_nodes::proof_info info{};
+    update(info);
+    return info;
   }
 };
 
@@ -6357,8 +6401,13 @@ std::unordered_map<crypto::public_key, service_nodes::proof_info> BlockchainLMDB
   RCURSOR(service_node_proofs);
 
   std::unordered_map<crypto::public_key, service_nodes::proof_info> result;
-  for (const auto &pair : iterable_db<crypto::public_key, service_node_proof_serialized>(m_cursors->service_node_proofs))
-    result.emplace(*pair.first, *pair.second);
+  for (const auto &pair : iterable_db<crypto::public_key, service_node_proof_serialized, service_node_proof_serialized_old>(
+        m_cursors->service_node_proofs)) {
+    if (std::holds_alternative<service_node_proof_serialized*>(pair.second))
+      result.emplace(*pair.first, *var::get<service_node_proof_serialized*>(pair.second));
+    else
+      result.emplace(*pair.first, service_node_proof_serialized{*var::get<service_node_proof_serialized_old*>(pair.second)});
+  }
 
   return result;
 }

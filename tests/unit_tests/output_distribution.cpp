@@ -33,6 +33,7 @@
 #include "cryptonote_core/cryptonote_core.h"
 #include "cryptonote_core/tx_pool.h"
 #include "cryptonote_core/blockchain.h"
+#include "cryptonote_core/uptime_proof.h"
 #include "blockchain_db/testdb.h"
 
 #include "blockchain_utilities/blockchain_objects.h"

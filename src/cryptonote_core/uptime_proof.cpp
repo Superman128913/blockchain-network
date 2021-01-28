@@ -29,36 +29,36 @@ Proof::Proof(const std::string& serialized_proof)
   try {
     const lokimq::bt_dict bt_proof = lokimq::bt_deserialize<lokimq::bt_dict>(serialized_proof);
     //snode_version <X,X,X>
-    const lokimq::bt_list& bt_version = var::get<lokimq::bt_list>(bt_proof.at("version"));
+    const lokimq::bt_list& bt_version = var::get<lokimq::bt_list>(bt_proof.at("v"));
     int k = 0;
     for (lokimq::bt_value const &i: bt_version){
       version[k++] = static_cast<uint16_t>(lokimq::get_int<unsigned>(i));
     }
     //timestamp
-    timestamp = lokimq::get_int<unsigned>(bt_proof.at("timestamp"));
+    timestamp = lokimq::get_int<unsigned>(bt_proof.at("t"));
     //public_ip
-    bool succeeded = epee::string_tools::get_ip_int32_from_string(public_ip, var::get<std::string>(bt_proof.at("public_ip")));
+    bool succeeded = epee::string_tools::get_ip_int32_from_string(public_ip, var::get<std::string>(bt_proof.at("ip")));
     //storage_port
-    storage_port = static_cast<uint16_t>(lokimq::get_int<unsigned>(bt_proof.at("storage_port")));
+    storage_port = static_cast<uint16_t>(lokimq::get_int<unsigned>(bt_proof.at("s")));
     //pubkey_ed25519
-    pubkey_ed25519 = tools::make_from_guts<crypto::ed25519_public_key>(var::get<std::string>(bt_proof.at("pubkey_ed25519")));
+    pubkey_ed25519 = tools::make_from_guts<crypto::ed25519_public_key>(var::get<std::string>(bt_proof.at("pke")));
     //pubkey
-    if (auto it = bt_proof.find("pubkey"); it != bt_proof.end())
-      pubkey = tools::make_from_guts<crypto::public_key>(var::get<std::string>(bt_proof.at("pubkey")));
+    if (auto it = bt_proof.find("pk"); it != bt_proof.end())
+      pubkey = tools::make_from_guts<crypto::public_key>(var::get<std::string>(bt_proof.at("pk")));
     else
       std::memcpy(pubkey.data, pubkey_ed25519.data, 32);
     //qnet_port
-    qnet_port = lokimq::get_int<unsigned>(bt_proof.at("qnet_port"));
+    qnet_port = lokimq::get_int<unsigned>(bt_proof.at("q"));
     //storage_lmq_port
-    storage_lmq_port = lokimq::get_int<unsigned>(bt_proof.at("storage_lmq_port"));
+    storage_lmq_port = lokimq::get_int<unsigned>(bt_proof.at("slp"));
     //storage_version
-    const lokimq::bt_list& bt_storage_version = var::get<lokimq::bt_list>(bt_proof.at("storage_version"));
+    const lokimq::bt_list& bt_storage_version = var::get<lokimq::bt_list>(bt_proof.at("sv"));
     k = 0;
     for (lokimq::bt_value const &i: bt_storage_version){
       storage_server_version[k++] = static_cast<uint16_t>(lokimq::get_int<unsigned>(i));
     }
     //lokinet_version
-    const lokimq::bt_list& bt_lokinet_version = var::get<lokimq::bt_list>(bt_proof.at("lokinet_version"));
+    const lokimq::bt_list& bt_lokinet_version = var::get<lokimq::bt_list>(bt_proof.at("lv"));
     k = 0;
     for (lokimq::bt_value const &i: bt_lokinet_version){
       lokinet_version[k++] = static_cast<uint16_t>(lokimq::get_int<unsigned>(i));
@@ -68,6 +68,7 @@ Proof::Proof(const std::string& serialized_proof)
     throw;
   }
 }
+
 
 crypto::hash Proof::hash_uptime_proof() const
 {
@@ -82,18 +83,27 @@ crypto::hash Proof::hash_uptime_proof() const
 lokimq::bt_dict Proof::bt_encode_uptime_proof() const
 {
   lokimq::bt_dict encoded_proof{
-    {"version", lokimq::bt_list{{version[0], version[1], version[2]}}},
-    {"timestamp", timestamp},
-    {"public_ip", epee::string_tools::get_ip_string_from_int32(public_ip)},
-    {"storage_port", storage_port},
-    {"pubkey_ed25519", tools::view_guts(pubkey_ed25519)},
-    {"qnet_port", qnet_port},
-    {"storage_lmq_port", storage_lmq_port},
-    {"storage_version", lokimq::bt_list{{storage_server_version[0], storage_server_version[1], storage_server_version[2]}}},
-    {"lokinet_version", lokimq::bt_list{{lokinet_version[0], lokinet_version[1], lokinet_version[2]}}},
+    //version
+    {"v", lokimq::bt_list{{version[0], version[1], version[2]}}},
+    //timestamp
+    {"t", timestamp},
+    //public_ip
+    {"ip", epee::string_tools::get_ip_string_from_int32(public_ip)},
+    //storage_port
+    {"s", storage_port},
+    //pubkey_ed25519
+    {"pke", tools::view_guts(pubkey_ed25519)},
+    //qnet_port
+    {"q", qnet_port},
+    //storage_lmq_port
+    {"slp", storage_lmq_port},
+    //storage_version
+    {"sv", lokimq::bt_list{{storage_server_version[0], storage_server_version[1], storage_server_version[2]}}},
+    //lokinet_version
+    {"lv", lokimq::bt_list{{lokinet_version[0], lokinet_version[1], lokinet_version[2]}}},
   };
 
-  if (pubkey == pubkey_ed25519) encoded_proof["pubkey"] = tools::view_guts(pubkey);
+  if (pubkey != pubkey_ed25519) encoded_proof["pk"] = tools::view_guts(pubkey);
 
   return encoded_proof;
 }
@@ -110,4 +120,35 @@ cryptonote::NOTIFY_BTENCODED_UPTIME_PROOF::request Proof::generate_request() con
 
 }
 
+bool operator==(const uptime_proof::Proof& lhs, const uptime_proof::Proof& rhs)
+{
+   bool result = true;
+
+   if( (lhs.timestamp != rhs.timestamp) ||
+        (lhs.pubkey != rhs.pubkey) ||
+        (lhs.sig != rhs.sig) ||
+        (lhs.pubkey_ed25519 != rhs.pubkey_ed25519) ||
+        (lhs.sig_ed25519 != rhs.sig_ed25519) ||
+        (lhs.public_ip != rhs.public_ip) ||
+        (lhs.storage_port != rhs.storage_port) ||
+        (lhs.storage_lmq_port != rhs.storage_lmq_port) ||
+        (lhs.qnet_port != rhs.qnet_port) ||
+        (lhs.version[0] != rhs.version[0]) ||
+        (lhs.version[1] != rhs.version[1]) ||
+        (lhs.version[2] != rhs.version[2]) ||
+        (lhs.storage_server_version[0] != rhs.storage_server_version[0]) ||
+        (lhs.storage_server_version[1] != rhs.storage_server_version[1]) ||
+        (lhs.storage_server_version[2] != rhs.storage_server_version[2]) ||
+        (lhs.lokinet_version[0] != rhs.lokinet_version[0]) ||
+        (lhs.lokinet_version[1] != rhs.lokinet_version[1]) ||
+        (lhs.lokinet_version[2] != rhs.lokinet_version[2]))
+       result = false;
+
+   return result;
+}
+
+bool operator!=(const uptime_proof::Proof& lhs, const uptime_proof::Proof& rhs)
+{
+  return !(lhs == rhs);
+}
 

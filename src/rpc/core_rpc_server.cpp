@@ -56,6 +56,7 @@
 #include "cryptonote_basic/account.h"
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 #include "cryptonote_core/tx_sanity_check.h"
+#include "cryptonote_core/uptime_proof.h"
 #include "epee/misc_language.h"
 #include "net/parse.h"
 #include "crypto/hash.h"
@@ -3038,19 +3039,19 @@ namespace cryptonote { namespace rpc {
     entry.decommission_count            = info.decommission_count;
 
     m_core.get_service_node_list().access_proof(sn_info.pubkey, [&entry](const auto &proof) {
-        entry.service_node_version     = proof.version;
-        entry.lokinet_version          = proof.lokinet_version;
-        entry.storage_server_version   = proof.storage_server_version;
-        entry.public_ip                = epee::string_tools::get_ip_string_from_int32(proof.public_ip);
-        entry.storage_port             = proof.storage_port;
-        entry.storage_lmq_port         = proof.storage_lmq_port;
+        entry.service_node_version     = proof.proof->version;
+        entry.lokinet_version          = proof.proof->lokinet_version;
+        entry.storage_server_version   = proof.proof->storage_server_version;
+        entry.public_ip                = epee::string_tools::get_ip_string_from_int32(proof.proof->public_ip);
+        entry.storage_port             = proof.proof->storage_port;
+        entry.storage_lmq_port         = proof.proof->storage_lmq_port;
         entry.storage_server_reachable = proof.storage_server_reachable;
-        entry.pubkey_ed25519           = proof.pubkey_ed25519 ? tools::type_to_hex(proof.pubkey_ed25519) : "";
+        entry.pubkey_ed25519           = proof.proof->pubkey_ed25519 ? tools::type_to_hex(proof.proof->pubkey_ed25519) : "";
         entry.pubkey_x25519            = proof.pubkey_x25519 ? tools::type_to_hex(proof.pubkey_x25519) : "";
-        entry.quorumnet_port           = proof.quorumnet_port;
+        entry.quorumnet_port           = proof.proof->qnet_port;
 
         // NOTE: Service Node Testing
-        entry.last_uptime_proof                  = proof.timestamp;
+        entry.last_uptime_proof                  = proof.proof->timestamp;
         entry.storage_server_reachable           = proof.storage_server_reachable;
         entry.storage_server_reachable_timestamp = proof.storage_server_reachable_timestamp;
 

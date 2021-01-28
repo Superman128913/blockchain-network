@@ -31,6 +31,7 @@
 #include "cryptonote_core/cryptonote_core.h"
 #include "blockchain_objects.h"
 #include "blockchain_db/blockchain_db.h"
+#include "cryptonote_core/uptime_proof.h"
 #include "version.h"
 
 #undef OXEN_DEFAULT_LOG_CATEGORY

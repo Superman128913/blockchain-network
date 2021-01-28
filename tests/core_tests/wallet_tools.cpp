@@ -3,6 +3,7 @@
 //
 
 #include "wallet_tools.h"
+#include "cryptonote_core/uptime_proof.h"
 #include <random>
 
 using namespace crypto;

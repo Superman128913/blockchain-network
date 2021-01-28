@@ -31,6 +31,7 @@
 #include "chaingen.h"
 #include "block_validation.h"
 #include "common/util.h"
+#include "cryptonote_core/uptime_proof.h"
 
 using namespace cryptonote;
 

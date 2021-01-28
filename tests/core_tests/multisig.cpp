@@ -30,6 +30,7 @@
 
 #include "ringct/rctSigs.h"
 #include "cryptonote_basic/cryptonote_basic.h"
+#include "cryptonote_core/uptime_proof.h"
 #include "multisig/multisig.h"
 #include "common/apply_permutation.h"
 #include "common/util.h"
