@@ -301,7 +301,7 @@ int main(int argc, char const * argv[])
     if (!command_line::is_arg_defaulted(vm, daemon_args::arg_log_file))
       log_file_path = command_line::get_arg(vm, daemon_args::arg_log_file);
     if (log_file_path.is_relative())
-      log_file_path = fs::absolute(fs::relative(log_file_path, data_dir));
+      log_file_path = fs::absolute(data_dir / log_file_path);
     mlog_configure(log_file_path.string(), true, command_line::get_arg(vm, daemon_args::arg_max_log_file_size), command_line::get_arg(vm, daemon_args::arg_max_log_files));
 
     // Set log level
