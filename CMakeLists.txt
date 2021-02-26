@@ -51,7 +51,7 @@ message(STATUS "CMake version ${CMAKE_VERSION}")
 set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12 CACHE STRING "macOS deployment target (Apple clang only)")
 
 project(oxen
-    VERSION 8.1.5
+    VERSION 8.1.6
     LANGUAGES CXX C)
   set(OXEN_RELEASE_CODENAME "Salty Saga")
 
