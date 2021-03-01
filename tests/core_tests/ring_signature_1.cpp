@@ -30,6 +30,7 @@
 
 #include "chaingen.h"
 #include "ring_signature_1.h"
+#include "cryptonote_core/uptime_proof.h"
 
 using namespace cryptonote;
 

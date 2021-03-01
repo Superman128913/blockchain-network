@@ -2052,6 +2052,8 @@ namespace rpc {
       bool earned_downtime_blocks;
 
       bool service_node_version;
+      bool lokinet_version;
+      bool storage_server_version;
       bool contributors;
       bool total_contributed;
       bool total_reserved;
@@ -2108,6 +2110,8 @@ namespace rpc {
         uint32_t                              decommission_count;            // The number of times the Service Node has been decommissioned since registration
         int64_t                               earned_downtime_blocks;        // The number of blocks earned towards decommissioning, or the number of blocks remaining until deregistration if currently decommissioned
         std::array<uint16_t, 3>               service_node_version;          // The major, minor, patch version of the Service Node respectively.
+        std::array<uint16_t, 3>               lokinet_version;               // The major, minor, patch version of the Service Node's lokinet router.
+        std::array<uint16_t, 3>               storage_server_version;        // The major, minor, patch version of the Service Node's storage server.
         std::vector<service_node_contributor> contributors;                  // Array of contributors, contributing to this Service Node.
         uint64_t                              total_contributed;             // The total amount of Loki in atomic units contributed to this Service Node.
         uint64_t                              total_reserved;                // The total amount of Loki in atomic units reserved in this Service Node.
@@ -2183,9 +2187,9 @@ namespace rpc {
 
     struct request
     {
-      int version_major; // Storage Server Major version
-      int version_minor; // Storage Server Minor version
-      int version_patch; // Storage Server Patch version
+      uint16_t version_major; // Storage Server Major version
+      uint16_t version_minor; // Storage Server Minor version
+      uint16_t version_patch; // Storage Server Patch version
       uint16_t storage_lmq_port; // Storage Server lmq port to include in uptime proofs
       KV_MAP_SERIALIZABLE
     };
@@ -2200,7 +2204,7 @@ namespace rpc {
 
     struct request
     {
-      std::array<int, 3> version; // Lokinet version
+      std::array<uint16_t, 3> version; // Lokinet version
       KV_MAP_SERIALIZABLE
     };
 

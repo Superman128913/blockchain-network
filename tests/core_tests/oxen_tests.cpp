@@ -35,6 +35,7 @@
 #include "cryptonote_config.h"
 #include "cryptonote_core/oxen_name_system.h"
 #include "cryptonote_core/service_node_list.h"
+#include "cryptonote_core/uptime_proof.h"
 #include "oxen_economy.h"
 #include "common/random.h"
 

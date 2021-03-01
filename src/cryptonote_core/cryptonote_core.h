@@ -160,6 +160,15 @@ namespace cryptonote
      bool handle_uptime_proof(const NOTIFY_UPTIME_PROOF::request &proof, bool &my_uptime_proof_confirmation);
 
      /**
+      * @brief handles an incoming uptime proof that is encoded using B-encoding
+      *
+      * Parses an incoming uptime proof
+      *
+      * @return true if we haven't seen it before and thus need to relay.
+      */
+     bool handle_btencoded_uptime_proof(const NOTIFY_BTENCODED_UPTIME_PROOF::request &proof, bool &my_uptime_proof_confirmation);
+
+     /**
       * @brief handles an incoming transaction
       *
       * Parses an incoming transaction and, if nothing is obviously wrong,
@@ -1162,6 +1171,10 @@ namespace cryptonote
       */
      std::unordered_map<crypto::x25519_public_key, oxenmq::AuthLevel>& _lmq_auth_level_map() { return m_lmq_auth; }
      oxenmq::TaggedThreadID const &pulse_thread_id() const { return *m_pulse_thread_id; }
+
+     /// Service Node's storage server and lokinet version
+     std::array<uint16_t, 3> ss_version;
+     std::array<uint16_t, 3> lokinet_version;
 
  private:
 

@@ -36,6 +36,7 @@
 #include "blockchain_db/blockchain_db.h"
 #include "version.h"
 #include "epee/misc_os_dependent.h"
+#include "cryptonote_core/uptime_proof.h"
 
 #undef OXEN_DEFAULT_LOG_CATEGORY
 #define OXEN_DEFAULT_LOG_CATEGORY "bcutil"

@@ -32,6 +32,7 @@
 #include "chaingen_tests_list.h"
 #include "common/util.h"
 #include "common/command_line.h"
+#include "cryptonote_core/uptime_proof.h"
 #include "transaction_tests.h"
 
 namespace po = boost::program_options;

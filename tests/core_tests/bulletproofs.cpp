@@ -33,6 +33,7 @@
 #include "chaingen.h"
 #include "bulletproofs.h"
 #include "device/device.hpp"
+#include "cryptonote_core/uptime_proof.h"
 #include "common/util.h"
 
 using namespace crypto;

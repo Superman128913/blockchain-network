@@ -29,6 +29,7 @@
 #include "service_node_quorum_cop.h"
 #include "service_node_voting.h"
 #include "service_node_list.h"
+#include "uptime_proof.h"
 #include "cryptonote_config.h"
 #include "cryptonote_core.h"
 #include "version.h"
@@ -98,13 +99,13 @@ namespace service_nodes
 
     m_core.get_service_node_list().access_proof(pubkey, [&](const proof_info &proof) {
       ss_reachable             = proof.storage_server_reachable;
-      timestamp                = std::max(proof.timestamp, proof.effective_timestamp);
+      timestamp                = std::max(proof.proof->timestamp, proof.effective_timestamp);
       ips                      = proof.public_ips;
       checkpoint_participation = proof.checkpoint_participation;
       pulse_participation      = proof.pulse_participation;
 
       // TODO: remove after HF17
-      if (proof.version >= MIN_TIMESTAMP_VERSION && hf_version >= cryptonote::network_version_17) {
+      if (proof.proof->version >= MIN_TIMESTAMP_VERSION && hf_version >= cryptonote::network_version_17) {
         timestamp_participation  = proof.timestamp_participation;
         timesync_status          = proof.timesync_status;
         check_timestamp_obligation = true;
