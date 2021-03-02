@@ -6293,7 +6293,6 @@ bool simple_wallet::query_locked_stakes(bool print_result)
     using namespace cryptonote;
     auto response = m_wallet->list_current_stakes();
 
-    cryptonote::account_public_address const primary_address = m_wallet->get_address();
     for (rpc::GET_SERVICE_NODES::response::entry const &node_info : response)
     {
       bool only_once = true;
