@@ -390,6 +390,9 @@ namespace service_nodes
                   if (!test_results.checkpoint_participation) reason &= cryptonote::Decommission_Reason::missed_checkpoints;
                   if (!test_results.pulse_participation) reason &= cryptonote::Decommission_Reason::missed_pulse_participations;
                   if (!test_results.storage_server_reachable) reason &= cryptonote::Decommission_Reason::storage_server_unreachable;
+                  //TODO sean add timesync status and timesync response
+                  if (!test_results.timestamp_participation) reason &= cryptonote::Decommission_Reason::timestamp_response_unreachable;
+                  if (!test_results.timesync_status) reason &= cryptonote::Decommission_Reason::timesync_status_out_of_sync;
                   int64_t credit = calculate_decommission_credit(info, latest_height);
 
                   if (info.is_decommissioned()) {
@@ -562,7 +565,8 @@ namespace service_nodes
     uint16_t reason_consensus_any = vote.state_change.reason;
     for (const auto &pool_vote : votes)
     {
-      if (hf_version > HF_VERSION_CLSAG) {
+      //TODO remove after hard fork 17
+      if (hf_version > HF_VERSION_PROOF_BTENC) {
         reason_consensus_any |= pool_vote.vote.state_change.reason;
         reason_consensus_all &= pool_vote.vote.state_change.reason;
       }
@@ -570,8 +574,7 @@ namespace service_nodes
     }
 
     //TODO remove after hard fork 17
-    //if (hf_version > HF_VERSION_PROOF_BTENC) {
-    if (hf_version > HF_VERSION_CLSAG) {
+    if (hf_version > HF_VERSION_PROOF_BTENC) {
       state_change.reason_consensus_all = reason_consensus_all;
       state_change.reason_consensus_any = reason_consensus_any;
     }
