@@ -1338,6 +1338,40 @@ namespace tools::wallet_rpc {
   };
 
   OXEN_RPC_DOC_INTROSPECT
+  // Export transfers to csv
+  struct EXPORT_TRANSFERS : RPC_COMMAND
+  {
+    static constexpr auto names() { return NAMES("export_transfers"); }
+
+    struct request
+    {
+      std::string filename; // String for the filename of the CSV to write
+      bool in = false;
+      bool out = false;
+      bool stake = false;
+      bool pending = false;
+      bool failed = false;
+      bool pool = false;
+      bool coinbase = false;
+      bool filter_by_height = false;
+      uint64_t min_height = 0;
+      uint64_t max_height = CRYPTONOTE_MAX_BLOCK_NUMBER;
+      std::set<uint32_t> subaddr_indices;
+      uint32_t account_index;
+      bool all_accounts;
+
+      KV_MAP_SERIALIZABLE
+    };
+
+    struct response
+    {
+      std::string filename; // String for the filename written to
+
+      KV_MAP_SERIALIZABLE
+    };
+  };
+
+  OXEN_RPC_DOC_INTROSPECT
   // Import outputs in hex format.
   struct IMPORT_OUTPUTS : RESTRICTED
   {
@@ -2528,6 +2562,7 @@ This command is only required if the open wallet is one of the owners of a LNS r
     SIGN,
     VERIFY,
     EXPORT_OUTPUTS,
+    EXPORT_TRANSFERS,
     IMPORT_OUTPUTS,
     EXPORT_KEY_IMAGES,
     IMPORT_KEY_IMAGES,
