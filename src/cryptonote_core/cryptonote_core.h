@@ -852,6 +852,11 @@ namespace cryptonote
      network_type get_nettype() const { return m_nettype; };
 
      /**
+      * Returns the config settings for the network we are on.
+      */
+     constexpr const network_config& get_net_config() const { return get_config(m_nettype); }
+
+     /**
       * @brief get whether transaction relay should be padded
       *
       * @return whether transaction relay should be padded
@@ -1218,7 +1223,7 @@ namespace cryptonote
      tools::periodic_task m_fork_moaner{2h}; //!< interval for checking HardFork status
      tools::periodic_task m_txpool_auto_relayer{2min, false}; //!< interval for checking re-relaying txpool transactions
      tools::periodic_task m_check_disk_space_interval{10min}; //!< interval for checking for disk space
-     tools::periodic_task m_check_uptime_proof_interval{std::chrono::seconds{UPTIME_PROOF_TIMER_SECONDS}}; //!< interval for checking our own uptime proof
+     tools::periodic_task m_check_uptime_proof_interval{get_net_config().UPTIME_PROOF_CHECK_INTERVAL}; //!< interval for checking our own uptime proof
      tools::periodic_task m_block_rate_interval{90s, false}; //!< interval for checking block rate
      tools::periodic_task m_blockchain_pruning_interval{5h}; //!< interval for incremental blockchain pruning
      tools::periodic_task m_service_node_vote_relayer{2min, false};
