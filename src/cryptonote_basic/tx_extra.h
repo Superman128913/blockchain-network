@@ -347,32 +347,72 @@ namespace cryptonote
       END_SERIALIZE()
     };
 
+    enum struct version_t : uint8_t { v0, v4_reasons = 4 };
+
+    version_t version;
     service_nodes::new_state state;
-    uint64_t                 block_height;
-    uint32_t                 service_node_index;
-    uint16_t                 reason_consensus_all;
-    uint16_t                 reason_consensus_any;
-    std::vector<vote>        votes;
+    uint64_t block_height;
+    uint32_t service_node_index;
+    uint16_t reason_consensus_all;
+    uint16_t reason_consensus_any;
+    std::vector<vote> votes;
 
     tx_extra_service_node_state_change() = default;
 
     template <typename... VotesArgs>
-    tx_extra_service_node_state_change(service_nodes::new_state state, uint64_t block_height, uint32_t service_node_index, VotesArgs &&...votes)
-        : state{state}, block_height{block_height}, service_node_index{service_node_index}, votes{std::forward<VotesArgs>(votes)...} {}
+    tx_extra_service_node_state_change(
+        version_t version,
+        service_nodes::new_state state,
+        uint64_t block_height,
+        uint32_t service_node_index,
+        uint16_t reason_all,
+        uint16_t reason_any,
+        std::vector<vote> votes) :
+      version{version},
+      state{state},
+      block_height{block_height},
+      service_node_index{service_node_index},
+      reason_consensus_all{reason_all},
+      reason_consensus_any{reason_any},
+      votes{std::move(votes)}
+    {}
 
     // Compares equal if this represents a state change of the same SN (does *not* require equality of stored votes)
     bool operator==(const tx_extra_service_node_state_change &sc) const {
       return state == sc.state && block_height == sc.block_height && service_node_index == sc.service_node_index;
     }
 
-    BEGIN_SERIALIZE()
-      ENUM_FIELD(state, state < service_nodes::new_state::_count);
-      VARINT_FIELD(block_height);
-      VARINT_FIELD(service_node_index);
-      VARINT_FIELD(reason_consensus_all);
-      VARINT_FIELD(reason_consensus_any);
-      FIELD(votes);
-    END_SERIALIZE()
+    template <class Archive>
+    void serialize_value(Archive& ar) {
+      // Retrofit a field version in here.  Prior to adding reason fields, the first value (in
+      // binary serialization) was the `state` enum, which had a maximum acceptable value of 3: so
+      // if we get >= 4, that's a version, and otherwise we're implicitly version 0 (and there is no
+      // version 1-3).
+      if (Archive::is_serializer && version >= version_t::v4_reasons) {
+        field_varint(ar, "version", version);
+      } else if constexpr (Archive::is_deserializer) {
+        uint8_t ver;
+        field_varint(ar, "version", ver, [](auto v) { return v <= 4; });
+        if (ver < 4) { // Old record, so the "version" we read is actually the state value
+          version = version_t::v0;
+          state = static_cast<service_nodes::new_state>(ver);
+        } else {
+          version = static_cast<version_t>(ver);
+        }
+      }
+      if (Archive::is_serializer || version >= version_t::v4_reasons) {
+        field_varint(ar, "state", state, [](auto s) { return s < service_nodes::new_state::_count; });
+      }
+
+      field_varint(ar, "block_height", block_height);
+      field_varint(ar, "service_node_index", service_node_index);
+      field(ar, "votes", votes);
+      if (version >= version_t::v4_reasons)
+      {
+        field_varint(ar, "reason_consensus_all", reason_consensus_all);
+        field_varint(ar, "reason_consensus_any", reason_consensus_any);
+      }
+    }
   };
 
   // Describes the reason for a service node being decommissioned. Included in demerit votes and the decommission transaction itself.

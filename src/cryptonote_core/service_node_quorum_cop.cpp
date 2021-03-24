@@ -558,26 +558,24 @@ namespace service_nodes
         return true;
     }
 
-    cryptonote::tx_extra_service_node_state_change state_change{vote.state_change.state, vote.block_height, vote.state_change.worker_index};
+    using version_t = cryptonote::tx_extra_service_node_state_change::version_t;
+    auto ver = hf_version >= HF_VERSION_PROOF_BTENC ? version_t::v4_reasons : version_t::v0;
+    cryptonote::tx_extra_service_node_state_change state_change{
+        ver,
+        vote.state_change.state,
+        vote.block_height,
+        vote.state_change.worker_index,
+        vote.state_change.reason,
+        vote.state_change.reason,
+        {}};
+    state_change.votes.reserve(votes.size());
 
-    uint16_t reason_consensus_all = vote.state_change.reason;
-    uint16_t reason_consensus_any = vote.state_change.reason;
     for (const auto &pool_vote : votes)
     {
-      //TODO remove after hard fork 17
-      if (hf_version > HF_VERSION_PROOF_BTENC) {
-        reason_consensus_any |= pool_vote.vote.state_change.reason;
-        reason_consensus_all &= pool_vote.vote.state_change.reason;
-      }
+      state_change.reason_consensus_any |= pool_vote.vote.state_change.reason;
+      state_change.reason_consensus_all &= pool_vote.vote.state_change.reason;
       state_change.votes.emplace_back(pool_vote.vote.signature, pool_vote.vote.index_in_group);
     }
-
-    //TODO remove after hard fork 17
-    if (hf_version > HF_VERSION_PROOF_BTENC) {
-      state_change.reason_consensus_all = reason_consensus_all;
-      state_change.reason_consensus_any = reason_consensus_any;
-    }
-    state_change.votes.reserve(votes.size());
 
     cryptonote::transaction state_change_tx{};
     if (cryptonote::add_service_node_state_change_to_tx_extra(state_change_tx.extra, state_change, hf_version))
@@ -586,9 +584,7 @@ namespace service_nodes
       state_change_tx.type    = cryptonote::txtype::state_change;
 
       cryptonote::tx_verification_context tvc{};
-      cryptonote::blobdata const tx_blob = cryptonote::tx_to_blob(state_change_tx);
-
-      bool result = core.handle_incoming_tx(tx_blob, tvc, cryptonote::tx_pool_options::new_tx());
+      bool result = core.handle_incoming_tx(cryptonote::tx_to_blob(state_change_tx), tvc, cryptonote::tx_pool_options::new_tx());
       if (!result || tvc.m_verifivation_failed)
       {
         LOG_PRINT_L1("A full state change tx for height: " << vote.block_height <<
