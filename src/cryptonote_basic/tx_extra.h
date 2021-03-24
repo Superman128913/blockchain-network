@@ -376,13 +376,13 @@ namespace cryptonote
   };
 
   // Describes the reason for a service node being decommissioned. Included in demerit votes and the decommission transaction itself.
-  enum Decommission_Reason {
-    missed_uptime_proof = 0x1,
-    missed_checkpoints = 0x2,
-    missed_pulse_participations = 0x4,
-    storage_server_unreachable = 0x8,
-    timestamp_response_unreachable = 0x16,
-    timesync_status_out_of_sync = 0x32
+  enum Decommission_Reason : uint16_t {
+    missed_uptime_proof = 1 << 0,
+    missed_checkpoints = 1 << 1,
+    missed_pulse_participations = 1 << 2,
+    storage_server_unreachable = 1 << 3,
+    timestamp_response_unreachable = 1 << 4,
+    timesync_status_out_of_sync = 1 << 5
   };
 
   // Pre-Heimdall service node deregistration data; it doesn't carry the state change (it is only

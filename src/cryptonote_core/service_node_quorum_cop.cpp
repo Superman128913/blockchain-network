@@ -390,7 +390,6 @@ namespace service_nodes
                   if (!test_results.checkpoint_participation) reason &= cryptonote::Decommission_Reason::missed_checkpoints;
                   if (!test_results.pulse_participation) reason &= cryptonote::Decommission_Reason::missed_pulse_participations;
                   if (!test_results.storage_server_reachable) reason &= cryptonote::Decommission_Reason::storage_server_unreachable;
-                  //TODO sean add timesync status and timesync response
                   if (!test_results.timestamp_participation) reason &= cryptonote::Decommission_Reason::timestamp_response_unreachable;
                   if (!test_results.timesync_status) reason &= cryptonote::Decommission_Reason::timesync_status_out_of_sync;
                   int64_t credit = calculate_decommission_credit(info, latest_height);
