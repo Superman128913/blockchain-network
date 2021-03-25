@@ -706,6 +706,8 @@ namespace service_nodes
 
         info.active_since_height = -info.active_since_height;
         info.last_decommission_height = block_height;
+        //TODO sean
+        info.last_decommission_reason = state_change.reason_consensus_all;
         info.decommission_count++;
 
         if (hf_version >= cryptonote::network_version_13_enforce_checkpoints) {

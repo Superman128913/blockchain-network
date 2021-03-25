@@ -2049,6 +2049,7 @@ namespace rpc {
       bool funded;
       bool state_height;
       bool decommission_count;
+      bool last_decommission_reason;
       bool earned_downtime_blocks;
 
       bool service_node_version;
@@ -2108,6 +2109,7 @@ namespace rpc {
         bool                                  funded;                        // True if the required stakes have been submitted to activate this Service Node
         uint64_t                              state_height;                  // If active: the state at which the service node became active (i.e. fully staked height, or last recommissioning); if decommissioned: the decommissioning height; if awaiting: the last contribution (or registration) height
         uint32_t                              decommission_count;            // The number of times the Service Node has been decommissioned since registration
+        uint16_t                              last_decommission_reason;      // The reason for the last decommission
         int64_t                               earned_downtime_blocks;        // The number of blocks earned towards decommissioning, or the number of blocks remaining until deregistration if currently decommissioned
         std::array<uint16_t, 3>               service_node_version;          // The major, minor, patch version of the Service Node respectively.
         std::array<uint16_t, 3>               lokinet_version;               // The major, minor, patch version of the Service Node's lokinet router.

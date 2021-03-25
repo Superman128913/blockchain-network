@@ -425,6 +425,20 @@ namespace cryptonote
     timesync_status_out_of_sync = 1 << 5
   };
 
+  inline const char* ToString(OS_type v)
+  {
+      switch (v)
+      {
+          case missed_uptime_proof:   return "Missed Uptime Proofs";
+          case missed_checkpoints:   return "Missed Checkpoints";
+          case missed_pulse_participations: return "Missed Pulse Participation";
+          case storage_server_unreachable: return "Storage Server Unreachable";
+          case timestamp_response_unreachable: return "Unreachable for Timestamp Check";
+          case timesync_status_out_of_sync: return "Time out of sync";
+          default:      return "unknown decommission reason";
+      }
+  }
+
   // Pre-Heimdall service node deregistration data; it doesn't carry the state change (it is only
   // used for deregistrations), and is stored slightly less efficiently in the tx extra data.
   struct tx_extra_service_node_deregister_old

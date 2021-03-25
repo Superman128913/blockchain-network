@@ -3037,6 +3037,7 @@ namespace cryptonote { namespace rpc {
         ? (info.is_decommissioned() ? info.last_decommission_height : info.active_since_height) : info.last_reward_block_height;
     entry.earned_downtime_blocks        = service_nodes::quorum_cop::calculate_decommission_credit(info, current_height);
     entry.decommission_count            = info.decommission_count;
+    entry.last_decommission_reason      = info.last_decommission_reason;
 
     m_core.get_service_node_list().access_proof(sn_info.pubkey, [&entry](const auto &proof) {
         entry.service_node_version     = proof.proof->version;
