@@ -1694,7 +1694,11 @@ static void append_printable_service_node_list_entry(cryptonote::network_type ne
       if (entry.earned_downtime_blocks < service_nodes::DECOMMISSION_MINIMUM)
         stream << " (Note: " << service_nodes::DECOMMISSION_MINIMUM << " blocks required to enable deregistration delay)";
     } else {
-      stream << "Current Status: DECOMMISSIONED - " << cryptonote::ToString(entry.last_decommission_reason) << "\n";
+      stream << "Current Status: DECOMMISSIONED - " ;
+      auto reason = cryptonote::readable_reasons(entry.last_decommission_reason_consensus_all);
+      for (auto i = reason.begin(); i != reason.end(); ++i)
+        stream << *i << ", ";
+      stream << "\n";
       stream << indent2 << "Remaining Decommission Time Until DEREGISTRATION: " << entry.earned_downtime_blocks << " blocks";
     }
     stream << "\n";
