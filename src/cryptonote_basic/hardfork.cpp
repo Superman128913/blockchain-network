@@ -90,6 +90,7 @@ static constexpr HardFork::Params testnet_hard_forks[] =
   { network_version_15_lns,                 244777, 0, 1583940000 }, // 2020-03-11 15:20UTC
   { network_version_16_pulse,               382222, 0, 1600468200 }, // 2020-09-18 22:30UTC
   { network_version_17,                     447275, 0, 1608276840 }, // 2020-12-18 05:34UTC 
+  { network_version_18,                     501750, 0, 1616631051 }, // 2021-03-25 12:10UTC 
 };
 
 static constexpr HardFork::Params devnet_hard_forks[] =
