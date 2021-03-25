@@ -610,7 +610,7 @@ namespace nodetool
     std::set<std::string> full_addrs;
     if (nettype == cryptonote::TESTNET)
     {
-      full_addrs.insert("159.69.109.145:38156");
+      full_addrs.insert("144.76.164.202:38156"); // public.loki.foundation
     }
     else if (nettype == cryptonote::DEVNET)
     {
