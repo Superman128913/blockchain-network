@@ -425,7 +425,7 @@ namespace cryptonote
     timesync_status_out_of_sync = 1 << 5
   };
 
-  inline const char* ToString(OS_type v)
+  inline const char* ToString(Decommission_Reason v)
   {
       switch (v)
       {
