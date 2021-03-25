@@ -3278,7 +3278,13 @@ namespace cryptonote { namespace rpc {
     // argument: true if this ping should trigger an immediate proof send (i.e. first ping after
     // startup or after a ping expiry), false for an ordinary ping.
     template <typename RPC, typename Success>
-    auto handle_ping(std::array<uint16_t, 3> cur_version, std::array<uint16_t, 3> required, const char* name, std::atomic<std::time_t>& update, time_t lifetime, Success success)
+    auto handle_ping(
+            std::array<uint16_t, 3> cur_version,
+            std::array<uint16_t, 3> required,
+            std::string_view name,
+            std::atomic<std::time_t>& update,
+            std::chrono::seconds lifetime,
+            Success success)
     {
       typename RPC::response res{};
       if (cur_version < required) {
@@ -3289,7 +3295,7 @@ namespace cryptonote { namespace rpc {
       } else {
         auto now = std::time(nullptr);
         auto old = update.exchange(now);
-        bool significant = old + lifetime < now; // Print loudly for the first ping after startup/expiry
+        bool significant = std::chrono::seconds{now - old} > lifetime; // Print loudly for the first ping after startup/expiry
         if (significant)
           MGINFO_GREEN("Received ping from " << name << " " << version_printer{cur_version});
         else
@@ -3307,7 +3313,7 @@ namespace cryptonote { namespace rpc {
     m_core.ss_version = {req.version_major, req.version_minor, req.version_patch};
     return handle_ping<STORAGE_SERVER_PING>(
       {req.version_major, req.version_minor, req.version_patch}, service_nodes::MIN_STORAGE_SERVER_VERSION,
-      "Storage Server", m_core.m_last_storage_server_ping, STORAGE_SERVER_PING_LIFETIME,
+      "Storage Server", m_core.m_last_storage_server_ping, m_core.get_net_config().UPTIME_PROOF_FREQUENCY,
       [this, &req](bool significant) {
         m_core.m_storage_lmq_port = req.storage_lmq_port;
         if (significant)
@@ -3320,7 +3326,7 @@ namespace cryptonote { namespace rpc {
     m_core.lokinet_version = req.version;
     return handle_ping<LOKINET_PING>(
         req.version, service_nodes::MIN_LOKINET_VERSION,
-        "Lokinet", m_core.m_last_lokinet_ping, LOKINET_PING_LIFETIME,
+        "Lokinet", m_core.m_last_lokinet_ping, m_core.get_net_config().UPTIME_PROOF_FREQUENCY,
         [this](bool significant) { if (significant) m_core.reset_proof_interval(); });
   }
   //------------------------------------------------------------------------------------------------------------------------------
