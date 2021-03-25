@@ -376,6 +376,7 @@ namespace cryptonote
       const bool devnet = command_line::get_arg(vm, arg_devnet_on);
       m_nettype = testnet ? TESTNET : devnet ? DEVNET : MAINNET;
     }
+    m_check_uptime_proof_interval.interval(get_net_config().UPTIME_PROOF_CHECK_INTERVAL);
 
     m_config_folder = fs::u8path(command_line::get_arg(vm, arg_data_dir));
 
