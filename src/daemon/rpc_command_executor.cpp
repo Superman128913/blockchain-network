@@ -1549,7 +1549,7 @@ static void print_vote_history(std::ostringstream &stream, std::vector<service_n
   if (votes.empty())
     stream << "(Awaiting votes from service node)";
 
-  // NOTE: Votes were stored in a ring buffer and copied naiively into the vote
+  // NOTE: Votes were stored in a ring buffer and copied naïvely into the vote
   // array so they may be out of order. Find the smallest entry (by height) and
   // print starting from that entry.
   auto it       = std::min_element(votes.begin(), votes.end(), [](const auto &a, const auto &b) { return a.height < b.height; });
@@ -1557,19 +1557,14 @@ static void print_vote_history(std::ostringstream &stream, std::vector<service_n
 
   for (size_t i = 0; i < votes.size(); i++)
   {
-    service_nodes::participation_entry const &entry = votes[(offset + i) % votes.size()];
-    if (entry.is_pulse)
-    {
-      stream << "[" << entry.height << ", ";
-      stream << +entry.pulse.round << ", ";
-      stream << (entry.voted ? "Yes" : "No") << "]";
-    }
-    else
-    {
-      stream << "[" << entry.height << ", " << (entry.voted ? "Yes" : "No") << "]";
-    }
-    if (i < (votes.size() - 1)) stream << ",";
-    stream << " ";
+    if (i > 0) stream << ", ";
+    const auto& entry = votes[(offset + i) % votes.size()];
+    stream << "[" << entry.height;
+    if (entry.is_pulse and entry.pulse.round > 0)
+      // For a typical pulse round just [1234,yes].  For a backup round: [1234+3,yes]
+      stream << "+" << +entry.pulse.round;
+
+    stream << "," << (entry.voted ? "yes" : "NO") << "]";
   }
 }
 
@@ -1577,14 +1572,12 @@ template <class participationEntry>
 static void print_participation_history(std::ostringstream &stream, std::vector<participationEntry> const &votes)
 {
   if (votes.empty())
-    stream << "(Awaiting votes from service node)";
+    stream << "(Awaiting timesync data from service node)";
 
   for (size_t i = 0; i < votes.size(); i++)
   {
-    participationEntry const &entry = votes[i];
-    stream << "["<< (entry.pass() ? "Yes" : "No") << "]";
-    if (i < (votes.size() - 1)) stream << ",";
-    stream << " ";
+    if (i > 0) stream << ", ";
+    stream << "["<< (votes[i].pass() ? "yes" : "NO") << "]";
   }
 }
 
@@ -1696,8 +1689,8 @@ static void append_printable_service_node_list_entry(cryptonote::network_type ne
     //
     // NOTE: Component Versions
     //
-    stream << indent2 << "Storage Server Version: " << tools::join(".", entry.storage_server_version) << "\n";
-    stream << indent2 << "Lokinet Router Version: " << tools::join(".", entry.lokinet_version) << "\n";
+    stream << indent2 << "Storage Server / Lokinet Router versions: "
+        << tools::join(".", entry.storage_server_version) << " / " << tools::join(".", entry.lokinet_version) << "\n";
 
     //
     // NOTE: Node Credits
@@ -1712,7 +1705,10 @@ static void append_printable_service_node_list_entry(cryptonote::network_type ne
       stream << "Current Status: DECOMMISSIONED - " ;
       auto reason = cryptonote::readable_reasons(entry.last_decommission_reason_consensus_all);
       for (auto i = reason.begin(); i != reason.end(); ++i)
-        stream << *i << ", ";
+      {
+        if (i != reason.begin()) stream << ", ";
+        stream << *i;
+      }
       stream << "\n";
       stream << indent2 << "Remaining Decommission Time Until DEREGISTRATION: " << entry.earned_downtime_blocks << " blocks";
     }
@@ -1721,16 +1717,16 @@ static void append_printable_service_node_list_entry(cryptonote::network_type ne
     //
     // NOTE: Print Voting History
     //
-    stream << indent2 <<  "Checkpoint Participation [Height, Voted]\n" << indent3;
+    stream << indent2 <<  "Checkpoints [Height,Voted]: ";
     print_vote_history(stream, entry.checkpoint_participation);
 
-    stream << "\n\n" << indent2 << "Pulse Participation [Height, Round, Voted]\n" << indent3;
+    stream << "\n" << indent2 << "Pulse [Height,Voted]: ";
     print_vote_history(stream, entry.pulse_participation);
 
-    stream << "\n\n" << indent2 << "Timestamp Participation [in_sync]\n" << indent3;
+    stream << "\n" << indent2 << "Timestamps [in_sync]: ";
     print_participation_history(stream, entry.timestamp_participation);
 
-    stream << "\n\n" << indent2 << "Timesync Response [responded]\n" << indent3;
+    stream << "\n" << indent2 << "Timesync [responded]: ";
     print_participation_history(stream, entry.timesync_status);
   }
 
