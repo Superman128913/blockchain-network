@@ -296,6 +296,8 @@ namespace rpc {
         uint64_t height;               // The voting block height for the changing service node and validators
         uint32_t index;                // The index of all tested nodes at the given height for which this state change applies
         std::vector<uint32_t> voters;  // The position of validators in the testing quorum who validated and voted for this state change. This typically contains just 7 required voter slots (of 10 eligible voters).
+        std::optional<std::vector<std::string>> reasons; // Reasons for the decommissioning/deregistration as reported by the voting quorum.  This contains any reasons that all voters agreed on.
+        std::optional<std::vector<std::string>> reasons_maybe; // If present, this contains any decomm/dereg reasons that were given by some but not all quorum voters
         KV_MAP_SERIALIZABLE
       };
       struct lns_details

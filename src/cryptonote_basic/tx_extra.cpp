@@ -87,4 +87,15 @@ std::vector<std::string> readable_reasons(uint16_t decomm_reason) {
   return results;
 }
 
+std::vector<std::string> coded_reasons(uint16_t decomm_reason) {
+  std::vector<std::string> results;
+  if (decomm_reason & missed_uptime_proof) results.push_back("missed_uptime_proof");
+  if (decomm_reason & missed_checkpoints) results.push_back("missed_checkpoints");
+  if (decomm_reason & missed_pulse_participations) results.push_back("missed_pulse_participations");
+  if (decomm_reason & storage_server_unreachable) results.push_back("storage_server_unreachable");
+  if (decomm_reason & timestamp_response_unreachable) results.push_back("timestamp_response_unreachable");
+  if (decomm_reason & timesync_status_out_of_sync) results.push_back("timesync_status_out_of_sync");
+  return results;
+}
+
 }

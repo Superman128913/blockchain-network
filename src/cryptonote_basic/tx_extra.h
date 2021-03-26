@@ -425,7 +425,11 @@ namespace cryptonote
     timesync_status_out_of_sync = 1 << 5
   };
 
-  std::vector<std::string> readable_reasons(uint16_t decomm_reason);
+  // Returns human-readable reason strings (e.g. "Missed Uptime Proofs") for the given reason bits
+  std::vector<std::string> readable_reasons(uint16_t decomm_reasons);
+
+  // Return reason code strings (e.g. "missed_uptime_proofs") for the given reason bits
+  std::vector<std::string> coded_reasons(uint16_t decomm_reasons);
 
   // Pre-Heimdall service node deregistration data; it doesn't carry the state change (it is only
   // used for deregistrations), and is stored slightly less efficiently in the tx extra data.

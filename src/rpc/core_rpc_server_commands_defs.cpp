@@ -108,6 +108,8 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_TRANSACTIONS::extra_entry::state_change)
   KV_SERIALIZE(height)
   KV_SERIALIZE(index)
   KV_SERIALIZE(voters)
+  KV_SERIALIZE(reasons);
+  KV_SERIALIZE(reasons_maybe);
 KV_SERIALIZE_MAP_CODE_END()
 KV_SERIALIZE_MAP_CODE_BEGIN(GET_TRANSACTIONS::extra_entry::lns_details)
   KV_SERIALIZE(buy)
