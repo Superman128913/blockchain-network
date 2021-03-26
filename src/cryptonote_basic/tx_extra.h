@@ -428,7 +428,8 @@ namespace cryptonote
   // Returns human-readable reason strings (e.g. "Missed Uptime Proofs") for the given reason bits
   std::vector<std::string> readable_reasons(uint16_t decomm_reasons);
 
-  // Return reason code strings (e.g. "missed_uptime_proofs") for the given reason bits
+  // Return reason code strings (e.g. "uptime") for the given reason bits; these are used for RPC
+  // where we want something in-between a bit field and a human-readable string.
   std::vector<std::string> coded_reasons(uint16_t decomm_reasons);
 
   // Pre-Heimdall service node deregistration data; it doesn't carry the state change (it is only

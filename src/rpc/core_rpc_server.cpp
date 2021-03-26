@@ -754,10 +754,10 @@ namespace cryptonote { namespace rpc {
       void operator()(const tx_extra_service_node_state_change& x) {
         auto& sc = _state_change(x);
         if (x.reason_consensus_all)
-          sc.reasons = cryptonote::readable_reasons(x.reason_consensus_all);
+          sc.reasons = cryptonote::coded_reasons(x.reason_consensus_all);
         // If `any` has reasons not included in all then list the extra ones separately:
         if (uint16_t reasons_maybe = x.reason_consensus_any & ~x.reason_consensus_all)
-          sc.reasons_maybe = cryptonote::readable_reasons(reasons_maybe);
+          sc.reasons_maybe = cryptonote::coded_reasons(reasons_maybe);
         switch (x.state)
         {
           case service_nodes::new_state::decommission: sc.type = "decom"; break;
