@@ -292,7 +292,7 @@ bool oxen_chain_generator::add_blocks_until_next_checkpointable_height()
     return false;
 
   // NOTE: Add blocks until we get to the first height that has a checkpointing
-  // quorum AND there are service nodes in the quorum. Note we do this naiively
+  // quorum AND there are service nodes in the quorum. Note we do this naively
   // as tests shouldn't have to care about implementation details.
   for (;;)
   {
@@ -900,8 +900,8 @@ bool oxen_chain_generator::block_begin(oxen_blockchain_entry &entry, oxen_create
   }
 
   // NOTE: Calculate governance
-  cryptonote::oxen_miner_tx_context miner_tx_context = {};
-  service_nodes::quorum pulse_quorum                 = {};
+  cryptonote::oxen_miner_tx_context miner_tx_context;
+  service_nodes::quorum pulse_quorum;
   std::vector<service_nodes::pubkey_and_sninfo> active_snode_list =
       params.prev.service_node_state.active_service_nodes_infos();
 
@@ -948,11 +948,13 @@ bool oxen_chain_generator::block_begin(oxen_blockchain_entry &entry, oxen_create
     constexpr uint64_t num_blocks       = cryptonote::get_config(cryptonote::FAKECHAIN).GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS;
     uint64_t start_height               = height - num_blocks;
 
+    static_assert(cryptonote::network_version_count == cryptonote::network_version_18 + 1,
+            "The code below needs to be updated to support higher hard fork versions");
     if (blk.major_version == cryptonote::network_version_15_lns)
       miner_tx_context.batched_governance = FOUNDATION_REWARD_HF15 * num_blocks;
     else if (blk.major_version == cryptonote::network_version_16_pulse)
       miner_tx_context.batched_governance = (FOUNDATION_REWARD_HF15 + CHAINFLIP_LIQUIDITY_HF16) * num_blocks;
-    else if (blk.major_version == cryptonote::network_version_17)
+    else if (blk.major_version >= cryptonote::network_version_17 && blk.major_version <= cryptonote::network_version_18)
       miner_tx_context.batched_governance = FOUNDATION_REWARD_HF17 * num_blocks;
     else
     {
