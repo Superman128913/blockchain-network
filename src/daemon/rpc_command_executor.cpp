@@ -1695,15 +1695,19 @@ static void append_printable_service_node_list_entry(cryptonote::network_type ne
     //
     // NOTE: Node Credits
     //
-    stream << indent2;
     if (entry.active) {
-      stream << "Downtime Credits: " << entry.earned_downtime_blocks << " blocks";
-      stream << " (about " << to_string_rounded(entry.earned_downtime_blocks / (double) BLOCKS_EXPECTED_IN_HOURS(1), 2)  << " hours)";
+      stream << indent2 << "Current Status: ACTIVE\n";
+      stream << indent2 << "Downtime Credits: " << entry.earned_downtime_blocks << " blocks"
+        << " (about " << to_string_rounded(entry.earned_downtime_blocks / (double) BLOCKS_EXPECTED_IN_HOURS(1), 2)  << " hours)";
       if (entry.earned_downtime_blocks < service_nodes::DECOMMISSION_MINIMUM)
         stream << " (Note: " << service_nodes::DECOMMISSION_MINIMUM << " blocks required to enable deregistration delay)";
     } else {
-      stream << "Current Status: DECOMMISSIONED - " ;
+      stream << indent2 << "Current Status: DECOMMISSIONED - " ;
       auto reason = cryptonote::readable_reasons(entry.last_decommission_reason_consensus_all);
+      if (reason.empty()) // No unanimous reason, fall back to any reasons:
+        reason = cryptonote::readable_reasons(entry.last_decommission_reason_consensus_any);
+      if (reason.empty())
+        stream << "reason(s) not available";
       for (auto i = reason.begin(); i != reason.end(); ++i)
       {
         if (i != reason.begin()) stream << ", ";
