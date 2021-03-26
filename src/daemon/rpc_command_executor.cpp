@@ -1729,16 +1729,16 @@ static void append_printable_service_node_list_entry(cryptonote::network_type ne
     if (entry.earned_downtime_blocks < service_nodes::DECOMMISSION_MINIMUM)
       stream << " (Note: " << service_nodes::DECOMMISSION_MINIMUM << " blocks required to enable deregistration delay)";
   } else if (is_registered) {
-    stream << indent2 << "Current Status: DECOMMISSIONED - " ;
-    auto reason = cryptonote::readable_reasons(entry.last_decommission_reason_consensus_all);
-    if (reason.empty()) // No unanimous reason, fall back to any reasons:
-      reason = cryptonote::readable_reasons(entry.last_decommission_reason_consensus_any);
-    if (reason.empty())
-      stream << "reason(s) not available";
-    for (auto i = reason.begin(); i != reason.end(); ++i)
-    {
-      if (i != reason.begin()) stream << ", ";
-      stream << *i;
+    stream << indent2 << "Current Status: DECOMMISSIONED" ;
+    if (entry.last_decommission_reason_consensus_all || entry.last_decommission_reason_consensus_any)
+      stream << " - ";
+    if (auto reasons = cryptonote::readable_reasons(entry.last_decommission_reason_consensus_all); !reasons.empty())
+      stream << tools::join(", ", reasons);
+    // Add any "any" reasons that aren't in all with a (some) qualifier
+    if (auto reasons = cryptonote::readable_reasons(entry.last_decommission_reason_consensus_any & ~entry.last_decommission_reason_consensus_all); !reasons.empty()) {
+      for (auto& r : reasons)
+        r += "(some)";
+      stream << (entry.last_decommission_reason_consensus_all ? ", " : "") << tools::join(", ", reasons);
     }
     stream << "\n";
     stream << indent2 << "Remaining Decommission Time Until DEREGISTRATION: " << entry.earned_downtime_blocks << " blocks";
