@@ -469,6 +469,7 @@ bool rpc_command_executor::show_status() {
   int64_t my_decomm_remaining = 0;
   uint64_t my_sn_last_uptime = 0;
   bool my_sn_registered = false, my_sn_staked = false, my_sn_active = false;
+  uint16_t my_reason_all = 0, my_reason_any = 0;
   if (ires.service_node && *ires.service_node) {
     GET_SERVICE_KEYS::response res{};
 
@@ -488,6 +489,8 @@ bool rpc_command_executor::show_status() {
       my_sn_active = entry.active;
       my_decomm_remaining = entry.earned_downtime_blocks;
       my_sn_last_uptime = entry.last_uptime_proof;
+      my_reason_all = entry.last_decommission_reason_consensus_all;
+      my_reason_any = entry.last_decommission_reason_consensus_any;
     }
   }
 
@@ -567,6 +570,18 @@ bool rpc_command_executor::show_status() {
     str << " (lokinet)";
 
     tools::success_msg_writer() << str.str();
+
+    if (my_sn_registered && my_sn_staked && !my_sn_active && (my_reason_all | my_reason_any)) {
+      str.str("Decomm reasons: ");
+      if (auto reasons = cryptonote::readable_reasons(my_reason_all); !reasons.empty())
+        str << tools::join(", ", reasons);
+      if (auto reasons = cryptonote::readable_reasons(my_reason_any & ~my_reason_all); !reasons.empty()) {
+        for (auto& r : reasons)
+          r += "(some)";
+        str << (my_reason_all ? ", " : "") << tools::join(", ", reasons);
+      }
+      tools::fail_msg_writer() << str.str();
+    }
   }
 
   return true;
