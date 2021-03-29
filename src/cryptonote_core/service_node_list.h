@@ -210,6 +210,7 @@ namespace service_nodes
       v4_noproofs,
       v5_pulse_recomm_credit,
       v6_reassign_sort_keys,
+      v7_decommission_reason,
       _count
     };
 
@@ -271,6 +272,8 @@ namespace service_nodes
     uint32_t                           decommission_count = 0; // How many times this service node has been decommissioned
     int64_t                            active_since_height = 0; // if decommissioned: equal to the *negative* height at which you became active before the decommission
     uint64_t                           last_decommission_height = 0; // The height at which the last (or current!) decommissioning started, or 0 if never decommissioned
+    uint16_t                           last_decommission_reason_consensus_all = 0; // The reason which the last (or current!) decommissioning occurred as voted by all SNs, or 0 if never decommissioned
+    uint16_t                           last_decommission_reason_consensus_any = 0; // The reason which the last (or current!) decommissioning occurred as voted by any of the SNs, or 0 if never decommissioned
     int64_t                            recommission_credit = DECOMMISSION_INITIAL_CREDIT; // The number of blocks of credit you started with or kept when you were last activated (i.e. as of `active_since_height`)
     std::vector<contributor_t>         contributors;
     uint64_t                           total_contributed = 0;
@@ -330,6 +333,11 @@ namespace service_nodes
       {
         VARINT_FIELD(recommission_credit)
         FIELD(pulse_sorter)
+      }
+      if (version >= version_t::v7_decommission_reason)
+      {
+        VARINT_FIELD(last_decommission_reason_consensus_all)
+        VARINT_FIELD(last_decommission_reason_consensus_any)
       }
     END_SERIALIZE()
   };

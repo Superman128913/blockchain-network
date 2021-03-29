@@ -76,4 +76,26 @@ tx_extra_oxen_name_system tx_extra_oxen_name_system::make_update(
   return result;
 }
 
+std::vector<std::string> readable_reasons(uint16_t decomm_reason) {
+  std::vector<std::string> results;
+  if (decomm_reason & missed_uptime_proof) results.push_back("Missed Uptime Proofs");
+  if (decomm_reason & missed_checkpoints) results.push_back("Missed Checkpoints");
+  if (decomm_reason & missed_pulse_participations) results.push_back("Missed Pulse Participation");
+  if (decomm_reason & storage_server_unreachable) results.push_back("Storage Server Unreachable");
+  if (decomm_reason & timestamp_response_unreachable) results.push_back("Unreachable for Timestamp Check");
+  if (decomm_reason & timesync_status_out_of_sync) results.push_back("Time out of sync");
+  return results;
+}
+
+std::vector<std::string> coded_reasons(uint16_t decomm_reason) {
+  std::vector<std::string> results;
+  if (decomm_reason & missed_uptime_proof) results.push_back("uptime");
+  if (decomm_reason & missed_checkpoints) results.push_back("checkpoints");
+  if (decomm_reason & missed_pulse_participations) results.push_back("pulse");
+  if (decomm_reason & storage_server_unreachable) results.push_back("storage");
+  if (decomm_reason & timestamp_response_unreachable) results.push_back("timecheck");
+  if (decomm_reason & timesync_status_out_of_sync) results.push_back("timesync");
+  return results;
+}
+
 }

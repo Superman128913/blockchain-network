@@ -791,8 +791,8 @@ bool oxen_core_test_deregister_preferred::generate(std::vector<test_event_entry>
   /// generate two deregisters
   const auto deregister_pub_key_1 = gen.top_quorum().obligations->workers[0];
   const auto deregister_pub_key_2 = gen.top_quorum().obligations->workers[1];
-  gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, deregister_pub_key_1);
-  gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, deregister_pub_key_2);
+  gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, deregister_pub_key_1, 0, 0);
+  gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, deregister_pub_key_2, 0, 0);
 
   oxen_register_callback(events, "check_prefer_deregisters", [&events, miner](cryptonote::core &c, size_t ev_index)
   {
@@ -857,7 +857,7 @@ bool oxen_core_test_deregister_safety_buffer::generate(std::vector<test_event_en
 
   const auto deregister_pub_key = quorum_intersection[0];
   {
-    const auto dereg_tx = gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, deregister_pub_key, height_a);
+    const auto dereg_tx = gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, deregister_pub_key, 0, 0, height_a);
     gen.create_and_add_next_block({dereg_tx});
   }
 
@@ -870,7 +870,7 @@ bool oxen_core_test_deregister_safety_buffer::generate(std::vector<test_event_en
   }
 
   /// Try to deregister the node again for heightB (should fail)
-  const auto dereg_tx = gen.create_state_change_tx(service_nodes::new_state::deregister, deregister_pub_key, height_b);
+  const auto dereg_tx = gen.create_state_change_tx(service_nodes::new_state::deregister, deregister_pub_key, 0, 0, height_b);
   gen.add_tx(dereg_tx, false /*can_be_added_to_blockchain*/, "After a Service Node has deregistered, it can NOT be deregistered from the result of a quorum preceeding the height that the Service Node re-registered as.");
   return true;
 
@@ -891,7 +891,7 @@ bool oxen_core_test_deregister_too_old::generate(std::vector<test_event_entry>& 
   gen.add_n_blocks(1);
 
   const auto pk       = gen.top_quorum().obligations->workers[0];
-  const auto dereg_tx = gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, pk);
+  const auto dereg_tx = gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, pk, 0, 0);
   gen.add_n_blocks(service_nodes::STATE_CHANGE_TX_LIFETIME_IN_BLOCKS); /// create enough blocks to make deregistrations invalid (60 blocks)
 
   /// In the real world, this transaction should not make it into a block, but in this case we do try to add it (as in
@@ -920,7 +920,7 @@ bool oxen_core_test_deregister_zero_fee::generate(std::vector<test_event_entry> 
   gen.create_and_add_next_block(reg_txs);
   const auto deregister_pub_key = gen.top_quorum().obligations->workers[0];
   cryptonote::transaction const invalid_deregister =
-      gen.create_state_change_tx(service_nodes::new_state::deregister, deregister_pub_key, -1 /*height*/, {} /*voters*/, MK_COINS(1) /*fee*/);
+      gen.create_state_change_tx(service_nodes::new_state::deregister, deregister_pub_key, 0, 0, -1 /*height*/, {} /*voters*/, MK_COINS(1) /*fee*/);
   gen.add_tx(invalid_deregister, false /*can_be_added_to_blockchain*/, "Deregister transactions with non-zero fee can NOT be added to the blockchain");
   return true;
 }
@@ -947,11 +947,11 @@ bool oxen_core_test_deregister_on_split::generate(std::vector<test_event_entry> 
 
   gen.add_event_msg("create deregistration A");
   std::vector<uint64_t> const quorum_indexes = {1, 2, 3, 4, 5, 6, 7};
-  const auto dereg_a                         = gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, pk, split_height, quorum_indexes);
+  const auto dereg_a                         = gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, pk, 0, 0, split_height, quorum_indexes);
 
   gen.add_event_msg("create deregistration on alt chain (B)");
   std::vector<uint64_t> const fork_quorum_indexes = {1, 3, 4, 5, 6, 7, 8};
-  const auto dereg_b            = fork.create_and_add_state_change_tx(service_nodes::new_state::deregister, pk, split_height, fork_quorum_indexes, 0 /*fee*/, true /*kept_by_block*/);
+  const auto dereg_b            = fork.create_and_add_state_change_tx(service_nodes::new_state::deregister, pk, 0, 0, split_height, fork_quorum_indexes, 0 /*fee*/, true /*kept_by_block*/);
   crypto::hash expected_tx_hash = cryptonote::get_transaction_hash(dereg_b);
   size_t dereg_index            = gen.event_index();
 
@@ -1002,12 +1002,12 @@ bool oxen_core_test_state_change_ip_penalty_disallow_dupes::generate(std::vector
 
   const auto pub_key                         = gen.top_quorum().obligations->workers[0];
   std::vector<uint64_t> const quorum_indexes = {1, 2, 3, 4, 5, 6, 7};
-  const auto state_change_1                  = gen.create_and_add_state_change_tx(service_nodes::new_state::ip_change_penalty, pub_key, gen.height(), quorum_indexes);
+  const auto state_change_1                  = gen.create_and_add_state_change_tx(service_nodes::new_state::ip_change_penalty, pub_key, 0, 0, gen.height(), quorum_indexes);
 
   // NOTE: Try duplicate state change with different quorum indexes
   {
     std::vector<uint64_t> const alt_quorum_indexes = {1, 3, 4, 5, 6, 7, 8};
-    const auto state_change_2 = gen.create_state_change_tx(service_nodes::new_state::ip_change_penalty, pub_key, gen.height(), alt_quorum_indexes);
+    const auto state_change_2 = gen.create_state_change_tx(service_nodes::new_state::ip_change_penalty, pub_key, 0, 0, gen.height(), alt_quorum_indexes);
     gen.add_tx(state_change_2, false /*can_be_added_to_blockchain*/, "Can't add a state change with different permutation of votes than previously submitted");
 
     // NOTE: Try same duplicate state change on a new height
@@ -2768,7 +2768,7 @@ bool oxen_service_nodes_test_rollback::generate(std::vector<test_event_entry>& e
 
   // deregister some node (A) on main
   const auto pk           = gen.top_quorum().obligations->workers[0];
-  const auto dereg_tx     = gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, pk);
+  const auto dereg_tx     = gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, pk, 0, 0);
   size_t deregister_index = gen.event_index();
   gen.create_and_add_next_block({dereg_tx});
 
@@ -2914,7 +2914,7 @@ bool oxen_service_nodes_test_swarms_basic::generate(std::vector<test_event_entry
   for (size_t i = 0; i < excess; ++i)
   {
     const auto pk = top_quorum.obligations->workers[i];
-    const auto tx = gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, pk, cryptonote::get_block_height(gen.top().block));
+    const auto tx = gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, pk, 0, 0, cryptonote::get_block_height(gen.top().block));
     dereg_txs.push_back(tx);
   }
 
@@ -2937,7 +2937,7 @@ bool oxen_service_nodes_test_swarms_basic::generate(std::vector<test_event_entry
   dereg_txs.clear();
   {
     const auto pk = gen.top_quorum().obligations->workers[0];
-    const auto tx = gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, pk);
+    const auto tx = gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, pk, 0, 0);
     dereg_txs.push_back(tx);
   }
   gen.create_and_add_next_block(dereg_txs);
@@ -3204,7 +3204,7 @@ bool oxen_pulse_fallback_to_pow_and_back::generate(std::vector<test_event_entry>
   {
     const auto deregister_pub_key_1 = gen.top_quorum().obligations->workers[0];
     cryptonote::transaction tx =
-        gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, deregister_pub_key_1);
+        gen.create_and_add_state_change_tx(service_nodes::new_state::deregister, deregister_pub_key_1, 0, 0);
     gen.create_and_add_next_block({tx});
   }
 

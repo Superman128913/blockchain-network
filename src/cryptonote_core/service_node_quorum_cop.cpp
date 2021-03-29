@@ -369,6 +369,7 @@ namespace service_nodes
                 bool passed       = test_results.passed();
 
                 new_state vote_for_state;
+                uint16_t reason = 0;
                 if (passed) {
                   if (info.is_decommissioned()) {
                     vote_for_state = new_state::recommission;
@@ -385,6 +386,12 @@ namespace service_nodes
 
                 }
                 else {
+                  if (!test_results.uptime_proved) reason |= cryptonote::Decommission_Reason::missed_uptime_proof;
+                  if (!test_results.checkpoint_participation) reason |= cryptonote::Decommission_Reason::missed_checkpoints;
+                  if (!test_results.pulse_participation) reason |= cryptonote::Decommission_Reason::missed_pulse_participations;
+                  if (!test_results.storage_server_reachable) reason |= cryptonote::Decommission_Reason::storage_server_unreachable;
+                  if (!test_results.timestamp_participation) reason |= cryptonote::Decommission_Reason::timestamp_response_unreachable;
+                  if (!test_results.timesync_status) reason |= cryptonote::Decommission_Reason::timesync_status_out_of_sync;
                   int64_t credit = calculate_decommission_credit(info, latest_height);
 
                   if (info.is_decommissioned()) {
@@ -415,7 +422,7 @@ namespace service_nodes
                   }
                 }
 
-                quorum_vote_t vote = service_nodes::make_state_change_vote(m_obligations_height, static_cast<uint16_t>(index_in_group), node_index, vote_for_state, my_keys);
+                quorum_vote_t vote = service_nodes::make_state_change_vote(m_obligations_height, static_cast<uint16_t>(index_in_group), node_index, vote_for_state, reason, my_keys);
                 cryptonote::vote_verification_context vvc;
                 if (!handle_vote(vote, vvc))
                   LOG_ERROR("Failed to add state change vote; reason: " << print_vote_verification_context(vvc, &vote));
@@ -551,11 +558,24 @@ namespace service_nodes
         return true;
     }
 
-    cryptonote::tx_extra_service_node_state_change state_change{vote.state_change.state, vote.block_height, vote.state_change.worker_index};
+    using version_t = cryptonote::tx_extra_service_node_state_change::version_t;
+    auto ver = hf_version >= HF_VERSION_PROOF_BTENC ? version_t::v4_reasons : version_t::v0;
+    cryptonote::tx_extra_service_node_state_change state_change{
+        ver,
+        vote.state_change.state,
+        vote.block_height,
+        vote.state_change.worker_index,
+        vote.state_change.reason,
+        vote.state_change.reason,
+        {}};
     state_change.votes.reserve(votes.size());
 
     for (const auto &pool_vote : votes)
+    {
+      state_change.reason_consensus_any |= pool_vote.vote.state_change.reason;
+      state_change.reason_consensus_all &= pool_vote.vote.state_change.reason;
       state_change.votes.emplace_back(pool_vote.vote.signature, pool_vote.vote.index_in_group);
+    }
 
     cryptonote::transaction state_change_tx{};
     if (cryptonote::add_service_node_state_change_to_tx_extra(state_change_tx.extra, state_change, hf_version))
@@ -564,9 +584,7 @@ namespace service_nodes
       state_change_tx.type    = cryptonote::txtype::state_change;
 
       cryptonote::tx_verification_context tvc{};
-      cryptonote::blobdata const tx_blob = cryptonote::tx_to_blob(state_change_tx);
-
-      bool result = core.handle_incoming_tx(tx_blob, tvc, cryptonote::tx_pool_options::new_tx());
+      bool result = core.handle_incoming_tx(cryptonote::tx_to_blob(state_change_tx), tvc, cryptonote::tx_pool_options::new_tx());
       if (!result || tvc.m_verifivation_failed)
       {
         LOG_PRINT_L1("A full state change tx for height: " << vote.block_height <<

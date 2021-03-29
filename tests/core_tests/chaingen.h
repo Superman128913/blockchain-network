@@ -1498,7 +1498,7 @@ struct oxen_chain_generator
   cryptonote::transaction                              create_and_add_oxen_name_system_tx_update(cryptonote::account_base const &src, uint8_t hf_version, lns::mapping_type type, std::string const &name, lns::mapping_value const *value, lns::generic_owner const *owner = nullptr, lns::generic_owner const *backup_owner = nullptr, lns::generic_signature *signature = nullptr, bool kept_by_block = false);
   cryptonote::transaction                              create_and_add_oxen_name_system_tx_renew(cryptonote::account_base const &src, uint8_t hf_version, lns::mapping_type type, std::string const &name, bool kept_by_block = false);
   cryptonote::transaction                              create_and_add_tx                 (const cryptonote::account_base& src, const cryptonote::account_public_address& dest, uint64_t amount, uint64_t fee = TESTS_DEFAULT_FEE, bool kept_by_block = false);
-  cryptonote::transaction                              create_and_add_state_change_tx(service_nodes::new_state state, const crypto::public_key& pub_key, uint64_t height = -1, const std::vector<uint64_t>& voters = {}, uint64_t fee = 0, bool kept_by_block = false);
+  cryptonote::transaction                              create_and_add_state_change_tx(service_nodes::new_state state, const crypto::public_key& pub_key, uint16_t reasons_all, uint16_t reasons_any, uint64_t height = -1, const std::vector<uint64_t>& voters = {}, uint64_t fee = 0, bool kept_by_block = false);
   cryptonote::transaction                              create_and_add_registration_tx(const cryptonote::account_base& src, const cryptonote::keypair& sn_keys = cryptonote::keypair{hw::get_device("default")}, bool kept_by_block = false);
   cryptonote::transaction                              create_and_add_staking_tx     (const crypto::public_key &pub_key, const cryptonote::account_base &src, uint64_t amount, bool kept_by_block = false);
   oxen_blockchain_entry                               &create_and_add_next_block     (const std::vector<cryptonote::transaction>& txs = {}, cryptonote::checkpoint_t const *checkpoint = nullptr, bool can_be_added_to_blockchain = true, std::string const &fail_msg = {});
@@ -1514,7 +1514,7 @@ struct oxen_chain_generator
                                                                               std::array<oxen_service_node_contribution, 3> const &contributors = {},
                                                                               int num_contributors = 0) const;
   cryptonote::transaction                              create_staking_tx     (const crypto::public_key& pub_key, const cryptonote::account_base &src, uint64_t amount) const;
-  cryptonote::transaction                              create_state_change_tx(service_nodes::new_state state, const crypto::public_key& pub_key, uint64_t height = -1, const std::vector<uint64_t>& voters = {}, uint64_t fee = 0) const;
+  cryptonote::transaction                              create_state_change_tx(service_nodes::new_state state, const crypto::public_key& pub_key, uint16_t reasons_all, uint16_t reasons_any, uint64_t height = -1, const std::vector<uint64_t>& voters = {}, uint64_t fee = 0) const;
   cryptonote::checkpoint_t                             create_service_node_checkpoint(uint64_t block_height, size_t num_votes) const;
 
   // value: Takes the binary value NOT the human readable version, of the name->value mapping

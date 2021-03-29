@@ -774,7 +774,8 @@ namespace cryptonote
       return false;
 
     state_change = tx_extra_service_node_state_change{
-      service_nodes::new_state::deregister, dereg.block_height, dereg.service_node_index, dereg.votes.begin(), dereg.votes.end()};
+      tx_extra_service_node_state_change::version_t::v0,
+      service_nodes::new_state::deregister, dereg.block_height, dereg.service_node_index, 0, 0, {dereg.votes.begin(), dereg.votes.end()}};
     return true;
   }
   //---------------------------------------------------------------

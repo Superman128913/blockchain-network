@@ -397,9 +397,9 @@ cryptonote::transaction oxen_chain_generator::create_and_add_big_tx(
   return t;
 }
 
-cryptonote::transaction oxen_chain_generator::create_and_add_state_change_tx(service_nodes::new_state state, const crypto::public_key &pub_key, uint64_t height, const std::vector<uint64_t> &voters, uint64_t fee, bool kept_by_block)
+cryptonote::transaction oxen_chain_generator::create_and_add_state_change_tx(service_nodes::new_state state, const crypto::public_key &pub_key, uint16_t reasons_all, uint16_t reasons_any, uint64_t height, const std::vector<uint64_t> &voters, uint64_t fee, bool kept_by_block)
 {
-  cryptonote::transaction result = create_state_change_tx(state, pub_key, height, voters, fee);
+  cryptonote::transaction result = create_state_change_tx(state, pub_key, reasons_all, reasons_any, height, voters, fee);
   add_tx(result, true /*can_be_added_to_blockchain*/, "" /*fail_msg*/, kept_by_block);
   return result;
 }
@@ -517,10 +517,12 @@ cryptonote::transaction oxen_chain_generator::create_staking_tx(const crypto::pu
   return result;
 }
 
-cryptonote::transaction oxen_chain_generator::create_state_change_tx(service_nodes::new_state state, const crypto::public_key &pub_key, uint64_t height, const std::vector<uint64_t>& voters, uint64_t fee) const
+cryptonote::transaction oxen_chain_generator::create_state_change_tx(service_nodes::new_state state, const crypto::public_key &pub_key, uint16_t reasons_all, uint16_t reasons_any, uint64_t height, const std::vector<uint64_t>& voters, uint64_t fee) const
 {
   if (height == UINT64_MAX)
     height = this->height();
+
+  auto hf_version = get_hf_version_at(height + 1);
 
   service_nodes::quorum_manager const &quorums                   = quorum(height);
   std::vector<crypto::public_key> const &validator_service_nodes = quorums.obligations->validators;
@@ -534,13 +536,16 @@ cryptonote::transaction oxen_chain_generator::create_state_change_tx(service_nod
   }
   assert(worker_index < worker_service_nodes.size());
 
-  cryptonote::tx_extra_service_node_state_change state_change_extra(state, height, worker_index);
+  using scver = cryptonote::tx_extra_service_node_state_change::version_t;
+  cryptonote::tx_extra_service_node_state_change state_change_extra(
+          hf_version >= cryptonote::network_version_18 ? scver::v4_reasons : scver::v0,
+          state, height, worker_index, reasons_all, reasons_any, {});
   if (voters.size())
   {
     for (const auto voter_index : voters)
     {
       auto voter_keys = get_cached_keys(validator_service_nodes[voter_index]);
-      service_nodes::quorum_vote_t vote = service_nodes::make_state_change_vote(state_change_extra.block_height, voter_index, state_change_extra.service_node_index, state, voter_keys);
+      service_nodes::quorum_vote_t vote = service_nodes::make_state_change_vote(state_change_extra.block_height, voter_index, state_change_extra.service_node_index, state, 0, voter_keys);
       state_change_extra.votes.push_back({vote.signature, (uint32_t)voter_index});
     }
   }
@@ -550,7 +555,7 @@ cryptonote::transaction oxen_chain_generator::create_state_change_tx(service_nod
     {
       auto voter_keys = get_cached_keys(validator_service_nodes[i]);
 
-      service_nodes::quorum_vote_t vote = service_nodes::make_state_change_vote(state_change_extra.block_height, i, state_change_extra.service_node_index, state, voter_keys);
+      service_nodes::quorum_vote_t vote = service_nodes::make_state_change_vote(state_change_extra.block_height, i, state_change_extra.service_node_index, state, 0, voter_keys);
       state_change_extra.votes.push_back({vote.signature, (uint32_t)i});
     }
   }
@@ -558,13 +563,18 @@ cryptonote::transaction oxen_chain_generator::create_state_change_tx(service_nod
   cryptonote::transaction result;
   {
     std::vector<uint8_t> extra;
-    const bool full_tx_made = cryptonote::add_service_node_state_change_to_tx_extra(result.extra, state_change_extra, get_hf_version_at(height + 1));
+    const bool full_tx_made = cryptonote::add_service_node_state_change_to_tx_extra(result.extra, state_change_extra, hf_version);
     assert(full_tx_made);
-    if (fee) oxen_tx_builder(events_, result, top().block, first_miner_, first_miner_.get_keys().m_account_address, 0 /*amount*/, get_hf_version_at(height + 1)).with_tx_type(cryptonote::txtype::state_change).with_fee(fee).with_extra(extra).build();
+    if (fee)
+      oxen_tx_builder(events_, result, top().block, first_miner_, first_miner_.get_keys().m_account_address, 0 /*amount*/, hf_version)
+        .with_tx_type(cryptonote::txtype::state_change)
+        .with_fee(fee)
+        .with_extra(extra)
+        .build();
     else
     {
       result.type    = cryptonote::txtype::state_change;
-      result.version = cryptonote::transaction::get_max_version_for_hf(get_hf_version_at(height + 1));
+      result.version = cryptonote::transaction::get_max_version_for_hf(hf_version);
     }
   }
 

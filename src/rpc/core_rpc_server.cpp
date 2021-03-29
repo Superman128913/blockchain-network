@@ -753,6 +753,11 @@ namespace cryptonote { namespace rpc {
       }
       void operator()(const tx_extra_service_node_state_change& x) {
         auto& sc = _state_change(x);
+        if (x.reason_consensus_all)
+          sc.reasons = cryptonote::coded_reasons(x.reason_consensus_all);
+        // If `any` has reasons not included in all then list the extra ones separately:
+        if (uint16_t reasons_maybe = x.reason_consensus_any & ~x.reason_consensus_all)
+          sc.reasons_maybe = cryptonote::coded_reasons(reasons_maybe);
         switch (x.state)
         {
           case service_nodes::new_state::decommission: sc.type = "decom"; break;
@@ -3037,6 +3042,8 @@ namespace cryptonote { namespace rpc {
         ? (info.is_decommissioned() ? info.last_decommission_height : info.active_since_height) : info.last_reward_block_height;
     entry.earned_downtime_blocks        = service_nodes::quorum_cop::calculate_decommission_credit(info, current_height);
     entry.decommission_count            = info.decommission_count;
+    entry.last_decommission_reason_consensus_all      = info.last_decommission_reason_consensus_all;
+    entry.last_decommission_reason_consensus_any      = info.last_decommission_reason_consensus_any;
 
     m_core.get_service_node_list().access_proof(sn_info.pubkey, [&entry](const auto &proof) {
         entry.service_node_version     = proof.proof->version;

@@ -1,21 +1,21 @@
 // Copyright (c) 2014-2019, The Monero Project
-// 
+//
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -25,7 +25,7 @@
 // INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// 
+//
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #pragma once
@@ -347,29 +347,90 @@ namespace cryptonote
       END_SERIALIZE()
     };
 
+    enum struct version_t : uint8_t { v0, v4_reasons = 4 };
+
+    version_t version;
     service_nodes::new_state state;
-    uint64_t                 block_height;
-    uint32_t                 service_node_index;
-    std::vector<vote>        votes;
+    uint64_t block_height;
+    uint32_t service_node_index;
+    uint16_t reason_consensus_all;
+    uint16_t reason_consensus_any;
+    std::vector<vote> votes;
 
     tx_extra_service_node_state_change() = default;
 
     template <typename... VotesArgs>
-    tx_extra_service_node_state_change(service_nodes::new_state state, uint64_t block_height, uint32_t service_node_index, VotesArgs &&...votes)
-        : state{state}, block_height{block_height}, service_node_index{service_node_index}, votes{std::forward<VotesArgs>(votes)...} {}
+    tx_extra_service_node_state_change(
+        version_t version,
+        service_nodes::new_state state,
+        uint64_t block_height,
+        uint32_t service_node_index,
+        uint16_t reason_all,
+        uint16_t reason_any,
+        std::vector<vote> votes) :
+      version{version},
+      state{state},
+      block_height{block_height},
+      service_node_index{service_node_index},
+      reason_consensus_all{reason_all},
+      reason_consensus_any{reason_any},
+      votes{std::move(votes)}
+    {}
 
     // Compares equal if this represents a state change of the same SN (does *not* require equality of stored votes)
     bool operator==(const tx_extra_service_node_state_change &sc) const {
       return state == sc.state && block_height == sc.block_height && service_node_index == sc.service_node_index;
     }
 
-    BEGIN_SERIALIZE()
-      ENUM_FIELD(state, state < service_nodes::new_state::_count);
-      VARINT_FIELD(block_height);
-      VARINT_FIELD(service_node_index);
-      FIELD(votes);
-    END_SERIALIZE()
+    template <class Archive>
+    void serialize_value(Archive& ar) {
+      // Retrofit a field version in here.  Prior to adding reason fields, the first value (in
+      // binary serialization) was the `state` enum, which had a maximum acceptable value of 3: so
+      // if we get >= 4, that's a version, and otherwise we're implicitly version 0 (and there is no
+      // version 1-3).
+      if (Archive::is_serializer && version >= version_t::v4_reasons) {
+        field_varint(ar, "version", version);
+      } else if constexpr (Archive::is_deserializer) {
+        uint8_t ver;
+        field_varint(ar, "version", ver, [](auto v) { return v <= 4; });
+        if (ver < 4) { // Old record, so the "version" we read is actually the state value
+          version = version_t::v0;
+          state = static_cast<service_nodes::new_state>(ver);
+        } else {
+          version = static_cast<version_t>(ver);
+        }
+      }
+      if (Archive::is_serializer || version >= version_t::v4_reasons) {
+        field_varint(ar, "state", state, [](auto s) { return s < service_nodes::new_state::_count; });
+      }
+
+      field_varint(ar, "block_height", block_height);
+      field_varint(ar, "service_node_index", service_node_index);
+      field(ar, "votes", votes);
+      if (version >= version_t::v4_reasons)
+      {
+        field_varint(ar, "reason_consensus_all", reason_consensus_all);
+        field_varint(ar, "reason_consensus_any", reason_consensus_any);
+      }
+    }
   };
+
+  // Describes the reason for a service node being decommissioned. Included in demerit votes and the decommission transaction itself.
+  enum Decommission_Reason : uint16_t {
+    missed_uptime_proof = 1 << 0,
+    missed_checkpoints = 1 << 1,
+    missed_pulse_participations = 1 << 2,
+    storage_server_unreachable = 1 << 3,
+    timestamp_response_unreachable = 1 << 4,
+    timesync_status_out_of_sync = 1 << 5
+  };
+
+  // Returns human-readable reason strings (e.g. "Missed Uptime Proofs") for the given reason bits
+  std::vector<std::string> readable_reasons(uint16_t decomm_reasons);
+
+  // Return reason code strings (e.g. "uptime") for the given reason bits; these are used for RPC
+  // where we want something in-between a bit field and a human-readable string.
+  std::vector<std::string> coded_reasons(uint16_t decomm_reasons);
 
   // Pre-Heimdall service node deregistration data; it doesn't carry the state change (it is only
   // used for deregistrations), and is stored slightly less efficiently in the tx extra data.

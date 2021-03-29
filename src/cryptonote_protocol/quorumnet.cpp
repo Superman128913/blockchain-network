@@ -458,6 +458,7 @@ bt_dict serialize_vote(const quorum_vote_t &vote) {
     else {
         result["wi"] = vote.state_change.worker_index;
         result["sc"] = static_cast<std::underlying_type_t<new_state>>(vote.state_change.state);
+        result["re"] = static_cast<uint16_t>(vote.state_change.reason);
     }
     return result;
 }
@@ -481,6 +482,7 @@ quorum_vote_t deserialize_vote(std::string_view v) {
     } else {
         vote.state_change.worker_index = get_int<uint16_t>(d.at("wi"));
         vote.state_change.state = get_enum<new_state>(d, "sc");
+        vote.state_change.reason = get_int<uint16_t>(d.at("re"));
     }
 
     return vote;
