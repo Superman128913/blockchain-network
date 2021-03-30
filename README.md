@@ -10,15 +10,15 @@ Portions Copyright (c) 2012-2013 The Cryptonote developers.
 
 ## Development resources
 
-- Web: [loki.network](https://loki.network)
-- Telegram: [t.me/LokiCommunity](https://t.me/LokiCommunity)
-- Mail: [team@loki.network](mailto:team@loki.network)
-- GitHub: [https://github.com/loki-project/loki](https://github.com/loki-project/loki)
+- Web: [oxen.io](https://oxen.io)
+- Telegram: [t.me/OxenCommunity](https://t.me/Oxen_Community)
+- Mail: [team@oxen.io](mailto:team@oxen.io)
+- GitHub: [https://github.com/oxen-io/oxen-core](https://github.com/oxen-io/oxen-core)
 - Discord: [https://discord.gg/67GXfD6](https://discord.gg/67GXfD6)
 
 ## Vulnerability disclosure
 
-- Check out our [Vulnerability Response Process](https://loki-project.github.io/loki-docs/Contributing/VULNERABILITY_RESPONSE_LOKI), encourages prompt disclosure of any Vulnerabilities
+- Check out our [Vulnerability Response Process](https://github.com/oxen-io/oxen-docs/blob/master/docs/Contributing/VULNERABILITY_RESPONSE_LOKI.md), encourages prompt disclosure of any Vulnerabilities
 
 ## Information
 
@@ -26,7 +26,7 @@ Oxen is a private cryptocurrency based on Monero. Oxen currently offers an incen
 
 More information on the project can be found on the website and in the whitepaper.
 
-Oxen is an open source project, and we encourage contributions from anyone with something to offer. For more information on contributing, please contact team@loki.network
+Oxen is an open source project, and we encourage contributions from anyone with something to offer. For more information on contributing, please contact team@oxen.io
 
 ## Compiling Oxen from source
 
@@ -239,7 +239,7 @@ application.
     cd loki
     ```
 
-* If you would like a specific [version/tag](https://github.com/loki-project/loki/tags), do a git checkout for that version. eg. 'v5.1.2'. If you don't care about the version and just want binaries from master, skip this step:
+* If you would like a specific [version/tag](https://github.com/oxen-io/oxen-core/tags), do a git checkout for that version. eg. 'v5.1.2'. If you don't care about the version and just want binaries from master, skip this step:
 	
     ```bash
     git checkout v5.1.2
