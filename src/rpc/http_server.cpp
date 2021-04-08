@@ -492,11 +492,11 @@ namespace cryptonote::rpc {
       if (!done)
         return;
 
-      auto& lmq = data->core_rpc.get_core().get_lmq();
+      auto& omq = data->core_rpc.get_core().get_omq();
       std::string cat{data->call->is_public ? "rpc" : "admin"};
       std::string cmd{"http:" + data->uri}; // Used for LMQ job logging; prefixed with http: so we can distinguish it
       std::string remote{data->request.context.remote};
-      lmq.inject_task(std::move(cat), std::move(cmd), std::move(remote), [data=std::move(data)] { invoke_rpc(std::move(data)); });
+      omq.inject_task(std::move(cat), std::move(cmd), std::move(remote), [data=std::move(data)] { invoke_rpc(std::move(data)); });
     });
   }
 
@@ -565,11 +565,11 @@ namespace cryptonote::rpc {
       if (!ps.get_value("params", st_entry, nullptr))
         data->request.body = ""sv;
 
-      auto& lmq = data->core_rpc.get_core().get_lmq();
+      auto& omq = data->core_rpc.get_core().get_omq();
       std::string cat{data->call->is_public ? "rpc" : "admin"};
       std::string cmd{"jsonrpc:" + method}; // Used for LMQ job logging; prefixed with jsonrpc: so we can distinguish it
       std::string remote{data->request.context.remote};
-      lmq.inject_task(std::move(cat), std::move(cmd), std::move(remote), [data=std::move(data)] { invoke_rpc(std::move(data)); });
+      omq.inject_task(std::move(cat), std::move(cmd), std::move(remote), [data=std::move(data)] { invoke_rpc(std::move(data)); });
     });
   }
 
@@ -588,9 +588,9 @@ namespace cryptonote::rpc {
     m_sent_startup = true;
     m_listen_socks = m_startup_success.get();
 
-    auto& lmq = m_server.get_core().get_lmq();
-    if (timer_started.insert(&lmq).second)
-      lmq.add_timer(long_poll_process_timeouts, 1s);
+    auto& omq = m_server.get_core().get_omq();
+    if (timer_started.insert(&omq).second)
+      omq.add_timer(long_poll_process_timeouts, 1s);
   }
 
   void http_server::shutdown(bool join)

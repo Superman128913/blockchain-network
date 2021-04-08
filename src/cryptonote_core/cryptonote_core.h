@@ -350,7 +350,7 @@ namespace cryptonote
 
      /// Called (from service_node_quorum_cop) to tell quorumnet that it need to refresh its list of
      /// active SNs.
-     void update_lmq_sns();
+     void update_omq_sns();
 
      /**
       * @brief get the cryptonote protocol instance
@@ -698,8 +698,8 @@ namespace cryptonote
      tx_memory_pool &get_pool() { return m_mempool; }
 
      /// Returns a reference to the OxenMQ object.  Must not be called before init(), and should not
-     /// be used for any lmq communication until after start_oxenmq() has been called.
-     oxenmq::OxenMQ& get_lmq() { return *m_lmq; }
+     /// be used for any omq communication until after start_oxenmq() has been called.
+     oxenmq::OxenMQ& get_omq() { return *m_omq; }
 
      /**
       * @copydoc miner::on_synchronized
@@ -1144,7 +1144,7 @@ namespace cryptonote
       * Checks the given x25519 pubkey against the configured access lists and, if allowed, returns
       * the access level; otherwise returns `denied`.
       */
-     oxenmq::AuthLevel lmq_check_access(const crypto::x25519_public_key& pubkey) const;
+     oxenmq::AuthLevel omq_check_access(const crypto::x25519_public_key& pubkey) const;
 
      /**
       * @brief Initializes OxenMQ object, called during init().
@@ -1166,7 +1166,7 @@ namespace cryptonote
      /**
       * Returns whether to allow the connection and, if so, at what authentication level.
       */
-     oxenmq::AuthLevel lmq_allow(std::string_view ip, std::string_view x25519_pubkey, oxenmq::AuthLevel default_auth);
+     oxenmq::AuthLevel omq_allow(std::string_view ip, std::string_view x25519_pubkey, oxenmq::AuthLevel default_auth);
 
      /**
       * @brief Internal use only!
@@ -1174,7 +1174,7 @@ namespace cryptonote
       * This returns a mutable reference to the internal auth level map that OxenMQ uses, for
       * internal use only.
       */
-     std::unordered_map<crypto::x25519_public_key, oxenmq::AuthLevel>& _lmq_auth_level_map() { return m_lmq_auth; }
+     std::unordered_map<crypto::x25519_public_key, oxenmq::AuthLevel>& _omq_auth_level_map() { return m_omq_auth; }
      oxenmq::TaggedThreadID const &pulse_thread_id() const { return *m_pulse_thread_id; }
 
      /// Service Node's storage server and lokinet version
@@ -1250,7 +1250,7 @@ namespace cryptonote
      uint16_t m_quorumnet_port;
 
      /// OxenMQ main object.  Gets created during init().
-     std::unique_ptr<oxenmq::OxenMQ> m_lmq;
+     std::unique_ptr<oxenmq::OxenMQ> m_omq;
 
      // Internal opaque data object managed by cryptonote_protocol/quorumnet.cpp.  void pointer to
      // avoid linking issues (protocol does not link against core).
@@ -1258,7 +1258,7 @@ namespace cryptonote
 
      /// Stores x25519 -> access level for LMQ authentication.
      /// Not to be modified after the LMQ listener starts.
-     std::unordered_map<crypto::x25519_public_key, oxenmq::AuthLevel> m_lmq_auth;
+     std::unordered_map<crypto::x25519_public_key, oxenmq::AuthLevel> m_omq_auth;
 
      size_t block_sync_size;
 

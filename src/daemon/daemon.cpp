@@ -271,7 +271,7 @@ void daemon::init_options(boost::program_options::options_description& option_sp
   node_server::init_options(option_spec);
   cryptonote::rpc::core_rpc_server::init_options(option_spec, hidden);
   cryptonote::rpc::http_server::init_options(option_spec, hidden);
-  cryptonote::rpc::init_lmq_options(option_spec);
+  cryptonote::rpc::init_omq_options(option_spec);
   quorumnet::init_core_callbacks();
 }
 
@@ -308,7 +308,7 @@ bool daemon::run(bool interactive)
       throw std::runtime_error("Failed to start core");
 
     MGINFO("Starting OxenMQ");
-    lmq_rpc = std::make_unique<cryptonote::rpc::lmq_rpc>(*core, *rpc, vm);
+    omq_rpc = std::make_unique<cryptonote::rpc::omq_rpc>(*core, *rpc, vm);
     core->start_oxenmq();
 
     if (http_rpc_admin) {

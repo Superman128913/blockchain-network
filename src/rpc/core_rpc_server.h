@@ -89,7 +89,7 @@ namespace cryptonote::rpc {
   /// Junk that epee makes us deal with to pass in a generically parsed json value
   using jsonrpc_params = std::pair<epee::serialization::portable_storage, epee::serialization::storage_entry>;
 
-  enum struct rpc_source : uint8_t { internal, http, lmq };
+  enum struct rpc_source : uint8_t { internal, http, omq };
 
   /// Contains the context of the invocation, which must be filled out by the glue code (e.g. HTTP
   /// RPC server) with requester-specific context details.
