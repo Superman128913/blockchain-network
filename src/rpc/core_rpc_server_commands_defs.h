@@ -1989,29 +1989,6 @@ namespace rpc {
   };
 
   OXEN_RPC_DOC_INTROSPECT
-  // TODO: Undocumented, -- unused
-  struct PERFORM_BLOCKCHAIN_TEST : RPC_COMMAND
-  {
-    static constexpr auto names() { return NAMES("perform_blockchain_test"); }
-
-    struct request
-    {
-      uint64_t max_height;
-      uint64_t seed;
-
-      KV_MAP_SERIALIZABLE
-    };
-
-    struct response
-    {
-      std::string status;
-      uint64_t res_height;
-
-      KV_MAP_SERIALIZABLE
-    };
-  };
-
-  OXEN_RPC_DOC_INTROSPECT
   struct service_node_contribution
   {
     std::string key_image;         // The contribution's key image that is locked on the network.
@@ -2646,7 +2623,6 @@ namespace rpc {
     GET_SERVICE_NODE_REGISTRATION_CMD,
     GET_SERVICE_KEYS,
     GET_SERVICE_PRIVKEYS,
-    PERFORM_BLOCKCHAIN_TEST,
     GET_SERVICE_NODES,
     GET_SERVICE_NODE_STATUS,
     STORAGE_SERVER_PING,

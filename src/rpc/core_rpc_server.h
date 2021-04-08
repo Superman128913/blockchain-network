@@ -260,7 +260,6 @@ namespace cryptonote::rpc {
     GET_SERVICE_NODE_STATUS::response                   invoke(GET_SERVICE_NODE_STATUS::request&& req, rpc_context context);
     GET_SERVICE_NODES::response                         invoke(GET_SERVICE_NODES::request&& req, rpc_context context);
     GET_STAKING_REQUIREMENT::response                   invoke(GET_STAKING_REQUIREMENT::request&& req, rpc_context context);
-    PERFORM_BLOCKCHAIN_TEST::response                   invoke(PERFORM_BLOCKCHAIN_TEST::request&& req, rpc_context context);
     STORAGE_SERVER_PING::response                       invoke(STORAGE_SERVER_PING::request&& req, rpc_context context);
     LOKINET_PING::response                              invoke(LOKINET_PING::request&& req, rpc_context context);
     GET_CHECKPOINTS::response                           invoke(GET_CHECKPOINTS::request&& req, rpc_context context);
