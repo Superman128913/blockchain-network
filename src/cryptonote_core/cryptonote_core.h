@@ -1024,10 +1024,11 @@ namespace cryptonote
 
      /// Time point at which the storage server and lokinet last pinged us
      std::atomic<time_t> m_last_storage_server_ping, m_last_lokinet_ping;
-     std::atomic<uint16_t> m_storage_lmq_port;
+     std::atomic<uint16_t> m_storage_https_port, m_storage_omq_port;
 
      uint32_t sn_public_ip() const { return m_sn_public_ip; }
-     uint16_t storage_port() const { return m_storage_port; }
+     uint16_t storage_https_port() const { return m_storage_https_port; }
+     uint16_t storage_omq_port() const { return m_storage_omq_port; }
      uint16_t quorumnet_port() const { return m_quorumnet_port; }
 
      /**
@@ -1244,9 +1245,8 @@ namespace cryptonote
      bool m_service_node; // True if running in service node mode
      service_keys m_service_keys; // Always set, even for non-SN mode -- these can be used for public oxenmq rpc
 
-     /// Service Node's public IP and storage server port (http and oxenmq)
+     /// Service Node's public IP and qnet ports
      uint32_t m_sn_public_ip;
-     uint16_t m_storage_port;
      uint16_t m_quorumnet_port;
 
      /// OxenMQ main object.  Gets created during init().

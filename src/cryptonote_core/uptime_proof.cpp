@@ -14,7 +14,23 @@ namespace uptime_proof
 {
 
 //Constructor for the uptime proof, will take the service node keys as a param and sign 
-Proof::Proof(uint32_t sn_public_ip, uint16_t sn_storage_port, uint16_t sn_storage_lmq_port, const std::array<uint16_t, 3> ss_version, uint16_t quorumnet_port, const std::array<uint16_t, 3> lokinet_version, const service_nodes::service_node_keys& keys) : version{OXEN_VERSION}, pubkey{keys.pub}, timestamp{static_cast<uint64_t>(time(nullptr))}, public_ip{sn_public_ip}, storage_port{sn_storage_port}, pubkey_ed25519{keys.pub_ed25519},qnet_port{quorumnet_port}, storage_lmq_port{sn_storage_lmq_port}, storage_server_version{ss_version}
+Proof::Proof(
+        uint32_t sn_public_ip,
+        uint16_t sn_storage_https_port,
+        uint16_t sn_storage_omq_port,
+        const std::array<uint16_t, 3> ss_version,
+        uint16_t quorumnet_port,
+        const std::array<uint16_t, 3> lokinet_version,
+        const service_nodes::service_node_keys& keys) :
+    version{OXEN_VERSION},
+    pubkey{keys.pub},
+    timestamp{static_cast<uint64_t>(time(nullptr))},
+    public_ip{sn_public_ip},
+    pubkey_ed25519{keys.pub_ed25519},
+    qnet_port{quorumnet_port},
+    storage_https_port{sn_storage_https_port},
+    storage_omq_port{sn_storage_omq_port},
+    storage_server_version{ss_version}
 {
   this->lokinet_version = lokinet_version;
   crypto::hash hash = this->hash_uptime_proof();
@@ -41,7 +57,7 @@ Proof::Proof(const std::string& serialized_proof)
     //public_ip
     bool succeeded = epee::string_tools::get_ip_int32_from_string(public_ip, var::get<std::string>(bt_proof.at("ip")));
     //storage_port
-    storage_port = static_cast<uint16_t>(get_int<unsigned>(bt_proof.at("s")));
+    storage_https_port = static_cast<uint16_t>(get_int<unsigned>(bt_proof.at("shp")));
     //pubkey_ed25519
     pubkey_ed25519 = tools::make_from_guts<crypto::ed25519_public_key>(var::get<std::string>(bt_proof.at("pke")));
     //pubkey
@@ -51,8 +67,8 @@ Proof::Proof(const std::string& serialized_proof)
       std::memcpy(pubkey.data, pubkey_ed25519.data, 32);
     //qnet_port
     qnet_port = get_int<unsigned>(bt_proof.at("q"));
-    //storage_lmq_port
-    storage_lmq_port = get_int<unsigned>(bt_proof.at("slp"));
+    //storage_omq_port
+    storage_omq_port = get_int<unsigned>(bt_proof.at("sop"));
     //storage_version
     const bt_list& bt_storage_version = var::get<bt_list>(bt_proof.at("sv"));
     k = 0;
@@ -92,13 +108,13 @@ oxenmq::bt_dict Proof::bt_encode_uptime_proof() const
     //public_ip
     {"ip", epee::string_tools::get_ip_string_from_int32(public_ip)},
     //storage_port
-    {"s", storage_port},
+    {"shp", storage_https_port},
     //pubkey_ed25519
     {"pke", tools::view_guts(pubkey_ed25519)},
     //qnet_port
     {"q", qnet_port},
-    //storage_lmq_port
-    {"slp", storage_lmq_port},
+    //storage_omq_port
+    {"sop", storage_omq_port},
     //storage_version
     {"sv", oxenmq::bt_list{{storage_server_version[0], storage_server_version[1], storage_server_version[2]}}},
     //lokinet_version
@@ -132,18 +148,12 @@ bool operator==(const uptime_proof::Proof& lhs, const uptime_proof::Proof& rhs)
         (lhs.pubkey_ed25519 != rhs.pubkey_ed25519) ||
         (lhs.sig_ed25519 != rhs.sig_ed25519) ||
         (lhs.public_ip != rhs.public_ip) ||
-        (lhs.storage_port != rhs.storage_port) ||
-        (lhs.storage_lmq_port != rhs.storage_lmq_port) ||
+        (lhs.storage_https_port != rhs.storage_https_port) ||
+        (lhs.storage_omq_port != rhs.storage_omq_port) ||
         (lhs.qnet_port != rhs.qnet_port) ||
-        (lhs.version[0] != rhs.version[0]) ||
-        (lhs.version[1] != rhs.version[1]) ||
-        (lhs.version[2] != rhs.version[2]) ||
-        (lhs.storage_server_version[0] != rhs.storage_server_version[0]) ||
-        (lhs.storage_server_version[1] != rhs.storage_server_version[1]) ||
-        (lhs.storage_server_version[2] != rhs.storage_server_version[2]) ||
-        (lhs.lokinet_version[0] != rhs.lokinet_version[0]) ||
-        (lhs.lokinet_version[1] != rhs.lokinet_version[1]) ||
-        (lhs.lokinet_version[2] != rhs.lokinet_version[2]))
+        (lhs.version != rhs.version) ||
+        (lhs.storage_server_version != rhs.storage_server_version) ||
+        (lhs.lokinet_version != rhs.lokinet_version))
        result = false;
 
    return result;

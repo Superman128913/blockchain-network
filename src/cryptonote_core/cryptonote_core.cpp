@@ -180,7 +180,7 @@ namespace cryptonote
   };
   static const command_line::arg_descriptor<bool> arg_service_node  = {
     "service-node"
-  , "Run as a service node, options 'service-node-public-ip' and 'storage-server-port' must be set"
+  , "Run as a service node, option 'service-node-public-ip' must be set"
   };
   static const command_line::arg_descriptor<std::string> arg_public_ip = {
     "service-node-public-ip"
@@ -190,11 +190,7 @@ namespace cryptonote
     "service node."
   };
   static const command_line::arg_descriptor<uint16_t> arg_storage_server_port = {
-    "storage-server-port"
-  , "The port on which this service node's storage server is accessible. A listening "
-    "storage server is required for service nodes. (This option is specified "
-    "automatically when using Loki Launcher.)"
-  , 0};
+    "storage-server-port", "Deprecated option, ignored.", 0};
   static const command_line::arg_descriptor<uint16_t, false, true, 2> arg_quorumnet_port = {
     "quorumnet-port"
   , "The port on which this service node listen for direct connections from other "
@@ -394,16 +390,9 @@ namespace cryptonote
 
     if (m_service_node) {
       /// TODO: parse these options early, before we start p2p server etc?
-      m_storage_port = command_line::get_arg(vm, arg_storage_server_port);
-
       m_quorumnet_port = command_line::get_arg(vm, arg_quorumnet_port);
 
       bool args_okay = true;
-      if (m_storage_port == 0 && m_nettype != DEVNET) {
-        MERROR("Please specify the port on which the storage server is listening with: '--" << arg_storage_server_port.name << " <port>'");
-        storage_ok = false;
-      }
-
       if (m_quorumnet_port == 0) {
         MERROR("Quorumnet port cannot be 0; please specify a valid port to listen on with: '--" << arg_quorumnet_port.name << " <port>'");
         args_okay = false;
@@ -433,14 +422,10 @@ namespace cryptonote
       }
 
       if (!args_okay) {
-        MERROR("IMPORTANT: All service node operators are now required to run the oxen storage "
-               << "server and provide the public ip and ports on which it can be accessed on the internet.");
+        MERROR("IMPORTANT: One or more required service node-related configuration settings/options were omitted or invalid; "
+                << "please fix them and restart oxend.");
         return false;
       }
-
-      MGINFO("Storage server endpoint is set to: "
-             << (epee::net_utils::ipv4_network_address{ m_sn_public_ip, m_storage_port }).str());
-
     }
 
     return true;
@@ -1938,10 +1923,10 @@ namespace cryptonote
     auto hf_version = get_hard_fork_version(height);
     //TODO: remove after HF18
     if (hf_version < HF_VERSION_PROOF_BTENC) {
-      NOTIFY_UPTIME_PROOF::request req = m_service_node_list.generate_uptime_proof(m_sn_public_ip, m_storage_port, m_storage_lmq_port, m_quorumnet_port);
+      NOTIFY_UPTIME_PROOF::request req = m_service_node_list.generate_uptime_proof(m_sn_public_ip, storage_https_port(), storage_omq_port(), m_quorumnet_port);
       relayed = get_protocol()->relay_uptime_proof(req, fake_context);
     } else {
-      auto proof = m_service_node_list.generate_uptime_proof(m_sn_public_ip, m_storage_port, m_storage_lmq_port, ss_version, m_quorumnet_port, lokinet_version);
+      auto proof = m_service_node_list.generate_uptime_proof(m_sn_public_ip, storage_https_port(), storage_omq_port(), ss_version, m_quorumnet_port, lokinet_version);
       NOTIFY_BTENCODED_UPTIME_PROOF::request req = proof.generate_request();
       relayed = get_protocol()->relay_btencoded_uptime_proof(req, fake_context);
     }
@@ -2332,11 +2317,11 @@ namespace cryptonote
 
           m_service_node_list.for_each_service_node_info_and_proof(sn_pks.begin(), sn_pks.end(), [&](auto& pk, auto& sni, auto& proof) {
             if (pk != m_service_keys.pub && proof.proof->public_ip == m_sn_public_ip &&
-                (proof.proof->qnet_port == m_quorumnet_port || proof.proof->storage_port == m_storage_port || proof.proof->storage_port == m_storage_lmq_port))
+                (proof.proof->qnet_port == m_quorumnet_port || proof.proof->storage_https_port == storage_https_port() || proof.proof->storage_omq_port == storage_omq_port()))
             MGINFO_RED(
                 "Another service node (" << pk << ") is broadcasting the same public IP and ports as this service node (" <<
                 epee::string_tools::get_ip_string_from_int32(m_sn_public_ip) << ":" << proof.proof->qnet_port << "[qnet], :" <<
-                proof.proof->storage_port << "[SS-HTTP], :" << proof.proof->storage_lmq_port << "[SS-LMQ]). "
+                proof.proof->storage_https_port << "[SS-HTTP], :" << proof.proof->storage_omq_port << "[SS-LMQ]). "
                 "This will lead to deregistration of one or both service nodes if not corrected. "
                 "(Do both service nodes have the correct IP for the service-node-public-ip setting?)");
           });

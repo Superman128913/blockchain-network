@@ -1211,10 +1211,9 @@ KV_SERIALIZE_MAP_CODE_END()
 
 
 KV_SERIALIZE_MAP_CODE_BEGIN(STORAGE_SERVER_PING::request)
-  KV_SERIALIZE(version_major);
-  KV_SERIALIZE(version_minor);
-  KV_SERIALIZE(version_patch);
-  KV_SERIALIZE(storage_lmq_port);
+  KV_SERIALIZE(version);
+  KV_SERIALIZE(https_port);
+  KV_SERIALIZE(omq_port);
 KV_SERIALIZE_MAP_CODE_END()
 
 

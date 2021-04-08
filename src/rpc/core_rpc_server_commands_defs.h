@@ -2193,10 +2193,9 @@ namespace rpc {
 
     struct request
     {
-      uint16_t version_major; // Storage Server Major version
-      uint16_t version_minor; // Storage Server Minor version
-      uint16_t version_patch; // Storage Server Patch version
-      uint16_t storage_lmq_port; // Storage Server lmq port to include in uptime proofs
+      std::array<uint16_t, 3> version; // Storage server version
+      uint16_t https_port; // Storage server https port to include in uptime proofs
+      uint16_t omq_port; // Storage Server oxenmq port to include in uptime proofs
       KV_MAP_SERIALIZABLE
     };
 
