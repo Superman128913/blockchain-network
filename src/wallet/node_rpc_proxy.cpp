@@ -344,10 +344,28 @@ std::pair<bool, std::vector<cryptonote::rpc::ONS_NAMES_TO_OWNERS::response_entry
 {
   return get_result_pair<rpc::ONS_NAMES_TO_OWNERS>(request, [](auto&& res) { return std::move(res.entries); });
 }
-
-std::pair<bool, cryptonote::rpc::ONS_RESOLVE_ADDRESS::response> NodeRPCProxy::ons_resolve_address(cryptonote::rpc::ONS_RESOLVE_ADDRESS::request const &request) const
+std::pair<bool,cryptonote::rpc::ONS_RESOLVE::response> NodeRPCProxy::ons_resolve(cryptonote::rpc::ONS_RESOLVE::request const &request) const
 {
-  return get_result_pair<rpc::ONS_RESOLVE_ADDRESS>(request, [](auto&& res) { return std::move(res); });
+  std::pair<bool, cryptonote::rpc::ONS_RESOLVE::response> result;
+  auto& [success, resolved] = result;
+  success = false;
+
+  uint64_t height;
+  if (m_offline || !get_height(height))
+    return result;
+
+  {
+    try {
+      auto res = m_http_client.json_rpc<rpc::ONS_RESOLVE>(rpc::ONS_RESOLVE::names().front(), request);
+      resolved = res;
+    } catch (...) {
+      return result;
+    }
+
+  }
+
+  success = true;
+  return result;
 }
 
 }

@@ -2481,28 +2481,6 @@ namespace rpc {
     };
   };
 
-  // Resolves a provided address, will return the address if valid or the the resolved ONS wallet mapping if valid ONS Name
-  struct ONS_RESOLVE_ADDRESS : PUBLIC
-  {
-    static constexpr auto names() { return NAMES("ons_resolve_address"); }
-
-    struct request
-    {
-      std::string address; // The address or name to resolve to a public key via Oxen Name Service.
-      uint64_t height;               // Optional: if provided and true, the result will be provided for a Oxen Name Resolved at this height
-
-      KV_MAP_SERIALIZABLE
-    };
-
-    struct response
-    {
-      std::optional<std::string> address; // The value that the address maps to.
-      std::string status; // Generic RPC error code. "OK" is the success value.
-
-      KV_MAP_SERIALIZABLE
-    };
-  };
-
   OXEN_RPC_DOC_INTROSPECT
   // Get all the name mappings for the queried owner. The owner can be either a ed25519 public key or Monero style
   // public key; by default purchases are owned by the spend public key of the purchasing wallet.
@@ -2568,7 +2546,7 @@ namespace rpc {
 
     struct request
     {
-      uint16_t type;         // The ONS type (mandatory); currently supported values are: 0 = session, 2 = lokinet.
+      uint16_t type;         // The ONS type (mandatory); currently supported values are: 0 = session, 1 = wallet, 2 = lokinet.
       std::string name_hash; // The 32-byte BLAKE2b hash of the name to look up, encoded as 64 hex digits or 44/43 base64 characters (with/without padding).
 
       KV_MAP_SERIALIZABLE
@@ -2685,7 +2663,6 @@ namespace rpc {
     ONS_NAMES_TO_OWNERS,
     ONS_OWNERS_TO_NAMES,
     ONS_RESOLVE,
-    ONS_RESOLVE_ADDRESS,
     FLUSH_CACHE
   >;
 

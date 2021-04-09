@@ -869,6 +869,31 @@ bool validate_ons_name(mapping_type type, std::string name, std::string *reason)
   return true;
 }
 
+std::optional<cryptonote::address_parse_info> encrypted_wallet_value_to_info(std::string name, std::string encrypted_value, std::string nonce)
+{
+
+  std::string lower_name = tools::lowercase_ascii_string(std::move(name));
+  mapping_value record(oxenmq::from_hex(encrypted_value), oxenmq::from_hex(nonce));
+  record.decrypt(lower_name, mapping_type::wallet);
+
+  auto iter = std::next(record.buffer.begin(),1);
+  cryptonote::address_parse_info addr_info{0};
+  addr_info.has_payment_id = false;
+  addr_info.is_subaddress = false;
+  std::memcpy(&addr_info.address.m_spend_public_key.data, &*iter, 32);
+  std::advance(iter,32);
+  std::memcpy(&addr_info.address.m_view_public_key.data, &*iter, 32);
+  if (record.buffer[0] == 0x2) {
+    std::advance(iter,32);
+    std::copy_n(iter,8,addr_info.payment_id.data);
+    addr_info.has_payment_id = true;
+  } else if (record.buffer[0] == 0x1) {
+    addr_info.is_subaddress = true;
+  }
+
+  return addr_info;
+}
+
 static bool check_lengths(mapping_type type, std::string_view value, size_t max, bool binary_val, std::string *reason)
 {
   bool result;
@@ -1031,6 +1056,17 @@ bool mapping_value::validate_encrypted(mapping_type type, std::string_view value
 
   return true;
 }
+
+
+mapping_value::mapping_value(std::string encrypted_value, std::string nonce): buffer{0}
+{
+  auto it = std::copy(encrypted_value.begin(), encrypted_value.end(), buffer.begin());
+  std::copy(nonce.begin(), nonce.end(), it);
+  len = encrypted_value.size() + nonce.size();
+  encrypted = true;
+}
+
+mapping_value::mapping_value(){}
 
 std::string name_hash_bytes_to_base64(std::string_view bytes)
 {
@@ -2222,6 +2258,8 @@ bool name_system_db::get_wallet_mapping(std::string str, uint64_t blockchain_hei
   }
   return false;
 }
+
+
 
 mapping_record name_system_db::get_mapping(mapping_type type, std::string_view name_base64_hash, std::optional<uint64_t> blockchain_height)
 {

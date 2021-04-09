@@ -6519,6 +6519,45 @@ void wallet2::get_unconfirmed_payments_out(std::list<std::pair<crypto::hash,wall
   }
 }
 //----------------------------------------------------------------------------------------------------
+std::optional<std::string> wallet2::resolve_address(std::string address, uint64_t height)
+{
+
+  // addr_response will have an encrypted value
+  cryptonote::address_parse_info info;
+  bool result = false;
+  if (cryptonote::get_account_address_from_str(info, m_nettype, address))
+  {
+    result = true;
+  } else {
+    std::string name = tools::lowercase_ascii_string(std::move(address));
+    std::string reason;
+    if (ons::validate_ons_name(ons::mapping_type::wallet, name, &reason))
+    {
+      std::string b64_hashed_name = ons::name_to_base64_hash(name);
+      rpc::ONS_RESOLVE::request lookup_req{1, b64_hashed_name};
+      auto [success, addr_response] = resolve(lookup_req);
+      if (success && addr_response.encrypted_value)
+      {
+        std::optional<cryptonote::address_parse_info> addr_info = ons::encrypted_wallet_value_to_info(name, *addr_response.encrypted_value, *addr_response.nonce);
+        if (addr_info)
+        {
+          info = std::move(*addr_info);
+          result = true;
+          LOG_PRINT_L2("Resolved ONS name: "<< address << " to address: " << get_account_address_as_str(m_nettype, info.is_subaddress, info.address));
+        }
+      }
+
+    } else {
+      LOG_PRINT_L2("Invalid address format, could not resolve " << address);
+    }
+  }
+
+  if (result)
+    return get_account_address_as_str(m_nettype, info.is_subaddress, info.address);
+  else 
+    return std::nullopt;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::get_unconfirmed_payments(std::list<std::pair<crypto::hash,wallet2::pool_payment_details>>& unconfirmed_payments, const std::optional<uint32_t>& subaddr_account, const std::set<uint32_t>& subaddr_indices) const
 {
   for (auto i = m_unconfirmed_payments.begin(); i != m_unconfirmed_payments.end(); ++i) {

@@ -806,6 +806,7 @@ private:
       uint64_t min_height, uint64_t max_height = (uint64_t)-1, const std::optional<uint32_t>& subaddr_account = std::nullopt, const std::set<uint32_t>& subaddr_indices = {}) const;
     void get_unconfirmed_payments_out(std::list<std::pair<crypto::hash,wallet2::unconfirmed_transfer_details>>& unconfirmed_payments, const std::optional<uint32_t>& subaddr_account = std::nullopt, const std::set<uint32_t>& subaddr_indices = {}) const;
     void get_unconfirmed_payments(std::list<std::pair<crypto::hash,wallet2::pool_payment_details>>& unconfirmed_payments, const std::optional<uint32_t>& subaddr_account = std::nullopt, const std::set<uint32_t>& subaddr_indices = {}) const;
+    std::optional<std::string> resolve_address(std::string address, uint64_t height = 0);
 
     // These return pairs where .first == true if the request was successful, and .second is a
     // vector of the requested entries.
@@ -817,7 +818,7 @@ private:
     std::vector<cryptonote::rpc::GET_SERVICE_NODES::response::entry> list_current_stakes();
     auto ons_owners_to_names(cryptonote::rpc::ONS_OWNERS_TO_NAMES::request const &request) const { return m_node_rpc_proxy.ons_owners_to_names(request); }
     auto ons_names_to_owners(cryptonote::rpc::ONS_NAMES_TO_OWNERS::request const &request) const { return m_node_rpc_proxy.ons_names_to_owners(request); }
-    auto resolve_address(cryptonote::rpc::ONS_RESOLVE_ADDRESS::request const &request) const { return m_node_rpc_proxy.ons_resolve_address(request); }
+    auto resolve(cryptonote::rpc::ONS_RESOLVE::request const &request) const { return m_node_rpc_proxy.ons_resolve(request); }
 
     struct ons_detail
     {

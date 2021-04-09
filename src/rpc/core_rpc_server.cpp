@@ -3655,6 +3655,7 @@ namespace cryptonote { namespace rpc {
     if (!name_hash)
       throw rpc_error{ERROR_WRONG_PARAM, "Unable to resolve ONS address: invalid 'name_hash' value '" + req.name_hash + "'"};
 
+
     uint8_t hf_version = m_core.get_hard_fork_version(m_core.get_current_blockchain_height());
     auto type = static_cast<ons::mapping_type>(req.type);
     if (!ons::mapping_type_allowed(hf_version, type))
@@ -3667,27 +3668,6 @@ namespace cryptonote { namespace rpc {
       res.encrypted_value = oxenmq::to_hex(val);
       if (val.size() < mapping->to_view().size())
         res.nonce = oxenmq::to_hex(nonce);
-    }
-    return res;
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
-  ONS_RESOLVE_ADDRESS::response core_rpc_server::invoke(ONS_RESOLVE_ADDRESS::request&& req, rpc_context context)
-  {
-    ONS_RESOLVE_ADDRESS::response res{};
-
-    uint64_t height;
-    height = (req.height) ? req.height : m_core.get_current_blockchain_height();
-
-    cryptonote::address_parse_info info;
-    cryptonote::network_type nettype = m_core.get_nettype();
-    bool success = m_core.get_account_address_from_str_or_ons(info, nettype, req.address, height);
-
-    if (success)
-    {
-      res.status = STATUS_OK;
-      res.address = get_account_address_as_str(nettype, 0, info.address);
-    } else {
-      res.status = "Failed";
     }
     return res;
   }

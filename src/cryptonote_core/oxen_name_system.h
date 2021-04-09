@@ -105,6 +105,9 @@ struct mapping_value
   // blob: (optional) if function returns true then the value will be loaded into the given
   // mapping_value, ready for decryption via decrypt().
   static bool validate_encrypted(mapping_type type, std::string_view value, mapping_value *blob = nullptr, std::string *reason = nullptr);
+
+  mapping_value();
+  mapping_value(std::string encrypted_value, std::string nonce);
 };
 inline std::ostream &operator<<(std::ostream &os, mapping_value const &v) { return os << oxenmq::to_hex(v.to_view()); }
 
@@ -164,6 +167,8 @@ std::string name_hash_bytes_to_base64(std::string_view bytes);
 std::optional<std::string> name_hash_input_to_base64(std::string_view input);
 
 bool validate_ons_name(mapping_type type, std::string name, std::string *reason = nullptr);
+
+std::optional<cryptonote::address_parse_info> encrypted_wallet_value_to_info(std::string name, std::string encrypted_value, std::string nonce);
 
 generic_signature  make_ed25519_signature(crypto::hash const &hash, crypto::ed25519_secret_key const &skey);
 generic_owner      make_monero_owner(cryptonote::account_public_address const &owner, bool is_subaddress);

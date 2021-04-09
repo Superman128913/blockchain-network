@@ -1911,32 +1911,6 @@ namespace cryptonote
     return m_blockchain_storage.get_total_transactions();
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::get_account_address_from_str_or_ons(
-      cryptonote::address_parse_info& info
-    , cryptonote::network_type nettype
-    , std::string str,
-      uint64_t height
-    )
-  {
-    bool result = false;
-    if (cryptonote::get_account_address_from_str(info, nettype, str))
-    {
-      result = true;
-    } else {
-      std::string name = tools::lowercase_ascii_string(std::move(str));
-      std::string reason;
-      ons::name_system_db& db = m_blockchain_storage.name_system_db();
-      if (ons::validate_ons_name(ons::mapping_type::wallet, str, &reason) && db.get_wallet_mapping(name, height, info))
-      {
-        result = true;
-        LOG_PRINT_L2("Resolved ONS name: "<< str << " to address: " << get_account_address_as_str(nettype, info.is_subaddress, info.address));
-      } else {
-        LOG_PRINT_L2("Invalid address format, could not resolve " << str);
-      }
-    }
-    return result;
-  }
-  //-----------------------------------------------------------------------------------------------
   bool core::relay_txpool_transactions()
   {
     // we attempt to relay txes that should be relayed, but were not

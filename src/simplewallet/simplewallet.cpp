@@ -5909,11 +5909,9 @@ bool simple_wallet::transfer_main(Transfer transfer_type, const std::vector<std:
       r = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), local_args[i], oa_prompter);
       if (!r && m_wallet->is_trusted_daemon())
       {
-        rpc::ONS_RESOLVE_ADDRESS::request lookup_req{};
-        lookup_req.address = local_args[i];
-        auto [success, addr_response] = m_wallet->resolve_address(lookup_req);
-        if (success)
-          r = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), *addr_response.address, oa_prompter);
+        std::optional<std::string> address = m_wallet->resolve_address(local_args[i]);
+        if (address)
+          r = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), *address, oa_prompter);
       }
       if(!r)
       {

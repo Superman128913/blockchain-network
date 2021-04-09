@@ -871,14 +871,13 @@ namespace tools
       cryptonote::network_type nettype,
       std::string_view addr_or_url)
   {
-    rpc::ONS_RESOLVE_ADDRESS::request lookup_req{};
-    lookup_req.address = addr_or_url;
     if (m_wallet->is_trusted_daemon())
     {
-      if (auto [success, response] = m_wallet->resolve_address(lookup_req); success)
+      std::optional<std::string> address = m_wallet->resolve_address(std::string{addr_or_url});
+      if (address)
       {
         cryptonote::address_parse_info info;
-        if (!get_account_address_from_str_or_url(info, nettype, *response.address,
+        if (!get_account_address_from_str_or_url(info, nettype, *address,
           [](const std::string_view url, const std::vector<std::string> &addresses, bool dnssec_valid) {
             if (!dnssec_valid)
               throw wallet_rpc_error{error_code::WRONG_ADDRESS, "Invalid DNSSEC for "s + std::string{url}};
