@@ -1154,6 +1154,26 @@ namespace cryptonote
     return buf;
   }
   //---------------------------------------------------------------
+  bool is_valid_address(const std::string address, bool allow_subaddress, bool allow_integrated)
+  {
+    cryptonote::address_parse_info addr_info;
+    bool valid = false;
+    std::initializer_list<cryptonote::network_type> all_nettypes = {cryptonote::network_type::MAINNET, cryptonote::network_type::TESTNET, cryptonote::network_type::DEVNET, cryptonote::network_type::FAKECHAIN};
+    for (auto nettype : all_nettypes) {
+      if(get_account_address_from_str(addr_info, nettype, address))
+      {
+        if (addr_info.is_subaddress)
+          valid = allow_subaddress;
+        else if (addr_info.has_payment_id)
+          valid = allow_integrated;
+        else
+          valid = true;
+        break;
+      }
+    }
+    return valid;
+  }
+  //---------------------------------------------------------------
   crypto::hash get_blob_hash(const std::string_view blob)
   {
     crypto::hash h;

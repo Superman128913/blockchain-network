@@ -6444,6 +6444,8 @@ static std::optional<ons::mapping_type> guess_ons_type(tools::wallet2& wallet, s
       return ons::mapping_type::lokinet;
     if (!tools::ends_with(name, ".loki") && tools::starts_with(value, "05") && value.length() == 2*ons::SESSION_PUBLIC_KEY_BINARY_LENGTH)
       return ons::mapping_type::session;
+    if (cryptonote::is_valid_address(std::string{value}))
+      return ons::mapping_type::wallet;
 
     fail_msg_writer() << tr("Could not infer ONS type from name/value; trying using the type= argument or see `help' for more details");
     return std::nullopt;
@@ -7024,11 +7026,12 @@ bool simple_wallet::ons_print_owners_to_names(const std::vector<std::string>& ar
         fail_msg_writer() << "arg too long, fails basic size sanity check max length = " << MAX_LEN << ", arg = " << arg;
         return false;
       }
-      //if (!oxenmq::is_hex(arg))
-      //{
-        //fail_msg_writer() << "arg contains non-hex characters: " << arg;
-        //return false;
-      //}
+
+      if (!(oxenmq::is_hex(arg) && arg.size() == 64) && (!cryptonote::is_valid_address(arg)))
+      {
+        fail_msg_writer() << "arg contains non valid characters: " << arg;
+        return false;
+      }
 
       if (requests.back().entries.size() >= cryptonote::rpc::ONS_OWNERS_TO_NAMES::MAX_REQUEST_ENTRIES)
         requests.emplace_back();

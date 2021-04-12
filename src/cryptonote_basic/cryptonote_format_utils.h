@@ -219,6 +219,8 @@ namespace cryptonote
   std::string print_tx_verification_context  (tx_verification_context const &tvc, transaction const *tx = nullptr);
   std::string print_vote_verification_context(vote_verification_context const &vvc, service_nodes::quorum_vote_t const *vote = nullptr);
 
+  bool is_valid_address(const std::string address, bool allow_subaddress = true, bool allow_integrated = true);
+
   inline std::ostream &operator<<(std::ostream &stream, transaction const &tx)
   {
     stream << "tx={version=" << tx.version << ", type=" << tx.type << ", hash=" << get_transaction_hash(tx) << "}";

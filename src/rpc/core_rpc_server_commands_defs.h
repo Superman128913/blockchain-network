@@ -2460,7 +2460,7 @@ namespace rpc {
     struct response_entry
     {
       uint64_t entry_index;     // The index in request_entry's `entries` array that was resolved via Loki Name Service.
-      ons::mapping_type type;   // The type of Loki Name Service entry that the owner owns: currently supported values are 0 (session), 2 (lokinet)
+      ons::mapping_type type;   // The type of Loki Name Service entry that the owner owns: currently supported values are 0 (session), 1 (wallet) and 2 (lokinet)
       std::string name_hash;    // The hash of the name that was queried, in base64
       std::string owner;        // The public key that purchased the Loki Name Service entry.
       std::optional<std::string> backup_owner; // The backup public key that the owner specified when purchasing the Loki Name Service entry. Omitted if no backup owner.
@@ -2500,7 +2500,7 @@ namespace rpc {
     struct response_entry
     {
       uint64_t    request_index;   // (Deprecated) The index in request's `entries` array that was resolved via Loki Name Service.
-      ons::mapping_type type;      // The category the Loki Name Service entry belongs to; currently 0 for Session and 2 for Lokinet.
+      ons::mapping_type type;      // The category the Loki Name Service entry belongs to; currently 0 for Session, 1 for Wallet and 2 for Lokinet.
       std::string name_hash;       // The hash of the name that the owner purchased via Loki Name Service in base64
       std::string owner;           // The backup public key specified by the owner that purchased the Loki Name Service entry.
       std::optional<std::string> backup_owner; // The backup public key specified by the owner that purchased the Loki Name Service entry. Omitted if no backup owner.
