@@ -2145,20 +2145,8 @@ namespace tools
 
     m_wallet->get_transfers(args, all_transfers);
 
-    // output filename
-    std::string filename_str = "oxen-transfers.csv";
-    if (!req.filename.empty())
-    {
-      filename_str = req.filename;
-    }
-
-    fs::ofstream file{fs::u8path(filename_str)};
-
     const bool formatting = true;
-    file << m_wallet->transfers_to_csv(all_transfers, formatting);
-    file.close();
-
-    res.filename = filename_str;
+    res.data = m_wallet->transfers_to_csv(all_transfers, formatting);
 
     return res;
   }

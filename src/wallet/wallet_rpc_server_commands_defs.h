@@ -1345,7 +1345,6 @@ namespace tools::wallet_rpc {
 
     struct request
     {
-      std::string filename; // String for the filename of the CSV to write
       bool in = false;
       bool out = false;
       bool stake = false;
@@ -1365,7 +1364,7 @@ namespace tools::wallet_rpc {
 
     struct response
     {
-      std::string filename; // String for the filename written to
+      std::string data; // CSV data to be written to file by wallet
 
       KV_MAP_SERIALIZABLE
     };
