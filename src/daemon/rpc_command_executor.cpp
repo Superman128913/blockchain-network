@@ -1684,12 +1684,27 @@ static void append_printable_service_node_list_entry(cryptonote::network_type ne
     //
     // NOTE: Storage Server Test
     //
-    stream << indent2 << "Storage Server Reachable: " << (entry.storage_server_reachable ? "Yes" : "No") << " (";
-    if (entry.storage_server_reachable_timestamp == 0)
-      stream << "Awaiting first test";
-    else
-      stream << "Last checked: " << get_human_time_ago(entry.storage_server_reachable_timestamp, now);
-    stream << ")\n";
+    stream << indent2 << "Storage Server Reachable: ";
+    if (entry.storage_server_first_unreachable == 0) {
+      if (entry.storage_server_last_reachable == 0)
+        stream << "Not yet tested";
+      else {
+        stream << "Yes (last tested " << get_human_time_ago(entry.storage_server_last_reachable, now);
+        if (entry.storage_server_last_unreachable)
+          stream << "; last failure " << get_human_time_ago(entry.storage_server_last_unreachable, now);
+        stream << ")";
+      }
+    } else {
+      stream << "NO";
+      if (!entry.storage_server_reachable)
+        stream << " - FAILING!";
+      stream << " (last tested " << get_human_time_ago(entry.storage_server_last_unreachable, now)
+        << "; failing since " << get_human_time_ago(entry.storage_server_first_unreachable, now);
+      if (entry.storage_server_last_reachable)
+        stream << "; last good " << get_human_time_ago(entry.storage_server_last_reachable, now);
+      stream << ")";
+    }
+    stream << "\n";
 
     //
     // NOTE: Component Versions

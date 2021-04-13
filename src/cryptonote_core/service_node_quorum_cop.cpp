@@ -100,7 +100,7 @@ namespace service_nodes
     bool check_timestamp_obligation = false;
 
     m_core.get_service_node_list().access_proof(pubkey, [&](const proof_info &proof) {
-      ss_reachable             = proof.storage_server_reachable;
+      ss_reachable             = !proof.ss_unreachable_for(netconf.UPTIME_PROOF_VALIDITY - netconf.UPTIME_PROOF_FREQUENCY);
       timestamp                = std::max(proof.proof->timestamp, proof.effective_timestamp);
       ips                      = proof.public_ips;
       checkpoint_participation = proof.checkpoint_participation;
