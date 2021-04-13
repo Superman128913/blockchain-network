@@ -164,26 +164,29 @@ namespace {
       << "miner tx hash: " << header.miner_tx_hash;
   }
 
-  std::string get_human_time_ago(time_t t, time_t now, bool abbreviate = false)
+  std::string get_human_time_ago(std::chrono::seconds ago, bool abbreviate = false)
   {
-    if (t == now)
+    if (ago == 0s)
       return "now";
-    time_t dt = t > now ? t - now : now - t;
+    auto dt = ago > 0s ? ago : -ago;
     std::string s;
-    if (dt < 90)
-      s = std::to_string(dt) + (abbreviate ? "sec" : dt == 1 ? " second" : " seconds");
-    else if (dt < 90 * 60)
-      s = (boost::format(abbreviate ? "%.1fmin" : "%.1f minutes") % ((float)dt/60)).str();
-    else if (dt < 36 * 3600)
-      s = (boost::format(abbreviate ? "%.1fhr" : "%.1f hours") % ((float)dt/3600)).str();
+    if (dt < 90s)
+      s = std::to_string(dt.count()) + (abbreviate ? "sec" : dt == 1s ? " second" : " seconds");
+    else if (dt < 90min)
+      s = (boost::format(abbreviate ? "%.1fmin" : "%.1f minutes") % ((float)dt.count()/60)).str();
+    else if (dt < 36h)
+      s = (boost::format(abbreviate ? "%.1fhr" : "%.1f hours") % ((float)dt.count()/3600)).str();
     else
-      s = (boost::format("%.1f days") % ((float)dt/(3600*24))).str();
+      s = (boost::format("%.1f days") % ((float)dt.count()/(86400))).str();
     if (abbreviate) {
-        if (t > now)
+        if (ago < 0s)
             return s + " (in fut.)";
         return s;
     }
-    return s + " " + (t > now ? "in the future" : "ago");
+    return s + " " + (ago < 0s ? "in the future" : "ago");
+  }
+  std::string get_human_time_ago(std::time_t t, std::time_t now, bool abbreviate = false) {
+    return get_human_time_ago(std::chrono::seconds{now - t}, abbreviate);
   }
 
   char const *get_date_time(time_t t)
@@ -534,10 +537,12 @@ bool rpc_command_executor::show_status() {
     hfres.state == cryptonote::HardFork::UpdateNeeded ? "update needed" :
     "out of date, likely forked");
 
+  std::time_t now = std::time(nullptr);
+
   // restricted RPC does not disclose these:
   if (ires.outgoing_connections_count && ires.incoming_connections_count && ires.start_time)
   {
-    std::time_t uptime = std::time(nullptr) - *ires.start_time;
+    std::time_t uptime = now - *ires.start_time;
     str << ", " << *ires.outgoing_connections_count << "(out)+" << *ires.incoming_connections_count << "(in) connections"
       << ", uptime "
       << (uptime / (24*60*60)) << 'd'
@@ -555,16 +560,16 @@ bool rpc_command_executor::show_status() {
       str << "not registered";
     else
       str << (!my_sn_staked ? "awaiting" : my_sn_active ? "active" : "DECOMMISSIONED (" + std::to_string(my_decomm_remaining) + " blocks credit)")
-        << ", proof: " << (my_sn_last_uptime ? get_human_time_ago(my_sn_last_uptime, time(nullptr)) : "(never)");
+        << ", proof: " << (my_sn_last_uptime ? get_human_time_ago(my_sn_last_uptime, now) : "(never)");
     str << ", last pings: ";
     if (*ires.last_storage_server_ping > 0)
-        str << get_human_time_ago(*ires.last_storage_server_ping, time(nullptr), true /*abbreviate*/);
+        str << get_human_time_ago(*ires.last_storage_server_ping, now, true /*abbreviate*/);
     else
         str << "NOT RECEIVED";
     str << " (storage), ";
 
     if (*ires.last_lokinet_ping > 0)
-        str << get_human_time_ago(*ires.last_lokinet_ping, time(nullptr), true /*abbreviate*/);
+        str << get_human_time_ago(*ires.last_lokinet_ping, now, true /*abbreviate*/);
     else
         str << "NOT RECEIVED";
     str << " (lokinet)";
