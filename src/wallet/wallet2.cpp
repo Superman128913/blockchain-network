@@ -7787,10 +7787,11 @@ uint64_t wallet2::get_fee_percent(uint32_t priority, txtype type) const
       THROW_WALLET_EXCEPTION(error::invalid_priority);
 
     uint64_t burn_pct = 0;
-    if (use_fork_rules(network_version_15_ons, 0))
-      burn_pct = BLINK_BURN_TX_FEE_PERCENT;
-    else if (use_fork_rules(network_version_14_blink, 0))
-      burn_pct = BLINK_BURN_TX_FEE_PERCENT_OLD;
+    if (use_fork_rules(network_version_18, 0))
+      burn_pct = BLINK_BURN_TX_FEE_PERCENT_V18;
+    //TODO remove this in HF19
+    else if (use_fork_rules(network_version_15_ons, 0))
+      burn_pct = BLINK_BURN_TX_FEE_PERCENT_V15;
     else
       THROW_WALLET_EXCEPTION(error::invalid_priority);
     return BLINK_MINER_TX_FEE_PERCENT + burn_pct;
@@ -7808,8 +7809,10 @@ byte_and_output_fees wallet2::get_dynamic_base_fee_estimate() const
   if (m_node_rpc_proxy.get_dynamic_base_fee_estimate(FEE_ESTIMATE_GRACE_BLOCKS, fees))
     return fees;
 
+  if (use_fork_rules(cryptonote::network_version_18))
+    fees = {FEE_PER_BYTE_V13, FEE_PER_OUTPUT_V18}; // v18 reduces fee
   if (use_fork_rules(HF_VERSION_PER_OUTPUT_FEE))
-    fees = {FEE_PER_BYTE, FEE_PER_OUTPUT}; // v13 switches back from v12 per-byte fees, add per-output
+    fees = {FEE_PER_BYTE_V13, FEE_PER_OUTPUT_V13}; // v13 switches back from v12 per-byte fees, add per-output
   else
     fees = {FEE_PER_BYTE_V12, 0};
 
@@ -7819,9 +7822,6 @@ byte_and_output_fees wallet2::get_dynamic_base_fee_estimate() const
 //----------------------------------------------------------------------------------------------------
 byte_and_output_fees wallet2::get_base_fees() const
 {
-  if(m_light_wallet)
-    return {m_light_wallet_per_kb_fee / 1024, FEE_PER_OUTPUT};
-
   return get_dynamic_base_fee_estimate();
 }
 //----------------------------------------------------------------------------------------------------
@@ -7852,9 +7852,13 @@ oxen_construct_tx_params wallet2::construct_params(uint8_t hf_version, txtype tx
   else if (priority == tools::tx_priority_blink)
   {
     tx_params.burn_fixed   = BLINK_BURN_FIXED;
-    tx_params.burn_percent = hf_version <= network_version_14_blink
-        ? BLINK_BURN_TX_FEE_PERCENT_OLD
-        : BLINK_BURN_TX_FEE_PERCENT;
+
+    if (hf_version >= network_version_18)
+      tx_params.burn_percent = BLINK_BURN_TX_FEE_PERCENT_V18;
+    //TODO remove this in HF19
+    else
+      tx_params.burn_percent = BLINK_BURN_TX_FEE_PERCENT_V15;
+
   }
   if (extra_burn)
       tx_params.burn_fixed += extra_burn;

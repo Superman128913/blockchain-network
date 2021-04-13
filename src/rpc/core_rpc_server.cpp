@@ -2376,7 +2376,7 @@ namespace cryptonote { namespace rpc {
     res.fee_per_byte = fees.first;
     res.fee_per_output = fees.second;
     res.blink_fee_fixed = BLINK_BURN_FIXED;
-    constexpr auto blink_percent = BLINK_MINER_TX_FEE_PERCENT + BLINK_BURN_TX_FEE_PERCENT;
+    constexpr auto blink_percent = BLINK_MINER_TX_FEE_PERCENT + BLINK_BURN_TX_FEE_PERCENT_V18;
     res.blink_fee_per_byte = res.fee_per_byte * blink_percent / 100;
     res.blink_fee_per_output = res.fee_per_output * blink_percent / 100;
     res.quantization_mask = Blockchain::get_fee_quantization_mask();

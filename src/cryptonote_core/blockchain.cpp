@@ -3711,8 +3711,10 @@ byte_and_output_fees Blockchain::get_dynamic_base_fee(uint64_t block_reward, siz
     assert(hi == 0);
     lo /= 5;
 
-    if (version >= HF_VERSION_PER_OUTPUT_FEE)
-      fees.second = FEE_PER_OUTPUT;
+    if (version >= cryptonote::network_version_18)
+      fees.second = FEE_PER_OUTPUT_V18;
+    else if (version >= HF_VERSION_PER_OUTPUT_FEE)
+      fees.second = FEE_PER_OUTPUT_V13;
 
     return fees;
   }
