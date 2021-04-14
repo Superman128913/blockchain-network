@@ -1483,12 +1483,9 @@ bool mapping_value::decrypt(std::string_view name, mapping_type type, const cryp
       case mapping_type::session: dec_length = SESSION_PUBLIC_KEY_BINARY_LENGTH; break;
       case mapping_type::lokinet: dec_length = LOKINET_ADDRESS_BINARY_LENGTH; break;
       case mapping_type::wallet: //Wallet type has variable type, check performed in check_length
-        if (len == WALLET_ACCOUNT_BINARY_LENGTH_INC_PAYMENT_ID + crypto_aead_xchacha20poly1305_ietf_ABYTES + crypto_aead_xchacha20poly1305_ietf_NPUBBYTES)
-        {
-          dec_length = WALLET_ACCOUNT_BINARY_LENGTH_INC_PAYMENT_ID;
-        } else if (len == WALLET_ACCOUNT_BINARY_LENGTH_NO_PAYMENT_ID + crypto_aead_xchacha20poly1305_ietf_ABYTES + crypto_aead_xchacha20poly1305_ietf_NPUBBYTES)
-        {
-          dec_length = WALLET_ACCOUNT_BINARY_LENGTH_NO_PAYMENT_ID;
+        if (auto plain_len = len - crypto_aead_xchacha20poly1305_ietf_ABYTES - crypto_aead_xchacha20poly1305_ietf_NPUBBYTES;
+            plain_len == WALLET_ACCOUNT_BINARY_LENGTH_INC_PAYMENT_ID || plain_len == WALLET_ACCOUNT_BINARY_LENGTH_NO_PAYMENT_ID) {
+          dec_length = plain_len;
         } else {
           MERROR("Invalid wallet mapping_type length passed to mapping_value::decrypt");
           return false;
