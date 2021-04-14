@@ -110,20 +110,13 @@ std::string ons::mapping_value::to_readable_value(cryptonote::network_type netty
   {
     result = oxenmq::to_base32z(to_view()) + ".loki";
   } else if (type == ons::mapping_type::wallet) {
-    //DUPLICATE TODO sean fix this
-    cryptonote::address_parse_info addr_info{0};
-    auto iter = std::next(buffer.begin(),1);
-    std::memcpy(&addr_info.address.m_spend_public_key.data, &*iter, 32);
-    std::advance(iter,32);
-    std::memcpy(&addr_info.address.m_view_public_key.data, &*iter, 32);
-    if (buffer[0] == ONS_WALLET_TYPE_INTEGRATED) {
-      std::advance(iter,32);
-      std::copy_n(iter,8,addr_info.payment_id.data);
-      addr_info.has_payment_id = true;
-    } else if (buffer[0] == ONS_WALLET_TYPE_SUBADDRESS) {
-      addr_info.is_subaddress = true;
+    std::optional<cryptonote::address_parse_info> addr = get_wallet_address_info();
+    if(addr)
+    {
+      result = cryptonote::get_account_address_as_str(nettype, (*addr).is_subaddress, (*addr).address);
+    } else {
+      result = oxenmq::to_hex(to_view());
     }
-    result = cryptonote::get_account_address_as_str(nettype, addr_info.is_subaddress, addr_info.address);
   } else {
     result = oxenmq::to_hex(to_view());
   }
@@ -886,28 +879,10 @@ bool validate_ons_name(mapping_type type, std::string name, std::string *reason)
 
 std::optional<cryptonote::address_parse_info> encrypted_wallet_value_to_info(std::string name, std::string encrypted_value, std::string nonce)
 {
-
   std::string lower_name = tools::lowercase_ascii_string(std::move(name));
   mapping_value record(oxenmq::from_hex(encrypted_value), oxenmq::from_hex(nonce));
   record.decrypt(lower_name, mapping_type::wallet);
-
-  auto iter = std::next(record.buffer.begin(),1);
-  cryptonote::address_parse_info addr_info{0};
-  addr_info.has_payment_id = false;
-  addr_info.is_subaddress = false;
-  std::memcpy(&addr_info.address.m_spend_public_key.data, &*iter, 32);
-  std::advance(iter,32);
-  std::memcpy(&addr_info.address.m_view_public_key.data, &*iter, 32);
-  if (record.buffer[0] == ONS_WALLET_TYPE_INTEGRATED) {
-    std::advance(iter,32);
-    std::copy_n(iter,8,addr_info.payment_id.data);
-    addr_info.has_payment_id = true;
-  } else if (record.buffer[0] == ONS_WALLET_TYPE_SUBADDRESS) {
-    addr_info.is_subaddress = true;
-  }
-
-
-  return addr_info;
+  return record.get_wallet_address_info();
 }
 
 static bool check_lengths(mapping_type type, std::string_view value, size_t max, bool binary_val, std::string *reason)
@@ -1565,6 +1540,26 @@ mapping_value mapping_value::make_decrypted(std::string_view name, const crypto:
   result.encrypt(name, name_hash);
   assert(!result.encrypted);
   return result;
+}
+
+std::optional<cryptonote::address_parse_info> mapping_value::get_wallet_address_info() const
+{
+  assert(!encrypted);
+  if (encrypted) return std::nullopt;
+
+  cryptonote::address_parse_info addr_info{0};
+  auto* bufpos = &buffer[1];
+  std::memcpy(&addr_info.address.m_spend_public_key.data, bufpos, 32);
+  bufpos += 32;
+  std::memcpy(&addr_info.address.m_view_public_key.data, bufpos, 32);
+  if (buffer[0] == ONS_WALLET_TYPE_INTEGRATED) {
+    bufpos += 32;
+    std::copy_n(bufpos,8,addr_info.payment_id.data);
+    addr_info.has_payment_id = true;
+  } else if (buffer[0] == ONS_WALLET_TYPE_SUBADDRESS) {
+    addr_info.is_subaddress = true;
+  } else assert(buffer[0] == ONS_WALLET_CODE_PRIMARY);
+  return addr_info;
 }
 
 namespace {
@@ -2258,20 +2253,12 @@ bool name_system_db::get_wallet_mapping(std::string str, uint64_t blockchain_hei
   std::string b64_hashed_name = ons::name_to_base64_hash(name);
   if (auto record = name_system_db::resolve(mapping_type::wallet, b64_hashed_name, blockchain_height)){
     (*record).decrypt(name, mapping_type::wallet);
-
-    //DUPLICATE TODO sean fix this
-    auto iter = std::next((*record).buffer.begin(),1);
-    std::memcpy(&addr_info.address.m_spend_public_key.data, &*iter, 32);
-    std::advance(iter,32);
-    std::memcpy(&addr_info.address.m_view_public_key.data, &*iter, 32);
-    if ((*record).buffer[0] == ONS_WALLET_TYPE_INTEGRATED) {
-      std::advance(iter,32);
-      std::copy_n(iter,8,addr_info.payment_id.data);
-      addr_info.has_payment_id = true;
-    } else if ((*record).buffer[0] == ONS_WALLET_TYPE_SUBADDRESS) {
-      addr_info.is_subaddress = true;
+    std::optional<cryptonote::address_parse_info> addr = (*record).get_wallet_address_info();
+    if(addr)
+    {
+      addr_info = *addr;
+      return true;
     }
-    return true;
   }
   return false;
 }

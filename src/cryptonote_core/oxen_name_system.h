@@ -100,6 +100,8 @@ struct mapping_value
   // leaves `*this` encrypted and instead returns an decrypted copy.
   mapping_value make_decrypted(std::string_view name, const crypto::hash* name_hash = nullptr) const;
 
+  std::optional<cryptonote::address_parse_info> get_wallet_address_info() const;
+
   // Validate a human readable mapping value representation in 'value' and write the binary form into 'blob'.
   // value: if type is session, 66 character hex string of an ed25519 public key (with 05 prefix)
   //                   lokinet, 52 character base32z string of an ed25519 public key
