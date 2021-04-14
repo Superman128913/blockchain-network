@@ -2122,6 +2122,35 @@ namespace tools
     return res;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  EXPORT_TRANSFERS::response wallet_rpc_server::invoke(EXPORT_TRANSFERS::request&& req)
+  {
+    require_open();
+    EXPORT_TRANSFERS::response res{};
+    std::vector<wallet::transfer_view> all_transfers;
+
+    tools::wallet2::get_transfers_args_t args;
+    args.in = req.in;
+    args.out = req.out;
+    args.stake = req.stake;
+    args.pending = req.pending;
+    args.failed = req.failed;
+    args.pool = req.pool;
+    args.coinbase = req.coinbase;
+    args.filter_by_height = req.filter_by_height;
+    args.min_height = req.min_height;
+    args.max_height = req.max_height;
+    args.subaddr_indices = req.subaddr_indices;
+    args.account_index = req.account_index;
+    args.all_accounts = req.all_accounts;
+
+    m_wallet->get_transfers(args, all_transfers);
+
+    const bool formatting = true;
+    res.data = m_wallet->transfers_to_csv(all_transfers, formatting);
+
+    return res;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   IMPORT_OUTPUTS::response wallet_rpc_server::invoke(IMPORT_OUTPUTS::request&& req)
   {
     require_open();

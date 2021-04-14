@@ -118,6 +118,7 @@ namespace tools
     wallet_rpc::SIGN::response                            invoke(wallet_rpc::SIGN::request&& req);
     wallet_rpc::VERIFY::response                          invoke(wallet_rpc::VERIFY::request&& req);
     wallet_rpc::EXPORT_OUTPUTS::response                  invoke(wallet_rpc::EXPORT_OUTPUTS::request&& req);
+    wallet_rpc::EXPORT_TRANSFERS::response                invoke(wallet_rpc::EXPORT_TRANSFERS::request&& req);
     wallet_rpc::IMPORT_OUTPUTS::response                  invoke(wallet_rpc::IMPORT_OUTPUTS::request&& req);
     wallet_rpc::EXPORT_KEY_IMAGES::response               invoke(wallet_rpc::EXPORT_KEY_IMAGES::request&& req);
     wallet_rpc::IMPORT_KEY_IMAGES::response               invoke(wallet_rpc::IMPORT_KEY_IMAGES::request&& req);
