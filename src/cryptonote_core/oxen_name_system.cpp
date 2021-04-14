@@ -109,6 +109,20 @@ std::string ons::mapping_value::to_readable_value(cryptonote::network_type netty
   if (is_lokinet_type(type))
   {
     result = oxenmq::to_base32z(to_view()) + ".loki";
+  } else if (type == ons::mapping_type::wallet) {
+    cryptonote::address_parse_info addr_info{0};
+    auto iter = std::next(buffer.begin(),1);
+    std::memcpy(&addr_info.address.m_spend_public_key.data, &*iter, 32);
+    std::advance(iter,32);
+    std::memcpy(&addr_info.address.m_view_public_key.data, &*iter, 32);
+    if (buffer[0] == 0x2) {
+      std::advance(iter,32);
+      std::copy_n(iter,8,addr_info.payment_id.data);
+      addr_info.has_payment_id = true;
+    } else if (buffer[0] == 0x1) {
+      addr_info.is_subaddress = true;
+    }
+    result = cryptonote::get_account_address_as_str(nettype, addr_info.is_subaddress, addr_info.address);
   } else {
     result = oxenmq::to_hex(to_view());
   }
