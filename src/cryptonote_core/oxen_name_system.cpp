@@ -1512,7 +1512,8 @@ bool mapping_value::decrypt(std::string_view name, mapping_type type, const cryp
         {
           dec_length = WALLET_ACCOUNT_BINARY_LENGTH_NO_PAYMENT_ID;
         } else {
-          MERROR("Invalid wallet mapping_type length passed to mapping_value::decrypt"); return false;
+          MERROR("Invalid wallet mapping_type length passed to mapping_value::decrypt");
+          return false;
         }
         break;
       default: MERROR("Invalid mapping_type passed to mapping_value::decrypt"); return false;
