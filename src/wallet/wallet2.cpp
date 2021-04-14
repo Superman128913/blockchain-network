@@ -7847,15 +7847,17 @@ oxen_construct_tx_params wallet2::construct_params(uint8_t hf_version, txtype tx
   if (tx_type == txtype::oxen_name_system)
   {
     assert(priority != tools::tx_priority_blink);
-    tx_params.burn_fixed   = ons::burn_needed(hf_version, type) + extra_burn;
+    tx_params.burn_fixed = ons::burn_needed(hf_version, type);
   }
   else if (priority == tools::tx_priority_blink)
   {
-    tx_params.burn_fixed   = BLINK_BURN_FIXED + extra_burn;
+    tx_params.burn_fixed   = BLINK_BURN_FIXED;
     tx_params.burn_percent = hf_version <= network_version_14_blink
         ? BLINK_BURN_TX_FEE_PERCENT_OLD
         : BLINK_BURN_TX_FEE_PERCENT;
   }
+  if (extra_burn)
+      tx_params.burn_fixed += extra_burn;
 
   return tx_params;
 }
