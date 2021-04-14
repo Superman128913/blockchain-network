@@ -10822,14 +10822,6 @@ bool wallet2::light_wallet_key_image_is_ours(const crypto::key_image& key_image,
   return key_image == calculated_key_image;
 }
 
-// Before we have the final fee we can't determine the amount to burn, so we stick in this
-// placeholder then go back once we know the fee and replace it.  This value (~4398 OXEN) was chosen
-// because it's unlikely to ever be needed to be burned in a single transaction, and is the maximum
-// encoded value we can store in 6 bytes (tx extra integers are encoded 7 bits per byte -- see
-// common/varint.h).  7 bytes is likely just wasteful (we don't need more than 4400 OXEN burned at a
-// time), and 5 bytes (max 34.3 OXEN) might conceivable not be enough.
-static constexpr uint64_t BURN_FEE_PLACEHOLDER = (1ULL << (6*7)) - 1;
-
 // Another implementation of transaction creation that is hopefully better
 // While there is anything left to pay, it goes through random outputs and tries
 // to fill the next destination/amount. If it fully fills it, it will use the
@@ -10931,7 +10923,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
   if (burning)
   {
     extra_plus = extra_base;
-    add_burned_amount_to_tx_extra(extra_plus, BURN_FEE_PLACEHOLDER);
+    add_burned_amount_to_tx_extra(extra_plus, 0);
     fixed_fee += burn_fixed;
     THROW_WALLET_EXCEPTION_IF(burn_percent > fee_percent, error::wallet_internal_error, "invalid burn fees: cannot burn more than the tx fee");
   }
@@ -11362,11 +11354,7 @@ skip_tx:
     // the base fee that would apply at 100% (the actual fee here is that times the priority-based
     // fee percent)
     if (burning)
-    {
       tx_params.burn_fixed = burn_fixed + (tx.needed_fee - burn_fixed) * burn_percent / fee_percent;
-      // Make sure we can't enlarge the tx because that could make it invalid:
-      THROW_WALLET_EXCEPTION_IF(tx_params.burn_fixed > BURN_FEE_PLACEHOLDER, error::wallet_internal_error, "attempt to burn a larger amount than is internally supported");
-    }
 
     cryptonote::transaction test_tx;
     pending_tx test_ptx;
@@ -11598,7 +11586,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_from(const crypton
   if (burning)
   {
     extra_plus = extra_base;
-    add_burned_amount_to_tx_extra(extra_plus, BURN_FEE_PLACEHOLDER);
+    add_burned_amount_to_tx_extra(extra_plus, 0);
     fixed_fee += burn_fixed;
     THROW_WALLET_EXCEPTION_IF(burn_percent > fee_percent, error::wallet_internal_error, "invalid burn fees: cannot burn more than the tx fee");
   }
@@ -11737,11 +11725,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_from(const crypton
     // the base fee that would apply at 100% (the actual fee here is that times the priority-based
     // fee percent)
     if (burning)
-    {
       oxen_tx_params.burn_fixed = burn_fixed + tx.needed_fee * burn_percent / fee_percent;
-      // Make sure we can't enlarge the tx because that could make it invalid:
-      THROW_WALLET_EXCEPTION_IF(oxen_tx_params.burn_fixed > BURN_FEE_PLACEHOLDER, error::wallet_internal_error, "attempt to burn a larger amount than is internally supported");
-    }
 
     cryptonote::transaction test_tx;
     pending_tx test_ptx;
