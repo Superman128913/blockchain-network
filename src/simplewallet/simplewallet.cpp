@@ -5870,7 +5870,10 @@ bool simple_wallet::transfer_main(Transfer transfer_type, const std::vector<std:
   static constexpr auto BURN_PREFIX = "burn="sv;
   uint64_t burn_amount = 0;
   std::string burn_amount_str = eat_named_argument(local_args, BURN_PREFIX);
-  tools::parse_int(burn_amount_str, burn_amount);
+  if (!burn_amount_str.empty() && !cryptonote::parse_amount(burn_amount, burn_amount_str)) {
+    fail_msg_writer() << tr("Invalid amount");
+    return true;
+  }
 
   uint32_t priority = 0;
   std::set<uint32_t> subaddr_indices  = {};
@@ -6034,7 +6037,7 @@ bool simple_wallet::transfer_main(Transfer transfer_type, const std::vector<std:
     }
 
 
-    oxen_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, txtype::standard, priority, burn_amount*COIN);
+    oxen_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, txtype::standard, priority, burn_amount);
     ptx_vector = m_wallet->create_transactions_2(dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, unlock_block, priority, extra, m_current_subaddress_account, subaddr_indices, tx_params);
 
     if (ptx_vector.empty())
