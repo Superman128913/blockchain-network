@@ -1491,7 +1491,8 @@ bool mapping_value::decrypt(std::string_view name, mapping_type type, const cryp
           return false;
         }
         break;
-      default: MERROR("Invalid mapping_type passed to mapping_value::decrypt"); return false;
+      default: MERROR("Invalid mapping_type passed to mapping_value::decrypt");
+      return false;
     }
 
     auto expected_len = dec_length + crypto_aead_xchacha20poly1305_ietf_ABYTES + crypto_aead_xchacha20poly1305_ietf_NPUBBYTES;
