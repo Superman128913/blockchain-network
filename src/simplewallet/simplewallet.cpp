@@ -261,8 +261,8 @@ namespace
 
   const char* USAGE_ONS_ENCRYPT("ons_encrypt [type=session|lokinet] <name> <value>");
   const char* USAGE_ONS_MAKE_UPDATE_MAPPING_SIGNATURE("ons_make_update_mapping_signature [type=session|lokinet] [owner=<value>] [backup_owner=<value>] [value=<encrypted_ons_value>] <name>");
-  const char* USAGE_ONS_PRINT_OWNERS_TO_NAMES("ons_print_owners_to_names [<owner> ...]");
-  const char* USAGE_ONS_PRINT_NAME_TO_OWNERS("ons_print_name_to_owners [type=session|lokinet] <name> [<name> ...]");
+  const char* USAGE_ONS_BY_OWNER("ons_by_owner [<owner> ...]");
+  const char* USAGE_ONS_LOOKUP("ons_lookup [type=session|wallet|lokinet] <name> [<name> ...]");
 
 #if defined (OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
   std::string input_line(const std::string &prompt, bool yesno = false)
@@ -3169,14 +3169,14 @@ Pending or Failed: "failed"|"pending",  "out", Lock, Checkpointed, Time, Amount*
                            tr(USAGE_ONS_ENCRYPT),
                            tr("Encrypts a ONS mapping value with a given name; primarily intended for use with external mapping update signing"));
 
-  m_cmd_binder.set_handler("ons_print_owners_to_names",
-                           [this](const auto& x) { return ons_print_owners_to_names(x); },
-                           tr(USAGE_ONS_PRINT_OWNERS_TO_NAMES),
+  m_cmd_binder.set_handler("ons_by_owner",
+                           [this](const auto& x) { return ons_by_owner(x); },
+                           tr(USAGE_ONS_BY_OWNER),
                            tr("Query the Oxen Name Service names that the keys have purchased. If no keys are specified, it defaults to the current wallet."));
 
-  m_cmd_binder.set_handler("ons_print_name_to_owners",
-                           [this](const auto& x) { return ons_print_name_to_owners(x); },
-                           tr(USAGE_ONS_PRINT_NAME_TO_OWNERS),
+  m_cmd_binder.set_handler("ons_lookup",
+                           [this](const auto& x) { return ons_lookup(x); },
+                           tr(USAGE_ONS_LOOKUP),
                            tr("Query the ed25519 public keys that own the Oxen Name System names."));
 
   m_cmd_binder.set_handler("ons_make_update_mapping_signature",
@@ -6871,14 +6871,14 @@ bool simple_wallet::ons_make_update_mapping_signature(std::vector<std::string> a
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::ons_print_name_to_owners(std::vector<std::string> args)
+bool simple_wallet::ons_lookup(std::vector<std::string> args)
 {
   if (!try_connect_to_daemon())
     return false;
 
   if (args.empty())
   {
-    PRINT_USAGE(USAGE_ONS_PRINT_NAME_TO_OWNERS);
+    PRINT_USAGE(USAGE_ONS_LOOKUP);
     return true;
   }
 
@@ -6921,7 +6921,7 @@ bool simple_wallet::ons_print_name_to_owners(std::vector<std::string> args)
 
   if (args.empty())
   {
-    PRINT_USAGE(USAGE_ONS_PRINT_NAME_TO_OWNERS);
+    PRINT_USAGE(USAGE_ONS_LOOKUP);
     return true;
   }
 
@@ -6996,7 +6996,7 @@ bool simple_wallet::ons_print_name_to_owners(std::vector<std::string> args)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::ons_print_owners_to_names(const std::vector<std::string>& args)
+bool simple_wallet::ons_by_owner(const std::vector<std::string>& args)
 {
   if (!try_connect_to_daemon())
     return false;

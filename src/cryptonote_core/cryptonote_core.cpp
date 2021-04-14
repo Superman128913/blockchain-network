@@ -659,6 +659,9 @@ namespace cryptonote
     }
 
     auto ons_db_file_path = folder / "ons.db";
+    if(std::filesystem::exists(folder / "lns.db"))
+      ons_db_file_path = folder / "lns.db";
+
 
     folder /= db->get_db_name();
     MGINFO("Loading blockchain from folder " << folder << " ...");
