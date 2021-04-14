@@ -6444,7 +6444,7 @@ static std::optional<ons::mapping_type> guess_ons_type(tools::wallet2& wallet, s
       return ons::mapping_type::lokinet;
     if (!tools::ends_with(name, ".loki") && tools::starts_with(value, "05") && value.length() == 2*ons::SESSION_PUBLIC_KEY_BINARY_LENGTH)
       return ons::mapping_type::session;
-    if (cryptonote::is_valid_address(std::string{value}))
+    if (cryptonote::is_valid_address(std::string{value}, wallet.nettype()))
       return ons::mapping_type::wallet;
 
     fail_msg_writer() << tr("Could not infer ONS type from name/value; trying using the type= argument or see `help' for more details");
@@ -7027,7 +7027,7 @@ bool simple_wallet::ons_print_owners_to_names(const std::vector<std::string>& ar
         return false;
       }
 
-      if (!(oxenmq::is_hex(arg) && arg.size() == 64) && (!cryptonote::is_valid_address(arg)))
+      if (!(oxenmq::is_hex(arg) && arg.size() == 64) && (!cryptonote::is_valid_address(arg, m_wallet->nettype())))
       {
         fail_msg_writer() << "arg contains non valid characters: " << arg;
         return false;

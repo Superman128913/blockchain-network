@@ -42,6 +42,10 @@ constexpr size_t NAME_HASH_SIZE_B64_MAX = (NAME_HASH_SIZE + 2) / 3 * 4; // With 
 
 constexpr size_t SODIUM_ENCRYPTION_EXTRA_BYTES = 40; // crypto_aead_xchacha20poly1305_ietf_ABYTES (16) + crypto_aead_xchacha20poly1305_ietf_NPUBBYTES (24), but we don't include sodium here
 
+constexpr char ONS_WALLET_TYPE_PRIMARY = 0x00;
+constexpr char ONS_WALLET_TYPE_SUBADDRESS = 0x01;
+constexpr char ONS_WALLET_TYPE_INTEGRATED = 0x02;
+
 struct mapping_value
 {
   static size_t constexpr BUFFER_SIZE = std::max({WALLET_ACCOUNT_BINARY_LENGTH_INC_PAYMENT_ID, LOKINET_ADDRESS_BINARY_LENGTH, SESSION_PUBLIC_KEY_BINARY_LENGTH}) + SODIUM_ENCRYPTION_EXTRA_BYTES;
