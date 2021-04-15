@@ -659,7 +659,7 @@ namespace cryptonote
     }
 
     auto ons_db_file_path = folder / "ons.db";
-    if(std::filesystem::exists(folder / "lns.db"))
+    if(fs::exists(folder / "lns.db"))
       ons_db_file_path = folder / "lns.db";
 
 

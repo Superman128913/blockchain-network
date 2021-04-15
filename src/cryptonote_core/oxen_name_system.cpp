@@ -1534,7 +1534,7 @@ std::optional<cryptonote::address_parse_info> mapping_value::get_wallet_address_
     addr_info.has_payment_id = true;
   } else if (buffer[0] == ONS_WALLET_TYPE_SUBADDRESS) {
     addr_info.is_subaddress = true;
-  } else assert(buffer[0] == ONS_WALLET_CODE_PRIMARY);
+  } else assert(buffer[0] == ONS_WALLET_TYPE_PRIMARY);
   return addr_info;
 }
 
