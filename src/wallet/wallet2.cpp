@@ -7838,7 +7838,7 @@ uint64_t wallet2::get_fee_quantization_mask() const
   return 1;
 }
 
-oxen_construct_tx_params wallet2::construct_params(uint8_t hf_version, txtype tx_type, uint32_t priority, ons::mapping_type type)
+oxen_construct_tx_params wallet2::construct_params(uint8_t hf_version, txtype tx_type, uint32_t priority, uint64_t extra_burn, ons::mapping_type type)
 {
   oxen_construct_tx_params tx_params;
   tx_params.hf_version = hf_version;
@@ -7847,7 +7847,7 @@ oxen_construct_tx_params wallet2::construct_params(uint8_t hf_version, txtype tx
   if (tx_type == txtype::oxen_name_system)
   {
     assert(priority != tools::tx_priority_blink);
-    tx_params.burn_fixed   = ons::burn_needed(hf_version, type);
+    tx_params.burn_fixed = ons::burn_needed(hf_version, type);
   }
   else if (priority == tools::tx_priority_blink)
   {
@@ -7856,6 +7856,8 @@ oxen_construct_tx_params wallet2::construct_params(uint8_t hf_version, txtype tx
         ? BLINK_BURN_TX_FEE_PERCENT_OLD
         : BLINK_BURN_TX_FEE_PERCENT;
   }
+  if (extra_burn)
+      tx_params.burn_fixed += extra_burn;
 
   return tx_params;
 }
@@ -8877,7 +8879,7 @@ std::vector<wallet2::pending_tx> wallet2::ons_create_buy_mapping_tx(ons::mapping
     return {};
   }
 
-  oxen_construct_tx_params tx_params = wallet2::construct_params(*hf_version, txtype::oxen_name_system, priority, type);
+  oxen_construct_tx_params tx_params = wallet2::construct_params(*hf_version, txtype::oxen_name_system, priority, 0, type);
   auto result = create_transactions_2({} /*dests*/,
                                       CRYPTONOTE_DEFAULT_TX_MIXIN,
                                       0 /*unlock_at_block*/,
@@ -8934,7 +8936,7 @@ std::vector<wallet2::pending_tx> wallet2::ons_create_renewal_tx(
     return {};
   }
 
-  oxen_construct_tx_params tx_params = wallet2::construct_params(*hf_version, txtype::oxen_name_system, priority, type);
+  oxen_construct_tx_params tx_params = wallet2::construct_params(*hf_version, txtype::oxen_name_system, priority, 0, type);
   auto result = create_transactions_2({} /*dests*/,
                                       CRYPTONOTE_DEFAULT_TX_MIXIN,
                                       0 /*unlock_at_block*/,
@@ -8993,7 +8995,7 @@ std::vector<wallet2::pending_tx> wallet2::ons_create_update_mapping_tx(ons::mapp
     if (reason) *reason = ERR_MSG_NETWORK_VERSION_QUERY_FAILED;
     return {};
   }
-  oxen_construct_tx_params tx_params = wallet2::construct_params(*hf_version, txtype::oxen_name_system, priority, ons::mapping_type::update_record_internal);
+  oxen_construct_tx_params tx_params = wallet2::construct_params(*hf_version, txtype::oxen_name_system, priority, 0, ons::mapping_type::update_record_internal);
 
   auto result = create_transactions_2({} /*dests*/,
                                       CRYPTONOTE_DEFAULT_TX_MIXIN,
@@ -10820,14 +10822,6 @@ bool wallet2::light_wallet_key_image_is_ours(const crypto::key_image& key_image,
   return key_image == calculated_key_image;
 }
 
-// Before we have the final fee we can't determine the amount to burn, so we stick in this
-// placeholder then go back once we know the fee and replace it.  This value (~4398 OXEN) was chosen
-// because it's unlikely to ever be needed to be burned in a single transaction, and is the maximum
-// encoded value we can store in 6 bytes (tx extra integers are encoded 7 bits per byte -- see
-// common/varint.h).  7 bytes is likely just wasteful (we don't need more than 4400 OXEN burned at a
-// time), and 5 bytes (max 34.3 OXEN) might conceivable not be enough.
-static constexpr uint64_t BURN_FEE_PLACEHOLDER = (1ULL << (6*7)) - 1;
-
 // Another implementation of transaction creation that is hopefully better
 // While there is anything left to pay, it goes through random outputs and tries
 // to fill the next destination/amount. If it fully fills it, it will use the
@@ -10929,7 +10923,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
   if (burning)
   {
     extra_plus = extra_base;
-    add_burned_amount_to_tx_extra(extra_plus, BURN_FEE_PLACEHOLDER);
+    add_burned_amount_to_tx_extra(extra_plus, 0);
     fixed_fee += burn_fixed;
     THROW_WALLET_EXCEPTION_IF(burn_percent > fee_percent, error::wallet_internal_error, "invalid burn fees: cannot burn more than the tx fee");
   }
@@ -10947,6 +10941,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
     LOG_PRINT_L2("transfer: adding " << print_money(dt.amount) << ", for a total of " << print_money (needed_money));
     THROW_WALLET_EXCEPTION_IF(needed_money < dt.amount, error::tx_sum_overflow, dsts, 0, m_nettype);
   }
+
 
   // throw if attempting a transaction with no money
   THROW_WALLET_EXCEPTION_IF(needed_money == 0 && !is_ons_tx, error::zero_destination);
@@ -11359,11 +11354,7 @@ skip_tx:
     // the base fee that would apply at 100% (the actual fee here is that times the priority-based
     // fee percent)
     if (burning)
-    {
-      tx_params.burn_fixed = burn_fixed + tx.needed_fee * burn_percent / fee_percent;
-      // Make sure we can't enlarge the tx because that could make it invalid:
-      THROW_WALLET_EXCEPTION_IF(tx_params.burn_fixed > BURN_FEE_PLACEHOLDER, error::wallet_internal_error, "attempt to burn a larger amount than is internally supported");
-    }
+      tx_params.burn_fixed = burn_fixed + (tx.needed_fee - burn_fixed) * burn_percent / fee_percent;
 
     cryptonote::transaction test_tx;
     pending_tx test_ptx;
@@ -11595,7 +11586,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_from(const crypton
   if (burning)
   {
     extra_plus = extra_base;
-    add_burned_amount_to_tx_extra(extra_plus, BURN_FEE_PLACEHOLDER);
+    add_burned_amount_to_tx_extra(extra_plus, 0);
     fixed_fee += burn_fixed;
     THROW_WALLET_EXCEPTION_IF(burn_percent > fee_percent, error::wallet_internal_error, "invalid burn fees: cannot burn more than the tx fee");
   }
@@ -11734,11 +11725,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_from(const crypton
     // the base fee that would apply at 100% (the actual fee here is that times the priority-based
     // fee percent)
     if (burning)
-    {
       oxen_tx_params.burn_fixed = burn_fixed + tx.needed_fee * burn_percent / fee_percent;
-      // Make sure we can't enlarge the tx because that could make it invalid:
-      THROW_WALLET_EXCEPTION_IF(oxen_tx_params.burn_fixed > BURN_FEE_PLACEHOLDER, error::wallet_internal_error, "attempt to burn a larger amount than is internally supported");
-    }
 
     cryptonote::transaction test_tx;
     pending_tx test_ptx;
