@@ -55,6 +55,8 @@ extern "C" {
 #include "common/threadpool.h"
 #include "common/command_line.h"
 #include "common/hex.h"
+#include "common/base58.h"
+#include "common/dns_utils.h"
 #include "epee/warnings.h"
 #include "crypto/crypto.h"
 #include "cryptonote_config.h"
@@ -656,7 +658,10 @@ namespace cryptonote
       return false;
     }
 
-    auto lns_db_file_path = folder / "lns.db";
+    auto ons_db_file_path = folder / "ons.db";
+    if(std::filesystem::exists(folder / "lns.db"))
+      ons_db_file_path = folder / "lns.db";
+
 
     folder /= db->get_db_name();
     MGINFO("Loading blockchain from folder " << folder << " ...");
@@ -675,7 +680,7 @@ namespace cryptonote
         MERROR("Failed to remove data file in " << folder);
         return false;
       }
-      fs::remove(lns_db_file_path);
+      fs::remove(ons_db_file_path);
     }
 #endif
 
@@ -826,13 +831,13 @@ namespace cryptonote
     // Checkpoints
     m_checkpoints_path = m_config_folder / fs::u8path(JSON_HASH_FILE_NAME);
 
-    sqlite3 *lns_db = lns::init_oxen_name_system(lns_db_file_path, db->is_read_only());
-    if (!lns_db) return false;
+    sqlite3 *ons_db = ons::init_oxen_name_system(ons_db_file_path, db->is_read_only());
+    if (!ons_db) return false;
 
     init_oxenmq(vm);
 
     const difficulty_type fixed_difficulty = command_line::get_arg(vm, arg_fixed_difficulty);
-    r = m_blockchain_storage.init(db.release(), lns_db, m_nettype, m_offline, regtest ? &regtest_test_options : test_options, fixed_difficulty, get_checkpoints);
+    r = m_blockchain_storage.init(db.release(), ons_db, m_nettype, m_offline, regtest ? &regtest_test_options : test_options, fixed_difficulty, get_checkpoints);
     CHECK_AND_ASSERT_MES(r, false, "Failed to initialize blockchain storage");
 
     r = m_mempool.init(max_txpool_weight);
@@ -1343,6 +1348,7 @@ namespace cryptonote
       }
     }
 
+
     parse_incoming_tx_accumulated_batch(tx_info, opts.kept_by_block);
 
     return tx_info;
@@ -1670,8 +1676,8 @@ namespace cryptonote
     crypto::x25519_public_key x_pkey{0};
     constexpr std::array<uint16_t, 3> MIN_TIMESTAMP_VERSION{9,0,0};
     std::array<uint16_t,3> proofversion;
-    m_service_node_list.access_proof(pubkey, [&](auto &proof) { 
-      x_pkey = proof.pubkey_x25519; 
+    m_service_node_list.access_proof(pubkey, [&](auto &proof) {
+      x_pkey = proof.pubkey_x25519;
       proofversion = proof.proof->version;
     });
 
@@ -1682,7 +1688,7 @@ namespace cryptonote
         [this, pubkey](bool success, std::vector<std::string> data) {
           const time_t local_seconds = time(nullptr);
           MDEBUG("Timestamp message received: " << data[0] <<", local time is: " << local_seconds);
-          if(success){ 
+          if(success){
             int64_t received_seconds;
             if (tools::parse_int(data[0],received_seconds)){
               uint16_t variance;
@@ -1694,10 +1700,10 @@ namespace cryptonote
               std::lock_guard<std::mutex> lk(m_sn_timestamp_mutex);
               // Records the variance into the record of our performance (m_sn_times)
               service_nodes::timesync_entry entry{variance <= service_nodes::THRESHOLD_SECONDS_OUT_OF_SYNC};
-              m_sn_times.add(entry); 
+              m_sn_times.add(entry);
 
               // Counts the number of times we have been out of sync
-              uint8_t num_sn_out_of_sync = std::count_if(m_sn_times.begin(), m_sn_times.end(), 
+              uint8_t num_sn_out_of_sync = std::count_if(m_sn_times.begin(), m_sn_times.end(),
                 [](const service_nodes::timesync_entry entry) { return !entry.in_sync; });
               if (num_sn_out_of_sync > (m_sn_times.array.size() * service_nodes::MAXIMUM_EXTERNAL_OUT_OF_SYNC/100)) {
                 MWARNING("service node time might be out of sync");
