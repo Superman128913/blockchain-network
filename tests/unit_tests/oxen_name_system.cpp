@@ -87,6 +87,7 @@ TEST(oxen_name_system, value_encrypt_and_decrypt)
 {
   std::string name         = "my ons name";
   ons::mapping_value value = {};
+  value.encrypted          = false;
   value.len                = 32;
   memset(&value.buffer[0], 'a', value.len);
 
@@ -130,6 +131,7 @@ TEST(oxen_name_system, value_encrypt_and_decrypt_heavy)
 {
   std::string name         = "abcdefg";
   ons::mapping_value value = {};
+  value.encrypted          = false;
   value.len                = 33;
   memset(&value.buffer[0], 'a', value.len);
 
