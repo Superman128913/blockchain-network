@@ -1036,7 +1036,7 @@ mapping_value::mapping_value(std::string encrypted_value, std::string nonce): bu
   encrypted = true;
 }
 
-mapping_value::mapping_value(){}
+mapping_value::mapping_value() : buffer{0},encrypted(false),len(0){}
 
 std::string name_hash_bytes_to_base64(std::string_view bytes)
 {
