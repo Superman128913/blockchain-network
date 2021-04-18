@@ -41,6 +41,7 @@
 #include "cryptonote_basic/hardfork.h"
 #include "checkpoints/checkpoints.h"
 #include <boost/format.hpp>
+#include <oxenmq/base32z.h>
 
 #include "common/oxen_integration_test_hooks.h"
 
@@ -1588,9 +1589,9 @@ static void print_participation_history(std::ostringstream &stream, std::vector<
 
 static void append_printable_service_node_list_entry(cryptonote::network_type nettype, bool detailed_view, uint64_t blockchain_height, uint64_t entry_index, GET_SERVICE_NODES::response::entry const &entry, std::string &buffer)
 {
-  const char indent1[] = "    ";
-  const char indent2[] = "        ";
-  const char indent3[] = "            ";
+  const char indent1[] = "  ";
+  const char indent2[] = "    ";
+  const char indent3[] = "      ";
   bool is_registered = entry.total_contributed >= entry.staking_requirement;
 
   std::ostringstream stream;
@@ -1679,6 +1680,7 @@ static void append_printable_service_node_list_entry(cryptonote::network_type ne
     if (detailed_view)
       stream << indent2 << "Auxiliary Public Keys:\n"
              << indent3 << (entry.pubkey_ed25519.empty() ? "(not yet received)" : entry.pubkey_ed25519) << " (Ed25519)\n"
+             << indent3 << (entry.pubkey_ed25519.empty() ? "(not yet received)" : oxenmq::to_base32z(oxenmq::from_hex(entry.pubkey_ed25519)) + ".snode") << " (Lokinet)\n"
              << indent3 << (entry.pubkey_x25519.empty()  ? "(not yet received)" : entry.pubkey_x25519)  << " (X25519)\n";
 
     //
