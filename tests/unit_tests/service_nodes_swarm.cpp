@@ -505,3 +505,61 @@ TEST(swarm_to_snodes, decommission)
   /// 1 swarm should have been decommissioned
   ASSERT_EQ(initial_num_swarms - 1, swarm_to_snodes.size());
 }
+
+TEST(swarm_to_snodes, unassigned_swarm_bug)
+{
+  // Fix bug #1437 -- new swarm ids when there are few swarms (as often occurs on testnet) was
+  // buggy.
+  swarm_snode_map_t swarms;
+  const swarm_snode_map_t::mapped_type empty_swarm{};
+
+  auto a = get_new_swarm_id(swarms);
+  EXPECT_EQ(a, 0);
+  swarms.emplace(a, empty_swarm);
+
+  auto b = get_new_swarm_id(swarms);
+  EXPECT_EQ(b, MAX_ID/2);
+  swarms.emplace(b, empty_swarm);
+
+
+  auto c = get_new_swarm_id(swarms);
+  EXPECT_EQ(c, MAX_ID/2 + MAX_ID/4 + 1);
+  swarms.emplace(c, empty_swarm);
+
+  auto d = get_new_swarm_id(swarms);
+  EXPECT_EQ(d, MAX_ID/4);
+  swarms.emplace(d, empty_swarm);
+
+  swarms.erase(a);
+  swarms.erase(c);
+  swarms.erase(d);
+
+  // Bug 1: when we end up with only one swarm, we always get back MAX_ID/2, even if that is already
+  // a used swarm id:
+  auto e = get_new_swarm_id(swarms);
+  ASSERT_TRUE(swarms.size() == 1 && swarms.begin()->first == b);
+  EXPECT_NE(e, b);
+  EXPECT_EQ(e, MAX_ID);
+
+  // Insert a couple values that straddle the midpoint so that the midpoint of the longest gap will
+  // be at the wraparound point:
+  swarms.clear();
+  swarms.emplace(MAX_ID/2 - 100, empty_swarm);
+  swarms.emplace(MAX_ID/2 + 100, empty_swarm);
+  EXPECT_EQ(get_new_swarm_id(swarms), MAX_ID);
+
+  swarms.clear();
+  swarms.emplace(MAX_ID/2 - 100, empty_swarm);
+  swarms.emplace(MAX_ID/2 + 101, empty_swarm);
+  EXPECT_EQ(get_new_swarm_id(swarms), 0);
+
+  swarms.clear();
+  swarms.emplace(MAX_ID/2 - 101, empty_swarm);
+  swarms.emplace(MAX_ID/2 + 101, empty_swarm);
+  EXPECT_EQ(get_new_swarm_id(swarms), MAX_ID);
+
+  swarms.clear();
+  swarms.emplace(MAX_ID/2 - 101, empty_swarm);
+  swarms.emplace(MAX_ID/2 + 102, empty_swarm);
+  EXPECT_EQ(get_new_swarm_id(swarms), 0);
+}
