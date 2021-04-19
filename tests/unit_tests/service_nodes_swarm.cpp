@@ -34,6 +34,7 @@
 
 #include <functional>
 #include <iterator>
+#include <random>
 
 #undef LOKI_DEFAULT_LOG_CATEGORY
 #define LOKI_DEFAULT_LOG_CATEGORY "sn_unit_tests"
@@ -562,4 +563,57 @@ TEST(swarm_to_snodes, unassigned_swarm_bug)
   swarms.emplace(MAX_ID/2 - 101, empty_swarm);
   swarms.emplace(MAX_ID/2 + 102, empty_swarm);
   EXPECT_EQ(get_new_swarm_id(swarms), 0);
+}
+
+TEST(swarm_to_snodes, deterministic_swarm_ids)
+{
+  // Now lets add/remove a whole bunch and see that we end up with exactly what we expect.
+  // (This isn't the most efficient code, but it's okay, this doesn't need to be optimal).
+  swarm_snode_map_t swarms;
+  const swarm_snode_map_t::mapped_type empty_swarm{};
+
+  std::mt19937_64 rng{12345};
+  for (int i = 0; i < 10000; i++) {
+    auto n = rng();
+    // Remove a random id with prob 1/4, which means out of 4 draws (on average) we keep the size
+    // the same half the time and grow it half the time, so should expect around 5000 swarms at the
+    // end of this.
+    if (n < (1ULL << 62)) {
+      ASSERT_FALSE(swarms.empty());
+      n %= swarms.size();
+      auto it = swarms.begin();
+      std::advance(it, n % swarms.size());
+      swarms.erase(it);
+    } else { // Add
+      auto id = get_new_swarm_id(swarms);
+      ASSERT_FALSE(swarms.count(id));
+      swarms.emplace(id, empty_swarm);
+    }
+  }
+  std::vector<uint64_t> ids;
+  ids.reserve(swarms.size());
+  for (auto& [id, s] : swarms)
+    ids.push_back(id);
+  ASSERT_EQ(swarms.size(), 5048);
+  // Some more or less random selections:
+  EXPECT_EQ(ids[0],        1548112371908607ULL);
+  EXPECT_EQ(ids[1],        4398046511103999ULL);
+  EXPECT_EQ(ids[2],        7247980650299391ULL);
+  EXPECT_EQ(ids[3],       10097914789494783ULL);
+  EXPECT_EQ(ids[4],       12947848928690175ULL);
+  EXPECT_EQ(ids[25],      72796465851793407ULL);
+  EXPECT_EQ(ids[29],      84196202408574975ULL);
+  EXPECT_EQ(ids[42],     121245346218115071ULL);
+  EXPECT_EQ(ids[99],     283691592152252415ULL);
+  EXPECT_EQ(ids[404],   1203745330089164798ULL);
+  EXPECT_EQ(ids[888],   2829738309616402430ULL);
+  EXPECT_EQ(ids[999],   3243154681660178430ULL);
+  EXPECT_EQ(ids[2000],  6581905302285713406ULL);
+  EXPECT_EQ(ids[3000], 10403878089179267070ULL);
+  EXPECT_EQ(ids[3333], 11669248846982021118ULL);
+  EXPECT_EQ(ids[4567], 16860997617805426686ULL);
+  EXPECT_EQ(ids[5000], 18311495347400081406ULL);
+  EXPECT_EQ(ids[5045], 18439742383663874046ULL);
+  EXPECT_EQ(ids[5046], 18442592317803069438ULL);
+  EXPECT_EQ(ids[5047], 18445442251942264830ULL);
 }
