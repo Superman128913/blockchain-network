@@ -542,6 +542,15 @@ TEST(swarm_to_snodes, unassigned_swarm_bug)
   EXPECT_NE(e, b);
   EXPECT_EQ(e, MAX_ID);
 
+  // Try some other random starting points and make sure we get something halfway around:
+  swarms.clear();
+  swarms.emplace(MAX_ID/4, empty_swarm);
+  EXPECT_EQ(get_new_swarm_id(swarms), MAX_ID/2 + MAX_ID/4);
+
+  swarms.clear();
+  swarms.emplace(12345678901234567890ULL, empty_swarm);
+  EXPECT_EQ(get_new_swarm_id(swarms), 12345678901234567890ULL - MAX_ID/2 - 1);
+
   // Insert a couple values that straddle the midpoint so that the midpoint of the longest gap will
   // be at the wraparound point:
   swarms.clear();
