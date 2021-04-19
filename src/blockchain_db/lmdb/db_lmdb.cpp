@@ -6284,8 +6284,8 @@ struct service_node_proof_serialized_old
   service_node_proof_serialized_old(const service_nodes::proof_info &info)
     : timestamp{native_to_little(info.proof->timestamp)},
       ip{native_to_little(info.proof->public_ip)},
-      storage_port{native_to_little(info.proof->storage_port)},
-      storage_lmq_port{native_to_little(info.proof->storage_lmq_port)},
+      storage_https_port{native_to_little(info.proof->storage_https_port)},
+      storage_omq_port{native_to_little(info.proof->storage_omq_port)},
       quorumnet_port{native_to_little(info.proof->qnet_port)},
       version{native_to_little_container(info.proof->version)},
       pubkey_ed25519{info.proof->pubkey_ed25519}
@@ -6297,8 +6297,8 @@ struct service_node_proof_serialized_old
     if (info.proof->timestamp > info.effective_timestamp)
       info.effective_timestamp = info.proof->timestamp;
     info.proof->public_ip = little_to_native(ip);
-    info.proof->storage_port = little_to_native(storage_port);
-    info.proof->storage_lmq_port = little_to_native(storage_lmq_port);
+    info.proof->storage_https_port = little_to_native(storage_https_port);
+    info.proof->storage_omq_port = little_to_native(storage_omq_port);
     info.proof->qnet_port = little_to_native(quorumnet_port);
     info.proof->version = little_to_native_container(version);
     info.proof->storage_server_version = {0, 0, 0};
@@ -6315,10 +6315,10 @@ struct service_node_proof_serialized_old
 
   uint64_t timestamp;
   uint32_t ip;
-  uint16_t storage_port;
+  uint16_t storage_https_port;
   uint16_t quorumnet_port;
   std::array<uint16_t, 3> version;
-  uint16_t storage_lmq_port;
+  uint16_t storage_omq_port;
   crypto::ed25519_public_key pubkey_ed25519;
 };
 static_assert(sizeof(service_node_proof_serialized_old) == 56, "service node serialization struct has unexpected size and/or padding");

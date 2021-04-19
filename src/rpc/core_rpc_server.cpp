@@ -2330,8 +2330,8 @@ namespace cryptonote { namespace rpc {
     {
       res.service_node_state.service_node_pubkey  = std::move(get_service_node_key_res.service_node_pubkey);
       res.service_node_state.public_ip            = epee::string_tools::get_ip_string_from_int32(m_core.sn_public_ip());
-      res.service_node_state.storage_port         = m_core.storage_port();
-      res.service_node_state.storage_lmq_port     = m_core.m_storage_lmq_port;
+      res.service_node_state.storage_port         = m_core.storage_https_port();
+      res.service_node_state.storage_lmq_port     = m_core.storage_omq_port();
       res.service_node_state.quorumnet_port       = m_core.quorumnet_port();
       res.service_node_state.pubkey_ed25519       = std::move(get_service_node_key_res.service_node_ed25519_pubkey);
       res.service_node_state.pubkey_x25519        = std::move(get_service_node_key_res.service_node_x25519_pubkey);
@@ -3051,8 +3051,8 @@ namespace cryptonote { namespace rpc {
         entry.lokinet_version          = proof.proof->lokinet_version;
         entry.storage_server_version   = proof.proof->storage_server_version;
         entry.public_ip                = epee::string_tools::get_ip_string_from_int32(proof.proof->public_ip);
-        entry.storage_port             = proof.proof->storage_port;
-        entry.storage_lmq_port         = proof.proof->storage_lmq_port;
+        entry.storage_port             = proof.proof->storage_https_port;
+        entry.storage_lmq_port         = proof.proof->storage_omq_port;
         entry.storage_server_reachable = proof.storage_server_reachable;
         entry.pubkey_ed25519           = proof.proof->pubkey_ed25519 ? tools::type_to_hex(proof.proof->pubkey_ed25519) : "";
         entry.pubkey_x25519            = proof.pubkey_x25519 ? tools::type_to_hex(proof.pubkey_x25519) : "";
@@ -3187,95 +3187,6 @@ namespace cryptonote { namespace rpc {
 
     return res;
   }
-  //------------------------------------------------------------------------------------------------------------------------------
-  /// Start with seed and perform a series of computation arriving at the answer
-  static uint64_t perform_blockchain_test_routine(const cryptonote::core& core,
-                                                  uint64_t max_height,
-                                                  uint64_t seed)
-  {
-    /// Should be sufficiently large to make it impractical
-    /// to query remote nodes
-    constexpr size_t NUM_ITERATIONS = 1000;
-
-    std::mt19937_64 mt(seed);
-
-    crypto::hash hash;
-
-    uint64_t height = seed;
-
-    for (auto i = 0u; i < NUM_ITERATIONS; ++i)
-    {
-      height = height % (max_height + 1);
-
-      hash = core.get_block_id_by_height(height);
-
-      using blob_t = cryptonote::blobdata;
-      using block_pair_t = std::pair<blob_t, block>;
-
-      /// pick a random byte from the block blob
-      std::vector<block_pair_t> blocks;
-      std::vector<blob_t> txs;
-      if (!core.get_blockchain_storage().get_blocks(height, 1, blocks, txs)) {
-        MERROR("Could not query block at requested height: " << height);
-        return 0;
-      }
-      const blob_t &blob = blocks.at(0).first;
-      const uint64_t byte_idx = tools::uniform_distribution_portable(mt, blob.size());
-      uint8_t byte = blob[byte_idx];
-
-      /// pick a random byte from a random transaction blob if found
-      if (!txs.empty()) {
-        const uint64_t tx_idx = tools::uniform_distribution_portable(mt, txs.size());
-        const blob_t &tx_blob = txs[tx_idx];
-
-        /// not sure if this can be empty, so check to be safe
-        if (!tx_blob.empty()) {
-          const uint64_t byte_idx = tools::uniform_distribution_portable(mt, tx_blob.size());
-          const uint8_t tx_byte = tx_blob[byte_idx];
-          byte ^= tx_byte;
-        }
-
-      }
-
-      {
-        /// reduce hash down to 8 bytes
-        uint64_t n[4];
-        std::memcpy(n, hash.data, sizeof(n));
-        for (auto &ni : n) {
-          boost::endian::little_to_native_inplace(ni);
-        }
-
-        /// Note that byte (obviously) only affects the lower byte
-        /// of height, but that should be sufficient in this case
-        height = n[0] ^ n[1] ^ n[2] ^ n[3] ^ byte;
-      }
-
-    }
-
-    return height;
-  }
-
-  //------------------------------------------------------------------------------------------------------------------------------
-  PERFORM_BLOCKCHAIN_TEST::response core_rpc_server::invoke(PERFORM_BLOCKCHAIN_TEST::request&& req, rpc_context context)
-  {
-    PERFORM_BLOCKCHAIN_TEST::response res{};
-
-    PERF_TIMER(on_perform_blockchain_test);
-
-
-    uint64_t max_height = req.max_height;
-    uint64_t seed = req.seed;
-
-    if (m_core.get_current_blockchain_height() <= max_height)
-      throw rpc_error{ERROR_TOO_BIG_HEIGHT, "Requested block height too big."};
-
-    uint64_t res_height = perform_blockchain_test_routine(m_core, max_height, seed);
-
-    res.status = STATUS_OK;
-    res.res_height = res_height;
-
-    return res;
-  }
 
   namespace {
     struct version_printer { const std::array<uint16_t, 3> &v; };
@@ -3318,12 +3229,13 @@ namespace cryptonote { namespace rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   STORAGE_SERVER_PING::response core_rpc_server::invoke(STORAGE_SERVER_PING::request&& req, rpc_context context)
   {
-    m_core.ss_version = {req.version_major, req.version_minor, req.version_patch};
+    m_core.ss_version = req.version;
     return handle_ping<STORAGE_SERVER_PING>(
-      {req.version_major, req.version_minor, req.version_patch}, service_nodes::MIN_STORAGE_SERVER_VERSION,
+      req.version, service_nodes::MIN_STORAGE_SERVER_VERSION,
       "Storage Server", m_core.m_last_storage_server_ping, m_core.get_net_config().UPTIME_PROOF_FREQUENCY,
       [this, &req](bool significant) {
-        m_core.m_storage_lmq_port = req.storage_lmq_port;
+        m_core.m_storage_https_port = req.https_port;
+        m_core.m_storage_omq_port = req.omq_port;
         if (significant)
           m_core.reset_proof_interval();
       });

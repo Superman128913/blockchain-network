@@ -259,8 +259,8 @@ namespace cryptonote
       crypto::ed25519_public_key pubkey_ed25519;
       crypto::ed25519_signature sig_ed25519;
       uint32_t public_ip;
-      uint16_t storage_port;
-      uint16_t storage_lmq_port;
+      uint16_t storage_https_port;
+      uint16_t storage_omq_port;
       uint16_t qnet_port;
 
       KV_MAP_SERIALIZABLE

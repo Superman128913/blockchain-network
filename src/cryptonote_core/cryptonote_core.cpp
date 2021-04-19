@@ -182,7 +182,7 @@ namespace cryptonote
   };
   static const command_line::arg_descriptor<bool> arg_service_node  = {
     "service-node"
-  , "Run as a service node, options 'service-node-public-ip' and 'storage-server-port' must be set"
+  , "Run as a service node, option 'service-node-public-ip' must be set"
   };
   static const command_line::arg_descriptor<std::string> arg_public_ip = {
     "service-node-public-ip"
@@ -192,11 +192,7 @@ namespace cryptonote
     "service node."
   };
   static const command_line::arg_descriptor<uint16_t> arg_storage_server_port = {
-    "storage-server-port"
-  , "The port on which this service node's storage server is accessible. A listening "
-    "storage server is required for service nodes. (This option is specified "
-    "automatically when using Loki Launcher.)"
-  , 0};
+    "storage-server-port", "Deprecated option, ignored.", 0};
   static const command_line::arg_descriptor<uint16_t, false, true, 2> arg_quorumnet_port = {
     "quorumnet-port"
   , "The port on which this service node listen for direct connections from other "
@@ -211,7 +207,7 @@ namespace cryptonote
              val;
     }
   };
-  static const command_line::arg_descriptor<bool> arg_lmq_quorumnet_public{
+  static const command_line::arg_descriptor<bool> arg_omq_quorumnet_public{
     "lmq-public-quorumnet",
     "Allow the curve-enabled quorumnet address (for a Service Node) to be used for public RPC commands as if passed to --lmq-curve-public. "
       "Note that even without this option the quorumnet port can be used for RPC commands by --lmq-admin and --lmq-user pubkeys.",
@@ -364,7 +360,7 @@ namespace cryptonote
     command_line::add_arg(desc, integration_test::arg_hardforks_override);
     command_line::add_arg(desc, integration_test::arg_pipe_name);
 #endif
-    command_line::add_arg(desc, arg_lmq_quorumnet_public);
+    command_line::add_arg(desc, arg_omq_quorumnet_public);
 
     miner::init_options(desc);
     BlockchainDB::init_options(desc);
@@ -396,19 +392,12 @@ namespace cryptonote
 
     if (m_service_node) {
       /// TODO: parse these options early, before we start p2p server etc?
-      m_storage_port = command_line::get_arg(vm, arg_storage_server_port);
-
       m_quorumnet_port = command_line::get_arg(vm, arg_quorumnet_port);
 
-      bool storage_ok = true;
-      if (m_storage_port == 0 && m_nettype != DEVNET) {
-        MERROR("Please specify the port on which the storage server is listening with: '--" << arg_storage_server_port.name << " <port>'");
-        storage_ok = false;
-      }
-
+      bool args_okay = true;
       if (m_quorumnet_port == 0) {
         MERROR("Quorumnet port cannot be 0; please specify a valid port to listen on with: '--" << arg_quorumnet_port.name << " <port>'");
-        storage_ok = false;
+        args_okay = false;
       }
 
       const std::string pub_ip = command_line::get_arg(vm, arg_public_ip);
@@ -416,7 +405,7 @@ namespace cryptonote
       {
         if (!epee::string_tools::get_ip_int32_from_string(m_sn_public_ip, pub_ip)) {
           MERROR("Unable to parse IPv4 public address from: " << pub_ip);
-          storage_ok = false;
+          args_okay = false;
         }
 
         if (!epee::net_utils::is_ip_public(m_sn_public_ip)) {
@@ -424,25 +413,21 @@ namespace cryptonote
             MWARNING("Address given for public-ip is not public; allowing it because dev-allow-local-ips was specified. This service node WILL NOT WORK ON THE PUBLIC OXEN NETWORK!");
           } else {
             MERROR("Address given for public-ip is not public: " << epee::string_tools::get_ip_string_from_int32(m_sn_public_ip));
-            storage_ok = false;
+            args_okay = false;
           }
         }
       }
       else
       {
         MERROR("Please specify an IPv4 public address which the service node & storage server is accessible from with: '--" << arg_public_ip.name << " <ip address>'");
-        storage_ok = false;
+        args_okay = false;
       }
 
-      if (!storage_ok) {
-        MERROR("IMPORTANT: All service node operators are now required to run the oxen storage "
-               << "server and provide the public ip and ports on which it can be accessed on the internet.");
+      if (!args_okay) {
+        MERROR("IMPORTANT: One or more required service node-related configuration settings/options were omitted or invalid; "
+                << "please fix them and restart oxend.");
         return false;
       }
-
-      MGINFO("Storage server endpoint is set to: "
-             << (epee::net_utils::ipv4_network_address{ m_sn_public_ip, m_storage_port }).str());
-
     }
 
     return true;
@@ -1014,9 +999,9 @@ namespace cryptonote
     }
   }
 
-  oxenmq::AuthLevel core::lmq_check_access(const crypto::x25519_public_key& pubkey) const {
-    auto it = m_lmq_auth.find(pubkey);
-    if (it != m_lmq_auth.end())
+  oxenmq::AuthLevel core::omq_check_access(const crypto::x25519_public_key& pubkey) const {
+    auto it = m_omq_auth.find(pubkey);
+    if (it != m_omq_auth.end())
       return it->second;
     return oxenmq::AuthLevel::denied;
   }
@@ -1032,23 +1017,23 @@ namespace cryptonote
   // check_sn is whether we check an incoming key against known service nodes (and thus return
   // "true" for the service node access if it checks out).
   //
-  oxenmq::AuthLevel core::lmq_allow(std::string_view ip, std::string_view x25519_pubkey_str, oxenmq::AuthLevel default_auth) {
+  oxenmq::AuthLevel core::omq_allow(std::string_view ip, std::string_view x25519_pubkey_str, oxenmq::AuthLevel default_auth) {
     using namespace oxenmq;
     AuthLevel auth = default_auth;
     if (x25519_pubkey_str.size() == sizeof(crypto::x25519_public_key)) {
       crypto::x25519_public_key x25519_pubkey;
       std::memcpy(x25519_pubkey.data, x25519_pubkey_str.data(), x25519_pubkey_str.size());
-      auto user_auth = lmq_check_access(x25519_pubkey);
+      auto user_auth = omq_check_access(x25519_pubkey);
       if (user_auth >= AuthLevel::basic) {
         if (user_auth > auth)
           auth = user_auth;
-        MCINFO("lmq", "Incoming " << auth << "-authenticated connection");
+        MCINFO("omq", "Incoming " << auth << "-authenticated connection");
       }
 
-      MCINFO("lmq", "Incoming [" << auth << "] curve connection from " << ip << "/" << x25519_pubkey);
+      MCINFO("omq", "Incoming [" << auth << "] curve connection from " << ip << "/" << x25519_pubkey);
     }
     else {
-      MCINFO("lmq", "Incoming [" << auth << "] plain connection from " << ip);
+      MCINFO("omq", "Incoming [" << auth << "] plain connection from " << ip);
     }
     return auth;
   }
@@ -1056,23 +1041,23 @@ namespace cryptonote
   void core::init_oxenmq(const boost::program_options::variables_map& vm) {
     using namespace oxenmq;
     MGINFO("Starting oxenmq");
-    m_lmq = std::make_unique<OxenMQ>(
+    m_omq = std::make_unique<OxenMQ>(
         tools::copy_guts(m_service_keys.pub_x25519),
         tools::copy_guts(m_service_keys.key_x25519),
         m_service_node,
         [this](std::string_view x25519_pk) { return m_service_node_list.remote_lookup(x25519_pk); },
         [](LogLevel level, const char *file, int line, std::string msg) {
           // What a lovely interface (<-- sarcasm)
-          if (ELPP->vRegistry()->allowed(easylogging_level(level), "lmq"))
-            el::base::Writer(easylogging_level(level), file, line, ELPP_FUNC, el::base::DispatchAction::NormalLog).construct("lmq") << msg;
+          if (ELPP->vRegistry()->allowed(easylogging_level(level), "omq"))
+            el::base::Writer(easylogging_level(level), file, line, ELPP_FUNC, el::base::DispatchAction::NormalLog).construct("omq") << msg;
         },
         oxenmq::LogLevel::trace
     );
 
-    // ping.ping: a simple debugging target for pinging the lmq listener
-    m_lmq->add_category("ping", Access{AuthLevel::none})
+    // ping.ping: a simple debugging target for pinging the omq listener
+    m_omq->add_category("ping", Access{AuthLevel::none})
         .add_request_command("ping", [](Message& m) {
-            MCINFO("lmq", "Received ping from " << m.conn);
+            MCINFO("omq", "Received ping from " << m.conn);
             m.send_reply("pong");
         })
     ;
@@ -1085,9 +1070,9 @@ namespace cryptonote
         listen_ip = "0.0.0.0";
       std::string qnet_listen = "tcp://" + listen_ip + ":" + std::to_string(m_quorumnet_port);
       MGINFO("- listening on " << qnet_listen << " (quorumnet)");
-      m_lmq->listen_curve(qnet_listen,
-          [this, public_=command_line::get_arg(vm, arg_lmq_quorumnet_public)](std::string_view ip, std::string_view pk, bool) {
-            return lmq_allow(ip, pk, public_ ? AuthLevel::basic : AuthLevel::none);
+      m_omq->listen_curve(qnet_listen,
+          [this, public_=command_line::get_arg(vm, arg_omq_quorumnet_public)](std::string_view ip, std::string_view pk, bool) {
+            return omq_allow(ip, pk, public_ ? AuthLevel::basic : AuthLevel::none);
           });
 
       m_quorumnet_state = quorumnet_new(*this);
@@ -1097,20 +1082,20 @@ namespace cryptonote
   }
 
   void core::start_oxenmq() {
-      update_lmq_sns(); // Ensure we have SNs set for the current block before starting
+      update_omq_sns(); // Ensure we have SNs set for the current block before starting
 
       if (m_service_node)
       {
-        m_pulse_thread_id = m_lmq->add_tagged_thread("pulse");
-        m_lmq->add_timer([this]() { pulse::main(m_quorumnet_state, *this); },
+        m_pulse_thread_id = m_omq->add_tagged_thread("pulse");
+        m_omq->add_timer([this]() { pulse::main(m_quorumnet_state, *this); },
                          std::chrono::milliseconds(500),
                          false,
                          m_pulse_thread_id);
-        m_lmq->add_timer([this]() {this->check_service_node_time();},
+        m_omq->add_timer([this]() {this->check_service_node_time();},
                          5s,
                          false);
       }
-      m_lmq->start();
+      m_omq->start();
   }
 
   //-----------------------------------------------------------------------------------------------
@@ -1126,7 +1111,7 @@ namespace cryptonote
 #endif
     if (m_quorumnet_state)
       quorumnet_delete(m_quorumnet_state);
-    m_lmq.reset();
+    m_omq.reset();
     m_service_node_list.store();
     m_miner.stop();
     m_mempool.deinit();
@@ -1682,7 +1667,7 @@ namespace cryptonote
     });
 
     if (proofversion >= MIN_TIMESTAMP_VERSION && x_pkey) {
-      m_lmq->request(
+      m_omq->request(
         tools::view_guts(x_pkey),
         "quorum.timestamp",
         [this, pubkey](bool success, std::vector<std::string> data) {
@@ -1944,10 +1929,10 @@ namespace cryptonote
     auto hf_version = get_hard_fork_version(height);
     //TODO: remove after HF18
     if (hf_version < HF_VERSION_PROOF_BTENC) {
-      NOTIFY_UPTIME_PROOF::request req = m_service_node_list.generate_uptime_proof(m_sn_public_ip, m_storage_port, m_storage_lmq_port, m_quorumnet_port);
+      NOTIFY_UPTIME_PROOF::request req = m_service_node_list.generate_uptime_proof(m_sn_public_ip, storage_https_port(), storage_omq_port(), m_quorumnet_port);
       relayed = get_protocol()->relay_uptime_proof(req, fake_context);
     } else {
-      auto proof = m_service_node_list.generate_uptime_proof(m_sn_public_ip, m_storage_port, m_storage_lmq_port, ss_version, m_quorumnet_port, lokinet_version);
+      auto proof = m_service_node_list.generate_uptime_proof(m_sn_public_ip, storage_https_port(), storage_omq_port(), ss_version, m_quorumnet_port, lokinet_version);
       NOTIFY_BTENCODED_UPTIME_PROOF::request req = proof.generate_request();
       relayed = get_protocol()->relay_btencoded_uptime_proof(req, fake_context);
     }
@@ -1965,7 +1950,7 @@ namespace cryptonote
     {
       oxenmq::pubkey_set added;
       added.insert(tools::copy_guts(pkey));
-      m_lmq->update_active_sns(added, {} /*removed*/);
+      m_omq->update_active_sns(added, {} /*removed*/);
     }
     return result;
   }
@@ -1982,7 +1967,7 @@ namespace cryptonote
     {
       oxenmq::pubkey_set added;
       added.insert(tools::copy_guts(pkey));
-      m_lmq->update_active_sns(added, {} /*removed*/);
+      m_omq->update_active_sns(added, {} /*removed*/);
     }
     return result;
   }
@@ -2245,12 +2230,12 @@ namespace cryptonote
     return true;
   }
 
-  void core::update_lmq_sns()
+  void core::update_omq_sns()
   {
     // TODO: let callers (e.g. lokinet, ss) subscribe to callbacks when this fires
     oxenmq::pubkey_set active_sns;
     m_service_node_list.copy_active_x25519_pubkeys(std::inserter(active_sns, active_sns.end()));
-    m_lmq->set_active_sns(std::move(active_sns));
+    m_omq->set_active_sns(std::move(active_sns));
   }
   //-----------------------------------------------------------------------------------------------
   crypto::hash core::get_tail_id() const
@@ -2338,11 +2323,11 @@ namespace cryptonote
 
           m_service_node_list.for_each_service_node_info_and_proof(sn_pks.begin(), sn_pks.end(), [&](auto& pk, auto& sni, auto& proof) {
             if (pk != m_service_keys.pub && proof.proof->public_ip == m_sn_public_ip &&
-                (proof.proof->qnet_port == m_quorumnet_port || proof.proof->storage_port == m_storage_port || proof.proof->storage_port == m_storage_lmq_port))
+                (proof.proof->qnet_port == m_quorumnet_port || proof.proof->storage_https_port == storage_https_port() || proof.proof->storage_omq_port == storage_omq_port()))
             MGINFO_RED(
                 "Another service node (" << pk << ") is broadcasting the same public IP and ports as this service node (" <<
                 epee::string_tools::get_ip_string_from_int32(m_sn_public_ip) << ":" << proof.proof->qnet_port << "[qnet], :" <<
-                proof.proof->storage_port << "[SS-HTTP], :" << proof.proof->storage_lmq_port << "[SS-LMQ]). "
+                proof.proof->storage_https_port << "[SS-HTTP], :" << proof.proof->storage_omq_port << "[SS-LMQ]). "
                 "This will lead to deregistration of one or both service nodes if not corrected. "
                 "(Do both service nodes have the correct IP for the service-node-public-ip setting?)");
           });

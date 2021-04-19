@@ -2753,14 +2753,14 @@ namespace service_nodes
     size_t buf_size;
     crypto::hash result;
 
-    auto buf = tools::memcpy_le(proof.pubkey.data, proof.timestamp, proof.public_ip, proof.storage_port, proof.pubkey_ed25519.data, proof.qnet_port, proof.storage_lmq_port);
+    auto buf = tools::memcpy_le(proof.pubkey.data, proof.timestamp, proof.public_ip, proof.storage_https_port, proof.pubkey_ed25519.data, proof.qnet_port, proof.storage_omq_port);
     buf_size = buf.size();
     crypto::cn_fast_hash(buf.data(), buf_size, result);
     return result;
   }
 
   cryptonote::NOTIFY_UPTIME_PROOF::request service_node_list::generate_uptime_proof(
-      uint32_t public_ip, uint16_t storage_port, uint16_t storage_lmq_port, uint16_t quorumnet_port) const
+      uint32_t public_ip, uint16_t storage_https_port, uint16_t storage_omq_port, uint16_t quorumnet_port) const
   {
     assert(m_service_node_keys);
     const auto& keys = *m_service_node_keys;
@@ -2769,8 +2769,8 @@ namespace service_nodes
     result.timestamp                                = time(nullptr);
     result.pubkey                                   = keys.pub;
     result.public_ip                                = public_ip;
-    result.storage_port                             = storage_port;
-    result.storage_lmq_port                         = storage_lmq_port;
+    result.storage_https_port                       = storage_https_port;
+    result.storage_omq_port                         = storage_omq_port;
     result.qnet_port                                = quorumnet_port;
     result.pubkey_ed25519                           = keys.pub_ed25519;
 
@@ -2780,10 +2780,10 @@ namespace service_nodes
     return result;
   }
 
-  uptime_proof::Proof service_node_list::generate_uptime_proof(uint32_t public_ip, uint16_t storage_port, uint16_t storage_lmq_port, std::array<uint16_t, 3> ss_version, uint16_t quorumnet_port, std::array<uint16_t, 3> lokinet_version) const
+  uptime_proof::Proof service_node_list::generate_uptime_proof(uint32_t public_ip, uint16_t storage_https_port, uint16_t storage_omq_port, std::array<uint16_t, 3> ss_version, uint16_t quorumnet_port, std::array<uint16_t, 3> lokinet_version) const
   {
     const auto& keys = *m_service_node_keys;
-    return uptime_proof::Proof(public_ip, storage_port, storage_lmq_port, ss_version, quorumnet_port, lokinet_version, keys);
+    return uptime_proof::Proof(public_ip, storage_https_port, storage_omq_port, ss_version, quorumnet_port, lokinet_version, keys);
   }
 
 #ifdef __cpp_lib_erase_if // # (C++20)
@@ -2853,8 +2853,8 @@ namespace service_nodes
   //TODO remove after HF18
   bool proof_info::update(uint64_t ts,
                           uint32_t ip,
-                          uint16_t s_port,
-                          uint16_t s_lmq_port,
+                          uint16_t s_https_port,
+                          uint16_t s_omq_port,
                           uint16_t q_port,
                           std::array<uint16_t, 3> ver,
                           const crypto::ed25519_public_key& pk_ed,
@@ -2864,8 +2864,8 @@ namespace service_nodes
     if (!proof) proof = std::unique_ptr<uptime_proof::Proof>(new uptime_proof::Proof());
     update_db |= update_val(timestamp, ts);
     update_db |= update_val(proof->public_ip, ip);
-    update_db |= update_val(proof->storage_port, s_port);
-    update_db |= update_val(proof->storage_lmq_port, s_lmq_port);
+    update_db |= update_val(proof->storage_https_port, s_https_port);
+    update_db |= update_val(proof->storage_omq_port, s_omq_port);
     update_db |= update_val(proof->qnet_port, q_port);
     update_db |= update_val(proof->version, ver);
     update_db |= update_val(proof->pubkey_ed25519, pk_ed);
@@ -2973,7 +2973,7 @@ namespace service_nodes
     }
 
     auto old_x25519 = iproof.pubkey_x25519;
-    if (iproof.update(std::chrono::system_clock::to_time_t(now), proof.public_ip, proof.storage_port, proof.storage_lmq_port, proof.qnet_port, proof.snode_version, proof.pubkey_ed25519, derived_x25519_pubkey))
+    if (iproof.update(std::chrono::system_clock::to_time_t(now), proof.public_ip, proof.storage_https_port, proof.storage_omq_port, proof.qnet_port, proof.snode_version, proof.pubkey_ed25519, derived_x25519_pubkey))
       iproof.store(proof.pubkey, m_blockchain);
 
     if (now - x25519_map_last_pruned >= X25519_MAP_PRUNING_INTERVAL)

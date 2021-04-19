@@ -532,7 +532,7 @@ namespace service_nodes
 
     // These feels out of place here because the hook system sucks: TODO replace it with
     // std::function hooks instead.
-    m_core.update_lmq_sns();
+    m_core.update_omq_sns();
 
     return true;
   }
