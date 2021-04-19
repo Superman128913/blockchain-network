@@ -2052,6 +2052,9 @@ namespace rpc {
       bool last_uptime_proof;
       bool storage_server_reachable;
       bool storage_server_reachable_timestamp;
+      bool storage_server_last_reachable;
+      bool storage_server_last_unreachable;
+      bool storage_server_first_unreachable;
       bool checkpoint_participation;
       bool pulse_participation;
 
@@ -2111,8 +2114,11 @@ namespace rpc {
 
         // Service Node Testing
         uint64_t                                last_uptime_proof;                   // The last time this Service Node's uptime proof was relayed by at least 1 Service Node other than itself in unix epoch time.
-        bool                                    storage_server_reachable;            // Whether the node's storage server has been reported as unreachable for a long time
-        uint64_t                                storage_server_reachable_timestamp;  // The last time this Service Node's storage server was contacted
+        bool                                    storage_server_reachable;            // True if this storage server is currently passing tests for the purposes of SN node testing: true if the last test passed, or if it has been unreachable for less than an hour; false if it has been failing tests for more than an hour (and thus is considered unreachable).
+        uint64_t                                storage_server_first_unreachable;    // If the last test we received was a failure, this field contains the timestamp when failures started.  Will be 0 if the last result was a success or the node has not yet been tested.  (To disinguish between these cases check storage_server_last_reachable).
+        uint64_t                                storage_server_last_unreachable;     // The last time this Service Node failed a ping test (regardless of whether or not it is currently failing); 0 if it never failed a test since startup.
+        uint64_t                                storage_server_last_reachable;       // The last time we received a successful ping response for this Service Node (whether or not it is currently failing); 0 if we have never received a success since startup.
+
         std::vector<service_nodes::participation_entry> checkpoint_participation;    // Of the last N checkpoints the Service Node is in a checkpointing quorum, record whether or not the Service Node voted to checkpoint a block
         std::vector<service_nodes::participation_entry> pulse_participation;         // Of the last N pulse blocks the Service Node is in a pulse quorum, record whether or not the Service Node voted (participated) in that block
         std::vector<service_nodes::timestamp_participation_entry> timestamp_participation;         // Of the last N timestamp messages, record whether or not the Service Node was in sync with the network

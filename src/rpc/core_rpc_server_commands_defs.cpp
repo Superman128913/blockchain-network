@@ -1096,6 +1096,8 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_SERVICE_NODES::requested_fields_t)
     KV_SERIALIZE(decommission_count)
     KV_SERIALIZE(earned_downtime_blocks)
     KV_SERIALIZE(service_node_version)
+    KV_SERIALIZE(lokinet_version)
+    KV_SERIALIZE(storage_server_version)
     KV_SERIALIZE(contributors)
     KV_SERIALIZE(total_contributed)
     KV_SERIALIZE(total_reserved)
@@ -1116,7 +1118,9 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_SERVICE_NODES::requested_fields_t)
 
     KV_SERIALIZE(last_uptime_proof)
     KV_SERIALIZE(storage_server_reachable)
-    KV_SERIALIZE(storage_server_reachable_timestamp)
+    KV_SERIALIZE(storage_server_first_unreachable)
+    KV_SERIALIZE(storage_server_last_unreachable)
+    KV_SERIALIZE(storage_server_last_reachable)
     KV_SERIALIZE(checkpoint_participation)
     KV_SERIALIZE(pulse_participation)
   }
@@ -1151,6 +1155,8 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_SERVICE_NODES::response::entry)
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(decommission_count);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(earned_downtime_blocks);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(service_node_version);
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(lokinet_version)
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(storage_server_version)
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(contributors);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(total_contributed);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(total_reserved);
@@ -1166,7 +1172,9 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_SERVICE_NODES::response::entry)
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(pubkey_x25519);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(last_uptime_proof);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(storage_server_reachable);
-  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(storage_server_reachable_timestamp);
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(storage_server_first_unreachable)
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(storage_server_last_unreachable)
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(storage_server_last_reachable)
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(checkpoint_participation);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(pulse_participation);
 KV_SERIALIZE_MAP_CODE_END()
