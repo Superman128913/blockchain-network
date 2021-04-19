@@ -69,10 +69,10 @@ static_assert(STAKING_PORTIONS % 12 == 0, "Use a multiple of twelve, so that it 
 #define CRYPTONOTE_COINBASE_BLOB_RESERVED_SIZE          600
 #define CRYPTONOTE_DISPLAY_DECIMAL_POINT                9
 
-#define FEE_PER_KB                                      ((uint64_t)2000000000) // 2 OXEN (= 2 * pow(10, 9))
-#define FEE_PER_BYTE                                    ((uint64_t)215)   // Fallback used in wallet if no fee is available from RPC
-#define FEE_PER_BYTE_V12                                ((uint64_t)17200) // Higher fee (and fallback) in v12 (only, v13 switches back)
-#define FEE_PER_OUTPUT                                  ((uint64_t)20000000) // 0.02 OXEN per tx output (in addition to the per-byte fee), starting in v13
+#define FEE_PER_BYTE_V12                                ((uint64_t)17200) // Higher fee in v12 (only, v13 switches back)
+#define FEE_PER_BYTE_V13                                ((uint64_t)215)   // Fallback used in wallet if no fee is available from RPC
+#define FEE_PER_OUTPUT_V13                              ((uint64_t)20000000) // 0.02 OXEN per tx output (in addition to the per-byte fee), starting in v13
+#define FEE_PER_OUTPUT_V18                              ((uint64_t)5000000) // 0.005 OXEN per tx output (in addition to the per-byte fee), starting in v18
 #define DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD            ((uint64_t)10000000000000) // 10 * pow(10,12)
 #define DYNAMIC_FEE_PER_KB_BASE_FEE_V5                  ((uint64_t)400000000)
 #define DYNAMIC_FEE_REFERENCE_TRANSACTION_WEIGHT        ((uint64_t)3000)

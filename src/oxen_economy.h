@@ -41,16 +41,12 @@ static_assert(                           SN_REWARD_HF15 + FOUNDATION_REWARD_HF17
 // and the miner including the tx includes MINER_TX_FEE_PERCENT * [minimum tx fee]; the rest must be left unclaimed.
 constexpr uint64_t BLINK_MINER_TX_FEE_PERCENT = 100; // The blink miner tx fee (as a percentage of the minimum tx fee)
 constexpr uint64_t BLINK_BURN_FIXED           = 0;  // A fixed amount (in atomic currency units) that the sender must burn
-constexpr uint64_t BLINK_BURN_TX_FEE_PERCENT  = 150; // A percentage of the minimum miner tx fee that the sender must burn.  (Adds to BLINK_BURN_FIXED)
-
-// FIXME: can remove this post-fork 15; the burned amount only matters for mempool acceptance and
-// blink quorum signing, but isn't part of the blockchain concensus rules (so we don't actually have
-// to keep it around in the code for syncing the chain).
-constexpr uint64_t BLINK_BURN_TX_FEE_PERCENT_OLD = 400; // A percentage of the minimum miner tx fee that the sender must burn.  (Adds to BLINK_BURN_FIXED)
+constexpr uint64_t BLINK_BURN_TX_FEE_PERCENT_V15  = 150; // A percentage of the minimum miner tx fee that the sender must burn.  (Adds to BLINK_BURN_FIXED)
+constexpr uint64_t BLINK_BURN_TX_FEE_PERCENT_V18  = 200; // A percentage of the minimum miner tx fee that the sender must burn.  (Adds to BLINK_BURN_FIXED)
 
 static_assert(BLINK_MINER_TX_FEE_PERCENT >= 100, "blink miner fee cannot be smaller than the base tx fee");
 static_assert(BLINK_BURN_FIXED >= 0, "fixed blink burn amount cannot be negative");
-static_assert(BLINK_BURN_TX_FEE_PERCENT >= 0, "blink burn tx percent cannot be negative");
+static_assert(BLINK_BURN_TX_FEE_PERCENT_V18 >= 0, "blink burn tx percent cannot be negative");
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -83,6 +79,7 @@ constexpr uint64_t burn_needed(uint8_t hf_version, mapping_type type)
 
   // The base amount for session/wallet/lokinet-1year:
   const uint64_t basic_fee = (
+      hf_version >= 18 ? 7*COIN :  // cryptonote::network_version_18
       hf_version >= 16 ? 15*COIN :  // cryptonote::network_version_16_pulse -- but don't want to add cryptonote_config.h include
       20*COIN                       // cryptonote::network_version_15_ons
   );
