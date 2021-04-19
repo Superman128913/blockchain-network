@@ -22,7 +22,7 @@ namespace service_nodes
       all_ids.push_back(entry.first);
     }
 
-    std::sort(all_ids.begin(), all_ids.end());
+    assert(std::is_sorted(all_ids.begin(), all_ids.end()));
 
     uint64_t max_dist = 0;
     // The new swarm that is the farthest from its right neighbour
