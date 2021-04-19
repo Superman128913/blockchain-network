@@ -64,6 +64,8 @@ namespace cryptonote::rpc {
 
   protected:
 
+    virtual ~http_server_base() = default;
+
     virtual void create_rpc_endpoints(uWS::App& http) = 0;
 
     /// handles cors headers by adding any needed headers to the given vector

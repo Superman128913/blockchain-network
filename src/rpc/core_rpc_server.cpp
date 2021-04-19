@@ -3035,7 +3035,9 @@ namespace cryptonote { namespace rpc {
       std::chrono::steady_clock::time_point steady_now) {
     if (t == service_nodes::NEVER)
       return 0;
-    return std::chrono::system_clock::to_time_t(system_now + (t - steady_now));
+    return std::chrono::system_clock::to_time_t(
+            std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+                system_now + (t - steady_now)));
   }
 
   //------------------------------------------------------------------------------------------------------------------------------
