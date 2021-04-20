@@ -372,7 +372,7 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
 
         if (!m_service_node_list.block_added(blk, txs, checkpoint_ptr))
         {
-          MERROR("Unable to process block for updating service node list: " << cryptonote::get_block_hash(blk));
+          MFATAL("Unable to process block for updating service node list: " << cryptonote::get_block_hash(blk));
           return false;
         }
         snl_iteration_duration += clock::now() - snl_start;
@@ -383,7 +383,7 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
         auto ons_start = clock::now();
         if (!m_ons_db.add_block(blk, txs))
         {
-          MERROR("Unable to process block for updating ONS DB: " << cryptonote::get_block_hash(blk));
+          MFATAL("Unable to process block for updating ONS DB: " << cryptonote::get_block_hash(blk));
           return false;
         }
         ons_iteration_duration += clock::now() - ons_start;
@@ -543,12 +543,12 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, const network_type nett
       // so we re-throw
       catch (const std::exception& e)
       {
-        MERROR("Error popping block from blockchain: " << e.what());
+        MFATAL("Error popping block from blockchain: " << e.what());
         throw;
       }
       catch (...)
       {
-        MERROR("Error popping block from blockchain, throwing!");
+        MFATAL("Error popping block from blockchain, throwing!");
         throw;
       }
     }
@@ -574,7 +574,7 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, const network_type nett
 
   if (ons_db && !m_ons_db.init(this, nettype, ons_db))
   {
-    MERROR("ONS failed to initialise");
+    MFATAL("ONS failed to initialise");
     return false;
   }
 
@@ -585,7 +585,7 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, const network_type nett
 
   if (!m_db->is_read_only() && !load_missing_blocks_into_oxen_subsystems())
   {
-    MERROR("Failed to load blocks into oxen subsystems");
+    MFATAL("Failed to load blocks into oxen subsystems");
     return false;
   }
 

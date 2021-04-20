@@ -2095,7 +2095,7 @@ bool name_system_db::add_block(const cryptonote::block &block, const std::vector
       std::string fail_reason;
       if (!validate_ons_tx(block.major_version, height, tx, entry, &fail_reason))
       {
-        LOG_PRINT_L0("ONS TX: Failed to validate for tx=" << get_transaction_hash(tx) << ". This should have failed validation earlier reason=" << fail_reason);
+        MFATAL("ONS TX: Failed to validate for tx=" << get_transaction_hash(tx) << ". This should have failed validation earlier reason=" << fail_reason);
         assert("Failed to validate acquire name service. Should already have failed validation prior" == nullptr);
         return false;
       }
