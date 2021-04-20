@@ -1609,7 +1609,7 @@ namespace service_nodes
         std::shared_ptr<const quorum> quorum = get_quorum(quorum_type::pulse, block_height, false, nullptr);
         if (!quorum || quorum->validators.empty())
         {
-          MERROR("Unexpected Pulse error " << (quorum ? " quorum was not generated" : " quorum was empty"));
+          MFATAL("Unexpected Pulse error " << (quorum ? " quorum was not generated" : " quorum was empty"));
           return false;
         }
 

@@ -1258,6 +1258,13 @@ bool name_system_db::validate_ons_tx(uint8_t hf_version, uint64_t blockchain_hei
   {
     uint64_t burn                = cryptonote::get_burned_amount_from_tx_extra(tx.extra);
     uint64_t const burn_required = (ons_extra.is_buying() || ons_extra.is_renewing()) ? burn_needed(hf_version, ons_extra.type) : 0;
+    if (hf_version == cryptonote::network_version_18 && burn > burn_required && blockchain_height < 524'000) {
+        // Testnet sync fix: PR #1433 merged that lowered fees for HF18 while testnet was already on
+        // HF18, but broke syncing because earlier HF18 blocks have ONS txes at the higher fees, so
+        // this allows them to pass by pretending the tx burned the right amount.
+        burn = burn_required;
+    }
+
     if (burn != burn_required)
     {
       char const *over_or_under = burn > burn_required ? "too much " : "insufficient ";
@@ -2095,7 +2102,7 @@ bool name_system_db::add_block(const cryptonote::block &block, const std::vector
       std::string fail_reason;
       if (!validate_ons_tx(block.major_version, height, tx, entry, &fail_reason))
       {
-        LOG_PRINT_L0("ONS TX: Failed to validate for tx=" << get_transaction_hash(tx) << ". This should have failed validation earlier reason=" << fail_reason);
+        MFATAL("ONS TX: Failed to validate for tx=" << get_transaction_hash(tx) << ". This should have failed validation earlier reason=" << fail_reason);
         assert("Failed to validate acquire name service. Should already have failed validation prior" == nullptr);
         return false;
       }
