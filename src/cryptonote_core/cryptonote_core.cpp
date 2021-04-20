@@ -283,6 +283,8 @@ namespace cryptonote
   , m_last_storage_server_ping(0)
   , m_last_lokinet_ping(0)
   , m_pad_transactions(false)
+  , ss_version{0}
+  , lokinet_version{0}
   {
     m_checkpoints_updating.clear();
   }
