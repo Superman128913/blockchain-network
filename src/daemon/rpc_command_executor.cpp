@@ -1712,7 +1712,10 @@ static void append_printable_service_node_list_entry(cryptonote::network_type ne
     // NOTE: Component Versions
     //
     stream << indent2 << "Storage Server / Lokinet Router versions: "
-        << tools::join(".", entry.storage_server_version) << " / " << tools::join(".", entry.lokinet_version) << "\n";
+        << ((entry.storage_server_version[0] == 0 && entry.storage_server_version[1] == 0 && entry.storage_server_version[2] == 0) ? "(Storage server ping not yet received) " : tools::join(".", entry.storage_server_version)) << " / " << ((entry.lokinet_version[0] == 0 && entry.lokinet_version[1] == 0 && entry.lokinet_version[2] == 0) ? "(Lokinet ping not yet received)" : tools::join(".", entry.lokinet_version)) << "\n";
+
+
+
 
     //
     // NOTE: Print Voting History
