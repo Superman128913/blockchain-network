@@ -2057,6 +2057,8 @@ namespace rpc {
       bool storage_server_first_unreachable;
       bool checkpoint_participation;
       bool pulse_participation;
+      bool timestamp_participation;
+      bool timesync_status;
 
       bool block_hash;
       bool height;
