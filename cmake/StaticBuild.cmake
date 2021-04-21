@@ -398,13 +398,15 @@ build_external(boost
   ${boost_patch_commands}
   CONFIGURE_COMMAND
     ${CMAKE_COMMAND} -E env ${boost_bootstrap_cxx}
-    ./bootstrap.sh --without-icu --prefix=${DEPS_DESTDIR} --with-toolset=${boost_toolset}
-      --with-libraries=program_options,system,thread,serialization
-  BUILD_COMMAND true
+    ./tools/build/src/engine/build.sh ${boost_toolset} "--cxx=${deps_cxx}"
+  BUILD_COMMAND
+    cp tools/build/src/engine/b2 .
   INSTALL_COMMAND
     ./b2 -d0 variant=release link=static runtime-link=static optimization=speed ${boost_extra}
-      threading=multi threadapi=${boost_threadapi} ${boost_buildflags} cxxstd=14 visibility=global
+      threading=multi threadapi=${boost_threadapi} ${boost_buildflags} cxxstd=17 visibility=global
       --disable-icu --user-config=${CMAKE_CURRENT_BINARY_DIR}/user-config.bjam
+      --prefix=${DEPS_DESTDIR} --exec-prefix=${DEPS_DESTDIR} --libdir=${DEPS_DESTDIR}/lib --includedir=${DEPS_DESTDIR}/include
+      --with-program_options --with-system --with-thread --with-serialization
       install
   BUILD_BYPRODUCTS
     ${DEPS_DESTDIR}/lib/libboost_program_options.a
