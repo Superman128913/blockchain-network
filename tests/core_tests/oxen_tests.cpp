@@ -2549,7 +2549,12 @@ bool oxen_name_system_wrong_burn::generate(std::vector<test_event_entry> &events
         else            burn += 1;
 
         cryptonote::transaction tx = gen.create_oxen_name_system_tx(miner, gen.hardfork(), type, name, value, nullptr /*owner*/, nullptr /*backup_owner*/, burn);
-        gen.add_tx(tx, false /*can_be_added_to_blockchain*/, "Wrong burn for a ONS tx", false /*kept_by_block*/);
+        if (new_hf_version == cryptonote::network_version_18 && !under_burn && new_height < 524'000)
+        {
+          gen.add_tx(tx, true /*can_be_added_to_blockchain*/, "Wrong burn for a ONS tx but workaround for testnet", true /*kept_by_block*/);
+        } else {
+          gen.add_tx(tx, false /*can_be_added_to_blockchain*/, "Wrong burn for a ONS tx", false /*kept_by_block*/);
+        }
       }
     }
   }
