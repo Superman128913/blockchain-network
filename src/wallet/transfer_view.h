@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 #include "cryptonote_basic/subaddress_index.h"
+#include "cryptonote_basic/cryptonote_basic.h"
 #include "transfer_destination.h"
 #include "crypto/hash.h"
 
@@ -45,7 +46,8 @@ enum struct pay_type
   stake,
   miner,
   service_node,
-  governance
+  governance,
+  ons
 };
 
 inline const char *pay_type_string(pay_type type)
@@ -56,10 +58,21 @@ inline const char *pay_type_string(pay_type type)
     case pay_type::in:           return "in";
     case pay_type::out:          return "out";
     case pay_type::stake:        return "stake";
-    case pay_type::miner:        return "miner";
+    case pay_type::ons:          return "ons";
+    case pay_type::miner:        return "reward";
     case pay_type::service_node: return "snode";
     case pay_type::governance:   return "gov";
     default: assert(false);      return "xxxxx";
+  }
+}
+
+inline pay_type pay_type_from_tx(const cryptonote::transaction tx)
+{
+  switch(tx.type)
+  {
+    case cryptonote::txtype::stake: return wallet::pay_type::stake;
+    case cryptonote::txtype::oxen_name_system: return wallet::pay_type::ons;
+    default: return wallet::pay_type::out;
   }
 }
 

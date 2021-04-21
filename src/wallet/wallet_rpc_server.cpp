@@ -2017,7 +2017,7 @@ namespace tools
       {
         res.in.push_back(std::move(entry));
       }
-      else if (entry.pay_type == wallet::pay_type::out || entry.pay_type == wallet::pay_type::stake)
+      else if (entry.pay_type == wallet::pay_type::out || entry.pay_type == wallet::pay_type::stake || entry.pay_type == wallet::pay_type::ons)
       {
         res.out.push_back(std::move(entry));
       }
