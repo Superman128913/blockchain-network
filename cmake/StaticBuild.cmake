@@ -336,7 +336,7 @@ endif()
 
 
 set(boost_threadapi "pthread")
-set(boost_bootstrap_cxx "CXX=${deps_cxx}")
+set(boost_bootstrap_cxx "--cxx=${deps_cxx}")
 set(boost_toolset "")
 set(boost_extra "")
 if(USE_LTO)
@@ -353,7 +353,7 @@ if(CMAKE_CROSSCOMPILING)
       list(APPEND boost_extra "address-model=32")
     endif()
   elseif(ANDROID)
-    set(boost_bootstrap_cxx "CXX=c++")
+    set(boost_bootstrap_cxx "--cxx=c++")
   endif()
 endif()
 if(CMAKE_CXX_COMPILER_ID STREQUAL GNU)
@@ -397,8 +397,7 @@ build_external(boost
   #  PATCH_COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_BINARY_DIR}/user-config.bjam tools/build/src/user-config.jam
   ${boost_patch_commands}
   CONFIGURE_COMMAND
-    ${CMAKE_COMMAND} -E env ${boost_bootstrap_cxx}
-    ./tools/build/src/engine/build.sh ${boost_toolset} "--cxx=${deps_cxx}"
+    ./tools/build/src/engine/build.sh ${boost_toolset} ${boost_bootstrap_cxx}
   BUILD_COMMAND
     cp tools/build/src/engine/b2 .
   INSTALL_COMMAND
