@@ -29,9 +29,6 @@
 #ifndef OXEN_H
 #define OXEN_H
 
-#define OXEN_HOUR(val) ((val) * OXEN_MINUTES(60))
-#define OXEN_MINUTES(val) val * 60
-
 #include <cstddef>
 #include <utility>
 

@@ -118,6 +118,7 @@ namespace tools
     wallet_rpc::SIGN::response                            invoke(wallet_rpc::SIGN::request&& req);
     wallet_rpc::VERIFY::response                          invoke(wallet_rpc::VERIFY::request&& req);
     wallet_rpc::EXPORT_OUTPUTS::response                  invoke(wallet_rpc::EXPORT_OUTPUTS::request&& req);
+    wallet_rpc::EXPORT_TRANSFERS::response                invoke(wallet_rpc::EXPORT_TRANSFERS::request&& req);
     wallet_rpc::IMPORT_OUTPUTS::response                  invoke(wallet_rpc::IMPORT_OUTPUTS::request&& req);
     wallet_rpc::EXPORT_KEY_IMAGES::response               invoke(wallet_rpc::EXPORT_KEY_IMAGES::request&& req);
     wallet_rpc::IMPORT_KEY_IMAGES::response               invoke(wallet_rpc::IMPORT_KEY_IMAGES::request&& req);
@@ -157,15 +158,15 @@ namespace tools
     wallet_rpc::REGISTER_SERVICE_NODE::response           invoke(wallet_rpc::REGISTER_SERVICE_NODE::request&& req);
     wallet_rpc::CAN_REQUEST_STAKE_UNLOCK::response        invoke(wallet_rpc::CAN_REQUEST_STAKE_UNLOCK::request&& req);
     wallet_rpc::REQUEST_STAKE_UNLOCK::response            invoke(wallet_rpc::REQUEST_STAKE_UNLOCK::request&& req);
-    wallet_rpc::LNS_BUY_MAPPING::response                 invoke(wallet_rpc::LNS_BUY_MAPPING::request&& req);
-    wallet_rpc::LNS_RENEW_MAPPING::response               invoke(wallet_rpc::LNS_RENEW_MAPPING::request&& req);
-    wallet_rpc::LNS_UPDATE_MAPPING::response              invoke(wallet_rpc::LNS_UPDATE_MAPPING::request&& req);
-    wallet_rpc::LNS_MAKE_UPDATE_SIGNATURE::response       invoke(wallet_rpc::LNS_MAKE_UPDATE_SIGNATURE::request&& req);
-    wallet_rpc::LNS_HASH_NAME::response                   invoke(wallet_rpc::LNS_HASH_NAME::request&& req);
-    wallet_rpc::LNS_KNOWN_NAMES::response                 invoke(wallet_rpc::LNS_KNOWN_NAMES::request&& req);
-    wallet_rpc::LNS_ADD_KNOWN_NAMES::response             invoke(wallet_rpc::LNS_ADD_KNOWN_NAMES::request&& req);
-    wallet_rpc::LNS_DECRYPT_VALUE::response               invoke(wallet_rpc::LNS_DECRYPT_VALUE::request&& req);
-    wallet_rpc::LNS_ENCRYPT_VALUE::response               invoke(wallet_rpc::LNS_ENCRYPT_VALUE::request&& req);
+    wallet_rpc::ONS_BUY_MAPPING::response                 invoke(wallet_rpc::ONS_BUY_MAPPING::request&& req);
+    wallet_rpc::ONS_RENEW_MAPPING::response               invoke(wallet_rpc::ONS_RENEW_MAPPING::request&& req);
+    wallet_rpc::ONS_UPDATE_MAPPING::response              invoke(wallet_rpc::ONS_UPDATE_MAPPING::request&& req);
+    wallet_rpc::ONS_MAKE_UPDATE_SIGNATURE::response       invoke(wallet_rpc::ONS_MAKE_UPDATE_SIGNATURE::request&& req);
+    wallet_rpc::ONS_HASH_NAME::response                   invoke(wallet_rpc::ONS_HASH_NAME::request&& req);
+    wallet_rpc::ONS_KNOWN_NAMES::response                 invoke(wallet_rpc::ONS_KNOWN_NAMES::request&& req);
+    wallet_rpc::ONS_ADD_KNOWN_NAMES::response             invoke(wallet_rpc::ONS_ADD_KNOWN_NAMES::request&& req);
+    wallet_rpc::ONS_DECRYPT_VALUE::response               invoke(wallet_rpc::ONS_DECRYPT_VALUE::request&& req);
+    wallet_rpc::ONS_ENCRYPT_VALUE::response               invoke(wallet_rpc::ONS_ENCRYPT_VALUE::request&& req);
     wallet_rpc::QUERY_KEY::response                       invoke(wallet_rpc::QUERY_KEY::request&& req);
 
   private:
@@ -176,10 +177,15 @@ namespace tools
       // Checks that a wallet is open; if not, throws an error.
       void require_open();
 
+      // Safely and cleanly closes the currently open wallet (if one is open)
+      void close_wallet(bool save_current);
+
       template<typename Ts, typename Tu>
       void fill_response(std::vector<tools::wallet2::pending_tx> &ptx_vector,
           bool get_tx_key, Ts& tx_key, Tu &amount, Tu &fee, std::string &multisig_txset, std::string &unsigned_txset, bool do_not_relay, bool blink,
           Ts &tx_hash, bool get_tx_hex, Ts &tx_blob, bool get_tx_metadata, Ts &tx_metadata);
+
+      cryptonote::address_parse_info extract_account_addr(cryptonote::network_type nettype, std::string_view addr_or_url);
 
       void validate_transfer(const std::list<wallet::transfer_destination>& destinations, const std::string& payment_id, std::vector<cryptonote::tx_destination_entry>& dsts, std::vector<uint8_t>& extra, bool at_least_one_destination);
 

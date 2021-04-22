@@ -30,6 +30,7 @@
 
 #include "chaingen.h"
 #include "double_spend.h"
+#include "cryptonote_core/uptime_proof.h"
 
 using namespace cryptonote;
 

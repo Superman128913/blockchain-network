@@ -134,7 +134,7 @@ namespace cryptonote
   {
     return hf_version >= network_version_17         ? FOUNDATION_REWARD_HF17 :
            hf_version >= network_version_16_pulse   ? FOUNDATION_REWARD_HF15 + CHAINFLIP_LIQUIDITY_HF16 :
-           hf_version >= network_version_15_lns     ? FOUNDATION_REWARD_HF15 :
+           hf_version >= network_version_15_ons     ? FOUNDATION_REWARD_HF15 :
            base_reward / 20;
   }
 
@@ -197,7 +197,7 @@ namespace cryptonote
   uint64_t service_node_reward_formula(uint64_t base_reward, uint8_t hard_fork_version)
   {
     return
-      hard_fork_version >= network_version_15_lns          ? SN_REWARD_HF15 :
+      hard_fork_version >= network_version_15_ons          ? SN_REWARD_HF15 :
       hard_fork_version >= network_version_9_service_nodes ? base_reward / 2 : // 50% of base reward up until HF15's fixed payout
       0;
   }
@@ -277,34 +277,32 @@ namespace cryptonote
     keypair const gov_key = get_deterministic_keypair_from_height(height); // NOTE: Always need since we use same key for service node
 
     // NOTE: TX Extra
+    add_tx_extra<tx_extra_pub_key>(tx, txkey.pub);
+    if(!extra_nonce.empty())
     {
-      add_tx_extra<tx_extra_pub_key>(tx, txkey.pub);
-      if(!extra_nonce.empty())
-      {
-        if(!add_extra_nonce_to_tx_extra(tx.extra, extra_nonce))
-          return false;
-      }
-
-      // TODO(doyle): We don't need to do this. It's a deterministic key.
-      if (already_generated_coins != 0)
-        add_tx_extra<tx_extra_pub_key>(tx, gov_key.pub);
-
-      add_service_node_winner_to_tx_extra(tx.extra, miner_tx_context.block_leader.key);
+      if(!add_extra_nonce_to_tx_extra(tx.extra, extra_nonce))
+        return false;
     }
 
-    block_reward_parts reward_parts = {};
-    {
-      oxen_block_reward_context block_reward_context = {};
-      block_reward_context.fee                       = fee;
-      block_reward_context.height                    = height;
-      block_reward_context.block_leader_payouts      = miner_tx_context.block_leader.payouts;
-      block_reward_context.batched_governance        = miner_tx_context.batched_governance;
+    // TODO(doyle): We don't need to do this. It's a deterministic key.
+    if (already_generated_coins != 0)
+      add_tx_extra<tx_extra_pub_key>(tx, gov_key.pub);
 
-      if(!get_oxen_block_reward(median_weight, current_block_weight, already_generated_coins, hard_fork_version, reward_parts, block_reward_context))
-      {
-        LOG_PRINT_L0("Failed to calculate block reward");
-        return false;
-      }
+
+    add_service_node_winner_to_tx_extra(tx.extra, miner_tx_context.block_leader.key);
+
+
+    oxen_block_reward_context block_reward_context = {};
+    block_reward_context.fee                       = fee;
+    block_reward_context.height                    = height;
+    block_reward_context.block_leader_payouts      = miner_tx_context.block_leader.payouts;
+    block_reward_context.batched_governance        = miner_tx_context.batched_governance;
+
+    block_reward_parts reward_parts{};
+    if(!get_oxen_block_reward(median_weight, current_block_weight, already_generated_coins, hard_fork_version, reward_parts, block_reward_context))
+    {
+      LOG_PRINT_L0("Failed to calculate block reward");
+      return false;
     }
 
     // TODO(doyle): Batching awards
@@ -415,7 +413,7 @@ namespace cryptonote
       }
     }
     CHECK_AND_ASSERT_MES(rewards_length <= rewards.size(), false, "More rewards specified than supported, number of rewards: " << rewards_length << ", capacity: " << rewards.size());
-    CHECK_AND_ASSERT_MES(rewards_length > 0,               false, "Zero rewards are to be payed out, there should be atleast 1");
+    CHECK_AND_ASSERT_MES(rewards_length > 0,               false, "Zero rewards are to be payed out, there should be at least 1");
 
     // NOTE: Make TX Outputs
     uint64_t summary_amounts = 0;
@@ -449,7 +447,7 @@ namespace cryptonote
     }
 
     uint64_t expected_amount = 0;
-    if (hard_fork_version <= cryptonote::network_version_15_lns)
+    if (hard_fork_version <= cryptonote::network_version_15_ons)
     {
       // NOTE: Use the amount actually paid out when we split the service node
       // reward (across up to 4 recipients) which may actually pay out less than
@@ -563,6 +561,7 @@ namespace cryptonote
 
     return true;
   }
+
 
   crypto::public_key get_destination_view_key_pub(const std::vector<tx_destination_entry> &destinations, const std::optional<cryptonote::tx_destination_entry>& change_addr)
   {

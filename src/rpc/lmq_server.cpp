@@ -11,29 +11,32 @@ using oxenmq::AuthLevel;
 
 namespace {
 
-const command_line::arg_descriptor<std::vector<std::string>> arg_lmq_public{
+// TODO: all of this --lmq-blah options really should be renamed to --omq-blah, but then we *also*
+// need some sort of backwards compatibility shim, and that is a nuissance.
+
+const command_line::arg_descriptor<std::vector<std::string>> arg_omq_public{
   "lmq-public",
   "Adds a public, unencrypted OxenMQ RPC listener (with restricted capabilities) at the given "
     "address; can be specified multiple times. Examples: tcp://0.0.0.0:5555 (listen on port 5555), "
     "tcp://198.51.100.42:5555 (port 5555 on specific IPv4 address), tcp://[::]:5555, "
     "tcp://[2001:db8::abc]:5555 (IPv6), or ipc:///path/to/socket to listen on a unix domain socket"};
-const command_line::arg_descriptor<std::vector<std::string>> arg_lmq_curve_public{
+const command_line::arg_descriptor<std::vector<std::string>> arg_omq_curve_public{
   "lmq-curve-public",
   "Adds a curve-encrypted OxenMQ RPC listener at the given address that accepts (restricted) rpc "
     "commands from any client. Clients must already know this server's public x25519 key to "
     "establish an encrypted connection."};
-const command_line::arg_descriptor<std::vector<std::string>> arg_lmq_curve{
+const command_line::arg_descriptor<std::vector<std::string>> arg_omq_curve{
   "lmq-curve",
   "Adds a curve-encrypted OxenMQ RPC listener at the given address that only accepts client connections from whitelisted client x25519 pubkeys. "
     "Clients must already know this server's public x25519 key to establish an encrypted connection. When running in service node mode "
     "the quorumnet port is already listening as if specified with --lmq-curve."};
-const command_line::arg_descriptor<std::vector<std::string>> arg_lmq_admin{
+const command_line::arg_descriptor<std::vector<std::string>> arg_omq_admin{
   "lmq-admin",
   "Adds an x25519 pubkey of a client permitted to connect to the --lmq-curve, --lmq-curve-public, or quorumnet address(es) with unrestricted (admin) capabilities."};
-const command_line::arg_descriptor<std::vector<std::string>> arg_lmq_user{
+const command_line::arg_descriptor<std::vector<std::string>> arg_omq_user{
   "lmq-user",
   "Specifies an x25519 pubkey of a client permitted to connect to the --lmq-curve or quorumnet address(es) with restricted capabilities"};
-const command_line::arg_descriptor<std::vector<std::string>> arg_lmq_local_control{
+const command_line::arg_descriptor<std::vector<std::string>> arg_omq_local_control{
   "lmq-local-control",
   "Adds an unencrypted OxenMQ RPC listener with full, unrestricted capabilities and no authentication at the given address. "
 #ifndef _WIN32
@@ -42,18 +45,18 @@ const command_line::arg_descriptor<std::vector<std::string>> arg_lmq_local_contr
     "WARNING: Do not use this on a publicly accessible address!"};
 
 #ifndef _WIN32
-const command_line::arg_descriptor<std::string> arg_lmq_umask{
+const command_line::arg_descriptor<std::string> arg_omq_umask{
   "lmq-umask",
   "Sets the umask to apply to any listening ipc:///path/to/sock LMQ sockets, in octal.",
   "0007"};
 #endif
 
 
-void check_lmq_listen_addr(std::string_view addr) {
+void check_omq_listen_addr(std::string_view addr) {
   // Crude check for basic validity; you can specify all sorts of invalid things, but at least
   // we can check the prefix for something that looks zmq-y.
   if (addr.size() < 7 || (addr.substr(0, 6) != "tcp://" && addr.substr(0, 6) != "ipc://"))
-    throw std::runtime_error("Error: lmq listen address '" + std::string(addr) + "' is invalid: expected tcp://IP:PORT, tcp://[IPv6]:PORT or ipc:///path/to/socket");
+    throw std::runtime_error("Error: omq listen address '" + std::string(addr) + "' is invalid: expected tcp://IP:PORT, tcp://[IPv6]:PORT or ipc:///path/to/socket");
 }
 
 
@@ -80,49 +83,49 @@ constexpr std::string_view
 } // end anonymous namespace
 
 
-void init_lmq_options(boost::program_options::options_description& desc)
+void init_omq_options(boost::program_options::options_description& desc)
 {
-  command_line::add_arg(desc, arg_lmq_public);
-  command_line::add_arg(desc, arg_lmq_curve_public);
-  command_line::add_arg(desc, arg_lmq_curve);
-  command_line::add_arg(desc, arg_lmq_admin);
-  command_line::add_arg(desc, arg_lmq_user);
-  command_line::add_arg(desc, arg_lmq_local_control);
+  command_line::add_arg(desc, arg_omq_public);
+  command_line::add_arg(desc, arg_omq_curve_public);
+  command_line::add_arg(desc, arg_omq_curve);
+  command_line::add_arg(desc, arg_omq_admin);
+  command_line::add_arg(desc, arg_omq_user);
+  command_line::add_arg(desc, arg_omq_local_control);
 #ifndef _WIN32
-  command_line::add_arg(desc, arg_lmq_umask);
+  command_line::add_arg(desc, arg_omq_umask);
 #endif
 }
 
-lmq_rpc::lmq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::program_options::variables_map& vm)
+omq_rpc::omq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::program_options::variables_map& vm)
   : core_{core}, rpc_{rpc}
 {
-  auto& lmq = core.get_lmq();
-  auto& auth = core._lmq_auth_level_map();
+  auto& omq = core.get_omq();
+  auto& auth = core._omq_auth_level_map();
 
   // Set up any requested listening sockets.  (Note: if we are a service node, we'll already have
   // the quorumnet listener set up in cryptonote_core).
-  for (const auto &addr : command_line::get_arg(vm, arg_lmq_public)) {
-    check_lmq_listen_addr(addr);
+  for (const auto &addr : command_line::get_arg(vm, arg_omq_public)) {
+    check_omq_listen_addr(addr);
     MGINFO("LMQ listening on " << addr << " (public unencrypted)");
-    lmq.listen_plain(addr,
-        [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.lmq_allow(ip, pk, AuthLevel::basic); });
+    omq.listen_plain(addr,
+        [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.omq_allow(ip, pk, AuthLevel::basic); });
   }
 
-  for (const auto &addr : command_line::get_arg(vm, arg_lmq_curve_public)) {
-    check_lmq_listen_addr(addr);
+  for (const auto &addr : command_line::get_arg(vm, arg_omq_curve_public)) {
+    check_omq_listen_addr(addr);
     MGINFO("LMQ listening on " << addr << " (public curve)");
-    lmq.listen_curve(addr,
-        [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.lmq_allow(ip, pk, AuthLevel::basic); });
+    omq.listen_curve(addr,
+        [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.omq_allow(ip, pk, AuthLevel::basic); });
   }
 
-  for (const auto &addr : command_line::get_arg(vm, arg_lmq_curve)) {
-    check_lmq_listen_addr(addr);
+  for (const auto &addr : command_line::get_arg(vm, arg_omq_curve)) {
+    check_omq_listen_addr(addr);
     MGINFO("LMQ listening on " << addr << " (curve restricted)");
-    lmq.listen_curve(addr,
-        [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.lmq_allow(ip, pk, AuthLevel::denied); });
+    omq.listen_curve(addr,
+        [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.omq_allow(ip, pk, AuthLevel::denied); });
   }
 
-  auto locals = command_line::get_arg(vm, arg_lmq_local_control);
+  auto locals = command_line::get_arg(vm, arg_omq_local_control);
   if (locals.empty()) {
     // FIXME: this requires unix sockets and so probably won't work on older Windows 10 or pre-Win10
     // windows.  In theory we could do some runtime detection to see if the Windows version is new
@@ -138,14 +141,14 @@ lmq_rpc::lmq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
     locals.clear();
   }
   for (const auto &addr : locals) {
-    check_lmq_listen_addr(addr);
+    check_omq_listen_addr(addr);
     MGINFO("LMQ listening on " << addr << " (unauthenticated local admin)");
-    lmq.listen_plain(addr,
-        [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.lmq_allow(ip, pk, AuthLevel::admin); });
+    omq.listen_plain(addr,
+        [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.omq_allow(ip, pk, AuthLevel::admin); });
   }
 
 #ifndef _WIN32
-  auto umask_str = command_line::get_arg(vm, arg_lmq_umask);
+  auto umask_str = command_line::get_arg(vm, arg_omq_umask);
   try {
     int umask = -1;
     size_t len = 0;
@@ -154,7 +157,7 @@ lmq_rpc::lmq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
       throw std::invalid_argument("not an octal value");
     if (umask < 0 || umask > 0777)
       throw std::invalid_argument("invalid umask value");
-    lmq.STARTUP_UMASK = umask;
+    omq.STARTUP_UMASK = umask;
   } catch (const std::exception& e) {
     throw std::invalid_argument("Invalid --lmq-umask value '" + umask_str + "': value must be an octal value between 0 and 0777");
   }
@@ -164,27 +167,27 @@ lmq_rpc::lmq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
   // Insert our own pubkey so that, e.g., console commands from localhost automatically get full access
   {
     crypto::x25519_public_key my_pubkey;
-    const std::string& pk = lmq.get_pubkey();
+    const std::string& pk = omq.get_pubkey();
     std::copy(pk.begin(), pk.end(), my_pubkey.data);
     auth.emplace(std::move(my_pubkey), AuthLevel::admin);
   }
 
   // User-specified admin/user pubkeys
-  for (auto& pk : as_x_pubkeys(command_line::get_arg(vm, arg_lmq_admin)))
+  for (auto& pk : as_x_pubkeys(command_line::get_arg(vm, arg_omq_admin)))
     auth.emplace(std::move(pk), AuthLevel::admin);
-  for (auto& pk : as_x_pubkeys(command_line::get_arg(vm, arg_lmq_user)))
+  for (auto& pk : as_x_pubkeys(command_line::get_arg(vm, arg_omq_user)))
     auth.emplace(std::move(pk), AuthLevel::basic);
 
   // basic (non-admin) rpc commands go into the "rpc." category (e.g. 'rpc.get_info')
-  lmq.add_category("rpc", AuthLevel::basic, 0 /*no reserved threads*/, 1000 /*max queued requests*/);
+  omq.add_category("rpc", AuthLevel::basic, 0 /*no reserved threads*/, 1000 /*max queued requests*/);
 
   // Admin rpc commands go into "admin.".  We also always keep one (potential) thread reserved for
   // admin RPC commands; that way even if there are loads of basic commands being processed we'll
   // still have room to invoke an admin command without waiting for the basic ones to finish.
   constexpr unsigned int admin_reserved_threads = 1;
-  lmq.add_category("admin", AuthLevel::admin, admin_reserved_threads);
+  omq.add_category("admin", AuthLevel::admin, admin_reserved_threads);
   for (auto& cmd : rpc_commands) {
-    lmq.add_request_command(cmd.second->is_public ? "rpc" : "admin", cmd.first,
+    omq.add_request_command(cmd.second->is_public ? "rpc" : "admin", cmd.first,
         [name=std::string_view{cmd.first}, &call=*cmd.second, this](oxenmq::Message& m) {
       if (m.data.size() > 1)
         m.send_reply(LMQ_BAD_REQUEST, "Bad request: RPC commands must have at most one data part "
@@ -192,7 +195,7 @@ lmq_rpc::lmq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
 
       rpc_request request{};
       request.context.admin = m.access.auth >= AuthLevel::admin;
-      request.context.source = rpc_source::lmq;
+      request.context.source = rpc_source::omq;
       request.context.remote = m.remote;
       request.body = m.data.empty() ? ""sv : m.data[0];
 
@@ -231,7 +234,7 @@ lmq_rpc::lmq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
 
   // The "subscribe" category is for public subscriptions; i.e. anyone on a public RPC node, or
   // anyone on a private RPC node with public access level.
-  lmq.add_category("sub", AuthLevel::basic);
+  omq.add_category("sub", AuthLevel::basic);
 
   // TX mempool subscriptions: [sub.mempool, blink] or [sub.mempool, all] to subscribe to new
   // approved mempool blink txes, or to all new mempool txes.  You get back a reply of "OK" or
@@ -250,7 +253,7 @@ lmq_rpc::lmq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
   // such as txes that came from an existing block during a rollback).  Note that both txhash and
   // txblob are binary: in particular, txhash is *not* hex-encoded.
   //
-  lmq.add_request_command("sub", "mempool", [this](oxenmq::Message& m) {
+  omq.add_request_command("sub", "mempool", [this](oxenmq::Message& m) {
 
     if (m.data.size() != 1) {
       m.send_reply("Invalid subscription request: no subscription type given");
@@ -296,7 +299,7 @@ lmq_rpc::lmq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
   // The block notification for new blocks consists of a message [notify.block, height, blockhash]
   // containing the latest height/hash.  (Note that blockhash is the hash in bytes, *not* the hex
   // encoded block hash).
-  lmq.add_request_command("sub", "block", [this](oxenmq::Message& m) {
+  omq.add_request_command("sub", "block", [this](oxenmq::Message& m) {
       std::unique_lock lock{subs_mutex_};
     auto expiry = std::chrono::steady_clock::now() + 30min;
     auto result = block_subs_.emplace(m.conn, block_sub{expiry});
@@ -352,23 +355,23 @@ static void send_notifies(Mutex& mutex, Subs& subs, const char* desc, Call call)
   }
 }
 
-bool lmq_rpc::block_added(const block& block, const std::vector<transaction>& txs, const checkpoint_t *)
+bool omq_rpc::block_added(const block& block, const std::vector<transaction>& txs, const checkpoint_t *)
 {
-  auto& lmq = core_.get_lmq();
+  auto& omq = core_.get_omq();
   std::string height = std::to_string(get_block_height(block));
   send_notifies(subs_mutex_, block_subs_, "block", [&](auto& conn, auto& sub) {
-    lmq.send(conn, "notify.block", height, std::string_view{block.hash.data, sizeof(block.hash.data)});
+    omq.send(conn, "notify.block", height, std::string_view{block.hash.data, sizeof(block.hash.data)});
   });
 
   return true;
 }
 
-void lmq_rpc::send_mempool_notifications(const crypto::hash& id, const transaction& tx, const std::string& blob, const tx_pool_options& opts)
+void omq_rpc::send_mempool_notifications(const crypto::hash& id, const transaction& tx, const std::string& blob, const tx_pool_options& opts)
 {
-  auto& lmq = core_.get_lmq();
+  auto& omq = core_.get_omq();
   send_notifies(subs_mutex_, mempool_subs_, "mempool", [&](auto& conn, auto& sub) {
     if (sub.type == mempool_sub_type::all || opts.approved_blink)
-      lmq.send(conn, "notify.mempool", std::string_view{id.data, sizeof(id.data)}, blob);
+      omq.send(conn, "notify.mempool", std::string_view{id.data, sizeof(id.data)}, blob);
   });
 }
 

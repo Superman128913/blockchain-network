@@ -10,15 +10,15 @@ Portions Copyright (c) 2012-2013 The Cryptonote developers.
 
 ## Development resources
 
-- Web: [loki.network](https://loki.network)
-- Telegram: [t.me/LokiCommunity](https://t.me/LokiCommunity)
-- Mail: [team@loki.network](mailto:team@loki.network)
-- GitHub: [https://github.com/loki-project/loki](https://github.com/loki-project/loki)
+- Web: [oxen.io](https://oxen.io)
+- Telegram: [t.me/OxenCommunity](https://t.me/Oxen_Community)
+- Mail: [team@oxen.io](mailto:team@oxen.io)
+- GitHub: [https://github.com/oxen-io/oxen-core](https://github.com/oxen-io/oxen-core)
 - Discord: [https://discord.gg/67GXfD6](https://discord.gg/67GXfD6)
 
 ## Vulnerability disclosure
 
-- Check out our [Vulnerability Response Process](https://loki-project.github.io/loki-docs/Contributing/VULNERABILITY_RESPONSE_LOKI), encourages prompt disclosure of any Vulnerabilities
+- Check out our [Vulnerability Response Process](https://github.com/oxen-io/oxen-docs/blob/master/docs/Contributing/VULNERABILITY_RESPONSE_LOKI.md), encourages prompt disclosure of any Vulnerabilities
 
 ## Information
 
@@ -26,7 +26,7 @@ Oxen is a private cryptocurrency based on Monero. Oxen currently offers an incen
 
 More information on the project can be found on the website and in the whitepaper.
 
-Oxen is an open source project, and we encourage contributions from anyone with something to offer. For more information on contributing, please contact team@loki.network
+Oxen is an open source project, and we encourage contributions from anyone with something to offer. For more information on contributing, please contact team@oxen.io
 
 ## Compiling Oxen from source
 
@@ -77,10 +77,7 @@ breakdown of the minimum set of required boost packages.
 Install all dependencies at once on Debian/Ubuntu:
 
 ```
-sudo apt update && \
-sudo apt install g++ cmake pkg-config libboost-thread-dev libboost-serialization-dev libboost-program-options-dev \
-    libssl-dev libzmq3-dev libsqlite3-dev libunbound-dev libsodium-dev libunwind8-dev liblzma-dev libreadline-dev \
-    libldns-dev libexpat1-dev doxygen graphviz libsqlite3-dev libcurl4-openssl-dev
+sudo apt update && sudo apt install build-essential cmake pkg-config libboost-all-dev libssl-dev libzmq3-dev libunbound-dev libsodium-dev libunwind8-dev liblzma-dev libreadline6-dev libldns-dev libexpat1-dev doxygen graphviz libpgm-dev libsqlite3-dev libcurl4-openssl-dev
 ```
 
 Install all dependencies at once on macOS with the provided Brewfile:
@@ -89,46 +86,34 @@ Install all dependencies at once on macOS with the provided Brewfile:
 FreeBSD one liner for required to build dependencies
 ```pkg install git gmake cmake pkgconf boost-libs libzmq4 libsodium sqlite3 openssl unbound miniupnpc```
 
-### Cloning the repository
-
-Clone recursively to pull-in needed submodule(s):
-
-`$ git clone --recursive https://github.com/loki-project/loki`
-
-If you already have a repo cloned, initialize and update:
-
-`$ cd loki && git submodule update --init --recursive`
-
 ### Build instructions
 
-Oxen uses the CMake build system and an optional top-level [Makefile](Makefile) that wraps cmake
-commands as needed (alternatively you may create a build directory and invoke cmake directly).
+Oxen uses the CMake build system which is used by creating a build directory and invoke cmake before building.
 
 #### On Linux and macOS
 
-* Install the dependencies
-* Change to the root of the source code directory, change to the most recent release branch, and build:
+You do not have to build from source if you are on debian or ubuntu as we have apt repositories with pre-built oxen packages on `deb.oxen.io`.
 
-    ```bash
-    cd loki
-    git checkout master
-    make
-    ```
+You can install these using:
 
-    *Optional*: If your machine has several cores and enough memory, enable
-    parallel build by running `make -j<number of threads>` instead of `make`. For
-    this to be worthwhile, the machine should have one core and at least 2GB of RAM
-    available per thread.
+	$ sudo curl -so /etc/apt/trusted.gpg.d/oxen.gpg https://deb.oxen.io/pub.gpg
+	$ echo "deb https://deb.oxen.io $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/oxen.list
+	$ sudo apt update
+	$ sudo apt install oxend
 
-    *Note*: The instructions above will compile the most stable release of the
-    Oxen software. If you would like to use and test the most recent software,
-    use ```git checkout master```. The master branch may contain updates that are
-    both unstable and incompatible with release software, though testing is always
-    encouraged.
+if you want to build a dev build you can do the following after installing the dependancies above:
 
-* The resulting executables can be found in `build/release/bin`
+	$ git clone --recursive https://github.com/oxen-io/oxen-core.git
+	$ cd oxen-core
+	$ git submodule update --init --recursive
+	$ mkdir build
+	$ cd build
+	$ cmake ..
+	$ make -j$(nproc)
 
-* Add `PATH="$PATH:$HOME/loki/build/release/bin"` to `.profile`
+* The resulting executables can be found in `~/oxen-core/build/bin`
+
+* Add `PATH="$PATH:$HOME/oxen-core/build/bin"` to `.profile`
 
 * Run Oxen with `oxend --detach`
 
@@ -239,7 +224,7 @@ application.
     cd loki
     ```
 
-* If you would like a specific [version/tag](https://github.com/loki-project/loki/tags), do a git checkout for that version. eg. 'v5.1.2'. If you don't care about the version and just want binaries from master, skip this step:
+* If you would like a specific [version/tag](https://github.com/oxen-io/oxen-core/tags), do a git checkout for that version. eg. 'v5.1.2'. If you don't care about the version and just want binaries from master, skip this step:
 	
     ```bash
     git checkout v5.1.2

@@ -33,6 +33,7 @@
 #include "cryptonote_core/cryptonote_core.h"
 #include "cryptonote_core/tx_pool.h"
 #include "cryptonote_core/blockchain.h"
+#include "cryptonote_core/uptime_proof.h"
 #include "blockchain_db/testdb.h"
 
 #include "blockchain_utilities/blockchain_objects.h"
@@ -89,7 +90,7 @@ bool get_output_distribution(uint64_t amount, uint64_t from, uint64_t to, uint64
     get_test_options():hard_forks{{std::make_pair((uint8_t)1, (uint64_t)0)}}{}
   } opts;
   cryptonote::Blockchain *blockchain = &bc.m_blockchain;
-  bool r = blockchain->init(new TestDB(test_distribution_size), nullptr /*lns_db*/, cryptonote::FAKECHAIN, true, &opts.test_options, 0, NULL);
+  bool r = blockchain->init(new TestDB(test_distribution_size), nullptr /*ons_db*/, cryptonote::FAKECHAIN, true, &opts.test_options, 0, NULL);
   return r && blockchain->get_output_distribution(amount, from, to, start_height, distribution, base);
 }
 

@@ -160,6 +160,15 @@ namespace cryptonote
      bool handle_uptime_proof(const NOTIFY_UPTIME_PROOF::request &proof, bool &my_uptime_proof_confirmation);
 
      /**
+      * @brief handles an incoming uptime proof that is encoded using B-encoding
+      *
+      * Parses an incoming uptime proof
+      *
+      * @return true if we haven't seen it before and thus need to relay.
+      */
+     bool handle_btencoded_uptime_proof(const NOTIFY_BTENCODED_UPTIME_PROOF::request &proof, bool &my_uptime_proof_confirmation);
+
+     /**
       * @brief handles an incoming transaction
       *
       * Parses an incoming transaction and, if nothing is obviously wrong,
@@ -341,7 +350,7 @@ namespace cryptonote
 
      /// Called (from service_node_quorum_cop) to tell quorumnet that it need to refresh its list of
      /// active SNs.
-     void update_lmq_sns();
+     void update_omq_sns();
 
      /**
       * @brief get the cryptonote protocol instance
@@ -564,6 +573,12 @@ namespace cryptonote
       */
      size_t get_alternative_blocks_count() const;
 
+     // Returns a bool on whether the service node is currently active
+     bool is_active_sn() const;
+
+     // Returns the service nodes info
+     std::shared_ptr<const service_nodes::service_node_info> get_my_sn_info() const;
+
      /**
       * Returns a short daemon status summary string.  Used when built with systemd support and
       * running as a Type=notify daemon.
@@ -683,8 +698,8 @@ namespace cryptonote
      tx_memory_pool &get_pool() { return m_mempool; }
 
      /// Returns a reference to the OxenMQ object.  Must not be called before init(), and should not
-     /// be used for any lmq communication until after start_oxenmq() has been called.
-     oxenmq::OxenMQ& get_lmq() { return *m_lmq; }
+     /// be used for any omq communication until after start_oxenmq() has been called.
+     oxenmq::OxenMQ& get_omq() { return *m_omq; }
 
      /**
       * @copydoc miner::on_synchronized
@@ -835,6 +850,11 @@ namespace cryptonote
       * @return which network are we on?
       */
      network_type get_nettype() const { return m_nettype; };
+
+     /**
+      * Returns the config settings for the network we are on.
+      */
+     constexpr const network_config& get_net_config() const { return get_config(m_nettype); }
 
      /**
       * @brief get whether transaction relay should be padded
@@ -1004,10 +1024,11 @@ namespace cryptonote
 
      /// Time point at which the storage server and lokinet last pinged us
      std::atomic<time_t> m_last_storage_server_ping, m_last_lokinet_ping;
-     std::atomic<uint16_t> m_storage_lmq_port;
+     std::atomic<uint16_t> m_storage_https_port, m_storage_omq_port;
 
      uint32_t sn_public_ip() const { return m_sn_public_ip; }
-     uint16_t storage_port() const { return m_storage_port; }
+     uint16_t storage_https_port() const { return m_storage_https_port; }
+     uint16_t storage_omq_port() const { return m_storage_omq_port; }
      uint16_t quorumnet_port() const { return m_quorumnet_port; }
 
      /**
@@ -1048,6 +1069,7 @@ namespace cryptonote
       * @return true if all the checks pass, otherwise false
       */
      bool check_tx_semantic(const transaction& tx, bool kept_by_block) const;
+     bool check_service_node_time();
      void set_semantics_failed(const crypto::hash &tx_hash);
 
      void parse_incoming_tx_pre(tx_verification_batch_info &tx_info);
@@ -1123,7 +1145,7 @@ namespace cryptonote
       * Checks the given x25519 pubkey against the configured access lists and, if allowed, returns
       * the access level; otherwise returns `denied`.
       */
-     oxenmq::AuthLevel lmq_check_access(const crypto::x25519_public_key& pubkey) const;
+     oxenmq::AuthLevel omq_check_access(const crypto::x25519_public_key& pubkey) const;
 
      /**
       * @brief Initializes OxenMQ object, called during init().
@@ -1145,7 +1167,7 @@ namespace cryptonote
      /**
       * Returns whether to allow the connection and, if so, at what authentication level.
       */
-     oxenmq::AuthLevel lmq_allow(std::string_view ip, std::string_view x25519_pubkey, oxenmq::AuthLevel default_auth);
+     oxenmq::AuthLevel omq_allow(std::string_view ip, std::string_view x25519_pubkey, oxenmq::AuthLevel default_auth);
 
      /**
       * @brief Internal use only!
@@ -1153,8 +1175,12 @@ namespace cryptonote
       * This returns a mutable reference to the internal auth level map that OxenMQ uses, for
       * internal use only.
       */
-     std::unordered_map<crypto::x25519_public_key, oxenmq::AuthLevel>& _lmq_auth_level_map() { return m_lmq_auth; }
+     std::unordered_map<crypto::x25519_public_key, oxenmq::AuthLevel>& _omq_auth_level_map() { return m_omq_auth; }
      oxenmq::TaggedThreadID const &pulse_thread_id() const { return *m_pulse_thread_id; }
+
+     /// Service Node's storage server and lokinet version
+     std::array<uint16_t, 3> ss_version;
+     std::array<uint16_t, 3> lokinet_version;
 
  private:
 
@@ -1190,12 +1216,15 @@ namespace cryptonote
 
      fs::path m_config_folder; //!< folder to look in for configs and other files
 
+     //m_sn_times keeps track of the services nodes timestamp checks to with other services nodes. If too many of these are out of sync we can assume our service node time is not in sync. lock m_sn_timestamp_mutex when accessing m_sn_times
+     std::mutex m_sn_timestamp_mutex;
+     service_nodes::participation_history<service_nodes::timesync_entry, 30> m_sn_times;
 
      tools::periodic_task m_store_blockchain_interval{12h, false}; //!< interval for manual storing of Blockchain, if enabled
      tools::periodic_task m_fork_moaner{2h}; //!< interval for checking HardFork status
      tools::periodic_task m_txpool_auto_relayer{2min, false}; //!< interval for checking re-relaying txpool transactions
      tools::periodic_task m_check_disk_space_interval{10min}; //!< interval for checking for disk space
-     tools::periodic_task m_check_uptime_proof_interval{std::chrono::seconds{UPTIME_PROOF_TIMER_SECONDS}}; //!< interval for checking our own uptime proof
+     tools::periodic_task m_check_uptime_proof_interval{30s}; //!< interval for checking our own uptime proof (will be set to get_net_config().UPTIME_PROOF_CHECK_INTERVAL after init)
      tools::periodic_task m_block_rate_interval{90s, false}; //!< interval for checking block rate
      tools::periodic_task m_blockchain_pruning_interval{5h}; //!< interval for incremental blockchain pruning
      tools::periodic_task m_service_node_vote_relayer{2min, false};
@@ -1216,13 +1245,12 @@ namespace cryptonote
      bool m_service_node; // True if running in service node mode
      service_keys m_service_keys; // Always set, even for non-SN mode -- these can be used for public oxenmq rpc
 
-     /// Service Node's public IP and storage server port (http and oxenmq)
+     /// Service Node's public IP and qnet ports
      uint32_t m_sn_public_ip;
-     uint16_t m_storage_port;
      uint16_t m_quorumnet_port;
 
      /// OxenMQ main object.  Gets created during init().
-     std::unique_ptr<oxenmq::OxenMQ> m_lmq;
+     std::unique_ptr<oxenmq::OxenMQ> m_omq;
 
      // Internal opaque data object managed by cryptonote_protocol/quorumnet.cpp.  void pointer to
      // avoid linking issues (protocol does not link against core).
@@ -1230,7 +1258,7 @@ namespace cryptonote
 
      /// Stores x25519 -> access level for LMQ authentication.
      /// Not to be modified after the LMQ listener starts.
-     std::unordered_map<crypto::x25519_public_key, oxenmq::AuthLevel> m_lmq_auth;
+     std::unordered_map<crypto::x25519_public_key, oxenmq::AuthLevel> m_omq_auth;
 
      size_t block_sync_size;
 

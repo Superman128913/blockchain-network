@@ -89,7 +89,7 @@ namespace cryptonote::rpc {
   /// Junk that epee makes us deal with to pass in a generically parsed json value
   using jsonrpc_params = std::pair<epee::serialization::portable_storage, epee::serialization::storage_entry>;
 
-  enum struct rpc_source : uint8_t { internal, http, lmq };
+  enum struct rpc_source : uint8_t { internal, http, omq };
 
   /// Contains the context of the invocation, which must be filled out by the glue code (e.g. HTTP
   /// RPC server) with requester-specific context details.
@@ -260,7 +260,6 @@ namespace cryptonote::rpc {
     GET_SERVICE_NODE_STATUS::response                   invoke(GET_SERVICE_NODE_STATUS::request&& req, rpc_context context);
     GET_SERVICE_NODES::response                         invoke(GET_SERVICE_NODES::request&& req, rpc_context context);
     GET_STAKING_REQUIREMENT::response                   invoke(GET_STAKING_REQUIREMENT::request&& req, rpc_context context);
-    PERFORM_BLOCKCHAIN_TEST::response                   invoke(PERFORM_BLOCKCHAIN_TEST::request&& req, rpc_context context);
     STORAGE_SERVER_PING::response                       invoke(STORAGE_SERVER_PING::request&& req, rpc_context context);
     LOKINET_PING::response                              invoke(LOKINET_PING::request&& req, rpc_context context);
     GET_CHECKPOINTS::response                           invoke(GET_CHECKPOINTS::request&& req, rpc_context context);
@@ -268,9 +267,9 @@ namespace cryptonote::rpc {
     REPORT_PEER_SS_STATUS::response                     invoke(REPORT_PEER_SS_STATUS::request&& req, rpc_context context);
     TEST_TRIGGER_P2P_RESYNC::response                   invoke(TEST_TRIGGER_P2P_RESYNC::request&& req, rpc_context context);
     TEST_TRIGGER_UPTIME_PROOF::response                 invoke(TEST_TRIGGER_UPTIME_PROOF::request&& req, rpc_context context);
-    LNS_NAMES_TO_OWNERS::response                       invoke(LNS_NAMES_TO_OWNERS::request&& req, rpc_context context);
-    LNS_OWNERS_TO_NAMES::response                       invoke(LNS_OWNERS_TO_NAMES::request&& req, rpc_context context);
-    LNS_RESOLVE::response                               invoke(LNS_RESOLVE::request&& req, rpc_context context);
+    ONS_NAMES_TO_OWNERS::response                       invoke(ONS_NAMES_TO_OWNERS::request&& req, rpc_context context);
+    ONS_OWNERS_TO_NAMES::response                       invoke(ONS_OWNERS_TO_NAMES::request&& req, rpc_context context);
+    ONS_RESOLVE::response                               invoke(ONS_RESOLVE::request&& req, rpc_context context);
     FLUSH_CACHE::response                               invoke(FLUSH_CACHE::request&& req, rpc_context);
 
 #if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)

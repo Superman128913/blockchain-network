@@ -118,7 +118,7 @@ target_include_directories(uSockets PRIVATE uWebSockets/uSockets/src)
 
 # On Windows uSockets uses libuv for its event loop; on Mac kqueue is the default, but that seems to
 # not be reliable on older macos versions (like 10.12), so we use libuv on macos as well.
-if (WIN32 OR APPLE)
+if (WIN32 OR (APPLE AND NOT IOS))
   add_subdirectory(libuv EXCLUDE_FROM_ALL)
   target_link_libraries(uSockets uv_a)
   target_compile_definitions(uSockets PUBLIC LIBUS_USE_LIBUV)

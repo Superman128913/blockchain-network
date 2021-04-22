@@ -78,7 +78,7 @@ private:
   std::unique_ptr<node_server> p2p;
   std::unique_ptr<cryptonote::rpc::core_rpc_server> rpc;
   std::optional<cryptonote::rpc::http_server> http_rpc_admin, http_rpc_public;
-  std::unique_ptr<cryptonote::rpc::lmq_rpc> lmq_rpc;
+  std::unique_ptr<cryptonote::rpc::omq_rpc> omq_rpc;
 };
 
 } // namespace daemonize

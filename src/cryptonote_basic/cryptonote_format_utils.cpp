@@ -774,7 +774,8 @@ namespace cryptonote
       return false;
 
     state_change = tx_extra_service_node_state_change{
-      service_nodes::new_state::deregister, dereg.block_height, dereg.service_node_index, dereg.votes.begin(), dereg.votes.end()};
+      tx_extra_service_node_state_change::version_t::v0,
+      service_nodes::new_state::deregister, dereg.block_height, dereg.service_node_index, 0, 0, {dereg.votes.begin(), dereg.votes.end()}};
     return true;
   }
   //---------------------------------------------------------------
@@ -1151,6 +1152,22 @@ namespace cryptonote
       buf.resize(buf.size() - 2);
 
     return buf;
+  }
+  //---------------------------------------------------------------
+  bool is_valid_address(const std::string address, cryptonote::network_type nettype, bool allow_subaddress, bool allow_integrated)
+  {
+    cryptonote::address_parse_info addr_info;
+    bool valid = false;
+    if(get_account_address_from_str(addr_info, nettype, address))
+    {
+      if (addr_info.is_subaddress)
+        valid = allow_subaddress;
+      else if (addr_info.has_payment_id)
+        valid = allow_integrated;
+      else
+        valid = true;
+    }
+    return valid;
   }
   //---------------------------------------------------------------
   crypto::hash get_blob_hash(const std::string_view blob)
@@ -1543,20 +1560,20 @@ namespace cryptonote
 
 }
 
-std::string lns::generic_owner::to_string(cryptonote::network_type nettype) const
+std::string ons::generic_owner::to_string(cryptonote::network_type nettype) const
 {
-  if (type == lns::generic_owner_sig_type::monero)
+  if (type == ons::generic_owner_sig_type::monero)
     return cryptonote::get_account_address_as_str(nettype, wallet.is_subaddress, wallet.address);
   else
     return tools::type_to_hex(ed25519);
 }
 
-bool lns::generic_owner::operator==(generic_owner const &other) const
+bool ons::generic_owner::operator==(generic_owner const &other) const
 {
   if (type != other.type)
     return false;
 
-  if (type == lns::generic_owner_sig_type::monero)
+  if (type == ons::generic_owner_sig_type::monero)
     return wallet.is_subaddress == other.wallet.is_subaddress && wallet.address == other.wallet.address;
   else
     return ed25519 == other.ed25519;

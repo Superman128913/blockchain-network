@@ -29,6 +29,7 @@
 #include "service_node_quorum_cop.h"
 #include "service_node_voting.h"
 #include "service_node_list.h"
+#include "uptime_proof.h"
 #include "cryptonote_config.h"
 #include "cryptonote_core.h"
 #include "version.h"
@@ -61,6 +62,8 @@ namespace service_nodes
       if (!uptime_proved)            buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr, "Uptime proof missing.\n");
       if (!checkpoint_participation) buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr, "Skipped voting in at least %d checkpoints.\n", (int)(QUORUM_VOTE_CHECK_COUNT - CHECKPOINT_MAX_MISSABLE_VOTES));
       if (!pulse_participation)      buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr, "Skipped voting in at least %d pulse quorums.\n", (int)(QUORUM_VOTE_CHECK_COUNT - PULSE_MAX_MISSABLE_VOTES));
+      if (!timestamp_participation)      buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr, "Replied out of sync time for at least %d timestamp mesages.\n", (int)(QUORUM_VOTE_CHECK_COUNT - TIMESTAMP_MAX_MISSABLE_VOTES));
+      if (!timesync_status)      buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr, "Missed replying to at least %d timesync messages.\n", (int)(QUORUM_VOTE_CHECK_COUNT - TIMESYNC_MAX_UNSYNCED_VOTES));
       buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr, "Note: Storage server may not be reachable. This is only testable by an external Service Node.");
     }
     return buf;
@@ -81,21 +84,37 @@ namespace service_nodes
   // has submitted uptime proofs, participated in required quorums, etc.
   service_node_test_results quorum_cop::check_service_node(uint8_t hf_version, const crypto::public_key &pubkey, const service_node_info &info) const
   {
+    const auto& netconf = m_core.get_net_config();
+
     service_node_test_results result; // Defaults to true for individual tests
     bool ss_reachable = true;
     uint64_t timestamp = 0;
     decltype(std::declval<proof_info>().public_ips) ips{};
 
-    service_nodes::participation_history checkpoint_participation{};
-    service_nodes::participation_history pulse_participation{};
+    service_nodes::participation_history<service_nodes::participation_entry> checkpoint_participation{};
+    service_nodes::participation_history<service_nodes::participation_entry> pulse_participation{};
+    service_nodes::participation_history<service_nodes::timestamp_participation_entry> timestamp_participation{};
+    service_nodes::participation_history<service_nodes::timesync_entry> timesync_status{};
+
+    constexpr std::array<uint16_t, 3> MIN_TIMESTAMP_VERSION{9,1,0};
+    bool check_timestamp_obligation = false;
+
     m_core.get_service_node_list().access_proof(pubkey, [&](const proof_info &proof) {
-      ss_reachable             = proof.storage_server_reachable;
-      timestamp                = std::max(proof.timestamp, proof.effective_timestamp);
+      ss_reachable             = !proof.ss_unreachable_for(netconf.UPTIME_PROOF_VALIDITY - netconf.UPTIME_PROOF_FREQUENCY);
+      timestamp                = std::max(proof.proof->timestamp, proof.effective_timestamp);
       ips                      = proof.public_ips;
       checkpoint_participation = proof.checkpoint_participation;
       pulse_participation      = proof.pulse_participation;
+
+      // TODO: remove after HF18
+      if (proof.proof->version >= MIN_TIMESTAMP_VERSION && hf_version >= cryptonote::network_version_18) {
+        timestamp_participation  = proof.timestamp_participation;
+        timesync_status          = proof.timesync_status;
+        check_timestamp_obligation = true;
+      }
+
     });
-    uint64_t time_since_last_uptime_proof = std::time(nullptr) - timestamp;
+    std::chrono::seconds time_since_last_uptime_proof{std::time(nullptr) - timestamp};
 
     bool check_uptime_obligation     = true;
     bool check_checkpoint_obligation = true;
@@ -105,12 +124,12 @@ namespace service_nodes
     if (integration_test::state.disable_obligation_checkpointing) check_checkpoint_obligation = false;
 #endif
 
-    if (check_uptime_obligation && time_since_last_uptime_proof > UPTIME_PROOF_MAX_TIME_IN_SECONDS)
+    if (check_uptime_obligation && time_since_last_uptime_proof > netconf.UPTIME_PROOF_VALIDITY)
     {
       LOG_PRINT_L1(
-          "Service Node: " << pubkey << ", failed uptime proof obligation check: the last uptime proof was older than: "
-                           << UPTIME_PROOF_MAX_TIME_IN_SECONDS << "s. Time since last uptime proof was: "
-                           << tools::get_human_readable_timespan(std::chrono::seconds(time_since_last_uptime_proof)));
+          "Service Node: " << pubkey << ", failed uptime proof obligation check: the last uptime proof (" <<
+          tools::get_human_readable_timespan(time_since_last_uptime_proof) << ") was older than max validity (" <<
+          tools::get_human_readable_timespan(netconf.UPTIME_PROOF_VALIDITY) << ")");
       result.uptime_proved = false;
     }
 
@@ -128,8 +147,8 @@ namespace service_nodes
       std::vector<cryptonote::block> blocks;
       if (m_core.get_blocks(info.last_ip_change_height, 1, blocks)) {
         uint64_t find_ips_used_since = std::max(
-            uint64_t(std::time(nullptr)) - IP_CHANGE_WINDOW_IN_SECONDS,
-            uint64_t(blocks[0].timestamp) + IP_CHANGE_BUFFER_IN_SECONDS);
+            uint64_t(std::time(nullptr)) - std::chrono::seconds{IP_CHANGE_WINDOW}.count(),
+            uint64_t(blocks[0].timestamp) + std::chrono::seconds{IP_CHANGE_BUFFER}.count());
         if (ips[0].second > find_ips_used_since && ips[1].second > find_ips_used_since)
           result.single_ip = false;
       }
@@ -139,37 +158,30 @@ namespace service_nodes
     {
       if (check_checkpoint_obligation)
       {
-        if (checkpoint_participation.write_index >= QUORUM_VOTE_CHECK_COUNT)
+        if (!checkpoint_participation.check_participation(CHECKPOINT_MAX_MISSABLE_VOTES) )
         {
-          int missed_participation = 0;
-          for (participation_entry const &entry : checkpoint_participation)
-            if (!entry.voted) missed_participation++;
-
-          if (missed_participation > CHECKPOINT_MAX_MISSABLE_VOTES)
-          {
-            LOG_PRINT_L1("Service Node: " << pubkey << ", failed checkpoint obligation check: missed the last: "
-                                          << missed_participation << " checkpoint votes from: "
-                                          << QUORUM_VOTE_CHECK_COUNT
-                                          << " quorums that they were required to participate in.");
-            if (hf_version >= cryptonote::network_version_13_enforce_checkpoints)
-              result.checkpoint_participation = false;
-          }
+          LOG_PRINT_L1("Service Node: " << pubkey << ", failed checkpoint obligation check");
+          if (hf_version >= cryptonote::network_version_13_enforce_checkpoints)
+            result.checkpoint_participation = false;
         }
       }
 
-      if (pulse_participation.write_index >= QUORUM_VOTE_CHECK_COUNT)
+      if (!pulse_participation.check_participation(PULSE_MAX_MISSABLE_VOTES) )
       {
-        int missed_participation = 0;
-        for (participation_entry const &entry : pulse_participation)
-          if (!entry.voted) missed_participation++;
+        LOG_PRINT_L1("Service Node: " << pubkey << ", failed pulse obligation check");
+        result.pulse_participation = false;
+      }
 
-        if (missed_participation > PULSE_MAX_MISSABLE_VOTES)
+      if (check_timestamp_obligation){
+        if (!timestamp_participation.check_participation(TIMESTAMP_MAX_MISSABLE_VOTES) )
         {
-          LOG_PRINT_L1("Service Node: " << pubkey << ", failed pulse obligation check: did not participate in the last: "
-                                        << missed_participation << " pulse quorums from: "
-                                        << QUORUM_VOTE_CHECK_COUNT
-                                        << " quorums that they were required to participate in.");
-          result.pulse_participation = false;
+          LOG_PRINT_L1("Service Node: " << pubkey << ", failed timestamp obligation check");
+          result.timestamp_participation = false;
+        }
+        if (!timesync_status.check_participation(TIMESYNC_MAX_UNSYNCED_VOTES) )
+        {
+          LOG_PRINT_L1("Service Node: " << pubkey << ", failed timesync obligation check");
+          result.timesync_status = false;
         }
       }
     }
@@ -232,6 +244,8 @@ namespace service_nodes
     if (hf_version < cryptonote::network_version_9_service_nodes)
       return;
 
+    const auto& netconf = m_core.get_net_config();
+
     uint64_t const REORG_SAFETY_BUFFER_BLOCKS = (hf_version >= cryptonote::network_version_12_checkpointing)
                                                     ? REORG_SAFETY_BUFFER_BLOCKS_POST_HF12
                                                     : REORG_SAFETY_BUFFER_BLOCKS_PRE_HF12;
@@ -250,9 +264,8 @@ namespace service_nodes
     service_nodes::quorum_type const max_quorum_type = service_nodes::max_quorum_type_for_hf(hf_version);
     bool tested_myself_once_per_block                = false;
 
-    time_t start_time   = m_core.get_start_time();
-    time_t const now    = time(nullptr);
-    int const live_time = (now - start_time);
+    time_t start_time = m_core.get_start_time();
+    std::chrono::seconds live_time{time(nullptr) - start_time};
     for (int i = 0; i <= (int)max_quorum_type; i++)
     {
       quorum_type const type = static_cast<quorum_type>(i);
@@ -307,21 +320,15 @@ namespace service_nodes
               }
             }
 
-            // NOTE: Wait at least 2 hours before we're allowed to vote so that we collect necessary voting information from people on the network
-            bool alive_for_min_time = live_time >= MIN_TIME_IN_S_BEFORE_VOTING;
-            if (!alive_for_min_time)
+#ifndef OXEN_ENABLE_INTEGRATION_TEST_HOOKS
+            // NOTE: Wait at least 2 hours before we're allowed to vote so that we collect necessary
+            // voting information from people on the network
+            if (live_time < m_core.get_net_config().UPTIME_PROOF_VALIDITY)
               continue;
+#endif
 
             if (!m_core.service_node())
               continue;
-
-            if (m_core.get_nettype() == cryptonote::MAINNET && m_core.get_current_blockchain_height() < 646151)
-            {
-              // TODO(oxen): Pulse grace period, temporary code to be deleted
-              // once the grace height has transpired to give Service Nodes time
-              // to upgrade for the Pulse sorting key hot fix.
-              continue;
-            }
 
             auto quorum = m_core.get_quorum(quorum_type::obligations, m_obligations_height);
             if (!quorum)
@@ -362,6 +369,7 @@ namespace service_nodes
                 bool passed       = test_results.passed();
 
                 new_state vote_for_state;
+                uint16_t reason = 0;
                 if (passed) {
                   if (info.is_decommissioned()) {
                     vote_for_state = new_state::recommission;
@@ -378,6 +386,12 @@ namespace service_nodes
 
                 }
                 else {
+                  if (!test_results.uptime_proved) reason |= cryptonote::Decommission_Reason::missed_uptime_proof;
+                  if (!test_results.checkpoint_participation) reason |= cryptonote::Decommission_Reason::missed_checkpoints;
+                  if (!test_results.pulse_participation) reason |= cryptonote::Decommission_Reason::missed_pulse_participations;
+                  if (!test_results.storage_server_reachable) reason |= cryptonote::Decommission_Reason::storage_server_unreachable;
+                  if (!test_results.timestamp_participation) reason |= cryptonote::Decommission_Reason::timestamp_response_unreachable;
+                  if (!test_results.timesync_status) reason |= cryptonote::Decommission_Reason::timesync_status_out_of_sync;
                   int64_t credit = calculate_decommission_credit(info, latest_height);
 
                   if (info.is_decommissioned()) {
@@ -408,7 +422,7 @@ namespace service_nodes
                   }
                 }
 
-                quorum_vote_t vote = service_nodes::make_state_change_vote(m_obligations_height, static_cast<uint16_t>(index_in_group), node_index, vote_for_state, my_keys);
+                quorum_vote_t vote = service_nodes::make_state_change_vote(m_obligations_height, static_cast<uint16_t>(index_in_group), node_index, vote_for_state, reason, my_keys);
                 cryptonote::vote_verification_context vvc;
                 if (!handle_vote(vote, vvc))
                   LOG_ERROR("Failed to add state change vote; reason: " << print_vote_verification_context(vvc, &vote));
@@ -438,8 +452,8 @@ namespace service_nodes
                       // NOTE: Don't warn uptime proofs if the daemon is just
                       // recently started and is candidate for testing (i.e.
                       // restarting the daemon)
-                      if (!my_test_results.uptime_proved && live_time < OXEN_HOUR(1))
-                          continue;
+                      if (!my_test_results.uptime_proved && live_time < 1h)
+                        continue;
 
                       LOG_PRINT_L0("Service Node (yours) is active but is not passing tests for quorum: " << m_obligations_height);
                       LOG_PRINT_L0(my_test_results.why());
@@ -518,7 +532,7 @@ namespace service_nodes
 
     // These feels out of place here because the hook system sucks: TODO replace it with
     // std::function hooks instead.
-    m_core.update_lmq_sns();
+    m_core.update_omq_sns();
 
     return true;
   }
@@ -544,11 +558,24 @@ namespace service_nodes
         return true;
     }
 
-    cryptonote::tx_extra_service_node_state_change state_change{vote.state_change.state, vote.block_height, vote.state_change.worker_index};
+    using version_t = cryptonote::tx_extra_service_node_state_change::version_t;
+    auto ver = hf_version >= HF_VERSION_PROOF_BTENC ? version_t::v4_reasons : version_t::v0;
+    cryptonote::tx_extra_service_node_state_change state_change{
+        ver,
+        vote.state_change.state,
+        vote.block_height,
+        vote.state_change.worker_index,
+        vote.state_change.reason,
+        vote.state_change.reason,
+        {}};
     state_change.votes.reserve(votes.size());
 
     for (const auto &pool_vote : votes)
+    {
+      state_change.reason_consensus_any |= pool_vote.vote.state_change.reason;
+      state_change.reason_consensus_all &= pool_vote.vote.state_change.reason;
       state_change.votes.emplace_back(pool_vote.vote.signature, pool_vote.vote.index_in_group);
+    }
 
     cryptonote::transaction state_change_tx{};
     if (cryptonote::add_service_node_state_change_to_tx_extra(state_change_tx.extra, state_change, hf_version))
@@ -557,9 +584,7 @@ namespace service_nodes
       state_change_tx.type    = cryptonote::txtype::state_change;
 
       cryptonote::tx_verification_context tvc{};
-      cryptonote::blobdata const tx_blob = cryptonote::tx_to_blob(state_change_tx);
-
-      bool result = core.handle_incoming_tx(tx_blob, tvc, cryptonote::tx_pool_options::new_tx());
+      bool result = core.handle_incoming_tx(cryptonote::tx_to_blob(state_change_tx), tvc, cryptonote::tx_pool_options::new_tx());
       if (!result || tvc.m_verifivation_failed)
       {
         LOG_PRINT_L1("A full state change tx for height: " << vote.block_height <<
@@ -690,7 +715,6 @@ namespace service_nodes
   }
 
   // Calculate the decommission credit for a service node.  If the SN is current decommissioned this
-  // returns the number of blocks remaining in the credit; otherwise this is the number of currently
   // accumulated blocks.
   int64_t quorum_cop::calculate_decommission_credit(const service_node_info &info, uint64_t current_height)
   {

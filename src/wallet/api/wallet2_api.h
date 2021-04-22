@@ -454,6 +454,7 @@ struct Wallet
     bool devnet() const { return nettype() == DEVNET; }
     //! returns current hard fork info
     virtual void hardForkInfo(uint8_t &version, uint64_t &earliest_height) const = 0;
+    virtual std::optional<uint8_t> hardForkVersion() const = 0;
     //! check if hard fork rules should be used
     virtual bool useForkRules(uint8_t version, int64_t early_blocks) const = 0;  
     /*!

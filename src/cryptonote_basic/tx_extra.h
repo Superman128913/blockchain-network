@@ -1,21 +1,21 @@
 // Copyright (c) 2014-2019, The Monero Project
-// 
+//
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -25,7 +25,7 @@
 // INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// 
+//
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #pragma once
@@ -72,7 +72,7 @@ constexpr char
 
 }
 
-namespace lns
+namespace ons
 {
 enum struct extra_field : uint8_t
 {
@@ -127,7 +127,7 @@ struct alignas(size_t) generic_owner
     }
   END_SERIALIZE()
 };
-static_assert(sizeof(generic_owner) == 80, "Unexpected padding, we store binary blobs into the LNS DB");
+static_assert(sizeof(generic_owner) == 80, "Unexpected padding, we store binary blobs into the ONS DB");
 
 struct generic_signature
 {
@@ -148,18 +148,18 @@ struct generic_signature
   END_SERIALIZE()
 };
 
-static_assert(sizeof(crypto::ed25519_signature) == sizeof(crypto::signature), "LNS allows storing either ed25519 or monero style signatures, we store all signatures into crypto::signature in LNS");
+static_assert(sizeof(crypto::ed25519_signature) == sizeof(crypto::signature), "ONS allows storing either ed25519 or monero style signatures, we store all signatures into crypto::signature in ONS");
 inline std::ostream &operator<<(std::ostream &o, const generic_signature &v) {
     return o << '<' << tools::type_to_hex(v.data) << '>';
 }
 
-} // namespace lns
+} // namespace ons
 
 namespace std {
-  static_assert(sizeof(lns::generic_owner) >= sizeof(std::size_t) && alignof(lns::generic_owner) >= alignof(std::size_t),
+  static_assert(sizeof(ons::generic_owner) >= sizeof(std::size_t) && alignof(ons::generic_owner) >= alignof(std::size_t),
                 "Size and alignment of hash must be at least that of size_t");
-  template <> struct hash<lns::generic_owner> {
-    std::size_t operator()(const lns::generic_owner &v) const { return reinterpret_cast<const std::size_t &>(v); }
+  template <> struct hash<ons::generic_owner> {
+    std::size_t operator()(const ons::generic_owner &v) const { return reinterpret_cast<const std::size_t &>(v); }
   };
 }
 
@@ -347,29 +347,90 @@ namespace cryptonote
       END_SERIALIZE()
     };
 
+    enum struct version_t : uint8_t { v0, v4_reasons = 4 };
+
+    version_t version;
     service_nodes::new_state state;
-    uint64_t                 block_height;
-    uint32_t                 service_node_index;
-    std::vector<vote>        votes;
+    uint64_t block_height;
+    uint32_t service_node_index;
+    uint16_t reason_consensus_all;
+    uint16_t reason_consensus_any;
+    std::vector<vote> votes;
 
     tx_extra_service_node_state_change() = default;
 
     template <typename... VotesArgs>
-    tx_extra_service_node_state_change(service_nodes::new_state state, uint64_t block_height, uint32_t service_node_index, VotesArgs &&...votes)
-        : state{state}, block_height{block_height}, service_node_index{service_node_index}, votes{std::forward<VotesArgs>(votes)...} {}
+    tx_extra_service_node_state_change(
+        version_t version,
+        service_nodes::new_state state,
+        uint64_t block_height,
+        uint32_t service_node_index,
+        uint16_t reason_all,
+        uint16_t reason_any,
+        std::vector<vote> votes) :
+      version{version},
+      state{state},
+      block_height{block_height},
+      service_node_index{service_node_index},
+      reason_consensus_all{reason_all},
+      reason_consensus_any{reason_any},
+      votes{std::move(votes)}
+    {}
 
     // Compares equal if this represents a state change of the same SN (does *not* require equality of stored votes)
     bool operator==(const tx_extra_service_node_state_change &sc) const {
       return state == sc.state && block_height == sc.block_height && service_node_index == sc.service_node_index;
     }
 
-    BEGIN_SERIALIZE()
-      ENUM_FIELD(state, state < service_nodes::new_state::_count);
-      VARINT_FIELD(block_height);
-      VARINT_FIELD(service_node_index);
-      FIELD(votes);
-    END_SERIALIZE()
+    template <class Archive>
+    void serialize_value(Archive& ar) {
+      // Retrofit a field version in here.  Prior to adding reason fields, the first value (in
+      // binary serialization) was the `state` enum, which had a maximum acceptable value of 3: so
+      // if we get >= 4, that's a version, and otherwise we're implicitly version 0 (and there is no
+      // version 1-3).
+      if (Archive::is_serializer && version >= version_t::v4_reasons) {
+        field_varint(ar, "version", version);
+      } else if constexpr (Archive::is_deserializer) {
+        uint8_t ver;
+        field_varint(ar, "version", ver, [](auto v) { return v <= 4; });
+        if (ver < 4) { // Old record, so the "version" we read is actually the state value
+          version = version_t::v0;
+          state = static_cast<service_nodes::new_state>(ver);
+        } else {
+          version = static_cast<version_t>(ver);
+        }
+      }
+      if (Archive::is_serializer || version >= version_t::v4_reasons) {
+        field_varint(ar, "state", state, [](auto s) { return s < service_nodes::new_state::_count; });
+      }
+
+      field_varint(ar, "block_height", block_height);
+      field_varint(ar, "service_node_index", service_node_index);
+      field(ar, "votes", votes);
+      if (version >= version_t::v4_reasons)
+      {
+        field_varint(ar, "reason_consensus_all", reason_consensus_all);
+        field_varint(ar, "reason_consensus_any", reason_consensus_any);
+      }
+    }
   };
+
+  // Describes the reason for a service node being decommissioned. Included in demerit votes and the decommission transaction itself.
+  enum Decommission_Reason : uint16_t {
+    missed_uptime_proof = 1 << 0,
+    missed_checkpoints = 1 << 1,
+    missed_pulse_participations = 1 << 2,
+    storage_server_unreachable = 1 << 3,
+    timestamp_response_unreachable = 1 << 4,
+    timesync_status_out_of_sync = 1 << 5
+  };
+
+  // Returns human-readable reason strings (e.g. "Missed Uptime Proofs") for the given reason bits
+  std::vector<std::string> readable_reasons(uint16_t decomm_reasons);
+
+  // Return reason code strings (e.g. "uptime") for the given reason bits; these are used for RPC
+  // where we want something in-between a bit field and a human-readable string.
+  std::vector<std::string> coded_reasons(uint16_t decomm_reasons);
 
   // Pre-Heimdall service node deregistration data; it doesn't carry the state change (it is only
   // used for deregistrations), and is stored slightly less efficiently in the tx extra data.
@@ -473,55 +534,55 @@ namespace cryptonote
   struct tx_extra_oxen_name_system
   {
     uint8_t                 version = 0;
-    lns::mapping_type       type;
+    ons::mapping_type       type;
     crypto::hash            name_hash;
     crypto::hash            prev_txid = crypto::null_hash;  // previous txid that purchased the mapping
-    lns::extra_field        fields;
-    lns::generic_owner      owner        = {};
-    lns::generic_owner      backup_owner = {};
-    lns::generic_signature  signature    = {};
+    ons::extra_field        fields;
+    ons::generic_owner      owner        = {};
+    ons::generic_owner      backup_owner = {};
+    ons::generic_signature  signature    = {};
     std::string             encrypted_value; // binary format of the name->value mapping
 
-    bool field_is_set (lns::extra_field bit) const { return (fields & bit) == bit; }
-    bool field_any_set(lns::extra_field bit) const { return (fields & bit) != lns::extra_field::none; }
+    bool field_is_set (ons::extra_field bit) const { return (fields & bit) == bit; }
+    bool field_any_set(ons::extra_field bit) const { return (fields & bit) != ons::extra_field::none; }
 
-    // True if this is updating some LNS info: has a signature and 1 or more updating field
-    bool is_updating() const { return field_is_set(lns::extra_field::signature) && field_any_set(lns::extra_field::updatable_fields); }
-    // True if this is buying a new LNS record
-    bool is_buying()   const { return (fields == lns::extra_field::buy || fields == lns::extra_field::buy_no_backup); }
-    // True if this is renewing an existing LNS: has no fields at all, is a renewal registration (i.e. lokinet),
+    // True if this is updating some ONS info: has a signature and 1 or more updating field
+    bool is_updating() const { return field_is_set(ons::extra_field::signature) && field_any_set(ons::extra_field::updatable_fields); }
+    // True if this is buying a new ONS record
+    bool is_buying()   const { return (fields == ons::extra_field::buy || fields == ons::extra_field::buy_no_backup); }
+    // True if this is renewing an existing ONS: has no fields at all, is a renewal registration (i.e. lokinet),
     // and has a non-null txid set (which should point to the most recent registration or update).
-    bool is_renewing() const { return fields == lns::extra_field::none && prev_txid && is_lokinet_type(type); }
+    bool is_renewing() const { return fields == ons::extra_field::none && prev_txid && is_lokinet_type(type); }
 
     static tx_extra_oxen_name_system make_buy(
-        lns::generic_owner const& owner,
-        lns::generic_owner const* backup_owner,
-        lns::mapping_type type,
+        ons::generic_owner const& owner,
+        ons::generic_owner const* backup_owner,
+        ons::mapping_type type,
         const crypto::hash& name_hash,
         const std::string& encrypted_value,
         const crypto::hash& prev_txid);
 
-    static tx_extra_oxen_name_system make_renew(lns::mapping_type type, const crypto::hash& name_hash, const crypto::hash& prev_txid);
+    static tx_extra_oxen_name_system make_renew(ons::mapping_type type, const crypto::hash& name_hash, const crypto::hash& prev_txid);
 
     static tx_extra_oxen_name_system make_update(
-        const lns::generic_signature& signature,
-        lns::mapping_type type,
+        const ons::generic_signature& signature,
+        ons::mapping_type type,
         const crypto::hash& name_hash,
         std::string_view encrypted_value,
-        const lns::generic_owner* owner,
-        const lns::generic_owner* backup_owner,
+        const ons::generic_owner* owner,
+        const ons::generic_owner* backup_owner,
         const crypto::hash& prev_txid);
 
     BEGIN_SERIALIZE()
       FIELD(version)
-      ENUM_FIELD(type, type < lns::mapping_type::_count)
+      ENUM_FIELD(type, type < ons::mapping_type::_count)
       FIELD(name_hash)
       FIELD(prev_txid)
-      ENUM_FIELD(fields, fields <= lns::extra_field::all)
-      if (field_is_set(lns::extra_field::owner)) FIELD(owner);
-      if (field_is_set(lns::extra_field::backup_owner)) FIELD(backup_owner);
-      if (field_is_set(lns::extra_field::signature)) FIELD(signature);
-      if (field_is_set(lns::extra_field::encrypted_value)) FIELD(encrypted_value);
+      ENUM_FIELD(fields, fields <= ons::extra_field::all)
+      if (field_is_set(ons::extra_field::owner)) FIELD(owner);
+      if (field_is_set(ons::extra_field::backup_owner)) FIELD(backup_owner);
+      if (field_is_set(ons::extra_field::signature)) FIELD(signature);
+      if (field_is_set(ons::extra_field::encrypted_value)) FIELD(encrypted_value);
     END_SERIALIZE()
   };
 

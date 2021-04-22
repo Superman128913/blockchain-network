@@ -51,7 +51,7 @@ message(STATUS "CMake version ${CMAKE_VERSION}")
 set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12 CACHE STRING "macOS deployment target (Apple clang only)")
 
 project(oxen
-    VERSION 8.1.6
+    VERSION 9.1.0
     LANGUAGES CXX C)
   set(OXEN_RELEASE_CODENAME "Salty Saga")
 
@@ -60,7 +60,7 @@ project(oxen
 # empty string on `stable`, "-dev" on the `dev` branch, and can be set externally (via cmake
 # arguments) where it makes sense to take some other branch release with an extra value.
 if(NOT DEFINED OXEN_RELEASE_SUFFIX)
-  set(OXEN_RELEASE_SUFFIX "")
+  set(OXEN_RELEASE_SUFFIX "-dev")
 endif()
 
 if(POLICY CMP0079)
@@ -895,11 +895,6 @@ if(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND ARCH_WIDTH EQUAL "32" AND NOT IOS AN
   if (ATOMIC_FOUND)
     target_link_libraries(extra INTERFACE ${ATOMIC})
   endif()
-endif()
-
-option(OXEN_DEBUG_SHORT_PROOFS "Developer option to substantially reduce uptime proof intervals for local test network debugging (the result oxend will not be usable on the live networks)" OFF)
-if (OXEN_DEBUG_SHORT_PROOFS)
-  add_definitions(-DUPTIME_PROOF_BASE_MINUTE=3) # 20x faster uptime proofs
 endif()
 
 

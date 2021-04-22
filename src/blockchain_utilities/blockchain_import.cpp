@@ -41,6 +41,7 @@
 #include "blocks/blocks.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "serialization/binary_utils.h"
+#include "cryptonote_core/uptime_proof.h"
 #include "cryptonote_core/cryptonote_core.h"
 #include "common/hex.h"
 

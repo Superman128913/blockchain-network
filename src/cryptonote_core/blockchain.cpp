@@ -299,21 +299,21 @@ uint64_t Blockchain::get_current_blockchain_height(bool lock) const
 bool Blockchain::load_missing_blocks_into_oxen_subsystems()
 {
   uint64_t const snl_height   = std::max(m_hardfork->get_earliest_ideal_height_for_version(network_version_9_service_nodes), m_service_node_list.height() + 1);
-  uint64_t const lns_height   = std::max(m_hardfork->get_earliest_ideal_height_for_version(network_version_15_lns),          m_lns_db.height() + 1);
+  uint64_t const ons_height   = std::max(m_hardfork->get_earliest_ideal_height_for_version(network_version_15_ons),          m_ons_db.height() + 1);
   uint64_t const end_height   = m_db->height();
-  uint64_t const start_height = std::min(end_height, std::min(lns_height, snl_height));
+  uint64_t const start_height = std::min(end_height, std::min(ons_height, snl_height));
 
   int64_t const total_blocks = static_cast<int64_t>(end_height) - static_cast<int64_t>(start_height);
   if (total_blocks <= 0) return true;
   if (total_blocks > 1)
-    MGINFO("Loading blocks into oxen subsystems, scanning blockchain from height: " << start_height << " to: " << end_height << " (snl: " << snl_height << ", lns: " << lns_height << ")");
+    MGINFO("Loading blocks into oxen subsystems, scanning blockchain from height: " << start_height << " to: " << end_height << " (snl: " << snl_height << ", ons: " << ons_height << ")");
 
   using clock                   = std::chrono::steady_clock;
   using work_time               = std::chrono::duration<float>;
   int64_t constexpr BLOCK_COUNT = 1000;
   auto work_start               = clock::now();
   auto scan_start               = work_start;
-  work_time lns_duration{}, snl_duration{}, lns_iteration_duration{}, snl_iteration_duration{};
+  work_time ons_duration{}, snl_duration{}, ons_iteration_duration{}, snl_iteration_duration{};
 
   std::vector<cryptonote::block> blocks;
   std::vector<cryptonote::transaction> txs;
@@ -328,7 +328,7 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
     {
       m_service_node_list.store();
       auto duration = work_time{clock::now() - work_start};
-      MGINFO("... scanning height " << start_height + (index * BLOCK_COUNT) << " (" << duration.count() << "s) (snl: " << snl_iteration_duration.count() << "s; lns: " << lns_iteration_duration.count() << "s)");
+      MGINFO("... scanning height " << start_height + (index * BLOCK_COUNT) << " (" << duration.count() << "s) (snl: " << snl_iteration_duration.count() << "s; ons: " << ons_iteration_duration.count() << "s)");
 #ifdef ENABLE_SYSTEMD
       // Tell systemd that we're doing something so that it should let us continue starting up
       // (giving us 120s until we have to send the next notification):
@@ -336,9 +336,9 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
 #endif
       work_start = clock::now();
 
-      lns_duration += lns_iteration_duration;
+      ons_duration += ons_iteration_duration;
       snl_duration += snl_iteration_duration;
-      lns_iteration_duration = snl_iteration_duration = {};
+      ons_iteration_duration = snl_iteration_duration = {};
     }
 
     blocks.clear();
@@ -357,7 +357,7 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
       missed_txs.clear();
       if (!get_transactions(blk.tx_hashes, txs, missed_txs))
       {
-        MERROR("Unable to get transactions for block for updating LNS DB: " << cryptonote::get_block_hash(blk));
+        MERROR("Unable to get transactions for block for updating ONS DB: " << cryptonote::get_block_hash(blk));
         return false;
       }
 
@@ -372,21 +372,21 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
 
         if (!m_service_node_list.block_added(blk, txs, checkpoint_ptr))
         {
-          MERROR("Unable to process block for updating service node list: " << cryptonote::get_block_hash(blk));
+          MFATAL("Unable to process block for updating service node list: " << cryptonote::get_block_hash(blk));
           return false;
         }
         snl_iteration_duration += clock::now() - snl_start;
       }
 
-      if (m_lns_db.db && (block_height >= lns_height))
+      if (m_ons_db.db && (block_height >= ons_height))
       {
-        auto lns_start = clock::now();
-        if (!m_lns_db.add_block(blk, txs))
+        auto ons_start = clock::now();
+        if (!m_ons_db.add_block(blk, txs))
         {
-          MERROR("Unable to process block for updating LNS DB: " << cryptonote::get_block_hash(blk));
+          MFATAL("Unable to process block for updating ONS DB: " << cryptonote::get_block_hash(blk));
           return false;
         }
-        lns_iteration_duration += clock::now() - lns_start;
+        ons_iteration_duration += clock::now() - ons_start;
       }
     }
   }
@@ -394,7 +394,7 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
   if (total_blocks > 1)
   {
     auto duration = work_time{clock::now() - scan_start};
-    MGINFO("Done recalculating oxen subsystems (" << duration.count() << "s) (snl: " << snl_duration.count() << "s; lns: " << lns_duration.count() << "s)");
+    MGINFO("Done recalculating oxen subsystems (" << duration.count() << "s) (snl: " << snl_duration.count() << "s; ons: " << ons_duration.count() << "s)");
   }
 
   if (total_blocks > 0)
@@ -405,7 +405,7 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
 //------------------------------------------------------------------
 //FIXME: possibly move this into the constructor, to avoid accidentally
 //       dereferencing a null BlockchainDB pointer
-bool Blockchain::init(BlockchainDB* db, sqlite3 *lns_db, const network_type nettype, bool offline, const cryptonote::test_options *test_options, difficulty_type fixed_difficulty, const GetCheckpointsCallback& get_checkpoints/* = nullptr*/)
+bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, const network_type nettype, bool offline, const cryptonote::test_options *test_options, difficulty_type fixed_difficulty, const GetCheckpointsCallback& get_checkpoints/* = nullptr*/)
 {
   LOG_PRINT_L3("Blockchain::" << __func__);
 
@@ -543,12 +543,12 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *lns_db, const network_type nett
       // so we re-throw
       catch (const std::exception& e)
       {
-        MERROR("Error popping block from blockchain: " << e.what());
+        MFATAL("Error popping block from blockchain: " << e.what());
         throw;
       }
       catch (...)
       {
-        MERROR("Error popping block from blockchain, throwing!");
+        MFATAL("Error popping block from blockchain, throwing!");
         throw;
       }
     }
@@ -572,9 +572,9 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *lns_db, const network_type nett
       return false;
   }
 
-  if (lns_db && !m_lns_db.init(this, nettype, lns_db))
+  if (ons_db && !m_ons_db.init(this, nettype, ons_db))
   {
-    MERROR("LNS failed to initialise");
+    MFATAL("ONS failed to initialise");
     return false;
   }
 
@@ -585,18 +585,18 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *lns_db, const network_type nett
 
   if (!m_db->is_read_only() && !load_missing_blocks_into_oxen_subsystems())
   {
-    MERROR("Failed to load blocks into oxen subsystems");
+    MFATAL("Failed to load blocks into oxen subsystems");
     return false;
   }
 
   return true;
 }
 //------------------------------------------------------------------
-bool Blockchain::init(BlockchainDB* db, HardFork*& hf, sqlite3 *lns_db, const network_type nettype, bool offline)
+bool Blockchain::init(BlockchainDB* db, HardFork*& hf, sqlite3 *ons_db, const network_type nettype, bool offline)
 {
   if (hf != nullptr)
     m_hardfork = hf;
-  bool res = init(db, lns_db, nettype, offline, NULL);
+  bool res = init(db, ons_db, nettype, offline, NULL);
   if (hf == nullptr)
     hf = m_hardfork;
   return res;
@@ -751,7 +751,7 @@ block Blockchain::pop_block_from_blockchain()
 
   // make sure the hard fork object updates its current version
   m_hardfork->on_block_popped(1);
-  m_lns_db.block_detach(*this, m_db->height());
+  m_ons_db.block_detach(*this, m_db->height());
 
   // return transactions from popped block to the tx_pool
   size_t pruned = 0;
@@ -1351,6 +1351,7 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
   }
 
   block_reward_parts reward_parts;
+
   if (!get_oxen_block_reward(median_weight, cumulative_block_weight, already_generated_coins, version, reward_parts, block_reward_context))
   {
     MERROR_VER("block weight " << cumulative_block_weight << " is bigger than allowed for this blockchain");
@@ -3541,9 +3542,9 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     {
       cryptonote::tx_extra_oxen_name_system data;
       std::string fail_reason;
-      if (!m_lns_db.validate_lns_tx(hf_version, get_current_blockchain_height(), tx, data, &fail_reason))
+      if (!m_ons_db.validate_ons_tx(hf_version, get_current_blockchain_height(), tx, data, &fail_reason))
       {
-        MERROR_VER("Failed to validate LNS TX reason: " << fail_reason);
+        MERROR_VER("Failed to validate ONS TX reason: " << fail_reason);
         tvc.m_verbose_error = std::move(fail_reason);
         return false;
       }
@@ -3710,8 +3711,10 @@ byte_and_output_fees Blockchain::get_dynamic_base_fee(uint64_t block_reward, siz
     assert(hi == 0);
     lo /= 5;
 
-    if (version >= HF_VERSION_PER_OUTPUT_FEE)
-      fees.second = FEE_PER_OUTPUT;
+    if (version >= cryptonote::network_version_18)
+      fees.second = FEE_PER_OUTPUT_V18;
+    else if (version >= HF_VERSION_PER_OUTPUT_FEE)
+      fees.second = FEE_PER_OUTPUT_V13;
 
     return fees;
   }
@@ -4447,9 +4450,9 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
     return false;
   }
 
-  if (!m_lns_db.add_block(bl, only_txs))
+  if (!m_ons_db.add_block(bl, only_txs))
   {
-    MGINFO_RED("Failed to add block to LNS DB.");
+    MGINFO_RED("Failed to add block to ONS DB.");
     bvc.m_verifivation_failed = true;
     return false;
   }
@@ -4993,7 +4996,7 @@ bool Blockchain::calc_batched_governance_reward(uint64_t height, uint64_t &rewar
   size_t num_blocks = cryptonote::get_config(nettype()).GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS;
 
   // Fixed reward starting at HF15
-  if (hard_fork_version >= network_version_15_lns)
+  if (hard_fork_version >= network_version_15_ons)
   {
     reward = num_blocks * (
         hard_fork_version >= network_version_17 ? FOUNDATION_REWARD_HF17 :

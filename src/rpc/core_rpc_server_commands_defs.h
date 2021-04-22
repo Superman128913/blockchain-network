@@ -296,17 +296,19 @@ namespace rpc {
         uint64_t height;               // The voting block height for the changing service node and validators
         uint32_t index;                // The index of all tested nodes at the given height for which this state change applies
         std::vector<uint32_t> voters;  // The position of validators in the testing quorum who validated and voted for this state change. This typically contains just 7 required voter slots (of 10 eligible voters).
+        std::optional<std::vector<std::string>> reasons; // Reasons for the decommissioning/deregistration as reported by the voting quorum.  This contains any reasons that all voters agreed on, one or more of: "uptime" (missing uptime proofs), "checkpoints" (missed checkpoint votes), "pulse" (missing pulse votes), "storage" (storage server pings failed), "timecheck" (time sync pings failed), "timesync" (time was out of sync)
+        std::optional<std::vector<std::string>> reasons_maybe; // If present, this contains any decomm/dereg reasons that were given by some but not all quorum voters
         KV_MAP_SERIALIZABLE
       };
-      struct lns_details
+      struct ons_details
       {
-        std::optional<bool> buy;                 // Provided and true iff this is an LNS buy record
-        std::optional<bool> update;              // Provided and true iff this is an LNS record update
-        std::optional<bool> renew;               // Provided and true iff this is an LNS record renewal
-        std::string type;                        // The LNS request type.  For registrations: "lokinet", "session", "wallet"; for a record update: "update"
+        std::optional<bool> buy;                 // Provided and true iff this is an ONS buy record
+        std::optional<bool> update;              // Provided and true iff this is an ONS record update
+        std::optional<bool> renew;               // Provided and true iff this is an ONS record renewal
+        std::string type;                        // The ONS request type.  For registrations: "lokinet", "session", "wallet"; for a record update: "update"
         std::optional<uint64_t> blocks;          // The registration length in blocks (only applies to lokinet registrations; session/wallet registrations do not expire)
         std::string name_hash;                   // The hashed name of the record being purchased/updated, in hex (the actual name is not provided on the blockchain).
-        std::optional<std::string> prev_txid;    // For an update, this points at the txid of the previous lns update transaction.
+        std::optional<std::string> prev_txid;    // For an update, this points at the txid of the previous ons update transaction.
         std::optional<std::string> value;        // The encrypted value of the record, in hex.  Note that this is encrypted using the actual name itself (*not* the hashed name).
         std::optional<std::string> owner;        // The owner of this record; this can be a main wallet, wallet subaddress, or a plain public key.
         std::optional<std::string> backup_owner; // Backup owner wallet/pubkey of the record, if provided.
@@ -328,7 +330,7 @@ namespace rpc {
       std::optional<std::string> tx_secret_key;     // The transaction secret key, included in registrations/stakes to decrypt transaction amounts and recipients
       std::vector<std::string> locked_key_images;   // Key image(s) locked by the transaction (for registrations, stakes)
       std::optional<std::string> key_image_unlock;  // A key image being unlocked in a stake unlock request (an unlock will be started for *all* key images locked in the same SN contributions).
-      std::optional<lns_details> lns;               // an LNS registration or update
+      std::optional<ons_details> ons;               // an ONS registration or update
       KV_MAP_SERIALIZABLE
     };
 
@@ -1987,29 +1989,6 @@ namespace rpc {
   };
 
   OXEN_RPC_DOC_INTROSPECT
-  // TODO: Undocumented, -- unused
-  struct PERFORM_BLOCKCHAIN_TEST : RPC_COMMAND
-  {
-    static constexpr auto names() { return NAMES("perform_blockchain_test"); }
-
-    struct request
-    {
-      uint64_t max_height;
-      uint64_t seed;
-
-      KV_MAP_SERIALIZABLE
-    };
-
-    struct response
-    {
-      std::string status;
-      uint64_t res_height;
-
-      KV_MAP_SERIALIZABLE
-    };
-  };
-
-  OXEN_RPC_DOC_INTROSPECT
   struct service_node_contribution
   {
     std::string key_image;         // The contribution's key image that is locked on the network.
@@ -2049,9 +2028,13 @@ namespace rpc {
       bool funded;
       bool state_height;
       bool decommission_count;
+      bool last_decommission_reason_consensus_all;
+      bool last_decommission_reason_consensus_any;
       bool earned_downtime_blocks;
 
       bool service_node_version;
+      bool lokinet_version;
+      bool storage_server_version;
       bool contributors;
       bool total_contributed;
       bool total_reserved;
@@ -2069,8 +2052,13 @@ namespace rpc {
       bool last_uptime_proof;
       bool storage_server_reachable;
       bool storage_server_reachable_timestamp;
+      bool storage_server_last_reachable;
+      bool storage_server_last_unreachable;
+      bool storage_server_first_unreachable;
       bool checkpoint_participation;
       bool pulse_participation;
+      bool timestamp_participation;
+      bool timesync_status;
 
       bool block_hash;
       bool height;
@@ -2106,8 +2094,12 @@ namespace rpc {
         bool                                  funded;                        // True if the required stakes have been submitted to activate this Service Node
         uint64_t                              state_height;                  // If active: the state at which the service node became active (i.e. fully staked height, or last recommissioning); if decommissioned: the decommissioning height; if awaiting: the last contribution (or registration) height
         uint32_t                              decommission_count;            // The number of times the Service Node has been decommissioned since registration
+        uint16_t                              last_decommission_reason_consensus_all;      // The reason for the last decommission as voted by all SNs
+        uint16_t                              last_decommission_reason_consensus_any;      // The reason for the last decommission as voted by any SNs
         int64_t                               earned_downtime_blocks;        // The number of blocks earned towards decommissioning, or the number of blocks remaining until deregistration if currently decommissioned
         std::array<uint16_t, 3>               service_node_version;          // The major, minor, patch version of the Service Node respectively.
+        std::array<uint16_t, 3>               lokinet_version;               // The major, minor, patch version of the Service Node's lokinet router.
+        std::array<uint16_t, 3>               storage_server_version;        // The major, minor, patch version of the Service Node's storage server.
         std::vector<service_node_contributor> contributors;                  // Array of contributors, contributing to this Service Node.
         uint64_t                              total_contributed;             // The total amount of Loki in atomic units contributed to this Service Node.
         uint64_t                              total_reserved;                // The total amount of Loki in atomic units reserved in this Service Node.
@@ -2124,10 +2116,15 @@ namespace rpc {
 
         // Service Node Testing
         uint64_t                                last_uptime_proof;                   // The last time this Service Node's uptime proof was relayed by at least 1 Service Node other than itself in unix epoch time.
-        bool                                    storage_server_reachable;            // Whether the node's storage server has been reported as unreachable for a long time
-        uint64_t                                storage_server_reachable_timestamp;  // The last time this Service Node's storage server was contacted
+        bool                                    storage_server_reachable;            // True if this storage server is currently passing tests for the purposes of SN node testing: true if the last test passed, or if it has been unreachable for less than an hour; false if it has been failing tests for more than an hour (and thus is considered unreachable).
+        uint64_t                                storage_server_first_unreachable;    // If the last test we received was a failure, this field contains the timestamp when failures started.  Will be 0 if the last result was a success or the node has not yet been tested.  (To disinguish between these cases check storage_server_last_reachable).
+        uint64_t                                storage_server_last_unreachable;     // The last time this Service Node failed a ping test (regardless of whether or not it is currently failing); 0 if it never failed a test since startup.
+        uint64_t                                storage_server_last_reachable;       // The last time we received a successful ping response for this Service Node (whether or not it is currently failing); 0 if we have never received a success since startup.
+
         std::vector<service_nodes::participation_entry> checkpoint_participation;    // Of the last N checkpoints the Service Node is in a checkpointing quorum, record whether or not the Service Node voted to checkpoint a block
         std::vector<service_nodes::participation_entry> pulse_participation;         // Of the last N pulse blocks the Service Node is in a pulse quorum, record whether or not the Service Node voted (participated) in that block
+        std::vector<service_nodes::timestamp_participation_entry> timestamp_participation;         // Of the last N timestamp messages, record whether or not the Service Node was in sync with the network
+        std::vector<service_nodes::timesync_entry> timesync_status;         // Of the last N timestamp messages, record whether or not the Service Node responded
 
         KV_MAP_SERIALIZABLE
       };
@@ -2181,10 +2178,9 @@ namespace rpc {
 
     struct request
     {
-      int version_major; // Storage Server Major version
-      int version_minor; // Storage Server Minor version
-      int version_patch; // Storage Server Patch version
-      uint16_t storage_lmq_port; // Storage Server lmq port to include in uptime proofs
+      std::array<uint16_t, 3> version; // Storage server version
+      uint16_t https_port; // Storage server https port to include in uptime proofs
+      uint16_t omq_port; // Storage Server oxenmq port to include in uptime proofs
       KV_MAP_SERIALIZABLE
     };
 
@@ -2198,7 +2194,7 @@ namespace rpc {
 
     struct request
     {
-      std::array<int, 3> version; // Lokinet version
+      std::array<uint16_t, 3> version; // Lokinet version
       KV_MAP_SERIALIZABLE
     };
 
@@ -2261,7 +2257,6 @@ namespace rpc {
   struct GET_OUTPUT_BLACKLIST : PUBLIC, BINARY
   {
     static constexpr auto names() { return NAMES("get_output_blacklist.bin"); }
-
     struct request : EMPTY {};
 
     struct response
@@ -2424,9 +2419,9 @@ namespace rpc {
   OXEN_RPC_DOC_INTROSPECT
   // Get the name mapping for a Loki Name Service entry. Loki currently supports mappings
   // for Session and Lokinet.
-  struct LNS_NAMES_TO_OWNERS : PUBLIC
+  struct ONS_NAMES_TO_OWNERS : PUBLIC
   {
-    static constexpr auto names() { return NAMES("lns_names_to_owners"); }
+    static constexpr auto names() { return NAMES("ons_names_to_owners", "lns_names_to_owners"); }
 
     static constexpr size_t MAX_REQUEST_ENTRIES      = 256;
     static constexpr size_t MAX_TYPE_REQUEST_ENTRIES = 8;
@@ -2449,11 +2444,11 @@ namespace rpc {
     struct response_entry
     {
       uint64_t entry_index;     // The index in request_entry's `entries` array that was resolved via Loki Name Service.
-      lns::mapping_type type;   // The type of Loki Name Service entry that the owner owns: currently supported values are 0 (session), 2 (lokinet)
+      ons::mapping_type type;   // The type of Loki Name Service entry that the owner owns: currently supported values are 0 (session), 1 (wallet) and 2 (lokinet)
       std::string name_hash;    // The hash of the name that was queried, in base64
       std::string owner;        // The public key that purchased the Loki Name Service entry.
       std::optional<std::string> backup_owner; // The backup public key that the owner specified when purchasing the Loki Name Service entry. Omitted if no backup owner.
-      std::string encrypted_value; // The encrypted value that the name maps to. See the `LNS_RESOLVE` description for information on how this value can be decrypted.
+      std::string encrypted_value; // The encrypted value that the name maps to. See the `ONS_RESOLVE` description for information on how this value can be decrypted.
       uint64_t update_height;   // The last height that this Loki Name Service entry was updated on the Blockchain.
       std::optional<uint64_t> expiration_height; // For records that expire, this will be set to the expiration block height.
       std::string txid;                          // The txid of the mapping's most recent update or purchase.
@@ -2473,9 +2468,9 @@ namespace rpc {
   OXEN_RPC_DOC_INTROSPECT
   // Get all the name mappings for the queried owner. The owner can be either a ed25519 public key or Monero style
   // public key; by default purchases are owned by the spend public key of the purchasing wallet.
-  struct LNS_OWNERS_TO_NAMES : PUBLIC
+  struct ONS_OWNERS_TO_NAMES : PUBLIC
   {
-    static constexpr auto names() { return NAMES("lns_owners_to_names"); }
+    static constexpr auto names() { return NAMES("ons_owners_to_names", "lns_owners_to_names"); }
 
     static constexpr size_t MAX_REQUEST_ENTRIES = 256;
     struct request
@@ -2489,7 +2484,7 @@ namespace rpc {
     struct response_entry
     {
       uint64_t    request_index;   // (Deprecated) The index in request's `entries` array that was resolved via Loki Name Service.
-      lns::mapping_type type;      // The category the Loki Name Service entry belongs to; currently 0 for Session and 2 for Lokinet.
+      ons::mapping_type type;      // The category the Loki Name Service entry belongs to; currently 0 for Session, 1 for Wallet and 2 for Lokinet.
       std::string name_hash;       // The hash of the name that the owner purchased via Loki Name Service in base64
       std::string owner;           // The backup public key specified by the owner that purchased the Loki Name Service entry.
       std::optional<std::string> backup_owner; // The backup public key specified by the owner that purchased the Loki Name Service entry. Omitted if no backup owner.
@@ -2511,31 +2506,31 @@ namespace rpc {
   };
 
   OXEN_RPC_DOC_INTROSPECT
-  // Performs a simple LNS lookup of a BLAKE2b-hashed name.  This RPC method is meant for simple,
+  // Performs a simple ONS lookup of a BLAKE2b-hashed name.  This RPC method is meant for simple,
   // single-value resolutions that do not care about registration details, etc.; if you need more
-  // information use LNS_NAMES_TO_OWNERS instead.
+  // information use ONS_NAMES_TO_OWNERS instead.
   //
   // Technical details: the returned value is encrypted using the name itself so that neither this
   // oxend responding to the RPC request nor any other blockchain observers can (easily) obtain the
   // name of registered addresses or the registration details.  Thus, from a client's point of view,
-  // resolving an LNS record involves:
+  // resolving an ONS record involves:
   //
   // - Lower-case the name.
   // - Calculate the name hash as a null-key, 32-byte BLAKE2b hash of the lower-case name.
-  // - Obtain the encrypted value and the nonce from this RPC call (or LNS_NAMES_TO_OWNERS); (encode
+  // - Obtain the encrypted value and the nonce from this RPC call (or ONS_NAMES_TO_OWNERS); (encode
   //   the name hash using either hex or base64.).
   // - Calculate the decryption key as a 32-byte BLAKE2b keyed hash of the name using the
   //   (unkeyed) name hash calculated above as the hash key.
   // - Decrypt (and verify) using XChaCha20-Poly1305 (for example libsodium's
   //   crypto_aead_xchacha20poly1305_ietf_decrypt) using the above decryption key and using the
   //   first 24 bytes of the name hash as the public nonce.
-  struct LNS_RESOLVE : PUBLIC
+  struct ONS_RESOLVE : PUBLIC
   {
-    static constexpr auto names() { return NAMES("lns_resolve"); }
+    static constexpr auto names() { return NAMES("ons_resolve", "lns_resolve"); }
 
     struct request
     {
-      uint16_t type;         // The LNS type (mandatory); currently supported values are: 0 = session, 2 = lokinet.
+      uint16_t type;         // The ONS type (mandatory); currently supported values are: 0 = session, 1 = wallet, 2 = lokinet.
       std::string name_hash; // The 32-byte BLAKE2b hash of the name to look up, encoded as 64 hex digits or 44/43 base64 characters (with/without padding).
 
       KV_MAP_SERIALIZABLE
@@ -2543,7 +2538,7 @@ namespace rpc {
 
     struct response
     {
-      std::optional<std::string> encrypted_value; // The encrypted LNS value, in hex.  Will be omitted from the response if the given name_hash is not registered.
+      std::optional<std::string> encrypted_value; // The encrypted ONS value, in hex.  Will be omitted from the response if the given name_hash is not registered.
       std::optional<std::string> nonce; // The nonce value used for encryption, in hex.
 
       KV_MAP_SERIALIZABLE
@@ -2636,7 +2631,6 @@ namespace rpc {
     GET_SERVICE_NODE_REGISTRATION_CMD,
     GET_SERVICE_KEYS,
     GET_SERVICE_PRIVKEYS,
-    PERFORM_BLOCKCHAIN_TEST,
     GET_SERVICE_NODES,
     GET_SERVICE_NODE_STATUS,
     STORAGE_SERVER_PING,
@@ -2649,9 +2643,9 @@ namespace rpc {
     REPORT_PEER_SS_STATUS,
     TEST_TRIGGER_P2P_RESYNC,
     TEST_TRIGGER_UPTIME_PROOF,
-    LNS_NAMES_TO_OWNERS,
-    LNS_OWNERS_TO_NAMES,
-    LNS_RESOLVE,
+    ONS_NAMES_TO_OWNERS,
+    ONS_OWNERS_TO_NAMES,
+    ONS_RESOLVE,
     FLUSH_CACHE
   >;
 

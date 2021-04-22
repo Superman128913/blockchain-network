@@ -66,6 +66,7 @@ add_executable(unit_tests
   notify.cpp
   output_distribution.cpp
   parse_amount.cpp
+  parse_address.cpp
   pruning.cpp
   random.cpp
   rolling_median.cpp

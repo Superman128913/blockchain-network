@@ -32,6 +32,7 @@
 #include "cryptonote_core/cryptonote_core.h"
 #include "blockchain_objects.h"
 #include "blockchain_db/blockchain_db.h"
+#include "cryptonote_core/uptime_proof.h"
 #include "version.h"
 
 #undef OXEN_DEFAULT_LOG_CATEGORY
@@ -171,7 +172,7 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-  r = core_storage->init(db, nullptr /*lns_db*/, net_type);
+  r = core_storage->init(db, nullptr /*ons_db*/, net_type);
 
   CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize source blockchain storage");
   LOG_PRINT_L0("Source blockchain storage initialized OK");
