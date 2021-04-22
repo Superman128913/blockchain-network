@@ -2546,10 +2546,6 @@ void wallet2::process_unconfirmed(const crypto::hash &txid, const cryptonote::tr
   if(unconf_it != m_unconfirmed_txs.end()) {
     if (store_tx_info()) {
       try {
-        // TODO(doyle): ONS introduces tx type stake, we can use this to quickly determine if a transaction is staking
-        // transaction without having to parse tx_extra.
-        bool stake = service_nodes::tx_get_staking_components(tx, nullptr /*stake*/);
-        wallet::pay_type pay_type = stake ? wallet::pay_type::stake : wallet::pay_type::out;
         m_confirmed_txs.insert(std::make_pair(txid, confirmed_transfer_details(unconf_it->second, height)));
       }
       catch (...) {
@@ -2587,9 +2583,7 @@ void wallet2::process_outgoing(const crypto::hash &txid, const cryptonote::trans
     }
     entry.first->second.m_subaddr_account = subaddr_account;
     entry.first->second.m_subaddr_indices = subaddr_indices;
-
-    bool stake = service_nodes::tx_get_staking_components(tx, nullptr /*stake*/);
-    entry.first->second.m_pay_type = stake ? wallet::pay_type::stake : wallet::pay_type::out;
+    entry.first->second.m_pay_type = wallet::pay_type_from_tx(tx);
   }
 
   entry.first->second.m_rings.clear();
@@ -6330,6 +6324,8 @@ void wallet2::get_transfers(get_transfers_args_t args, std::vector<wallet::trans
     bool add_entry = true;
     if (args.stake && args_count == 1)
       add_entry = o.second.m_pay_type == wallet::pay_type::stake;
+    if (args.ons && args_count == 1)
+      add_entry = o.second.m_pay_type == wallet::pay_type::ons;
 
     if (add_entry)
       transfers.push_back(make_transfer_view(o.first, o.second));
@@ -6407,6 +6403,7 @@ std::string wallet2::transfers_to_csv(const std::vector<wallet::transfer_view>& 
         running_balance += transfer.amount;
         break;
       case wallet::pay_type::stake:
+      case wallet::pay_type::ons:
         running_balance -= transfer.fee;
         break;
       case wallet::pay_type::out:
@@ -6912,8 +6909,7 @@ void wallet2::add_unconfirmed_tx(const cryptonote::transaction& tx, uint64_t amo
   utd.m_timestamp = time(NULL);
   utd.m_subaddr_account = subaddr_account;
   utd.m_subaddr_indices = subaddr_indices;
-  bool stake = service_nodes::tx_get_staking_components(tx, nullptr /*stake*/);
-  utd.m_pay_type = stake ? wallet::pay_type::stake : wallet::pay_type::out;
+  utd.m_pay_type = wallet::pay_type_from_tx(tx);
   for (const auto &in: tx.vin)
   {
     if (!std::holds_alternative<cryptonote::txin_to_key>(in))

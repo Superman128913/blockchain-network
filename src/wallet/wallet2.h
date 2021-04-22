@@ -787,6 +787,7 @@ private:
       bool in = false;
       bool out = false;
       bool stake = false;
+      bool ons = false;
       bool pending = false;
       bool failed = false;
       bool pool = false;

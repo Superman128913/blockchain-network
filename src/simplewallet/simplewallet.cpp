@@ -8548,6 +8548,7 @@ bool simple_wallet::show_transfers(const std::vector<std::string> &args_)
         case wallet::pay_type::miner:        color = epee::console_color_cyan; break;
         case wallet::pay_type::governance:   color = epee::console_color_cyan; break;
         case wallet::pay_type::stake:        color = epee::console_color_blue; break;
+        case wallet::pay_type::ons:          color = epee::console_color_blue; break;
         case wallet::pay_type::service_node: color = epee::console_color_cyan; break;
         default:                            color = epee::console_color_magenta; break;
       }
@@ -8568,6 +8569,7 @@ bool simple_wallet::show_transfers(const std::vector<std::string> &args_)
         if (transfer.pay_type == wallet::pay_type::in ||
             transfer.pay_type == wallet::pay_type::governance ||
             transfer.pay_type == wallet::pay_type::service_node ||
+            transfer.pay_type == wallet::pay_type::ons ||
             transfer.pay_type == wallet::pay_type::miner)
           destinations += output.address.substr(0, 6);
         else
