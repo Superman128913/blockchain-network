@@ -211,8 +211,8 @@ namespace service_nodes {
   // blocks out of sync and sending something that it thinks is legit.
   constexpr uint64_t VOTE_OR_TX_VERIFY_HEIGHT_BUFFER    = 5;
 
-  constexpr std::array<uint16_t, 3> MIN_STORAGE_SERVER_VERSION{{2, 0, 9}};
-  constexpr std::array<uint16_t, 3> MIN_LOKINET_VERSION{{0, 8, 0}};
+  constexpr std::array<uint16_t, 3> MIN_STORAGE_SERVER_VERSION{{2, 1, 0}};
+  constexpr std::array<uint16_t, 3> MIN_LOKINET_VERSION{{0, 9, 0}};
 
   // The minimum accepted version number, broadcasted by Service Nodes via uptime proofs for each hardfork
   struct proof_version
@@ -222,7 +222,7 @@ namespace service_nodes {
   };
 
   constexpr proof_version MIN_UPTIME_PROOF_VERSIONS[] = {
-    {cryptonote::network_version_18,                      {9,0,0}},
+    {cryptonote::network_version_18,                      {9,1,0}},
     {cryptonote::network_version_16_pulse,                {8,1,0}},
     {cryptonote::network_version_15_ons,                  {7,1,2}},
     {cryptonote::network_version_14_blink,                {6,1,0}},

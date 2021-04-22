@@ -96,7 +96,7 @@ namespace service_nodes
     service_nodes::participation_history<service_nodes::timestamp_participation_entry> timestamp_participation{};
     service_nodes::participation_history<service_nodes::timesync_entry> timesync_status{};
 
-    constexpr std::array<uint16_t, 3> MIN_TIMESTAMP_VERSION{9,0,0};
+    constexpr std::array<uint16_t, 3> MIN_TIMESTAMP_VERSION{9,1,0};
     bool check_timestamp_obligation = false;
 
     m_core.get_service_node_list().access_proof(pubkey, [&](const proof_info &proof) {
