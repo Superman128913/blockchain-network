@@ -14,8 +14,9 @@ For users who take comfort in containerization.
 If you just want to build the container image and get oxend running:
 
 ```
-$ sh build_container.sh
-$ docker run -d -p 22022:22022 --name oxend oxend:8.1.6
+$ sh build_base_container.sh
+$ sh build_oxend_container.sh
+$ docker run -d -p 22022:22022 --name oxend oxend:9.1.0
 ```
 
 The blockchain and wallet won't be persisted beyond the containers lifetime, so you probably want to continue reading if
@@ -31,7 +32,7 @@ The `RELEASE` variable can be updated for any release version. Once built, the c
 ```
 $ docker images
 REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
-oxend               8.1.6               d3cafa2081b0        9 days ago          185MB
+oxend               9.1.0               17046241ccc2        3 minutes ago       159MB
 ```
 
 The image can be used to run the oxend container locally. The image can also be uploaded to a docker registry so that
@@ -41,13 +42,13 @@ other users can use it without needing to build it.
 
 Run the container, storing the blockchain in Docker volume `oxen-blockchain`:
 
-`$ docker run --name oxend -d --mount "source=oxen-blockchain,target=/home/oxen/.oxen,type=volume" oxend:8.1.6`
+`$ docker run --name oxend -d --mount "source=oxen-blockchain,target=/home/oxen/.oxen,type=volume" oxend:9.1.0`
 
 Same as above, but additionally mounting the wallet directory `/home/<your_user>/Oxen` to `/wallet` in the container:
 
 ```
 $ docker run --name oxend -d --mount "source=oxen-blockchain,target=/home/oxen/.oxen,type=volume" \
-                             --mount "source=/home/<your_user>/Oxen,target=/wallet,type=bind" oxend:8.1.6
+                             --mount "source=/home/<your_user>/Oxen,target=/wallet,type=bind" oxend:9.1.0
 ```
 
 Check on how the synchronization is going:
@@ -64,7 +65,7 @@ specs are 4G memory, 2 CPUs, and 30G disk. The memory and CPUs can be limited ea
 ```
 $ docker run --name oxend -d --mount "source=oxen-blockchain,target=/home/oxen/.oxen,type=volume" \
                              --mount "source=/home/<your_user>/Oxen,target=/wallet,type=bind" \
-			     --memory=4g --cpus=2 oxend:8.1.6
+			     --memory=4g --cpus=2 oxend:9.1.0
 ```
 
 Note: the blockchain sync speed will be impacted by limiting the CPU allocation.
