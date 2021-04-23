@@ -2828,7 +2828,7 @@ namespace service_nodes
       proof = std::move(new_proof);
     }
     update_db |= update_val(timestamp, ts);
-    effective_timestamp = proof->timestamp;
+    effective_timestamp = timestamp;
     pubkey_x25519 = pk_x2;
 
     // Track an IP change (so that the obligations quorum can penalize for IP changes)
@@ -2869,7 +2869,7 @@ namespace service_nodes
     update_db |= update_val(proof->qnet_port, q_port);
     update_db |= update_val(proof->version, ver);
     update_db |= update_val(proof->pubkey_ed25519, pk_ed);
-    effective_timestamp = proof->timestamp;
+    effective_timestamp = timestamp;
     pubkey_x25519 = pk_x2;
 
     // Track an IP change (so that the obligations quorum can penalize for IP changes)
