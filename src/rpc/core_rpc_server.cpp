@@ -3071,7 +3071,7 @@ namespace cryptonote { namespace rpc {
         entry.quorumnet_port           = proof.proof->qnet_port;
 
         // NOTE: Service Node Testing
-        entry.last_uptime_proof                  = proof.proof->timestamp;
+        entry.last_uptime_proof                  = proof.timestamp;
         auto system_now = std::chrono::system_clock::now();
         auto steady_now = std::chrono::steady_clock::now();
         entry.storage_server_reachable = !proof.ss_unreachable_for(netconf.UPTIME_PROOF_VALIDITY - netconf.UPTIME_PROOF_FREQUENCY, steady_now);
