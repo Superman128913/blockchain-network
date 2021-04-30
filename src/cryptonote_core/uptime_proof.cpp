@@ -121,7 +121,9 @@ oxenmq::bt_dict Proof::bt_encode_uptime_proof() const
     {"lv", oxenmq::bt_list{{lokinet_version[0], lokinet_version[1], lokinet_version[2]}}},
   };
 
-  if (pubkey != pubkey_ed25519) encoded_proof["pk"] = tools::view_guts(pubkey);
+  if (tools::view_guts(pubkey) != tools::view_guts(pubkey_ed25519)) {
+    encoded_proof["pk"] = tools::view_guts(pubkey);
+  }
 
   return encoded_proof;
 }
