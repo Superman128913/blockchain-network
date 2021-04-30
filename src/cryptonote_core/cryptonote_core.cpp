@@ -1928,16 +1928,19 @@ namespace cryptonote
     cryptonote_connection_context fake_context{};
     bool relayed;
     auto height = get_current_blockchain_height();
-    auto hf_version = get_hard_fork_version(height);
-    //TODO: remove after HF18
-    if (hf_version < HF_VERSION_PROOF_BTENC) {
+
+    auto proof = m_service_node_list.generate_uptime_proof(m_sn_public_ip, storage_https_port(), storage_omq_port(), ss_version, m_quorumnet_port, lokinet_version);
+    NOTIFY_BTENCODED_UPTIME_PROOF::request req = proof.generate_request();
+    relayed = get_protocol()->relay_btencoded_uptime_proof(req, fake_context);
+
+    // TODO: remove after HF19
+    if (relayed && tools::view_guts(m_service_keys.pub) != tools::view_guts(m_service_keys.pub_ed25519)) {
+      // Temp workaround: nodes with both pub and ed25519 are failing bt-encoded proofs, so send
+      // an old-style proof out as well as a workaround.
       NOTIFY_UPTIME_PROOF::request req = m_service_node_list.generate_uptime_proof(m_sn_public_ip, storage_https_port(), storage_omq_port(), m_quorumnet_port);
-      relayed = get_protocol()->relay_uptime_proof(req, fake_context);
-    } else {
-      auto proof = m_service_node_list.generate_uptime_proof(m_sn_public_ip, storage_https_port(), storage_omq_port(), ss_version, m_quorumnet_port, lokinet_version);
-      NOTIFY_BTENCODED_UPTIME_PROOF::request req = proof.generate_request();
-      relayed = get_protocol()->relay_btencoded_uptime_proof(req, fake_context);
+      get_protocol()->relay_uptime_proof(req, fake_context);
     }
+
     if (relayed)
       MGINFO("Submitted uptime-proof for Service Node (yours): " << m_service_keys.pub);
 
