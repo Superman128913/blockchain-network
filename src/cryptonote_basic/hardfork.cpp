@@ -97,7 +97,11 @@ static constexpr HardFork::Params testnet_hard_forks[] =
 static constexpr HardFork::Params devnet_hard_forks[] =
 {
   { network_version_7,                      1,      0, 1599848400 },
-  { network_version_16_pulse,               2,      0, 1599848400 }, // 2020-09-11 18:20 UTC
+  { network_version_11_infinite_staking,    2,      0, 1599848400 },
+  { network_version_12_checkpointing,       3,      0, 1599848400 },
+  { network_version_13_enforce_checkpoints, 4,      0, 1599848400 }, 
+  { network_version_15_ons,                 5,      0, 1599848400 },
+  { network_version_16_pulse,               99,      0, 1599848400 }, // 2020-09-11 18:20 UTC
 };
 
 uint64_t HardFork::get_hardcoded_hard_fork_height(network_type nettype, cryptonote::network_version version)
