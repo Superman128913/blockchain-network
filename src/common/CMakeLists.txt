@@ -57,13 +57,6 @@ set_source_files_properties(${PROJECT_BINARY_DIR}/translations/translation_files
 add_dependencies(common generate_translation_data)
 
 
-if (STACK_TRACE)
-  target_sources(common PRIVATE stack_trace.cpp)
-  if(WIN32 OR STATIC)
-    target_compile_definitions(common PRIVATE STATICLIB)
-  endif()
-endif()
-
 if (BACKCOMPAT)
   target_sources(common PRIVATE compat/glibc_compat.cpp)
 endif()
@@ -78,22 +71,3 @@ target_link_libraries(common
     OpenSSL::SSL
     OpenSSL::Crypto
     extra)
-
-option(STACK_TRACE "Install a hook that dumps stack on exception" OFF)
-
-if(STACK_TRACE)
-# Can't install hook in static build on OSX, because OSX linker does not support --wrap
-# On ARM, having libunwind package (with .so's only) installed breaks static link.
-# When possible, avoid stack tracing using libunwind in favor of using easylogging++.
-  if (APPLE)
-  elseif(CMAKE_C_COMPILER_ID STREQUAL "GNU" AND NOT MINGW)
-    target_link_libraries(common PRIVATE easylogging) # for diag output only
-  elseif (ARM AND STATIC)
-  else()
-    find_package(Libunwind)
-    if(LIBUNWIND_FOUND)
-      target_link_libraries(common PRIVATE ${LIBUNWIND_LIBRARIES})
-      target_include_directories(common PRIVATE ${LIBUNWIND_INCLUDE_DIR})
-    endif()
-  endif()
-endif()

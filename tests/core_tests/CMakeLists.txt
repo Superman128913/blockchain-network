@@ -59,7 +59,6 @@ target_link_libraries(core_tests
     Boost::program_options
     miniupnpc
     extra)
-enable_stack_trace(core_tests)
 set_property(TARGET core_tests
   PROPERTY
     FOLDER "tests")
