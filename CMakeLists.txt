@@ -75,6 +75,16 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.14)
+  cmake_policy(SET CMP0083 NEW)
+  include(CheckPIESupported)
+  check_pie_supported(OUTPUT_VARIABLE pie_error LANGUAGES CXX C)
+  if(NOT CMAKE_CXX_LINK_PIE_SUPPORTED)
+    message(WARNING "PIE linking is not supported: ${pie_error}")
+  endif()
+else()
+  message(WARNING "PIE disabled: cmake 3.14+ is required for proper PIE linking support")
+endif()
 
 include(CheckCCompilerFlag)
 include(CheckCXXCompilerFlag)
@@ -628,10 +638,6 @@ else()
   endif()
 
   # linker
-  if (NOT (WIN32 AND (CMAKE_C_COMPILER_ID STREQUAL "GNU" AND CMAKE_C_COMPILER_VERSION VERSION_LESS 9.1)))
-    # Windows binaries die on startup with PIE when compiled with GCC <9.x
-    add_linker_flag_if_supported(-pie LD_SECURITY_FLAGS)
-  endif()
   add_linker_flag_if_supported(-Wl,-z,relro LD_SECURITY_FLAGS)
   add_linker_flag_if_supported(-Wl,-z,now LD_SECURITY_FLAGS)
   add_linker_flag_if_supported(-Wl,-z,noexecstack noexecstack_SUPPORTED)
@@ -740,14 +746,6 @@ else()
     endif(ARM8)
 
   endif(ARM)
-
-  if(ANDROID OR IOS)
-    #From Android 5: "only position independent executables (PIE) are supported" 
-    message(STATUS "Enabling PIE executable")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIE")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIE")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_CXX_FLAGS} -fPIE -pie")
-  endif()
 
   if(APPLE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=default -DGTEST_HAS_TR1_TUPLE=0")
