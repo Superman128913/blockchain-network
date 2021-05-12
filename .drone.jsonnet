@@ -138,6 +138,7 @@ local android_build_steps(android_abi, android_platform=21, jobs=6, cmake_extra=
         '-DCMAKE_TOOLCHAIN_FILE=/usr/lib/android-sdk/ndk-bundle/build/cmake/android.toolchain.cmake ' +
         '-DANDROID_PLATFORM=' + android_platform + ' -DANDROID_ABI=' + android_abi + ' ' +
         '-DMONERO_SLOW_HASH=ON ' +
+        '-DLOCAL_MIRROR=https://builds.lokinet.dev/deps ' +
         '-DBUILD_STATIC_DEPS=ON -DSTATIC=ON -G Ninja ' + cmake_extra,
     'ninja -j' + jobs + ' -v wallet_merged',
     'cd ..',
