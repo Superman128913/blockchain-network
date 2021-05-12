@@ -86,7 +86,6 @@ if(STACK_TRACE)
 # On ARM, having libunwind package (with .so's only) installed breaks static link.
 # When possible, avoid stack tracing using libunwind in favor of using easylogging++.
   if (APPLE)
-  elseif (DEPENDS AND NOT LINUX)
   elseif(CMAKE_C_COMPILER_ID STREQUAL "GNU" AND NOT MINGW)
     target_link_libraries(common PRIVATE easylogging) # for diag output only
   elseif (ARM AND STATIC)
