@@ -41,7 +41,6 @@
 #include "epee/wipeable_string.h"
 #include "crypto/crypto.h"
 #include "util.h"
-#include "stack_trace.h"
 #include "epee/misc_os_dependent.h"
 #include "epee/readline_buffer.h"
 #include "string_util.h"
@@ -73,41 +72,6 @@ namespace tools
     MINFO("libunbound was built " << (with_threads ? "with" : "without") << " threads");
     return with_threads;
   }
-
-#ifdef STACK_TRACE
-#ifdef _WIN32
-  // https://stackoverflow.com/questions/1992816/how-to-handle-seg-faults-under-windows
-  static LONG WINAPI windows_crash_handler(PEXCEPTION_POINTERS pExceptionInfo)
-  {
-    tools::log_stack_trace("crashing");
-    exit(1);
-    return EXCEPTION_CONTINUE_SEARCH;
-  }
-  static void setup_crash_dump()
-  {
-    SetUnhandledExceptionFilter(windows_crash_handler);
-  }
-#else
-  static void posix_crash_handler(int signal)
-  {
-    tools::log_stack_trace(("crashing with fatal signal " + std::to_string(signal)).c_str());
-#ifdef NDEBUG
-    _exit(1);
-#else
-    abort();
-#endif
-  }
-  static void setup_crash_dump()
-  {
-    signal(SIGSEGV, posix_crash_handler);
-    signal(SIGBUS, posix_crash_handler);
-    signal(SIGILL, posix_crash_handler);
-    signal(SIGFPE, posix_crash_handler);
-  }
-#endif
-#else
-  static void setup_crash_dump() {}
-#endif
 
   bool disable_core_dumps()
   {
@@ -142,8 +106,6 @@ namespace tools
   bool on_startup()
   {
     mlog_configure("", true);
-
-    setup_crash_dump();
 
 #ifdef __GLIBC__
     const char *ver = ::gnu_get_libc_version();

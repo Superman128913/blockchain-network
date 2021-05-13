@@ -47,10 +47,6 @@
 #include "command_server.h"
 #include "daemon.h"
 
-#ifdef STACK_TRACE
-#include "common/stack_trace.h"
-#endif // STACK_TRACE
-
 #undef OXEN_DEFAULT_LOG_CATEGORY
 #define OXEN_DEFAULT_LOG_CATEGORY "daemon"
 
@@ -310,10 +306,6 @@ int main(int argc, char const * argv[])
       mlog_set_log(command_line::get_arg(vm, daemon_args::arg_log_level).c_str());
     }
     logs_initialized = true;
-
-#ifdef STACK_TRACE
-    tools::set_stack_trace_log(log_file_path.filename().string());
-#endif // STACK_TRACE
 
     if (!command_line::is_arg_defaulted(vm, daemon_args::arg_max_concurrency))
       tools::set_max_concurrency(command_line::get_arg(vm, daemon_args::arg_max_concurrency));
