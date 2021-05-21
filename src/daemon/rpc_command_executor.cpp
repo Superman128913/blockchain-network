@@ -186,6 +186,7 @@ namespace {
     }
     return s + " " + (ago < 0s ? "in the future" : "ago");
   }
+
   std::string get_human_time_ago(std::time_t t, std::time_t now, bool abbreviate = false) {
     return get_human_time_ago(std::chrono::seconds{now - t}, abbreviate);
   }
@@ -1967,7 +1968,7 @@ static uint64_t get_actual_amount(uint64_t amount, uint64_t portions)
   return resultlo;
 }
 
-bool rpc_command_executor::prepare_registration()
+bool rpc_command_executor::prepare_registration(bool force_registration)
 {
   // RAII-style class to temporarily clear categories and restore upon destruction (i.e. upon returning).
   struct clear_log_categories {
@@ -1989,6 +1990,20 @@ bool rpc_command_executor::prepare_registration()
   if (!res.service_node)
   {
     tools::fail_msg_writer() << "Unable to prepare registration: this daemon is not running in --service-node mode";
+    return false;
+  }
+  else if (auto last_lokinet_ping = static_cast<std::time_t>(res.last_lokinet_ping.value_or(0));
+      last_lokinet_ping < (time(nullptr) - 60) && !force_registration)
+  {
+    tools::fail_msg_writer() << "Unable to prepare registration: this daemon has not received a ping from lokinet "
+                             << (res.last_lokinet_ping == 0 ? "yet" : "since " + get_human_time_ago(last_lokinet_ping, std::time(nullptr)));
+    return false;
+  }
+  else if (auto last_storage_server_ping = static_cast<std::time_t>(res.last_storage_server_ping.value_or(0));
+      last_storage_server_ping < (time(nullptr) - 60) && !force_registration)
+  {
+    tools::fail_msg_writer() << "Unable to prepare registration: this daemon has not received a ping from the storage server "
+                             << (res.last_storage_server_ping == 0 ? "yet" : "since " + get_human_time_ago(last_storage_server_ping, std::time(nullptr)));
     return false;
   }
 
