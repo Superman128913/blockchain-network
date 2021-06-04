@@ -101,12 +101,8 @@ namespace service_nodes
       checkpoint_participation = proof.checkpoint_participation;
       pulse_participation      = proof.pulse_participation;
 
-      // TODO: remove after HF18
-      if (proof.proof->version >= MIN_TIMESTAMP_VERSION && hf_version >= cryptonote::network_version_18) {
-        timestamp_participation  = proof.timestamp_participation;
-        timesync_status          = proof.timesync_status;
-        check_timestamp_obligation = true;
-      }
+      timestamp_participation  = proof.timestamp_participation;
+      timesync_status          = proof.timesync_status;
 
     });
     std::chrono::seconds time_since_last_uptime_proof{std::time(nullptr) - timestamp};
@@ -131,8 +127,7 @@ namespace service_nodes
     if (!ss_reachable)
     {
       LOG_PRINT_L1("Service Node storage server is not reachable for node: " << pubkey);
-      if (hf_version >= cryptonote::network_version_13_enforce_checkpoints)
-          result.storage_server_reachable = false;
+      result.storage_server_reachable = false;
     }
 
     if (!lokinet_reachable)
@@ -157,14 +152,10 @@ namespace service_nodes
 
     if (!info.is_decommissioned())
     {
-      if (check_checkpoint_obligation)
+      if (check_checkpoint_obligation && !checkpoint_participation.check_participation(CHECKPOINT_MAX_MISSABLE_VOTES) )
       {
-        if (!checkpoint_participation.check_participation(CHECKPOINT_MAX_MISSABLE_VOTES) )
-        {
-          LOG_PRINT_L1("Service Node: " << pubkey << ", failed checkpoint obligation check");
-          if (hf_version >= cryptonote::network_version_13_enforce_checkpoints)
-            result.checkpoint_participation = false;
-        }
+        LOG_PRINT_L1("Service Node: " << pubkey << ", failed checkpoint obligation check");
+        result.checkpoint_participation = false;
       }
 
       if (!pulse_participation.check_participation(PULSE_MAX_MISSABLE_VOTES) )
@@ -173,17 +164,15 @@ namespace service_nodes
         result.pulse_participation = false;
       }
 
-      if (check_timestamp_obligation){
-        if (!timestamp_participation.check_participation(TIMESTAMP_MAX_MISSABLE_VOTES) )
-        {
-          LOG_PRINT_L1("Service Node: " << pubkey << ", failed timestamp obligation check");
-          result.timestamp_participation = false;
-        }
-        if (!timesync_status.check_participation(TIMESYNC_MAX_UNSYNCED_VOTES) )
-        {
-          LOG_PRINT_L1("Service Node: " << pubkey << ", failed timesync obligation check");
-          result.timesync_status = false;
-        }
+      if (!timestamp_participation.check_participation(TIMESTAMP_MAX_MISSABLE_VOTES) )
+      {
+        LOG_PRINT_L1("Service Node: " << pubkey << ", failed timestamp obligation check");
+        result.timestamp_participation = false;
+      }
+      if (!timesync_status.check_participation(TIMESYNC_MAX_UNSYNCED_VOTES) )
+      {
+        LOG_PRINT_L1("Service Node: " << pubkey << ", failed timesync obligation check");
+        result.timesync_status = false;
       }
     }
 
