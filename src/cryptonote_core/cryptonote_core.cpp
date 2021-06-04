@@ -2545,11 +2545,6 @@ namespace cryptonote
     return true;
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::set_storage_server_peer_reachable(crypto::public_key const &pubkey, bool value)
-  {
-    return m_service_node_list.set_storage_server_peer_reachable(pubkey, value);
-  }
-  //-----------------------------------------------------------------------------------------------
   void core::flush_bad_txs_cache()
   {
     bad_semantics_txes_lock.lock();

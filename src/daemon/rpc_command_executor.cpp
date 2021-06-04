@@ -1687,27 +1687,32 @@ static void append_printable_service_node_list_entry(cryptonote::network_type ne
     //
     // NOTE: Storage Server Test
     //
-    stream << indent2 << "Storage Server Reachable: ";
-    if (entry.storage_server_first_unreachable == 0) {
-      if (entry.storage_server_last_reachable == 0)
-        stream << "Not yet tested";
-      else {
-        stream << "Yes (last tested " << get_human_time_ago(entry.storage_server_last_reachable, now);
-        if (entry.storage_server_last_unreachable)
-          stream << "; last failure " << get_human_time_ago(entry.storage_server_last_unreachable, now);
+    auto print_reachable = [&stream, &now] (bool reachable, auto first_unreachable, auto last_unreachable, auto last_reachable) {
+      if (first_unreachable == 0) {
+        if (last_reachable == 0)
+          stream << "Not yet tested";
+        else {
+          stream << "Yes (last tested " << get_human_time_ago(last_reachable, now);
+          if (last_unreachable)
+            stream << "; last failure " << get_human_time_ago(last_unreachable, now);
+          stream << ")";
+        }
+      } else {
+        stream << "NO";
+        if (!reachable)
+          stream << " - FAILING!";
+        stream << " (last tested " << get_human_time_ago(last_unreachable, now)
+          << "; failing since " << get_human_time_ago(first_unreachable, now);
+        if (last_reachable)
+          stream << "; last good " << get_human_time_ago(last_reachable, now);
         stream << ")";
       }
-    } else {
-      stream << "NO";
-      if (!entry.storage_server_reachable)
-        stream << " - FAILING!";
-      stream << " (last tested " << get_human_time_ago(entry.storage_server_last_unreachable, now)
-        << "; failing since " << get_human_time_ago(entry.storage_server_first_unreachable, now);
-      if (entry.storage_server_last_reachable)
-        stream << "; last good " << get_human_time_ago(entry.storage_server_last_reachable, now);
-      stream << ")";
-    }
-    stream << "\n";
+      stream << '\n';
+    };
+    stream << indent2 << "Storage Server Reachable: ";
+    print_reachable(entry.storage_server_reachable, entry.storage_server_first_unreachable, entry.storage_server_last_unreachable, entry.storage_server_last_reachable);
+    stream << indent2 << "Lokinet Reachable: ";
+    print_reachable(entry.lokinet_reachable, entry.lokinet_first_unreachable, entry.lokinet_last_unreachable, entry.lokinet_last_reachable);
 
     //
     // NOTE: Component Versions

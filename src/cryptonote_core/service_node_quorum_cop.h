@@ -93,9 +93,20 @@ namespace service_nodes
     bool timestamp_participation  = true;
     bool timesync_status          = true;
     bool storage_server_reachable = true;
+    bool lokinet_reachable        = true;
 
-    char const *why() const;
-    bool passed() const { return uptime_proved && checkpoint_participation && pulse_participation && storage_server_reachable && timestamp_participation && timesync_status; }
+    // Returns a vector of reasons why this node is failing (nullopt if not failing).
+    std::optional<std::vector<std::string_view>> why() const;
+    constexpr bool passed() const {
+        return uptime_proved &&
+            //single_ip -- deliberately excluded (it only gives ip-change penalties, not deregs)
+            checkpoint_participation &&
+            pulse_participation &&
+            timestamp_participation &&
+            timesync_status &&
+            storage_server_reachable &&
+            lokinet_reachable;
+    }
   };
 
   class quorum_cop
