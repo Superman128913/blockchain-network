@@ -1603,7 +1603,7 @@ CREATE INDEX IF NOT EXISTS mapping_type_name_exp ON mappings (type, name_hash, e
   bool need_mappings_migration = false;
   {
     sql_compiled_statement mappings_info{ons_db};
-    mappings_info.compile(R"(PRAGMA table_info(mappings))", false);
+    mappings_info.compile("PRAGMA table_info(mappings)", false);
     while (step(mappings_info) == SQLITE_ROW)
     {
       auto name = get<std::string_view>(mappings_info, 1);
@@ -1619,7 +1619,7 @@ CREATE INDEX IF NOT EXISTS mapping_type_name_exp ON mappings (type, name_hash, e
   {
     // Earlier version migration: we need "update_height" to exist (if this fails it's fine).
     sqlite3_exec(ons_db.db,
-        R"(ALTER TABLE mappings ADD COLUMN update_height INTEGER NOT NULL DEFAULT register_height)",
+        "ALTER TABLE mappings ADD COLUMN update_height INTEGER NOT NULL DEFAULT register_height",
         nullptr /*callback*/, nullptr /*callback ctx*/, nullptr /*errstr*/);
 
     LOG_PRINT_L1("Migrating ONS mappings database to new format");
@@ -1650,7 +1650,7 @@ COMMIT TRANSACTION;
   // Updates to add columns; we ignore errors on these since they will fail if the column already
   // exists
   for (const auto& upgrade : {
-    R"(ALTER TABLE settings ADD COLUMN pruned_height INTEGER NOT NULL DEFAULT 0)",
+    "ALTER TABLE settings ADD COLUMN pruned_height INTEGER NOT NULL DEFAULT 0",
   }) {
     sqlite3_exec(ons_db.db, upgrade, nullptr /*callback*/, nullptr /*callback ctx*/, nullptr /*errstr*/);
   }
@@ -1665,7 +1665,7 @@ FROM mappings
   JOIN owner o1 ON mappings.owner_id = o1.id
   LEFT JOIN owner o2 ON mappings.backup_owner_id = o2.id
 )"s;
-const std::string sql_select_mappings_and_owners_suffix = R"( GROUP BY name_hash, type)";
+const std::string sql_select_mappings_and_owners_suffix = " GROUP BY name_hash, type";
 
 struct scoped_db_transaction
 {
@@ -1722,7 +1722,7 @@ scoped_db_transaction::~scoped_db_transaction()
 enum struct db_version { v0, v1_track_updates, v2_full_rows };
 auto constexpr DB_VERSION = db_version::v2_full_rows;
 
-constexpr auto EXPIRATION = R"( (expiration_height IS NULL OR expiration_height >= ?) )"sv;
+constexpr auto EXPIRATION = " (expiration_height IS NULL OR expiration_height >= ?) "sv;
 
 } // anon. namespace
 
@@ -1733,10 +1733,10 @@ bool name_system_db::init(cryptonote::Blockchain const *blockchain, cryptonote::
   this->nettype = nettype;
 
   std::string const GET_MAPPINGS_BY_OWNER_STR = sql_select_mappings_and_owners_prefix
-    + R"(WHERE ? IN (o1.address, o2.address))"
+    + "WHERE ? IN (o1.address, o2.address)"
     + sql_select_mappings_and_owners_suffix;
   std::string const GET_MAPPING_STR           = sql_select_mappings_and_owners_prefix
-    + R"(WHERE type = ? AND name_hash = ?)"
+    + "WHERE type = ? AND name_hash = ?"
     + sql_select_mappings_and_owners_suffix;
 
   const std::string GET_MAPPING_COUNTS_STR = R"(
@@ -1745,25 +1745,25 @@ bool name_system_db::init(cryptonote::Blockchain const *blockchain, cryptonote::
     )
     GROUP BY type)";
 
-  std::string const RESOLVE_STR =
-R"(SELECT encrypted_value, MAX(update_height)
+  std::string const RESOLVE_STR = R"(
+SELECT encrypted_value, MAX(update_height)
 FROM mappings
 WHERE type = ? AND name_hash = ? AND)" + std::string{EXPIRATION};
 
-  constexpr auto GET_SETTINGS_STR     = R"(SELECT * FROM settings WHERE id = 1)"sv;
-  constexpr auto GET_OWNER_BY_ID_STR  = R"(SELECT * FROM owner WHERE id = ?)"sv;
-  constexpr auto GET_OWNER_BY_KEY_STR = R"(SELECT * FROM owner WHERE address = ?)"sv;
+  constexpr auto GET_SETTINGS_STR     = "SELECT * FROM settings WHERE id = 1"sv;
+  constexpr auto GET_OWNER_BY_ID_STR  = "SELECT * FROM owner WHERE id = ?"sv;
+  constexpr auto GET_OWNER_BY_KEY_STR = "SELECT * FROM owner WHERE address = ?"sv;
 
   // Prune queries used when we need to rollback to remove records added after the detach point:
-  constexpr auto PRUNE_MAPPINGS_STR   = R"(DELETE FROM mappings WHERE update_height >= ?)"sv;
-  constexpr auto PRUNE_OWNERS_STR =
-R"(DELETE FROM owner
+  constexpr auto PRUNE_MAPPINGS_STR   = "DELETE FROM mappings WHERE update_height >= ?"sv;
+  constexpr auto PRUNE_OWNERS_STR = R"(
+DELETE FROM owner
 WHERE NOT EXISTS (SELECT * FROM mappings WHERE owner.id = mappings.owner_id)
 AND NOT EXISTS   (SELECT * FROM mappings WHERE owner.id = mappings.backup_owner_id))"sv;
 
-  constexpr auto SAVE_MAPPING_STR  = R"(INSERT INTO mappings (type, name_hash, encrypted_value, txid, owner_id, backup_owner_id, update_height, expiration_height) VALUES (?,?,?,?,?,?,?,?))"sv;
-  constexpr auto SAVE_OWNER_STR    = R"(INSERT INTO owner (address) VALUES (?))"sv;
-  constexpr auto SAVE_SETTINGS_STR = R"(INSERT OR REPLACE INTO settings (id, top_height, top_hash, version) VALUES (1,?,?,?))"sv;
+  constexpr auto SAVE_MAPPING_STR  = "INSERT INTO mappings (type, name_hash, encrypted_value, txid, owner_id, backup_owner_id, update_height, expiration_height) VALUES (?,?,?,?,?,?,?,?)"sv;
+  constexpr auto SAVE_OWNER_STR    = "INSERT INTO owner (address) VALUES (?)"sv;
+  constexpr auto SAVE_SETTINGS_STR = "INSERT OR REPLACE INTO settings (id, top_height, top_hash, version) VALUES (1,?,?,?)"sv;
 
   if (!build_default_tables(*this))
     return false;
@@ -1816,7 +1816,7 @@ AND NOT EXISTS   (SELECT * FROM mappings WHERE owner.id = mappings.backup_owner_
         for (mapping_record const &record: all_mappings)
             hashes.push_back(record.txid);
 
-        constexpr auto UPDATE_MAPPING_HEIGHT = R"(UPDATE mappings SET update_height = ? WHERE id = ?)"sv;
+        constexpr auto UPDATE_MAPPING_HEIGHT = "UPDATE mappings SET update_height = ? WHERE id = ?"sv;
         sql_compiled_statement update_mapping_height{*this};
         if (!update_mapping_height.compile(UPDATE_MAPPING_HEIGHT, false))
           return false;
@@ -1833,7 +1833,7 @@ AND NOT EXISTS   (SELECT * FROM mappings WHERE owner.id = mappings.backup_owner_
       if (settings.version < static_cast<decltype(settings.version)>(db_version::v2_full_rows))
       {
         sql_compiled_statement prune_height{*this};
-        if (!prune_height.compile(R"(UPDATE settings SET pruned_height = (SELECT MAX(update_height) FROM mappings))", false))
+        if (!prune_height.compile("UPDATE settings SET pruned_height = (SELECT MAX(update_height) FROM mappings)", false))
           return false;
 
         if (step(prune_height) != SQLITE_DONE)
@@ -1910,7 +1910,7 @@ AND NOT EXISTS   (SELECT * FROM mappings WHERE owner.id = mappings.backup_owner_
       // This likely means something external changed the lmdb and/or the ons.db, and we can't
       // recover from it: so just drop and recreate the tables completely and rescan from scratch.
 
-      char constexpr DROP_TABLE_SQL[] = R"(DROP TABLE IF EXISTS owner; DROP TABLE IF EXISTS settings; DROP TABLE IF EXISTS mappings)";
+      char constexpr DROP_TABLE_SQL[] = "DROP TABLE IF EXISTS owner; DROP TABLE IF EXISTS settings; DROP TABLE IF EXISTS mappings";
       sqlite3_exec(db, DROP_TABLE_SQL, nullptr /*callback*/, nullptr /*callback context*/, nullptr);
       if (!build_default_tables(*this)) return false;
     }
@@ -1971,19 +1971,18 @@ SELECT                type, name_hash, ?,    ?)";
   bind.emplace_back(blob_view{tx_hash.data, sizeof(tx_hash)});
   bind.emplace_back(height);
 
-  constexpr auto suffix = R"(
-FROM mappings WHERE type = ? AND name_hash = ? ORDER BY update_height DESC LIMIT 1)"sv;
+  constexpr auto suffix = " FROM mappings WHERE type = ? AND name_hash = ? ORDER BY update_height DESC LIMIT 1"sv;
 
   if (entry.is_renewing())
   {
-    sql += R"(, expiration_height + ?, owner_id, backup_owner_id, encrypted_value)";
+    sql += ", expiration_height + ?, owner_id, backup_owner_id, encrypted_value";
     bind.emplace_back(expiry_blocks(ons_db.network_type(), entry.type).value_or(0));
   }
   else
   {
     // Updating
 
-    sql += R"(, expiration_height)";
+    sql += ", expiration_height";
 
     if (entry.field_is_set(ons::extra_field::owner))
     {
@@ -1998,7 +1997,7 @@ FROM mappings WHERE type = ? AND name_hash = ? ORDER BY update_height DESC LIMIT
       bind.emplace_back(*opt_id);
     }
     else
-      sql += R"(, owner_id)";
+      sql += ", owner_id";
 
     if (entry.field_is_set(ons::extra_field::backup_owner))
     {
@@ -2014,7 +2013,7 @@ FROM mappings WHERE type = ? AND name_hash = ? ORDER BY update_height DESC LIMIT
       bind.emplace_back(*opt_id);
     }
     else
-      sql += R"(, backup_owner_id)";
+      sql += ", backup_owner_id";
 
     if (entry.field_is_set(ons::extra_field::encrypted_value))
     {
@@ -2022,7 +2021,7 @@ FROM mappings WHERE type = ? AND name_hash = ? ORDER BY update_height DESC LIMIT
       bind.emplace_back(blob_view{entry.encrypted_value});
     }
     else
-      sql += R"(, encrypted_value)";
+      sql += ", encrypted_value";
   }
 
   sql += suffix;
@@ -2309,13 +2308,13 @@ std::vector<mapping_record> name_system_db::get_mappings(std::vector<mapping_typ
   sql_statement.reserve(sql_select_mappings_and_owners_prefix.size() + EXPIRATION.size() + 70
       + sql_select_mappings_and_owners_suffix.size());
   sql_statement += sql_select_mappings_and_owners_prefix;
-  sql_statement += R"(WHERE name_hash = ?)";
+  sql_statement += "WHERE name_hash = ?";
   bind.emplace_back(name_base64_hash);
 
   // Generate string statement
   if (types.size())
   {
-    sql_statement += R"( AND type IN ()";
+    sql_statement += " AND type IN (";
 
     for (size_t i = 0; i < types.size(); i++)
     {
@@ -2352,8 +2351,8 @@ std::vector<mapping_record> name_system_db::get_mappings_by_owners(std::vector<g
   std::vector<std::variant<blob_view, uint64_t>> bind;
   // Generate string statement
   {
-    constexpr auto SQL_WHERE_OWNER = R"(WHERE (o1.address IN ()"sv;
-    constexpr auto SQL_OR_BACKUP_OWNER  = R"() OR o2.address IN ()"sv;
+    constexpr auto SQL_WHERE_OWNER = "WHERE (o1.address IN ("sv;
+    constexpr auto SQL_OR_BACKUP_OWNER  = ") OR o2.address IN ("sv;
     constexpr auto SQL_SUFFIX  = "))"sv;
 
     std::string placeholders;
