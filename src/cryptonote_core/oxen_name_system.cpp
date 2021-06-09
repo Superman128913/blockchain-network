@@ -1584,6 +1584,7 @@ CREATE TABLE IF NOT EXISTS "settings" (
 CREATE TABLE IF NOT EXISTS "mappings" ()" + mappings_columns + R"();
 CREATE INDEX IF NOT EXISTS "owner_id_index" ON mappings("owner_id");
 CREATE INDEX IF NOT EXISTS "backup_owner_id_index" ON mappings("backup_owner_index");
+CREATE UNIQUE INDEX IF NOT EXISTS "name_type_update" ON "mappings" ("name_hash", "type", "update_height" DESC);
 CREATE INDEX IF NOT EXISTS "mapping_type_name_exp" ON "mappings" ("type", "name_hash", "expiration_height" DESC);
 )";
 
@@ -1752,8 +1753,9 @@ WHERE "type" = ? AND "name_hash" = ? AND)" + std::string{EXPIRATION};
   constexpr auto GET_SETTINGS_STR     = R"(SELECT * FROM "settings" WHERE "id" = 1)"sv;
   constexpr auto GET_OWNER_BY_ID_STR  = R"(SELECT * FROM "owner" WHERE "id" = ?)"sv;
   constexpr auto GET_OWNER_BY_KEY_STR = R"(SELECT * FROM "owner" WHERE "address" = ?)"sv;
-  constexpr auto PRUNE_MAPPINGS_STR   = R"(DELETE FROM "mappings" WHERE "update_height" >= ?)"sv;
 
+  // Prune queries used when we need to rollback to remove records added after the detach point:
+  constexpr auto PRUNE_MAPPINGS_STR   = R"(DELETE FROM "mappings" WHERE "update_height" >= ?)"sv;
   constexpr auto PRUNE_OWNERS_STR =
 R"(DELETE FROM "owner"
 WHERE NOT EXISTS (SELECT * FROM "mappings" WHERE "owner"."id" = "mappings"."owner_id")
