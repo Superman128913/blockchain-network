@@ -51,6 +51,7 @@ enum struct ons_sql_type
   get_mappings,
   get_mappings_by_owner,
   get_mappings_by_owners,
+  get_mapping_counts,
   get_owner,
   get_setting,
   get_sentinel_end,
@@ -455,27 +456,32 @@ bool sql_run_statement(ons_sql_type type, sql_compiled_statement& statement, voi
           }
           break;
 
-          case ons_sql_type::get_mappings_by_owners: /* FALLTHRU */
-          case ons_sql_type::get_mappings_by_owner: /* FALLTHRU */
-          case ons_sql_type::get_mappings: /* FALLTHRU */
+          case ons_sql_type::get_mappings_by_owners: [[fallthrough]];
+          case ons_sql_type::get_mappings_by_owner: [[fallthrough]];
+          case ons_sql_type::get_mappings: [[fallthrough]];
           case ons_sql_type::get_mapping:
           {
             if (mapping_record tmp_entry = sql_get_mapping_from_statement(statement))
             {
               data_loaded = true;
               if (type == ons_sql_type::get_mapping)
-              {
-                auto *entry = reinterpret_cast<mapping_record *>(context);
-                *entry      = std::move(tmp_entry);
-              }
+                *static_cast<mapping_record *>(context) = std::move(tmp_entry);
               else
-              {
-                auto *records = reinterpret_cast<std::vector<mapping_record> *>(context);
-                records->emplace_back(std::move(tmp_entry));
-              }
+                static_cast<std::vector<mapping_record>*>(context)->push_back(std::move(tmp_entry));
             }
           }
           break;
+
+          case ons_sql_type::get_mapping_counts:
+          {
+            auto& counts = *static_cast<std::map<mapping_type, int>*>(context);
+            std::underlying_type_t<mapping_type> type_val;
+            int count;
+            get(statement, 0, type_val);
+            get(statement, 1, count);
+            counts.emplace(static_cast<mapping_type>(type_val), count);
+            data_loaded = true;
+          }
         }
       }
       break;
@@ -1578,6 +1584,7 @@ CREATE TABLE IF NOT EXISTS "settings" (
 CREATE TABLE IF NOT EXISTS "mappings" ()" + mappings_columns + R"();
 CREATE INDEX IF NOT EXISTS "owner_id_index" ON mappings("owner_id");
 CREATE INDEX IF NOT EXISTS "backup_owner_id_index" ON mappings("backup_owner_index");
+CREATE INDEX IF NOT EXISTS "mapping_type_name_exp" ON "mappings" ("type", "name_hash", "expiration_height" DESC);
 )";
 
   char *table_err_msg = nullptr;
@@ -1626,6 +1633,7 @@ DROP TABLE "mappings_old";
 CREATE UNIQUE INDEX "name_type_update" ON "mappings" ("name_hash", "type", "update_height" DESC);
 CREATE INDEX "owner_id_index" ON mappings("owner_id");
 CREATE INDEX "backup_owner_id_index" ON mappings("backup_owner_index");
+CREATE INDEX "mapping_type_name_exp" ON "mappings" ("type", "name_hash", "expiration_height" DESC);
 COMMIT TRANSACTION;
 )";
 
@@ -1723,12 +1731,18 @@ bool name_system_db::init(cryptonote::Blockchain const *blockchain, cryptonote::
   this->db      = db;
   this->nettype = nettype;
 
-  std::string const get_mappings_by_owner_str = sql_select_mappings_and_owners_prefix
+  std::string const GET_MAPPINGS_BY_OWNER_STR = sql_select_mappings_and_owners_prefix
     + R"(WHERE ? IN ("o1"."address", "o2"."address"))"
     + sql_select_mappings_and_owners_suffix;
-  std::string const get_mapping_str           = sql_select_mappings_and_owners_prefix
+  std::string const GET_MAPPING_STR           = sql_select_mappings_and_owners_prefix
     + R"(WHERE "type" = ? AND "name_hash" = ?)"
     + sql_select_mappings_and_owners_suffix;
+
+  const std::string GET_MAPPING_COUNTS_STR = R"(
+    SELECT type, COUNT(*) FROM (
+      SELECT DISTINCT type, name_hash FROM mappings WHERE )" + std::string{EXPIRATION} + R"(
+    )
+    GROUP BY type)";
 
   std::string const RESOLVE_STR =
 R"(SELECT "encrypted_value", MAX("update_height")
@@ -1834,8 +1848,9 @@ AND NOT EXISTS   (SELECT * FROM "mappings" WHERE "owner"."id" = "mappings"."back
   // Prepare commonly executed sql statements
   //
   // ---------------------------------------------------------------------------
-  if (!get_mappings_by_owner_sql.compile(get_mappings_by_owner_str) ||
-      !get_mapping_sql.compile(get_mapping_str) ||
+  if (!get_mappings_by_owner_sql.compile(GET_MAPPINGS_BY_OWNER_STR) ||
+      !get_mapping_sql.compile(GET_MAPPING_STR) ||
+      !get_mapping_counts_sql.compile(GET_MAPPING_COUNTS_STR) ||
       !resolve_sql.compile(RESOLVE_STR) ||
       !get_owner_by_id_sql.compile(GET_OWNER_BY_ID_STR) ||
       !get_owner_by_key_sql.compile(GET_OWNER_BY_KEY_STR) ||
@@ -2392,6 +2407,12 @@ std::vector<mapping_record> name_system_db::get_mappings_by_owner(generic_owner 
     auto end = std::remove_if(result.begin(), result.end(), [height=*blockchain_height](auto& r) { return !r.active(height); });
     result.erase(end, result.end());
   }
+  return result;
+}
+
+std::map<mapping_type, int> name_system_db::get_mapping_counts(uint64_t blockchain_height) {
+  std::map<mapping_type, int> result;
+  bind_and_run(ons_sql_type::get_mapping_counts, get_mapping_counts_sql, &result, blockchain_height);
   return result;
 }
 

@@ -417,6 +417,13 @@ namespace cryptonote { namespace rpc {
 
     res.block_size_limit = res.block_weight_limit = m_core.get_blockchain_storage().get_current_cumulative_block_weight_limit();
     res.block_size_median = res.block_weight_median = m_core.get_blockchain_storage().get_current_cumulative_block_weight_median();
+
+    auto ons_counts = m_core.get_blockchain_storage().name_system_db().get_mapping_counts(res.height);
+    res.ons_counts = {
+      ons_counts[ons::mapping_type::session],
+      ons_counts[ons::mapping_type::wallet],
+      ons_counts[ons::mapping_type::lokinet]};
+
     if (context.admin)
     {
       res.service_node = m_core.service_node();
