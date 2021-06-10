@@ -3556,13 +3556,18 @@ namespace cryptonote { namespace rpc {
     std::vector<ons::mapping_record> records = db.get_mappings_by_owners(owners, height);
     for (auto &record : records)
     {
-      auto& entry = res.entries.emplace_back();
-
-      auto it = owner_to_request_index.find(record.owner);
+      auto it = owner_to_request_index.end();
+      if (record.owner)
+          it = owner_to_request_index.find(record.owner);
+      if (it == owner_to_request_index.end() && record.backup_owner)
+          it = owner_to_request_index.find(record.backup_owner);
       if (it == owner_to_request_index.end())
-        throw rpc_error{ERROR_INTERNAL, "Owner=" + record.owner.to_string(nettype()) +
-          ", could not be mapped back a index in the request 'entries' array"};
+        throw rpc_error{ERROR_INTERNAL,
+            (record.owner ? ("Owner=" + record.owner.to_string(nettype()) + " ") : ""s) +
+            (record.backup_owner ? ("BackupOwner=" + record.backup_owner.to_string(nettype()) + " ") : ""s) +
+            " could not be mapped back a index in the request 'entries' array"};
 
+      auto& entry = res.entries.emplace_back();
       entry.request_index   = it->second;
       entry.type            = record.type;
       entry.name_hash       = std::move(record.name_hash);

@@ -7068,17 +7068,6 @@ bool simple_wallet::ons_by_owner(const std::vector<std::string>& args)
     auto const &rpc = rpc_results[i];
     for (auto const &entry : rpc)
     {
-      std::string const *owner = nullptr;
-      try
-      {
-        owner = &requests[i].entries.at(entry.request_index);
-      }
-      catch (std::exception const &e)
-      {
-        fail_msg_writer() << "Daemon returned an invalid owner index = " << entry.request_index << " skipping mapping";
-        continue;
-      }
-
       std::string_view name;
       std::string value;
       if (auto got = cache.find(entry.name_hash); got != cache.end())
@@ -7100,7 +7089,7 @@ bool simple_wallet::ons_by_owner(const std::vector<std::string>& args)
       if (!value.empty()) writer
         << "\n    Value: " << value;
       writer
-        << "\n    Owner: " << *owner;
+        << "\n    Owner: " << entry.owner;
       if (entry.backup_owner) writer
         << "\n    Backup owner: " << *entry.backup_owner;
       writer
