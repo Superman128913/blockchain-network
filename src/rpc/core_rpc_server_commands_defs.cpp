@@ -1122,6 +1122,10 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_SERVICE_NODES::requested_fields_t)
     KV_SERIALIZE(storage_server_first_unreachable)
     KV_SERIALIZE(storage_server_last_unreachable)
     KV_SERIALIZE(storage_server_last_reachable)
+    KV_SERIALIZE(lokinet_reachable)
+    KV_SERIALIZE(lokinet_first_unreachable)
+    KV_SERIALIZE(lokinet_last_unreachable)
+    KV_SERIALIZE(lokinet_last_reachable)
     KV_SERIALIZE(checkpoint_participation)
     KV_SERIALIZE(pulse_participation)
     KV_SERIALIZE(timestamp_participation)
@@ -1178,6 +1182,10 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_SERVICE_NODES::response::entry)
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(storage_server_first_unreachable)
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(storage_server_last_unreachable)
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(storage_server_last_reachable)
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(lokinet_reachable);
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(lokinet_first_unreachable)
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(lokinet_last_unreachable)
+  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(lokinet_last_reachable)
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(checkpoint_participation);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(pulse_participation);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(timestamp_participation);
@@ -1303,7 +1311,7 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_SN_STATE_CHANGES::response)
 KV_SERIALIZE_MAP_CODE_END()
 
 
-KV_SERIALIZE_MAP_CODE_BEGIN(REPORT_PEER_SS_STATUS::request)
+KV_SERIALIZE_MAP_CODE_BEGIN(REPORT_PEER_STATUS::request)
   KV_SERIALIZE(type)
   KV_SERIALIZE(pubkey)
   KV_SERIALIZE(passed)

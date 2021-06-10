@@ -3233,49 +3233,62 @@ namespace service_nodes
     info.timesync_status.add(entry);
   }
 
-  std::optional<bool> proof_info::ss_reachable(const std::chrono::steady_clock::time_point& now) const {
-    if (ss_last_reachable >= ss_last_unreachable)
+  std::optional<bool> proof_info::reachable_stats::reachable(const std::chrono::steady_clock::time_point& now) const {
+    if (last_reachable >= last_unreachable)
       return true;
-    if (ss_last_unreachable > now - config::SS_MAX_FAILURE_VALIDITY)
+    if (last_unreachable > now - config::REACHABLE_MAX_FAILURE_VALIDITY)
       return false;
     // Last result was a failure, but it was a while ago, so we don't know for sure that it isn't
     // reachable now:
     return std::nullopt;
   }
 
-  bool proof_info::ss_unreachable_for(std::chrono::seconds threshold, const std::chrono::steady_clock::time_point& now) const {
-    if (auto maybe_reachable = ss_reachable(now); !maybe_reachable /*stale*/ || *maybe_reachable /*good*/)
+  bool proof_info::reachable_stats::unreachable_for(std::chrono::seconds threshold, const std::chrono::steady_clock::time_point& now) const {
+    if (auto maybe_reachable = reachable(now); !maybe_reachable /*stale*/ || *maybe_reachable /*good*/)
       return false;
-    if (ss_first_unreachable > now - threshold)
+    if (first_unreachable > now - threshold)
       return false; // Unreachable, but for less than the grace time
     return true;
   }
 
-  bool service_node_list::set_storage_server_peer_reachable(crypto::public_key const &pubkey, bool reachable)
-  {
+  bool service_node_list::set_peer_reachable(bool storage_server, const crypto::public_key& pubkey, bool reachable) {
+
     // (See .h for overview description)
 
     std::lock_guard lock(m_sn_mutex);
 
+    const auto type = storage_server ? "storage server"sv : "lokinet"sv;
+
     if (!m_state.service_nodes_infos.count(pubkey)) {
-      MDEBUG("Dropping SS reachable report: " << pubkey << " is not a registered SN pubkey");
+      MDEBUG("Dropping " << type << " reachable report: " << pubkey << " is not a registered SN pubkey");
       return false;
     }
 
-    MDEBUG("Received " << (reachable ? "reachable" : "UNREACHABLE") << " report for SN " << pubkey);
+    MDEBUG("Received " << type << (reachable ? " reachable" : " UNREACHABLE") << " report for SN " << pubkey);
 
     const auto now = std::chrono::steady_clock::now();
-    proof_info& info = proofs[pubkey];
+
+    auto& reach = storage_server ? proofs[pubkey].ss_reachable : proofs[pubkey].lokinet_reachable;
     if (reachable) {
-      info.ss_last_reachable = now;
-      info.ss_first_unreachable = NEVER;
+      reach.last_reachable = now;
+      reach.first_unreachable = NEVER;
     } else {
-      info.ss_last_unreachable = now;
-      if (info.ss_first_unreachable == NEVER)
-        info.ss_first_unreachable = now;
+      reach.last_unreachable = now;
+      if (reach.first_unreachable == NEVER)
+        reach.first_unreachable = now;
     }
 
     return true;
+
+  }
+  bool service_node_list::set_storage_server_peer_reachable(crypto::public_key const &pubkey, bool reachable)
+  {
+      return set_peer_reachable(true, pubkey, reachable);
+  }
+
+  bool service_node_list::set_lokinet_peer_reachable(crypto::public_key const &pubkey, bool reachable)
+  {
+      return set_peer_reachable(false, pubkey, reachable);
   }
 
   static quorum_manager quorum_for_serialization_to_quorum_manager(service_node_list::quorum_for_serialization const &source)

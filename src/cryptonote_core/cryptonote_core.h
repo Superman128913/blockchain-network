@@ -1017,11 +1017,6 @@ namespace cryptonote
       */
      void flush_invalid_blocks();
 
-     /**
-      * @brief Record the reachability status of node's storage server
-      */
-     bool set_storage_server_peer_reachable(crypto::public_key const &pubkey, bool value);
-
      /// Time point at which the storage server and lokinet last pinged us
      std::atomic<time_t> m_last_storage_server_ping, m_last_lokinet_ping;
      std::atomic<uint16_t> m_storage_https_port, m_storage_omq_port;

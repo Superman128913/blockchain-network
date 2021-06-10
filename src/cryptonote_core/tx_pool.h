@@ -90,12 +90,7 @@ namespace cryptonote
       o.approved_blink = approved;
       o.fee_percent = BLINK_MINER_TX_FEE_PERCENT;
 
-      if (hf_version >= network_version_18)
-        o.burn_percent = BLINK_BURN_TX_FEE_PERCENT_V18;
-      //TODO remove this in HF19
-      else
-        o.burn_percent = BLINK_BURN_TX_FEE_PERCENT_V15;
-
+      o.burn_percent = BLINK_BURN_TX_FEE_PERCENT_V18;
       o.burn_fixed = BLINK_BURN_FIXED;
       return o;
     }
