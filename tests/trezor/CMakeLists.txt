@@ -52,7 +52,6 @@ target_link_libraries(trezor_tests
     ${ZMQ_LIB}
     extra)
 
-enable_stack_trace(trezor_tests)
 set_property(TARGET trezor_tests
   PROPERTY
     FOLDER "tests")

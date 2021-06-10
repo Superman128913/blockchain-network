@@ -417,6 +417,13 @@ namespace cryptonote { namespace rpc {
 
     res.block_size_limit = res.block_weight_limit = m_core.get_blockchain_storage().get_current_cumulative_block_weight_limit();
     res.block_size_median = res.block_weight_median = m_core.get_blockchain_storage().get_current_cumulative_block_weight_median();
+
+    auto ons_counts = m_core.get_blockchain_storage().name_system_db().get_mapping_counts(res.height);
+    res.ons_counts = {
+      ons_counts[ons::mapping_type::session],
+      ons_counts[ons::mapping_type::wallet],
+      ons_counts[ons::mapping_type::lokinet]};
+
     if (context.admin)
     {
       res.service_node = m_core.service_node();
@@ -3074,10 +3081,14 @@ namespace cryptonote { namespace rpc {
         entry.last_uptime_proof                  = proof.timestamp;
         auto system_now = std::chrono::system_clock::now();
         auto steady_now = std::chrono::steady_clock::now();
-        entry.storage_server_reachable = !proof.ss_unreachable_for(netconf.UPTIME_PROOF_VALIDITY - netconf.UPTIME_PROOF_FREQUENCY, steady_now);
-        entry.storage_server_first_unreachable = reachable_to_time_t(proof.ss_first_unreachable, system_now, steady_now);
-        entry.storage_server_last_unreachable = reachable_to_time_t(proof.ss_last_unreachable, system_now, steady_now);
-        entry.storage_server_last_reachable = reachable_to_time_t(proof.ss_last_reachable, system_now, steady_now);
+        entry.storage_server_reachable = !proof.ss_reachable.unreachable_for(netconf.UPTIME_PROOF_VALIDITY - netconf.UPTIME_PROOF_FREQUENCY, steady_now);
+        entry.storage_server_first_unreachable = reachable_to_time_t(proof.ss_reachable.first_unreachable, system_now, steady_now);
+        entry.storage_server_last_unreachable = reachable_to_time_t(proof.ss_reachable.last_unreachable, system_now, steady_now);
+        entry.storage_server_last_reachable = reachable_to_time_t(proof.ss_reachable.last_reachable, system_now, steady_now);
+        entry.lokinet_reachable = !proof.lokinet_reachable.unreachable_for(netconf.UPTIME_PROOF_VALIDITY - netconf.UPTIME_PROOF_FREQUENCY, steady_now);
+        entry.lokinet_first_unreachable = reachable_to_time_t(proof.lokinet_reachable.first_unreachable, system_now, steady_now);
+        entry.lokinet_last_unreachable = reachable_to_time_t(proof.lokinet_reachable.last_unreachable, system_now, steady_now);
+        entry.lokinet_last_reachable = reachable_to_time_t(proof.lokinet_reachable.last_reachable, system_now, steady_now);
 
         service_nodes::participation_history<service_nodes::participation_entry> const &checkpoint_participation = proof.checkpoint_participation;
         service_nodes::participation_history<service_nodes::participation_entry> const &pulse_participation      = proof.pulse_participation;
@@ -3421,9 +3432,9 @@ namespace cryptonote { namespace rpc {
     return res;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  REPORT_PEER_SS_STATUS::response core_rpc_server::invoke(REPORT_PEER_SS_STATUS::request&& req, rpc_context context)
+  REPORT_PEER_STATUS::response core_rpc_server::invoke(REPORT_PEER_STATUS::request&& req, rpc_context context)
   {
-    REPORT_PEER_SS_STATUS::response res{};
+    REPORT_PEER_STATUS::response res{};
 
     crypto::public_key pubkey;
     if (!tools::hex_to_type(req.pubkey, pubkey)) {
@@ -3431,9 +3442,14 @@ namespace cryptonote { namespace rpc {
       throw rpc_error{ERROR_WRONG_PARAM, "Could not parse public key"};
     }
 
-    if (req.type != "reachability")
+    bool success = false;
+    if (req.type == "lokinet")
+      success = m_core.get_service_node_list().set_lokinet_peer_reachable(pubkey, req.passed);
+    else if (req.type == "storage" || req.type == "reachability" /* TODO: old name, can be removed once SS no longer uses it */)
+      success = m_core.get_service_node_list().set_storage_server_peer_reachable(pubkey, req.passed);
+    else
       throw rpc_error{ERROR_WRONG_PARAM, "Unknown status type"};
-    if (!m_core.set_storage_server_peer_reachable(pubkey, req.passed))
+    if (!success)
       throw rpc_error{ERROR_WRONG_PARAM, "Pubkey not found"};
 
     res.status = STATUS_OK;
@@ -3549,13 +3565,18 @@ namespace cryptonote { namespace rpc {
     std::vector<ons::mapping_record> records = db.get_mappings_by_owners(owners, height);
     for (auto &record : records)
     {
-      auto& entry = res.entries.emplace_back();
-
-      auto it = owner_to_request_index.find(record.owner);
+      auto it = owner_to_request_index.end();
+      if (record.owner)
+          it = owner_to_request_index.find(record.owner);
+      if (it == owner_to_request_index.end() && record.backup_owner)
+          it = owner_to_request_index.find(record.backup_owner);
       if (it == owner_to_request_index.end())
-        throw rpc_error{ERROR_INTERNAL, "Owner=" + record.owner.to_string(nettype()) +
-          ", could not be mapped back a index in the request 'entries' array"};
+        throw rpc_error{ERROR_INTERNAL,
+            (record.owner ? ("Owner=" + record.owner.to_string(nettype()) + " ") : ""s) +
+            (record.backup_owner ? ("BackupOwner=" + record.backup_owner.to_string(nettype()) + " ") : ""s) +
+            " could not be mapped back a index in the request 'entries' array"};
 
+      auto& entry = res.entries.emplace_back();
       entry.request_index   = it->second;
       entry.type            = record.type;
       entry.name_hash       = std::move(record.name_hash);

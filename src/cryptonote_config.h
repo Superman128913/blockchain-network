@@ -241,7 +241,7 @@ namespace config
   inline constexpr auto UPTIME_PROOF_CHECK_INTERVAL = 30s; // How frequently to check whether we need to broadcast a proof
   inline constexpr auto UPTIME_PROOF_FREQUENCY = 1h; // How often to send proofs out to the network since the last proof we successfully sent.  (Approximately; this can be up to CHECK_INTERFACE/2 off in either direction).  The minimum accepted time between proofs is half of this.
   inline constexpr auto UPTIME_PROOF_VALIDITY = 2h + 5min; // The maximum time that we consider an uptime proof to be valid (i.e. after this time since the last proof we consider the SN to be down)
-  inline constexpr auto SS_MAX_FAILURE_VALIDITY = 10min; // If we don't hear any SS ping test failures for more than this long then we start considering the SN as passing for the purpose of obligation testing until we get another test result.  This should be somewhat larger than SS's max re-test backoff (5min).
+  inline constexpr auto REACHABLE_MAX_FAILURE_VALIDITY = 5min; // If we don't hear any SS ping/lokinet session test failures for more than this long then we start considering the SN as passing for the purpose of obligation testing until we get another test result.  This should be somewhat larger than SS/lokinet's max re-test backoff (2min).
 
   // Hash domain separators
   inline constexpr std::string_view HASH_KEY_BULLETPROOF_EXPONENT = "bulletproof"sv;
@@ -298,7 +298,7 @@ namespace config
     inline constexpr uint16_t ZMQ_RPC_DEFAULT_PORT = 38858;
     inline constexpr uint16_t QNET_DEFAULT_PORT = 38859;
     inline constexpr boost::uuids::uuid const NETWORK_ID = { {
-        0xa9, 0xf7, 0x5c, 0x7d, 0x55, 0x17, 0xcb, 0x6b, 0x5a, 0xf4, 0x63, 0x79, 0x7a, 0x57, 0xab, 0xd3
+        0xa9, 0xf7, 0x5c, 0x7d, 0x55, 0x17, 0xcb, 0x6b, 0x5b, 0xf4, 0x63, 0x79, 0x7a, 0x57, 0xab, 0xd3
       } };
     inline constexpr std::string_view GENESIS_TX = "04011e1e01ff00018080c9db97f4fb2702fa27e905f604faa4eb084ee675faca77b0cfea9adec1526da33cae5e286f31624201dae05bf3fa1662b7fd373c92426763d921cf3745e10ee43edb510f690c656f247200000000000000000000000000000000000000000000000000000000000000000000"sv;
     inline constexpr uint32_t GENESIS_NONCE = 12345;
@@ -309,6 +309,8 @@ namespace config
       "dV3EhSE1xXgSzswBgVioqFNTfcqGopvTrcYjs4YDLHUfU64DuHxFoEmbwoyipTidGiTXx5EuYdgzZhDLMTo9uEv82M4A7Uimp"sv, // hardfork v7-9
       "dV3EhSE1xXgSzswBgVioqFNTfcqGopvTrcYjs4YDLHUfU64DuHxFoEmbwoyipTidGiTXx5EuYdgzZhDLMTo9uEv82M4A7Uimp"sv, // hardfork v10
     };
+
+    inline constexpr auto UPTIME_PROOF_STARTUP_DELAY = 5s;
   }
 
   namespace fakechain {
@@ -335,8 +337,9 @@ namespace cryptonote
     network_version_14_blink,
     network_version_15_ons,
     network_version_16_pulse,
-    network_version_17, // future HF
-    network_version_18, // future HF
+    network_version_17,
+    network_version_18,
+    network_version_19,
 
     network_version_count,
   };

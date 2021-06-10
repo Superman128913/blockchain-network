@@ -296,7 +296,7 @@ namespace rpc {
         uint64_t height;               // The voting block height for the changing service node and validators
         uint32_t index;                // The index of all tested nodes at the given height for which this state change applies
         std::vector<uint32_t> voters;  // The position of validators in the testing quorum who validated and voted for this state change. This typically contains just 7 required voter slots (of 10 eligible voters).
-        std::optional<std::vector<std::string>> reasons; // Reasons for the decommissioning/deregistration as reported by the voting quorum.  This contains any reasons that all voters agreed on, one or more of: "uptime" (missing uptime proofs), "checkpoints" (missed checkpoint votes), "pulse" (missing pulse votes), "storage" (storage server pings failed), "timecheck" (time sync pings failed), "timesync" (time was out of sync)
+        std::optional<std::vector<std::string>> reasons; // Reasons for the decommissioning/deregistration as reported by the voting quorum.  This contains any reasons that all voters agreed on, one or more of: "uptime" (missing uptime proofs), "checkpoints" (missed checkpoint votes), "pulse" (missing pulse votes), "storage" (storage server pings failed), "lokinet" (lokinet router unreachable), "timecheck" (time sync pings failed), "timesync" (time was out of sync)
         std::optional<std::vector<std::string>> reasons_maybe; // If present, this contains any decomm/dereg reasons that were given by some but not all quorum voters
         KV_MAP_SERIALIZABLE
       };
@@ -640,6 +640,7 @@ namespace rpc {
       uint64_t block_weight_limit;          // Maximum allowed block weight.
       uint64_t block_size_median;           // Median block size of latest 100 blocks.
       uint64_t block_weight_median;         // Median block weight of latest 100 blocks.
+      std::array<int, 3> ons_counts;        // ONS registration counts, [session, wallet, lokinet]
       std::optional<bool> service_node;                    // Will be true if the node is running in --service-node mode.
       std::optional<uint64_t> start_time;                  // Start time of the daemon, as UNIX time.
       std::optional<uint64_t> last_storage_server_ping;    // Last ping time of the storage server (0 if never or not running as a service node)
@@ -2051,10 +2052,13 @@ namespace rpc {
 
       bool last_uptime_proof;
       bool storage_server_reachable;
-      bool storage_server_reachable_timestamp;
       bool storage_server_last_reachable;
       bool storage_server_last_unreachable;
       bool storage_server_first_unreachable;
+      bool lokinet_reachable;
+      bool lokinet_last_reachable;
+      bool lokinet_last_unreachable;
+      bool lokinet_first_unreachable;
       bool checkpoint_participation;
       bool pulse_participation;
       bool timestamp_participation;
@@ -2118,8 +2122,12 @@ namespace rpc {
         uint64_t                                last_uptime_proof;                   // The last time this Service Node's uptime proof was relayed by at least 1 Service Node other than itself in unix epoch time.
         bool                                    storage_server_reachable;            // True if this storage server is currently passing tests for the purposes of SN node testing: true if the last test passed, or if it has been unreachable for less than an hour; false if it has been failing tests for more than an hour (and thus is considered unreachable).
         uint64_t                                storage_server_first_unreachable;    // If the last test we received was a failure, this field contains the timestamp when failures started.  Will be 0 if the last result was a success or the node has not yet been tested.  (To disinguish between these cases check storage_server_last_reachable).
-        uint64_t                                storage_server_last_unreachable;     // The last time this Service Node failed a ping test (regardless of whether or not it is currently failing); 0 if it never failed a test since startup.
-        uint64_t                                storage_server_last_reachable;       // The last time we received a successful ping response for this Service Node (whether or not it is currently failing); 0 if we have never received a success since startup.
+        uint64_t                                storage_server_last_unreachable;     // The last time this service node's storage server failed a ping test (regardless of whether or not it is currently failing); 0 if it never failed a test since startup.
+        uint64_t                                storage_server_last_reachable;       // The last time we received a successful ping response for this storage server (whether or not it is currently failing); 0 if we have never received a success since startup.
+        bool                                    lokinet_reachable;                   // True if this lokinet is currently passing tests for the purposes of SN node testing: true if the last test passed, or if it has been unreachable for less than an hour; false if it has been failing tests for more than an hour (and thus is considered unreachable).
+        uint64_t                                lokinet_first_unreachable;           // If the last test we received was a failure, this field contains the timestamp when failures started.  Will be 0 if the last result was a success or the node has not yet been tested.  (To disinguish between these cases check lokinet_last_reachable).
+        uint64_t                                lokinet_last_unreachable;            // The last time this service node's lokinet failed a reachable test (regardless of whether or not it is currently failing); 0 if it never failed a test since startup.
+        uint64_t                                lokinet_last_reachable;              // The last time we received a successful test response for this service node's lokinet router (whether or not it is currently failing); 0 if we have never received a success since startup.
 
         std::vector<service_nodes::participation_entry> checkpoint_participation;    // Of the last N checkpoints the Service Node is in a checkpointing quorum, record whether or not the Service Node voted to checkpoint a block
         std::vector<service_nodes::participation_entry> pulse_participation;         // Of the last N pulse blocks the Service Node is in a pulse quorum, record whether or not the Service Node voted (participated) in that block
@@ -2383,13 +2391,16 @@ namespace rpc {
 
 
   OXEN_RPC_DOC_INTROSPECT
-  struct REPORT_PEER_SS_STATUS : RPC_COMMAND
+  // Reports service node peer status (success/fail) from lokinet and storage server.
+  struct REPORT_PEER_STATUS : RPC_COMMAND
   {
-    static constexpr auto names() { return NAMES("report_peer_storage_server_status"); }
+    // TODO: remove the `report_peer_storage_server_status` once we require a storage server version
+    // that stops using the old name.
+    static constexpr auto names() { return NAMES("report_peer_status", "report_peer_storage_server_status"); }
 
     struct request
     {
-      std::string type; // test type (currently used: ["reachability"])
+      std::string type; // test type; currently supported are: "storage" and "lokinet" for storage server and lokinet tests, respectively.
       std::string pubkey; // service node pubkey
       bool passed; // whether the node is passing the test
 
@@ -2640,7 +2651,7 @@ namespace rpc {
     GET_OUTPUT_BLACKLIST,
     GET_CHECKPOINTS,
     GET_SN_STATE_CHANGES,
-    REPORT_PEER_SS_STATUS,
+    REPORT_PEER_STATUS,
     TEST_TRIGGER_P2P_RESYNC,
     TEST_TRIGGER_UPTIME_PROOF,
     ONS_NAMES_TO_OWNERS,

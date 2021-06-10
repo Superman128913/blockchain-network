@@ -422,7 +422,8 @@ namespace cryptonote
     missed_pulse_participations = 1 << 2,
     storage_server_unreachable = 1 << 3,
     timestamp_response_unreachable = 1 << 4,
-    timesync_status_out_of_sync = 1 << 5
+    timesync_status_out_of_sync = 1 << 5,
+    lokinet_unreachable = 1 << 6,
   };
 
   // Returns human-readable reason strings (e.g. "Missed Uptime Proofs") for the given reason bits

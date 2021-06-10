@@ -186,6 +186,7 @@ namespace {
     }
     return s + " " + (ago < 0s ? "in the future" : "ago");
   }
+
   std::string get_human_time_ago(std::time_t t, std::time_t now, bool abbreviate = false) {
     return get_human_time_ago(std::chrono::seconds{now - t}, abbreviate);
   }
@@ -1686,27 +1687,32 @@ static void append_printable_service_node_list_entry(cryptonote::network_type ne
     //
     // NOTE: Storage Server Test
     //
-    stream << indent2 << "Storage Server Reachable: ";
-    if (entry.storage_server_first_unreachable == 0) {
-      if (entry.storage_server_last_reachable == 0)
-        stream << "Not yet tested";
-      else {
-        stream << "Yes (last tested " << get_human_time_ago(entry.storage_server_last_reachable, now);
-        if (entry.storage_server_last_unreachable)
-          stream << "; last failure " << get_human_time_ago(entry.storage_server_last_unreachable, now);
+    auto print_reachable = [&stream, &now] (bool reachable, auto first_unreachable, auto last_unreachable, auto last_reachable) {
+      if (first_unreachable == 0) {
+        if (last_reachable == 0)
+          stream << "Not yet tested";
+        else {
+          stream << "Yes (last tested " << get_human_time_ago(last_reachable, now);
+          if (last_unreachable)
+            stream << "; last failure " << get_human_time_ago(last_unreachable, now);
+          stream << ")";
+        }
+      } else {
+        stream << "NO";
+        if (!reachable)
+          stream << " - FAILING!";
+        stream << " (last tested " << get_human_time_ago(last_unreachable, now)
+          << "; failing since " << get_human_time_ago(first_unreachable, now);
+        if (last_reachable)
+          stream << "; last good " << get_human_time_ago(last_reachable, now);
         stream << ")";
       }
-    } else {
-      stream << "NO";
-      if (!entry.storage_server_reachable)
-        stream << " - FAILING!";
-      stream << " (last tested " << get_human_time_ago(entry.storage_server_last_unreachable, now)
-        << "; failing since " << get_human_time_ago(entry.storage_server_first_unreachable, now);
-      if (entry.storage_server_last_reachable)
-        stream << "; last good " << get_human_time_ago(entry.storage_server_last_reachable, now);
-      stream << ")";
-    }
-    stream << "\n";
+      stream << '\n';
+    };
+    stream << indent2 << "Storage Server Reachable: ";
+    print_reachable(entry.storage_server_reachable, entry.storage_server_first_unreachable, entry.storage_server_last_unreachable, entry.storage_server_last_reachable);
+    stream << indent2 << "Lokinet Reachable: ";
+    print_reachable(entry.lokinet_reachable, entry.lokinet_first_unreachable, entry.lokinet_last_unreachable, entry.lokinet_last_reachable);
 
     //
     // NOTE: Component Versions
@@ -1967,7 +1973,7 @@ static uint64_t get_actual_amount(uint64_t amount, uint64_t portions)
   return resultlo;
 }
 
-bool rpc_command_executor::prepare_registration()
+bool rpc_command_executor::prepare_registration(bool force_registration)
 {
   // RAII-style class to temporarily clear categories and restore upon destruction (i.e. upon returning).
   struct clear_log_categories {
@@ -1989,6 +1995,20 @@ bool rpc_command_executor::prepare_registration()
   if (!res.service_node)
   {
     tools::fail_msg_writer() << "Unable to prepare registration: this daemon is not running in --service-node mode";
+    return false;
+  }
+  else if (auto last_lokinet_ping = static_cast<std::time_t>(res.last_lokinet_ping.value_or(0));
+      last_lokinet_ping < (time(nullptr) - 60) && !force_registration)
+  {
+    tools::fail_msg_writer() << "Unable to prepare registration: this daemon has not received a ping from lokinet "
+                             << (res.last_lokinet_ping == 0 ? "yet" : "since " + get_human_time_ago(last_lokinet_ping, std::time(nullptr)));
+    return false;
+  }
+  else if (auto last_storage_server_ping = static_cast<std::time_t>(res.last_storage_server_ping.value_or(0));
+      last_storage_server_ping < (time(nullptr) - 60) && !force_registration)
+  {
+    tools::fail_msg_writer() << "Unable to prepare registration: this daemon has not received a ping from the storage server "
+                             << (res.last_storage_server_ping == 0 ? "yet" : "since " + get_human_time_ago(last_storage_server_ping, std::time(nullptr)));
     return false;
   }
 

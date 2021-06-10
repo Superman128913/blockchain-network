@@ -305,6 +305,9 @@ struct name_system_db
   std::vector<mapping_record> get_mappings_by_owners(std::vector<generic_owner> const &keys, std::optional<uint64_t> blockchain_height = std::nullopt);
   settings_record             get_settings          ();
 
+  // Returns the count of each type of ONS registration that is currently active.
+  std::map<mapping_type, int> get_mapping_counts(uint64_t blockchain_height);
+
   // Resolves a mapping of the given type and name hash. Returns a null optional if the value was
   // not found or expired, otherwise returns the encrypted value.
   std::optional<mapping_value> resolve(mapping_type type, std::string_view name_hash_b64, uint64_t blockchain_height);
@@ -333,6 +336,7 @@ private:
   sql_compiled_statement prune_mappings_sql{*this};
   sql_compiled_statement prune_owners_sql{*this};
   sql_compiled_statement get_mappings_by_owner_sql{*this};
+  sql_compiled_statement get_mapping_counts_sql{*this};
   sql_compiled_statement get_mappings_on_height_and_newer_sql{*this};
 };
 

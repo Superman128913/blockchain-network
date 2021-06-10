@@ -45,28 +45,21 @@
 
 namespace service_nodes
 {
-  char const *service_node_test_results::why() const
+  std::optional<std::vector<std::string_view>> service_node_test_results::why() const
   {
-    static char buf[2048];
-    buf[0]              = 0;
-    char *buf_ptr       = buf;
-    char const *buf_end = buf + sizeof(buf);
-
     if (passed())
-    {
-      buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr, "Service Node is passing all local tests");
-    }
-    else
-    {
-      buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr, "Service Node is currently failing the following tests: ");
-      if (!uptime_proved)            buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr, "Uptime proof missing.\n");
-      if (!checkpoint_participation) buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr, "Skipped voting in at least %d checkpoints.\n", (int)(QUORUM_VOTE_CHECK_COUNT - CHECKPOINT_MAX_MISSABLE_VOTES));
-      if (!pulse_participation)      buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr, "Skipped voting in at least %d pulse quorums.\n", (int)(QUORUM_VOTE_CHECK_COUNT - PULSE_MAX_MISSABLE_VOTES));
-      if (!timestamp_participation)      buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr, "Replied out of sync time for at least %d timestamp mesages.\n", (int)(QUORUM_VOTE_CHECK_COUNT - TIMESTAMP_MAX_MISSABLE_VOTES));
-      if (!timesync_status)      buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr, "Missed replying to at least %d timesync messages.\n", (int)(QUORUM_VOTE_CHECK_COUNT - TIMESYNC_MAX_UNSYNCED_VOTES));
-      buf_ptr += snprintf(buf_ptr, buf_end - buf_ptr, "Note: Storage server may not be reachable. This is only testable by an external Service Node.");
-    }
-    return buf;
+      return std::nullopt;
+
+    std::vector<std::string_view> results{{"Service Node is currently failing the following tests:"sv}};
+    if (!uptime_proved) results.push_back("Uptime proof missing."sv);
+    if (!checkpoint_participation) results.push_back("Skipped voting in too many checkpoints."sv);
+    if (!pulse_participation) results.push_back("Skipped voting in too many pulse quorums."sv);
+    // These ones are not likely to be useful when we are reporting on ourself:
+    if (!timestamp_participation) results.push_back("Too many out-of-sync timesync replies."sv);
+    if (!timesync_status) results.push_back("Too many missed timesync replies."sv);
+    if (!storage_server_reachable) results.push_back("Storage server is not reachable."sv);
+    if (!lokinet_reachable) results.push_back("Lokinet router is not reachable."sv);
+    return results;
   }
 
   quorum_cop::quorum_cop(cryptonote::core& core)
@@ -87,7 +80,7 @@ namespace service_nodes
     const auto& netconf = m_core.get_net_config();
 
     service_node_test_results result; // Defaults to true for individual tests
-    bool ss_reachable = true;
+    bool ss_reachable = true, lokinet_reachable = true;
     uint64_t timestamp = 0;
     decltype(std::declval<proof_info>().public_ips) ips{};
 
@@ -97,21 +90,19 @@ namespace service_nodes
     service_nodes::participation_history<service_nodes::timesync_entry> timesync_status{};
 
     constexpr std::array<uint16_t, 3> MIN_TIMESTAMP_VERSION{9,1,0};
-    bool check_timestamp_obligation = false;
+
+    const auto unreachable_threshold = netconf.UPTIME_PROOF_VALIDITY - netconf.UPTIME_PROOF_FREQUENCY;
 
     m_core.get_service_node_list().access_proof(pubkey, [&](const proof_info &proof) {
-      ss_reachable             = !proof.ss_unreachable_for(netconf.UPTIME_PROOF_VALIDITY - netconf.UPTIME_PROOF_FREQUENCY);
+      ss_reachable             = !proof.ss_reachable.unreachable_for(unreachable_threshold);
+      lokinet_reachable        = !proof.lokinet_reachable.unreachable_for(unreachable_threshold);
       timestamp                = std::max(proof.timestamp, proof.effective_timestamp);
       ips                      = proof.public_ips;
       checkpoint_participation = proof.checkpoint_participation;
       pulse_participation      = proof.pulse_participation;
 
-      // TODO: remove after HF18
-      if (proof.proof->version >= MIN_TIMESTAMP_VERSION && hf_version >= cryptonote::network_version_18) {
-        timestamp_participation  = proof.timestamp_participation;
-        timesync_status          = proof.timesync_status;
-        check_timestamp_obligation = true;
-      }
+      timestamp_participation  = proof.timestamp_participation;
+      timesync_status          = proof.timesync_status;
 
     });
     std::chrono::seconds time_since_last_uptime_proof{std::time(nullptr) - timestamp};
@@ -136,8 +127,14 @@ namespace service_nodes
     if (!ss_reachable)
     {
       LOG_PRINT_L1("Service Node storage server is not reachable for node: " << pubkey);
-      if (hf_version >= cryptonote::network_version_13_enforce_checkpoints)
-          result.storage_server_reachable = false;
+      result.storage_server_reachable = false;
+    }
+
+    // TODO: perhaps come back and make this activate on some "soft fork" height before HF19?
+    if (!lokinet_reachable && hf_version >= cryptonote::network_version_19)
+    {
+      LOG_PRINT_L1("Service Node lokinet is not reachable for node: " << pubkey);
+      result.lokinet_reachable = false;
     }
 
     // IP change checks
@@ -156,14 +153,10 @@ namespace service_nodes
 
     if (!info.is_decommissioned())
     {
-      if (check_checkpoint_obligation)
+      if (check_checkpoint_obligation && !checkpoint_participation.check_participation(CHECKPOINT_MAX_MISSABLE_VOTES) )
       {
-        if (!checkpoint_participation.check_participation(CHECKPOINT_MAX_MISSABLE_VOTES) )
-        {
-          LOG_PRINT_L1("Service Node: " << pubkey << ", failed checkpoint obligation check");
-          if (hf_version >= cryptonote::network_version_13_enforce_checkpoints)
-            result.checkpoint_participation = false;
-        }
+        LOG_PRINT_L1("Service Node: " << pubkey << ", failed checkpoint obligation check");
+        result.checkpoint_participation = false;
       }
 
       if (!pulse_participation.check_participation(PULSE_MAX_MISSABLE_VOTES) )
@@ -172,17 +165,15 @@ namespace service_nodes
         result.pulse_participation = false;
       }
 
-      if (check_timestamp_obligation){
-        if (!timestamp_participation.check_participation(TIMESTAMP_MAX_MISSABLE_VOTES) )
-        {
-          LOG_PRINT_L1("Service Node: " << pubkey << ", failed timestamp obligation check");
-          result.timestamp_participation = false;
-        }
-        if (!timesync_status.check_participation(TIMESYNC_MAX_UNSYNCED_VOTES) )
-        {
-          LOG_PRINT_L1("Service Node: " << pubkey << ", failed timesync obligation check");
-          result.timesync_status = false;
-        }
+      if (!timestamp_participation.check_participation(TIMESTAMP_MAX_MISSABLE_VOTES) )
+      {
+        LOG_PRINT_L1("Service Node: " << pubkey << ", failed timestamp obligation check");
+        result.timestamp_participation = false;
+      }
+      if (!timesync_status.check_participation(TIMESYNC_MAX_UNSYNCED_VOTES) )
+      {
+        LOG_PRINT_L1("Service Node: " << pubkey << ", failed timesync obligation check");
+        result.timesync_status = false;
       }
     }
 
@@ -390,6 +381,7 @@ namespace service_nodes
                   if (!test_results.checkpoint_participation) reason |= cryptonote::Decommission_Reason::missed_checkpoints;
                   if (!test_results.pulse_participation) reason |= cryptonote::Decommission_Reason::missed_pulse_participations;
                   if (!test_results.storage_server_reachable) reason |= cryptonote::Decommission_Reason::storage_server_unreachable;
+                  if (!test_results.lokinet_reachable) reason |= cryptonote::Decommission_Reason::lokinet_unreachable;
                   if (!test_results.timestamp_participation) reason |= cryptonote::Decommission_Reason::timestamp_response_unreachable;
                   if (!test_results.timesync_status) reason |= cryptonote::Decommission_Reason::timesync_status_out_of_sync;
                   int64_t credit = calculate_decommission_credit(info, latest_height);
@@ -444,25 +436,24 @@ namespace service_nodes
                 if (info.can_be_voted_on(m_obligations_height))
                 {
                   tested_myself_once_per_block = true;
-                  auto my_test_results         = check_service_node(obligations_height_hf_version, my_keys.pub, info);
-                  if (info.is_active())
-                  {
-                    if (!my_test_results.passed())
-                    {
-                      // NOTE: Don't warn uptime proofs if the daemon is just
-                      // recently started and is candidate for testing (i.e.
-                      // restarting the daemon)
-                      if (!my_test_results.uptime_proved && live_time < 1h)
-                        continue;
+                  auto my_test_results = check_service_node(obligations_height_hf_version, my_keys.pub, info);
+                  const bool print_failings = info.is_decommissioned() ||
+                    (info.is_active() && !my_test_results.passed() &&
+                      // Don't warn uptime proofs if the daemon is just recently started and is candidate for testing (i.e. restarting the daemon)
+                      (my_test_results.uptime_proved || live_time >= 1h));
 
-                      LOG_PRINT_L0("Service Node (yours) is active but is not passing tests for quorum: " << m_obligations_height);
-                      LOG_PRINT_L0(my_test_results.why());
-                    }
-                  }
-                  else if (info.is_decommissioned())
+                  if (print_failings)
                   {
-                    LOG_PRINT_L0("Service Node (yours) is currently decommissioned and being tested in quorum: " << m_obligations_height);
-                    LOG_PRINT_L0(my_test_results.why());
+                    LOG_PRINT_L0(
+                        (info.is_decommissioned()
+                          ? "Service Node (yours) is currently decommissioned and being tested in quorum: "
+                          : "Service Node (yours) is active but is not passing tests for quorum: ")
+                        << m_obligations_height);
+                    if (auto why = my_test_results.why())
+                      LOG_PRINT_L0(tools::join("\n", *why));
+                    else
+                      LOG_PRINT_L0("Service Node is passing all local tests");
+                    LOG_PRINT_L0("(Note that some tests, such as storage server and lokinet reachability, can only assessed by remote service nodes)");
                   }
                 }
               }

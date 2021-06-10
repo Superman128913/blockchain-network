@@ -34,21 +34,10 @@ if (NOT (MINGW OR APPLE OR FREEBSD OR OPENBSD OR DRAGONFLY))
   add_compile_options("${WARNINGS_AS_ERRORS_FLAG}") # applies only to targets that follow
 endif()
 
-function (enable_stack_trace target)
-  if(STACK_TRACE)
-    target_compile_definitions("${target}" PRIVATE STACK_TRACE)
-    if (STATIC)
-      set_property(TARGET "${target}"
-        APPEND PROPERTY LINK_FLAGS "-Wl,--wrap=__cxa_throw")
-    endif()
-  endif()
-endfunction()
-
 set_property(GLOBAL PROPERTY oxen_executable_targets "")
 function (oxen_add_executable target binary)
   add_executable("${target}" ${ARGN})
   target_link_libraries("${target}" PRIVATE extra)
-  enable_stack_trace("${target}")
   set_target_properties("${target}" PROPERTIES
     OUTPUT_NAME "${binary}"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
