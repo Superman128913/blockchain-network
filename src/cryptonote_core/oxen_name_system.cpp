@@ -1583,7 +1583,8 @@ CREATE TABLE IF NOT EXISTS settings (
 
 CREATE TABLE IF NOT EXISTS mappings ()" + mappings_columns + R"();
 CREATE INDEX IF NOT EXISTS owner_id_index ON mappings(owner_id);
-CREATE INDEX IF NOT EXISTS backup_owner_id_index ON mappings(backup_owner_index);
+DROP INDEX IF EXISTS backup_owner_id_index;
+CREATE INDEX IF NOT EXISTS backup_owner_index ON mappings(backup_owner_id);
 CREATE UNIQUE INDEX IF NOT EXISTS name_type_update ON mappings (name_hash, type, update_height DESC);
 CREATE INDEX IF NOT EXISTS mapping_type_name_exp ON mappings (type, name_hash, expiration_height DESC);
 )";
@@ -1633,7 +1634,7 @@ INSERT INTO mappings
 DROP TABLE mappings_old;
 CREATE UNIQUE INDEX name_type_update ON mappings(name_hash, type, update_height DESC);
 CREATE INDEX owner_id_index ON mappings(owner_id);
-CREATE INDEX backup_owner_id_index ON mappings(backup_owner_index);
+CREATE INDEX backup_owner_index ON mappings(backup_owner_id);
 CREATE INDEX mapping_type_name_exp ON mappings(type, name_hash, expiration_height DESC);
 COMMIT TRANSACTION;
 )";
