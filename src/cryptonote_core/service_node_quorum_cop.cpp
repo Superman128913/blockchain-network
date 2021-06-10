@@ -130,7 +130,8 @@ namespace service_nodes
       result.storage_server_reachable = false;
     }
 
-    if (!lokinet_reachable)
+    // TODO: perhaps come back and make this activate on some "soft fork" height before HF19?
+    if (!lokinet_reachable && hf_version >= cryptonote::network_version_19)
     {
       LOG_PRINT_L1("Service Node lokinet is not reachable for node: " << pubkey);
       result.lokinet_reachable = false;

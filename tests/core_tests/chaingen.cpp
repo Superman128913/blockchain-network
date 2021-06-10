@@ -958,13 +958,13 @@ bool oxen_chain_generator::block_begin(oxen_blockchain_entry &entry, oxen_create
     constexpr uint64_t num_blocks       = cryptonote::get_config(cryptonote::FAKECHAIN).GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS;
     uint64_t start_height               = height - num_blocks;
 
-    static_assert(cryptonote::network_version_count == cryptonote::network_version_18 + 1,
+    static_assert(cryptonote::network_version_count == cryptonote::network_version_19 + 1,
             "The code below needs to be updated to support higher hard fork versions");
     if (blk.major_version == cryptonote::network_version_15_ons)
       miner_tx_context.batched_governance = FOUNDATION_REWARD_HF15 * num_blocks;
     else if (blk.major_version == cryptonote::network_version_16_pulse)
       miner_tx_context.batched_governance = (FOUNDATION_REWARD_HF15 + CHAINFLIP_LIQUIDITY_HF16) * num_blocks;
-    else if (blk.major_version >= cryptonote::network_version_17 && blk.major_version <= cryptonote::network_version_18)
+    else if (blk.major_version >= cryptonote::network_version_17 && blk.major_version <= cryptonote::network_version_19)
       miner_tx_context.batched_governance = FOUNDATION_REWARD_HF17 * num_blocks;
     else
     {
