@@ -61,7 +61,6 @@
 #include "cryptonote_basic/verification_context.h"
 #include "crypto/hash.h"
 #include "checkpoints/checkpoints.h"
-#include "cryptonote_basic/hardfork.h"
 #include "blockchain_db/blockchain_db.h"
 #include "cryptonote_core/oxen_name_system.h"
 #include "pulse.h"
@@ -149,19 +148,7 @@ namespace cryptonote
      *
      * @return true on success, false if any initialization steps fail
      */
-    bool init(BlockchainDB* db, sqlite3 *ons_db, const network_type nettype = MAINNET, bool offline = false, const cryptonote::test_options *test_options = NULL, difficulty_type fixed_difficulty = 0, const GetCheckpointsCallback& get_checkpoints = nullptr);
-
-    /**
-     * @brief Initialize the Blockchain state
-     *
-     * @param db a pointer to the backing store to use for the blockchain
-     * @param hf a structure containing hardfork information
-     * @param nettype network type
-     * @param offline true if running offline, else false
-     *
-     * @return true on success, false if any initialization steps fail
-     */
-    bool init(BlockchainDB* db, HardFork*& hf, sqlite3 *ons_db, const network_type nettype = MAINNET, bool offline = false);
+    bool init(BlockchainDB* db, sqlite3 *ons_db, const network_type nettype = MAINNET, bool offline = false, const cryptonote::test_options *test_options = nullptr, difficulty_type fixed_difficulty = 0, const GetCheckpointsCallback& get_checkpoints = nullptr);
 
     /**
      * @brief Uninitializes the blockchain state
@@ -822,72 +809,12 @@ namespace cryptonote
     void set_show_time_stats(bool stats) { m_show_time_stats = stats; }
 
     /**
-     * @brief gets the hardfork voting state object
-     *
-     * @return the HardFork object
-     */
-    HardFork::State get_hard_fork_state() const;
-
-    /**
-     * @brief gets the current hardfork version in use/voted for
+     * @brief gets the network hard fork version of the blockchain at the given height.
+     * If height is omitted, uses the current blockchain height.
      *
      * @return the version
      */
-    uint8_t get_current_hard_fork_version() const { return m_hardfork->get_current_version(); }
-
-    /**
-     * @brief returns the newest hardfork version known to the blockchain
-     *
-     * @return the version
-     */
-    uint8_t get_ideal_hard_fork_version() const { return m_hardfork->get_ideal_version(); }
-
-    /**
-     * @brief returns the next hardfork version
-     *
-     * @return the version
-     */
-    uint8_t get_next_hard_fork_version() const { return m_hardfork->get_next_version(); }
-
-    /**
-     * @brief returns the newest hardfork version voted to be enabled
-     * as of a certain height
-     *
-     * @param height the height for which to check version info
-     *
-     * @return the version
-     */
-    uint8_t get_ideal_hard_fork_version(uint64_t height) const { return m_hardfork->get_ideal_version(height); }
-
-    /**
-     * @brief returns the actual hardfork version for a given block height
-     *
-     * @param height the height for which to check version info
-     *
-     * @return the version
-     */
-    uint8_t get_hard_fork_version(uint64_t height) const { return m_hardfork->get(height); }
-
-    /**
-     * @brief returns the earliest block a given version may activate
-     *
-     * @return the height
-     */
-    uint64_t get_earliest_ideal_height_for_version(uint8_t version) const { return m_hardfork->get_earliest_ideal_height_for_version(version); }
-
-    /**
-     * @brief get information about hardfork voting for a version
-     *
-     * @param version the version in question
-     * @param window the size of the voting window
-     * @param votes the number of votes to enable <version>
-     * @param threshold the number of votes required to enable <version>
-     * @param earliest_height the earliest height at which <version> is allowed
-     * @param voting which version this node is voting for/using
-     *
-     * @return whether the version queried is enabled 
-     */
-    bool get_hard_fork_voting_info(uint8_t version, uint32_t &window, uint32_t &votes, uint32_t &threshold, uint64_t &earliest_height, uint8_t &voting) const;
+    uint8_t get_network_version(std::optional<uint64_t> height = std::nullopt) const;
 
     /**
      * @brief remove transactions from the transaction pool (if present)
@@ -1194,7 +1121,6 @@ namespace cryptonote
     std::vector<AltBlockAddedHook*> m_alt_block_added_hooks;
 
     checkpoints m_checkpoints;
-    HardFork *m_hardfork;
 
     network_type m_nettype;
     bool m_offline;
@@ -1221,6 +1147,9 @@ namespace cryptonote
     uint64_t m_prepare_height;
     uint64_t m_prepare_nblocks;
     std::vector<block> *m_prepare_blocks;
+
+    std::chrono::steady_clock::time_point last_outdated_warning = {};
+    std::mutex last_outdated_warning_mutex;
 
     /**
      * @brief collects the keys for all outputs being "spent" as an input

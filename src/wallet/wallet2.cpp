@@ -8389,7 +8389,7 @@ wallet2::register_service_node_result wallet2::create_register_service_node_tx(c
       }
     }
 
-    staking_requirement = service_nodes::get_staking_requirement(nettype(), bc_height, *hf_version);
+    staking_requirement = service_nodes::get_staking_requirement(nettype(), bc_height);
     std::vector<std::string> const args(local_args.begin(), local_args.begin() + local_args.size() - 3);
     contributor_args = service_nodes::convert_registration_args(nettype(), args, staking_requirement, *hf_version);
 

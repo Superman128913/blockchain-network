@@ -93,7 +93,7 @@ namespace service_nodes
   void service_node_list::init()
   {
     std::lock_guard lock(m_sn_mutex);
-    if (m_blockchain.get_current_hard_fork_version() < 9)
+    if (m_blockchain.get_network_version() < cryptonote::network_version_9_service_nodes)
     {
       reset(true);
       return;
@@ -471,7 +471,7 @@ namespace service_nodes
     hw::device &hwdev         = hw::get_device("default");
     contribution->transferred = 0;
     bool stake_decoded        = true;
-    if (hf_version >= cryptonote::network_version_11_infinite_staking || hf_version == cryptonote::HardFork::INVALID_HF_VERSION)
+    if (hf_version >= cryptonote::network_version_11_infinite_staking)
     {
       // In Infinite Staking, we lock the key image that would be generated if
       // you tried to send your stake and prevent it from being transacted on
@@ -552,7 +552,7 @@ namespace service_nodes
       }
     }
 
-    if (hf_version < cryptonote::network_version_11_infinite_staking || (hf_version == cryptonote::HardFork::INVALID_HF_VERSION && !stake_decoded))
+    if (hf_version < cryptonote::network_version_11_infinite_staking)
     {
       // Pre Infinite Staking, we only need to prove the amount sent is
       // sufficient to become a contributor to the Service Node and that there
@@ -889,7 +889,7 @@ namespace service_nodes
 
     // check the initial contribution exists
 
-    uint64_t staking_requirement = get_staking_requirement(nettype, block_height, hf_version);
+    uint64_t staking_requirement = get_staking_requirement(nettype, block_height);
     cryptonote::account_public_address address;
 
     staking_components stake = {};
@@ -2666,7 +2666,7 @@ namespace service_nodes
     if (!m_blockchain.has_db())
         return false; // Haven't been initialized yet
 
-    uint8_t hf_version = m_blockchain.get_current_hard_fork_version();
+    uint8_t hf_version = m_blockchain.get_network_version();
     if (hf_version < cryptonote::network_version_9_service_nodes)
       return true;
 
@@ -2907,7 +2907,7 @@ namespace service_nodes
   //TODO remove after HF18
   bool service_node_list::handle_uptime_proof(cryptonote::NOTIFY_UPTIME_PROOF::request const &proof, bool &my_uptime_proof_confirmation, crypto::x25519_public_key &x25519_pkey)
   {
-    uint8_t const hf_version = m_blockchain.get_current_hard_fork_version();
+    uint8_t const hf_version = m_blockchain.get_network_version();
     auto& netconf = get_config(m_blockchain.nettype());
     auto now = std::chrono::system_clock::now();
 
@@ -3000,7 +3000,7 @@ namespace service_nodes
 
   bool service_node_list::handle_btencoded_uptime_proof(std::unique_ptr<uptime_proof::Proof> proof, bool &my_uptime_proof_confirmation, crypto::x25519_public_key &x25519_pkey)
   {
-    uint8_t const hf_version = m_blockchain.get_current_hard_fork_version();
+    uint8_t const hf_version = m_blockchain.get_network_version();
     auto& netconf = get_config(m_blockchain.nettype());
     auto now = std::chrono::system_clock::now();
 
@@ -3322,7 +3322,7 @@ namespace service_nodes
       if (info.version < version_t::v1_add_registration_hf_version)
       {
         info.version = version_t::v1_add_registration_hf_version;
-        info.registration_hf_version = sn_list->m_blockchain.get_hard_fork_version(pubkey_info.info->registration_height);
+        info.registration_hf_version = sn_list->m_blockchain.get_network_version(pubkey_info.info->registration_height);
       }
       if (info.version < version_t::v4_noproofs)
       {
@@ -3552,13 +3552,7 @@ namespace service_nodes
       m_blockchain.get_db().clear_service_node_data();
     }
 
-    uint64_t hardfork_9_from_height = 0;
-    {
-      uint32_t window, votes, threshold;
-      uint8_t voting;
-      m_blockchain.get_hard_fork_voting_info(9, window, votes, threshold, hardfork_9_from_height, voting);
-    }
-    m_state.height = hardfork_9_from_height - 1;
+    m_state.height = hard_fork_begins(m_blockchain.nettype(), cryptonote::network_version_9_service_nodes).value_or(1) - 1;
   }
 
   size_t service_node_info::total_num_locked_contributions() const

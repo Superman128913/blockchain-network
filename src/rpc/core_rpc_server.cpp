@@ -40,6 +40,7 @@
 #include <variant>
 #include <oxenmq/base64.h>
 #include "crypto/crypto.h"
+#include "cryptonote_basic/hardfork.h"
 #include "cryptonote_basic/tx_extra.h"
 #include "cryptonote_core/oxen_name_system.h"
 #include "cryptonote_core/pulse.h"
@@ -1024,7 +1025,7 @@ namespace cryptonote { namespace rpc {
       }
 
       if (req.stake_info) {
-        auto hf_version = m_core.get_hard_fork_version(e.in_pool ? m_core.get_current_blockchain_height() : e.block_height);
+        auto hf_version = get_network_version(nettype(), e.in_pool ? m_core.get_current_blockchain_height() : e.block_height);
         service_nodes::staking_components sc;
         if (service_nodes::tx_get_staking_components_and_amounts(nettype(), hf_version, t, e.block_height, &sc)
             && sc.transferred > 0)
@@ -1312,7 +1313,7 @@ namespace cryptonote { namespace rpc {
     const account_public_address& lMiningAdr = lMiner.get_mining_address();
     if (lMiner.is_mining())
       res.address = get_account_address_as_str(nettype(), false, lMiningAdr);
-    const uint8_t major_version = m_core.get_blockchain_storage().get_current_hard_fork_version();
+    const uint8_t major_version = m_core.get_blockchain_storage().get_network_version();
 
     res.pow_algorithm =
         major_version >= network_version_12_checkpointing    ? "RandomX (OXEN variant)"               :
@@ -1466,14 +1467,14 @@ namespace cryptonote { namespace rpc {
 
     std::function<void(const transaction& tx, tx_info& txi)> load_extra;
     if (req.tx_extra || req.stake_info)
-        load_extra = [this, &req](const transaction& tx, tx_info& txi) {
+        load_extra = [this, &req, net=nettype()](const transaction& tx, tx_info& txi) {
             if (req.tx_extra)
-                load_tx_extra_data(txi.extra.emplace(), tx, nettype());
+                load_tx_extra_data(txi.extra.emplace(), tx, net);
             if (req.stake_info) {
                 auto height = m_core.get_current_blockchain_height();
-                auto hf_version = m_core.get_hard_fork_version(height);
+                auto hf_version = get_network_version(net, height);
                 service_nodes::staking_components sc;
-                if (service_nodes::tx_get_staking_components_and_amounts(nettype(), hf_version, tx, height, &sc)
+                if (service_nodes::tx_get_staking_components_and_amounts(net, hf_version, tx, height, &sc)
                         && sc.transferred > 0)
                     txi.stake_amount = sc.transferred;
             }
@@ -2104,10 +2105,15 @@ namespace cryptonote { namespace rpc {
       return res;
 
     const Blockchain &blockchain = m_core.get_blockchain_storage();
-    uint8_t version = req.version > 0 ? req.version : blockchain.get_next_hard_fork_version();
-    res.version = blockchain.get_current_hard_fork_version();
-    res.enabled = blockchain.get_hard_fork_voting_info(version, res.window, res.votes, res.threshold, res.earliest_height, res.voting);
-    res.state = blockchain.get_hard_fork_state();
+    uint8_t version =
+      req.version > 0 ? req.version :
+      req.height > 0 ? blockchain.get_network_version(req.height) :
+      blockchain.get_network_version();
+    res.version = version;
+    res.enabled = blockchain.get_network_version() >= version;
+    auto heights = get_hard_fork_heights(m_core.get_nettype(), version);
+    res.earliest_height = heights.first;
+    res.last_height = heights.second;
     res.status = STATUS_OK;
     return res;
   }
@@ -2844,10 +2850,10 @@ namespace cryptonote { namespace rpc {
 
     bool at_least_one_succeeded = false;
     res.quorums.reserve(std::min((uint64_t)16, count));
+    auto net = nettype();
     for (size_t height = start; height != end;)
     {
-      uint8_t hf_version = m_core.get_hard_fork_version(height);
-      if (hf_version != HardFork::INVALID_HF_VERSION)
+      uint8_t hf_version = get_network_version(net, height);
       {
         auto start_quorum_iterator = static_cast<service_nodes::quorum_type>(0);
         auto end_quorum_iterator   = service_nodes::max_quorum_type_for_hf(hf_version);
@@ -2886,7 +2892,7 @@ namespace cryptonote { namespace rpc {
     }
 
     if (uint8_t hf_version; add_curr_pulse
-        && (hf_version = m_core.get_hard_fork_version(curr_height)) >= network_version_16_pulse)
+        && (hf_version = get_network_version(nettype(), curr_height)) >= network_version_16_pulse)
     {
       cryptonote::Blockchain const &blockchain   = m_core.get_blockchain_storage();
       cryptonote::block_header const &top_header = blockchain.get_db().get_block_header_from_height(curr_height - 1);
@@ -2940,7 +2946,7 @@ namespace cryptonote { namespace rpc {
     if (!m_core.service_node())
       throw rpc_error{ERROR_WRONG_PARAM, "Daemon has not been started in service node mode, please relaunch with --service-node flag."};
 
-    uint8_t hf_version = m_core.get_hard_fork_version(m_core.get_current_blockchain_height());
+    uint8_t hf_version = get_network_version(nettype(), m_core.get_current_blockchain_height());
     if (!service_nodes::make_registration_cmd(m_core.get_nettype(), hf_version, req.staking_requirement, req.args, m_core.get_service_keys(), res.registration_cmd, req.make_friendly))
       throw rpc_error{ERROR_INTERNAL, "Failed to make registration command"};
 
@@ -2957,7 +2963,7 @@ namespace cryptonote { namespace rpc {
     std::vector<std::string> args;
 
     uint64_t const curr_height   = m_core.get_current_blockchain_height();
-    uint64_t staking_requirement = service_nodes::get_staking_requirement(m_core.get_nettype(), curr_height, m_core.get_hard_fork_version(curr_height));
+    uint64_t staking_requirement = service_nodes::get_staking_requirement(nettype(), curr_height);
 
     {
       uint64_t portions_cut;
@@ -3142,7 +3148,9 @@ namespace cryptonote { namespace rpc {
     res.height = m_core.get_current_blockchain_height() - 1;
     res.target_height = m_core.get_target_blockchain_height();
     res.block_hash = tools::type_to_hex(m_core.get_block_id_by_height(res.height));
-    res.hardfork = m_core.get_hard_fork_version(res.height);
+    auto [hf, snode_rev] = get_network_version_revision(nettype(), res.height);
+    res.hardfork = hf;
+    res.snode_revision = snode_rev;
 
     if (!req.poll_block_hash.empty()) {
       res.polling_mode = true;
@@ -3284,7 +3292,7 @@ namespace cryptonote { namespace rpc {
     PERF_TIMER(on_get_staking_requirement);
     res.height = req.height > 0 ? req.height : m_core.get_current_blockchain_height();
 
-    res.staking_requirement = service_nodes::get_staking_requirement(m_core.get_nettype(), res.height, m_core.get_hard_fork_version(res.height));
+    res.staking_requirement = service_nodes::get_staking_requirement(nettype(), res.height);
     res.status = STATUS_OK;
     return res;
   }
@@ -3483,7 +3491,7 @@ namespace cryptonote { namespace rpc {
       check_quantity_limit(req.entries.size(), ONS_NAMES_TO_OWNERS::MAX_REQUEST_ENTRIES);
 
     std::optional<uint64_t> height = m_core.get_current_blockchain_height();
-    uint8_t hf_version = m_core.get_hard_fork_version(*height);
+    uint8_t hf_version = get_network_version(nettype(), *height);
     if (req.include_expired) height = std::nullopt;
 
     std::vector<ons::mapping_type> types;
@@ -3605,7 +3613,7 @@ namespace cryptonote { namespace rpc {
       throw rpc_error{ERROR_WRONG_PARAM, "Unable to resolve ONS address: invalid 'name_hash' value '" + req.name_hash + "'"};
 
 
-    uint8_t hf_version = m_core.get_hard_fork_version(m_core.get_current_blockchain_height());
+    uint8_t hf_version = m_core.get_blockchain_storage().get_network_version();
     auto type = static_cast<ons::mapping_type>(req.type);
     if (!ons::mapping_type_allowed(hf_version, type))
       throw rpc_error{ERROR_WRONG_PARAM, "Invalid lokinet type '" + std::to_string(req.type) + "'"};

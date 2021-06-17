@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2019, The Monero Project
+// Copyright (c) 2018-2021, The Loki Project
 // 
 // All rights reserved.
 // 
@@ -29,263 +29,72 @@
 #pragma once
 
 #include "cryptonote_basic/cryptonote_basic.h"
-#include <mutex>
 
 namespace cryptonote
 {
-  class BlockchainDB;
 
-  class HardFork
-  {
-  public:
-    struct Params
-    {
-      uint8_t version;
-      uint64_t height;
-      uint8_t threshold;
-      time_t time;
-    };
-
-    constexpr static uint8_t INVALID_HF_VERSION         = 255;
-    constexpr static uint64_t INVALID_HF_VERSION_HEIGHT = static_cast<uint64_t>(-1);
-    typedef enum {
-      LikelyForked,
-      UpdateNeeded,
-      Ready,
-    } State;
-
-    static const uint64_t DEFAULT_ORIGINAL_VERSION_TILL_HEIGHT = 0; // <= actual height
-    static const time_t DEFAULT_FORKED_TIME = 31557600; // a year in seconds
-    static const time_t DEFAULT_UPDATE_TIME = 31557600 / 2;
-    static const uint64_t DEFAULT_WINDOW_SIZE = 10080; // supermajority window check length - a week
-    static const uint8_t DEFAULT_THRESHOLD_PERCENT = 80;
-
-    struct ParamsIterator
-    {
-      const Params *begin_, *end_;
-      constexpr Params const *begin() { return begin_; };
-      constexpr Params const *end()   { return end_; };
-    };
-
-    // NOTE: Returns INVALID_HF_VERSION_HEIGHT if version not specified for nettype
-    static uint64_t get_hardcoded_hard_fork_height(network_type nettype, cryptonote::network_version version);
-    static ParamsIterator get_hardcoded_hard_forks(network_type nettype);
-
-    /**
-     * @brief creates a new HardFork object
-     *
-     * @param original_version the block version for blocks 0 through to the first fork
-     * @param forked_time the time in seconds before thinking we're forked
-     * @param update_time the time in seconds before thinking we need to update
-     * @param window_size the size of the window in blocks to consider for version voting
-     * @param default_threshold_percent the size of the majority in percents
-     */
-    HardFork(cryptonote::BlockchainDB &db, uint8_t original_version = 1, time_t forked_time = DEFAULT_FORKED_TIME, time_t update_time = DEFAULT_UPDATE_TIME, uint64_t window_size = DEFAULT_WINDOW_SIZE, uint8_t default_threshold_percent = DEFAULT_THRESHOLD_PERCENT);
-
-    /**
-     * @brief add a new hardfork height
-     *
-     * returns true if no error, false otherwise
-     *
-     * @param version the major block version for the fork, must be > 0 and > the last-added hf
-     * @param height The height the hardfork takes effect; must be > the last-added hf
-     * @param threshold The threshold of votes needed for this fork (0-100)
-     * @param time Approximate time of the hardfork (seconds since epoch); must be >= the timestamp
-     * of the last-added hf
-     *
-     * @throws std::invalid_argument if any parameters are invalid
-     */
-    void add_fork(uint8_t version, uint64_t height, uint8_t threshold, time_t time);
-
-    /**
-     * @brief add a new hardfork height
-     *
-     * returns true if no error, false otherwise
-     *
-     * @param version the major block version for the fork
-     * @param height The height the hardfork takes effect
-     * @param time Approximate time of the hardfork (seconds since epoch)
-     *
-     * @throws std::invalid_argument if any parameters are invalid
-     */
-    void add_fork(uint8_t version, uint64_t height, time_t time);
-
-    /**
-     * @brief initialize the object
-     *
-     * Must be done after adding all the required hardforks via add above
-     */
-    void init();
-
-    /**
-     * @brief check whether a new block would be accepted
-     *
-     * returns true if the block is accepted, false otherwise
-     *
-     * @param block the new block
-     *
-     * This check is made by add. It is exposed publicly to allow
-     * the caller to inexpensively check whether a block would be
-     * accepted or rejected by its version number. Indeed, if this
-     * check could only be done as part of add, the caller would
-     * either have to add the block to the blockchain first, then
-     * call add, then have to pop the block from the blockchain if
-     * its version did not satisfy the hard fork requirements, or
-     * call add first, then, if the hard fork requirements are met,
-     * add the block to the blockchain, upon which a failure (the
-     * block being invalid, double spending, etc) would cause the
-     * hardfork object to reorganize.
-     */
-    bool check(const cryptonote::block &block) const;
-
-    /**
-     * @brief same as check, but for a particular height, rather than the top
-     *
-     * NOTE: this does not play well with voting, and relies on voting to be
-     * disabled (that is, forks happen on the scheduled date, whether or not
-     * enough blocks have voted for the fork).
-     *
-     * returns true if no error, false otherwise
-     *
-     * @param block the new block
-     * @param height which height to check for
-     */
-    bool check_for_height(const cryptonote::block &block, uint64_t height) const;
-
-    /**
-     * @brief add a new block
-     *
-     * returns true if no error, false otherwise
-     *
-     * @param block the new block
-     */
-    bool add(const cryptonote::block &block, uint64_t height);
-
-    /**
-     * @brief called when the blockchain is reorganized
-     *
-     * This will rescan the blockchain to determine which hard forks
-     * have been triggered
-     *
-     * returns true if no error, false otherwise
-     *
-     * @param blockchain the blockchain
-     * @param height of the last block kept from the previous blockchain
-     */
-    bool reorganize_from_block_height(uint64_t height);
-    bool reorganize_from_chain_height(uint64_t height);
-
-    /**
-     * @brief called when one or more blocks are popped from the blockchain
-     *
-     * The current fork will be updated by looking up the db,
-     * which is much cheaper than recomputing everything
-     *
-     * @param new_chain_height the height of the chain after popping
-     */
-    void on_block_popped(uint64_t new_chain_height);
-
-    /**
-     * @brief returns current state at the given time
-     *
-     * Based on the approximate time of the last known hard fork,
-     * estimate whether we need to update, or if we're way behind
-     *
-     * @param t the time to consider
-     */
-    State get_state(time_t t) const;
-    State get_state() const;
-
-    /**
-     * @brief returns the hard fork version for the given block height
-     *
-     * @param height height of the block to check
-     */
-    uint8_t get(uint64_t height) const;
-
-    /**
-     * @brief returns the latest "ideal" version
-     *
-     * This is the latest version that's been scheduled
-     */
-    uint8_t get_ideal_version() const;
-
-    /**
-     * @brief returns the "ideal" version for a given height
-     *
-     * @param height height of the block to check
-     */
-    uint8_t get_ideal_version(uint64_t height) const;
-
-    /**
-     * @brief returns the next version
-     *
-     * This is the version which will we fork to next
-     */
-    uint8_t get_next_version() const;
-
-    /**
-     * @brief returns the current version
-     *
-     * This is the latest version that's past its trigger date and had enough votes
-     * at one point in the past.
-     */
-    uint8_t get_current_version() const;
-
-    /**
-     * @brief returns the earliest block a given version may activate
-     */
-    uint64_t get_earliest_ideal_height_for_version(uint8_t version) const;
-
-    /**
-     * @brief returns information about current voting state
-     *
-     * returns true if the given version is enabled (ie, the current version
-     * is at least the passed version), false otherwise
-     *
-     * @param version the version to check voting for
-     * @param window the number of blocks considered in voting
-     * @param votes number of votes for next version
-     * @param threshold number of votes needed to switch to next version
-     * @param earliest_height earliest height at which the version can take effect
-     */
-    bool get_voting_info(uint8_t version, uint32_t &window, uint32_t &votes, uint32_t &threshold, uint64_t &earliest_height, uint8_t &voting) const;
-
-    /**
-     * @brief returns the size of the voting window in blocks
-     */
-    uint64_t get_window_size() const { return window_size; }
-
-  private:
-
-    uint8_t get_block_version(uint64_t height) const;
-    bool do_check(uint8_t block_version, uint8_t voting_version) const;
-    bool do_check_for_height(uint8_t block_version, uint8_t voting_version, uint64_t height) const;
-    int get_voted_fork_index(uint64_t height) const;
-    uint8_t get_effective_version(uint8_t voting_version) const;
-    bool add(uint8_t block_version, uint8_t voting_version, uint64_t height);
-
-    bool rescan_from_block_height(uint64_t height);
-    bool rescan_from_chain_height(uint64_t height);
-
-  private:
-
-    BlockchainDB &db;
-
-    time_t forked_time;
-    time_t update_time;
-    uint64_t window_size;
-    uint8_t default_threshold_percent;
-
-    uint8_t original_version;
-    std::vector<Params> heights;
-
-    std::deque<uint8_t> versions; /* rolling window of the last N blocks' versions */
-    unsigned int last_versions[256]; /* count of the block versions in the last N blocks */
-    uint32_t current_fork_index;
-
-    mutable std::recursive_mutex lock;
+  // Defines where hard fork (i.e. new minimum network versions) begin
+  struct hard_fork {
+    uint8_t version; // Blockchain major version
+    uint8_t snode_revision; // Snode revision for enforcing non-blockchain-breaking mandatory service node updates
+    uint64_t height;
+    time_t time;
   };
+
+  // Stick your fake hard forks in here if you're into that sort of thing.
+  extern std::vector<hard_fork> fakechain_hardforks;
+
+  // Returns an iteratable range over hard fork values for the given network.
+  std::pair<const hard_fork*, const hard_fork*> get_hard_forks(network_type type);
+
+  // Returns the height range for which the given block/network version is valid.  Returns a pair of
+  // heights {A, B} where A/B is the first/last height at which the version is acceptable.  Returns
+  // nullopt for A if the version indicates a hardfork we do not know about (i.e. we are likely
+  // outdated), and returns nullopt for B if the version indicates that top network version we know
+  // about (i.e. there is no subsequent hardfork scheduled).
+  std::pair<std::optional<uint64_t>, std::optional<uint64_t>>
+  get_hard_fork_heights(network_type type, uint8_t version);
+
+  // Returns the lowest network version >= the given version, that is, it rounds up missing hf table
+  // entries to the next largest entry.  Typically this returns the network version itself, but if
+  // some versions are skipped (particularly on testnet/devnet/fakechain) then this will return the
+  // next version that does exist in the hard fork list.  If there is no >= value in the hard fork
+  // table then this returns the given hard fork value itself.
+  //
+  // For example, if the HF list contains hf versions {7,8,14} then:
+  //    hard_fork_ceil(7) == 7
+  //    hard_fork_ceil(8) == 8
+  //    hard_fork_ceil(9) == 14
+  //    ...
+  //    hard_fork_ceil(14) == 14
+  //    hard_fork_ceil(15) == 15
+  uint8_t hard_fork_ceil(network_type type, uint8_t version);
+
+  // Returns true if the given height is sufficiently high to be at or after the given hard fork
+  // version.
+  bool is_hard_fork_at_least(network_type type, uint8_t version, uint64_t height);
+
+  // Returns the active network version and snode revision for the given height.
+  std::pair<uint8_t, uint8_t>
+  get_network_version_revision(network_type nettype, uint64_t height);
+
+  // Returns the network (i.e. block) version for the given height.
+  inline uint8_t get_network_version(network_type nettype, uint64_t height) {
+      return get_network_version_revision(nettype, height).first;
+  }
+
+  // Returns the first height at which the given network version rules become active.  This is
+  // a shortcut for `get_hard_fork_heights(type, hard_fork_ceil(type, version)).first`, i.e. it
+  // returns the first height at which `version` rules become active (even if they became active at
+  // a hard fork > the given value).
+  inline std::optional<uint64_t> hard_fork_begins(network_type type, uint8_t version) {
+      return get_hard_fork_heights(type, hard_fork_ceil(type, version)).first;
+  }
+
+  // Returns the "ideal" network version that we want to use on blocks we create, which is to use
+  // the required major version for major version and the maximum major version we know about as
+  // minor version.  If this seems a bit silly, it is, and will be changed in the future.
+  std::pair<uint8_t, uint8_t> get_ideal_block_version(network_type nettype, uint64_t height);
 
 }  // namespace cryptonote
 

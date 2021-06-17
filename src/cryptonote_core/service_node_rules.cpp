@@ -1,4 +1,5 @@
 #include "cryptonote_config.h"
+#include "cryptonote_basic/hardfork.h"
 #include "common/oxen.h"
 #include "epee/int-util.h"
 #include <boost/endian/conversion.hpp>
@@ -12,15 +13,15 @@
 namespace service_nodes {
 
 // TODO(oxen): Move to oxen_economy, this will also need access to oxen::exp2
-uint64_t get_staking_requirement(cryptonote::network_type m_nettype, uint64_t height, uint8_t hf_version)
+uint64_t get_staking_requirement(cryptonote::network_type nettype, uint64_t height)
 {
-  if (m_nettype == cryptonote::TESTNET || m_nettype == cryptonote::FAKECHAIN || m_nettype == cryptonote::DEVNET)
+  if (nettype == cryptonote::TESTNET || nettype == cryptonote::FAKECHAIN || nettype == cryptonote::DEVNET)
       return COIN * 100;
 
-  if (hf_version >= cryptonote::network_version_16_pulse)
+  if (is_hard_fork_at_least(nettype, cryptonote::network_version_16_pulse, height))
     return 15000'000000000;
 
-  if (hf_version >= cryptonote::network_version_13_enforce_checkpoints)
+  if (is_hard_fork_at_least(nettype, cryptonote::network_version_13_enforce_checkpoints, height))
   {
     constexpr int64_t heights[] = {
         385824,
@@ -69,7 +70,7 @@ uint64_t get_staking_requirement(cryptonote::network_type m_nettype, uint64_t he
   uint64_t height_adjusted = height - hardfork_height;
   uint64_t base = 0, variable = 0;
   std::fesetround(FE_TONEAREST);
-  if (hf_version >= cryptonote::network_version_11_infinite_staking)
+  if (is_hard_fork_at_least(nettype, cryptonote::network_version_11_infinite_staking, height))
   {
     base     = 15000 * COIN;
     variable = (25007.0 * COIN) / oxen::exp2(height_adjusted/129600.0);

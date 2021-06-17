@@ -1429,7 +1429,8 @@ namespace rpc {
 
     struct request
     {
-      uint8_t version; // The major block version for the fork.
+      uint8_t version; // The major block version for the fork (only one of `version` and `height` may be given).
+      uint64_t height; // Request hard fork info about this height (only one of `version` and `height` may be given).
 
       KV_MAP_SERIALIZABLE
     };
@@ -1437,13 +1438,9 @@ namespace rpc {
     struct response
     {
       uint8_t version;          // The major block version for the fork.
-      bool enabled;             // Tells if hard fork is enforced.
-      uint32_t window;          // Number of blocks over which current votes are cast. Default is 10080 blocks.
-      uint32_t votes;           // Number of votes towards hard fork.
-      uint32_t threshold;       // Minimum percent of votes to trigger hard fork. Default is 80.
-      uint8_t voting;           // Hard fork voting status.
-      uint32_t state;           // Current hard fork state: 0 (There is likely a hard fork), 1 (An update is needed to fork properly), or 2 (Everything looks good).
-      uint64_t earliest_height; // Block height at which hard fork would be enabled if voted in.
+      bool enabled;             // Indicates whether hard fork is enforced (that is, at or above the requested hardfork)
+      std::optional<uint64_t> earliest_height; // Block height at which hard fork will be enabled.
+      std::optional<uint64_t> last_height; // The last block height at which this hard fork will be active; will be omitted if this oxend is not aware of any future hard fork.
       std::string status;       // General RPC error code. "OK" means everything looks good.
       bool untrusted;           // States if the result is obtained using the bootstrap mode, and is therefore not trusted (`true`), or when the daemon is fully synced (`false`).
 
@@ -2068,6 +2065,7 @@ namespace rpc {
       bool height;
       bool target_height;
       bool hardfork;
+      bool snode_revision;
       KV_MAP_SERIALIZABLE
     };
 
@@ -2146,6 +2144,7 @@ namespace rpc {
       std::string block_hash;                 // Current block's hash.
       bool        unchanged;                  // Will be true (and `service_node_states` omitted) if you gave the current block hash to poll_block_hash
       uint8_t     hardfork;                   // Current hardfork version.
+      uint8_t     snode_revision;             // snode revision for non-hardfork but mandatory snode updates
       std::string status;                     // Generic RPC error code. "OK" is the success value.
       std::string as_json;                    // If `include_json` is set in the request, this contains the json representation of the `entry` data structure
 

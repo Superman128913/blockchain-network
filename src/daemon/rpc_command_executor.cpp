@@ -532,12 +532,8 @@ bool rpc_command_executor::show_status() {
 
   str << ", v" << (ires.version.empty() ? "?.?.?" : ires.version);
   str << "(net v" << +hfres.version << ')';
-  print_fork_extra_info(str, hfres.earliest_height, net_height, ires.target);
-
-  str << ", " << (
-    hfres.state == cryptonote::HardFork::Ready ? "up to date" :
-    hfres.state == cryptonote::HardFork::UpdateNeeded ? "update needed" :
-    "out of date, likely forked");
+  if (hfres.earliest_height)
+    print_fork_extra_info(str, *hfres.earliest_height, net_height, ires.target);
 
   std::time_t now = std::time(nullptr);
 
@@ -1194,20 +1190,6 @@ bool rpc_command_executor::in_peers(bool set, uint32_t limit)
 	tools::msg_writer() << "Max number of in peers set to " << s << std::endl;
 
 	return true;
-}
-
-bool rpc_command_executor::hard_fork_info(uint8_t version)
-{
-    HARD_FORK_INFO::response res{};
-    if (!invoke<HARD_FORK_INFO>({version}, res, "Failed to retrieve hard fork info"))
-      return false;
-
-    version = version > 0 ? version : res.voting;
-    tools::msg_writer() << "version " << (uint32_t)version << " " << (res.enabled ? "enabled" : "not enabled") <<
-        ", " << res.votes << "/" << res.window << " votes, threshold " << res.threshold;
-    tools::msg_writer() << "current version " << (uint32_t)res.version << ", voting for version " << (uint32_t)res.voting;
-
-    return true;
 }
 
 bool rpc_command_executor::print_bans()
@@ -2058,8 +2040,8 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
   }
 
   const uint64_t staking_requirement =
-    std::max(service_nodes::get_staking_requirement(nettype, block_height, hf_version),
-             service_nodes::get_staking_requirement(nettype, block_height + 30 * 24, hf_version)); // allow 1 day
+    std::max(service_nodes::get_staking_requirement(nettype, block_height),
+             service_nodes::get_staking_requirement(nettype, block_height + 30 * 24)); // allow 1 day
 
   // anything less than DUST will be added to operator stake
   const uint64_t DUST = MAX_NUMBER_OF_CONTRIBUTORS;

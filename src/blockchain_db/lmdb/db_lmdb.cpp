@@ -36,6 +36,7 @@
 #include <type_traits>
 #include <variant>
 
+#include "cryptonote_basic/hardfork.h"
 #include "epee/string_tools.h"
 #include "common/file.h"
 #include "common/pruning.h"
@@ -49,7 +50,6 @@
 #include "cryptonote_core/service_node_rules.h"
 #include "cryptonote_core/service_node_list.h"
 #include "cryptonote_core/uptime_proof.h"
-#include "cryptonote_basic/hardfork.h"
 
 #undef OXEN_DEFAULT_LOG_CATEGORY
 #define OXEN_DEFAULT_LOG_CATEGORY "blockchain.db.lmdb"
@@ -1392,8 +1392,6 @@ BlockchainLMDB::BlockchainLMDB(bool batch_transactions): BlockchainDB()
   m_cum_count = 0;
 
   // reset may also need changing when initialize things here
-
-  m_hardfork = nullptr;
 }
 
 void BlockchainLMDB::open(const fs::path& filename, cryptonote::network_type nettype, const int db_flags)
@@ -4573,64 +4571,6 @@ void BlockchainLMDB::add_output_blacklist(std::vector<uint64_t> const &blacklist
     throw0(DB_ERROR(lmdb_error("Failed to add blacklisted output to db transaction: ", ret).c_str()));
 }
 
-void BlockchainLMDB::check_hard_fork_info()
-{
-}
-
-void BlockchainLMDB::drop_hard_fork_info()
-{
-  LOG_PRINT_L3("BlockchainLMDB::" << __func__);
-  check_open();
-
-  TXN_PREFIX(0);
-
-  auto result = mdb_drop(*txn_ptr, m_hf_starting_heights, 1);
-  if (result)
-    throw1(DB_ERROR(lmdb_error("Error dropping hard fork starting heights db: ", result).c_str()));
-  result = mdb_drop(*txn_ptr, m_hf_versions, 1);
-  if (result)
-    throw1(DB_ERROR(lmdb_error("Error dropping hard fork versions db: ", result).c_str()));
-
-  TXN_POSTFIX_SUCCESS();
-}
-
-void BlockchainLMDB::set_hard_fork_version(uint64_t height, uint8_t version)
-{
-  LOG_PRINT_L3("BlockchainLMDB::" << __func__);
-  check_open();
-
-  TXN_BLOCK_PREFIX(0);
-
-  MDB_val_copy<uint64_t> val_key(height);
-  MDB_val_copy<uint8_t> val_value(version);
-  int result;
-  result = mdb_put(*txn_ptr, m_hf_versions, &val_key, &val_value, MDB_APPEND);
-  if (result == MDB_KEYEXIST)
-    result = mdb_put(*txn_ptr, m_hf_versions, &val_key, &val_value, 0);
-  if (result)
-    throw1(DB_ERROR(lmdb_error("Error adding hard fork version to db transaction: ", result).c_str()));
-
-  TXN_BLOCK_POSTFIX_SUCCESS();
-}
-
-uint8_t BlockchainLMDB::get_hard_fork_version(uint64_t height) const
-{
-  LOG_PRINT_L3("BlockchainLMDB::" << __func__);
-  check_open();
-
-  TXN_PREFIX_RDONLY();
-  RCURSOR(hf_versions);
-
-  MDB_val_copy<uint64_t> val_key(height);
-  MDB_val val_ret;
-  auto result = mdb_cursor_get(m_cur_hf_versions, &val_key, &val_ret, MDB_SET);
-  if (result == MDB_NOTFOUND || result)
-    throw0(DB_ERROR(lmdb_error("Error attempting to retrieve a hard fork version at height " + std::to_string(height) + " from the db: ", result).c_str()));
-
-  uint8_t ret = *(const uint8_t*)val_ret.mv_data;
-  return ret;
-}
-
 void BlockchainLMDB::add_alt_block(const crypto::hash &blkid, const cryptonote::alt_block_data_t &data, const cryptonote::blobdata &block, cryptonote::blobdata const *checkpoint)
 {
   LOG_PRINT_L3("BlockchainLMDB::" << __func__);
@@ -4805,8 +4745,8 @@ void BlockchainLMDB::fixup(cryptonote::network_type nettype)
           add_timestamp_and_difficulty(nettype, curr_chain_height, timestamps, difficulties, curr_timestamp, curr_cumulative_diff);
 
           // NOTE: Calculate next block difficulty
-          uint8_t const hf_version = get_hard_fork_version(curr_height);
-          if (hf_version >= cryptonote::network_version_16_pulse && block_header_has_pulse_components(get_block_header_from_height(curr_height)))
+          if (is_hard_fork_at_least(nettype, cryptonote::network_version_16_pulse, curr_height)
+              && block_header_has_pulse_components(get_block_header_from_height(curr_height)))
           {
             diff = PULSE_FIXED_DIFFICULTY;
           }
@@ -4815,7 +4755,7 @@ void BlockchainLMDB::fixup(cryptonote::network_type nettype)
             diff = next_difficulty_v2(timestamps,
                                       difficulties,
                                       tools::to_seconds(TARGET_BLOCK_TIME),
-                                      difficulty_mode(nettype, hf_version, curr_height + 1));
+                                      difficulty_mode(nettype, curr_height + 1));
           }
         }
 

@@ -32,6 +32,7 @@
 #include "uptime_proof.h"
 #include "cryptonote_config.h"
 #include "cryptonote_core.h"
+#include "cryptonote_basic/hardfork.h"
 #include "version.h"
 #include "common/oxen.h"
 #include "common/util.h"
@@ -183,7 +184,7 @@ namespace service_nodes
 
   void quorum_cop::blockchain_detached(uint64_t height, bool by_pop_blocks)
   {
-    uint8_t hf_version                        = m_core.get_hard_fork_version(height);
+    uint8_t hf_version = get_network_version(m_core.get_nettype(), height);
     uint64_t const REORG_SAFETY_BUFFER_BLOCKS = (hf_version >= cryptonote::network_version_12_checkpointing)
                                                     ? REORG_SAFETY_BUFFER_BLOCKS_POST_HF12
                                                     : REORG_SAFETY_BUFFER_BLOCKS_PRE_HF12;
@@ -280,7 +281,7 @@ namespace service_nodes
           m_obligations_height = std::max(m_obligations_height, start_voting_from_height);
           for (; m_obligations_height < (height - REORG_SAFETY_BUFFER_BLOCKS); m_obligations_height++)
           {
-            uint8_t const obligations_height_hf_version = m_core.get_hard_fork_version(m_obligations_height);
+            uint8_t const obligations_height_hf_version = get_network_version(m_core.get_nettype(), m_obligations_height);
             if (obligations_height_hf_version < cryptonote::network_version_9_service_nodes) continue;
 
             // NOTE: Count checkpoints for other nodes, irrespective of being
@@ -476,7 +477,7 @@ namespace service_nodes
                  m_last_checkpointed_height <= height;
                  m_last_checkpointed_height += CHECKPOINT_INTERVAL)
             {
-              uint8_t checkpointed_height_hf_version = m_core.get_hard_fork_version(m_last_checkpointed_height);
+              uint8_t checkpointed_height_hf_version = get_network_version(m_core.get_nettype(), m_last_checkpointed_height);
               if (checkpointed_height_hf_version <= cryptonote::network_version_11_infinite_staking)
                   continue;
 
@@ -536,21 +537,21 @@ namespace service_nodes
       return true;
     }
 
-    uint8_t const hf_version = core.get_blockchain_storage().get_current_hard_fork_version();
+    auto net = core.get_blockchain_storage().get_network_version();
 
     // NOTE: Verify state change is still valid or have we processed some other state change already that makes it invalid
     {
       crypto::public_key const &service_node_pubkey = quorum.workers[vote.state_change.worker_index];
       auto service_node_infos = core.get_service_node_list_state({service_node_pubkey});
       if (!service_node_infos.size() ||
-          !service_node_infos[0].info->can_transition_to_state(hf_version, vote.block_height, vote.state_change.state))
+          !service_node_infos[0].info->can_transition_to_state(net, vote.block_height, vote.state_change.state))
         // NOTE: Vote is valid but is invalidated because we cannot apply the change to a service node or it is not on the network anymore
         //       So don't bother generating a state change tx.
         return true;
     }
 
     using version_t = cryptonote::tx_extra_service_node_state_change::version_t;
-    auto ver = hf_version >= HF_VERSION_PROOF_BTENC ? version_t::v4_reasons : version_t::v0;
+    auto ver = net >= HF_VERSION_PROOF_BTENC ? version_t::v4_reasons : version_t::v0;
     cryptonote::tx_extra_service_node_state_change state_change{
         ver,
         vote.state_change.state,
@@ -569,9 +570,9 @@ namespace service_nodes
     }
 
     cryptonote::transaction state_change_tx{};
-    if (cryptonote::add_service_node_state_change_to_tx_extra(state_change_tx.extra, state_change, hf_version))
+    if (cryptonote::add_service_node_state_change_to_tx_extra(state_change_tx.extra, state_change, net))
     {
-      state_change_tx.version = cryptonote::transaction::get_max_version_for_hf(hf_version);
+      state_change_tx.version = cryptonote::transaction::get_max_version_for_hf(net);
       state_change_tx.type    = cryptonote::txtype::state_change;
 
       cryptonote::tx_verification_context tvc{};
@@ -677,7 +678,7 @@ namespace service_nodes
       return false;
     }
 
-    if (!verify_vote_signature(m_core.get_hard_fork_version(vote.block_height), vote, vvc, *quorum))
+    if (!verify_vote_signature(get_network_version(m_core.get_nettype(), vote.block_height), vote, vvc, *quorum))
       return false;
 
     std::vector<pool_vote_entry> votes = m_vote_pool.add_pool_vote_if_unique(vote, vvc);
