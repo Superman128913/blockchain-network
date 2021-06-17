@@ -2747,7 +2747,7 @@ namespace service_nodes
     return true;
   }
 
-  //TODO: remove after HF18
+  //TODO: remove after HF18, snode revision 1
   crypto::hash service_node_list::hash_uptime_proof(const cryptonote::NOTIFY_UPTIME_PROOF::request &proof) const
   {
     size_t buf_size;
@@ -2850,7 +2850,7 @@ namespace service_nodes
   };
 
 
-  //TODO remove after HF18
+  //TODO remove after HF18, snode revision 1
   bool proof_info::update(uint64_t ts,
                           uint32_t ip,
                           uint16_t s_https_port,
@@ -2904,10 +2904,13 @@ namespace service_nodes
 
 #define REJECT_PROOF(log) do { LOG_PRINT_L2("Rejecting uptime proof from " << proof.pubkey << ": " log); return false; } while (0)
 
-  //TODO remove after HF18
+  //TODO remove after HF18, snode revision 1
   bool service_node_list::handle_uptime_proof(cryptonote::NOTIFY_UPTIME_PROOF::request const &proof, bool &my_uptime_proof_confirmation, crypto::x25519_public_key &x25519_pkey)
   {
-    uint8_t const hf_version = m_blockchain.get_network_version();
+    auto vers = get_network_version_revision(m_blockchain.nettype(), m_blockchain.get_current_blockchain_height());
+    if (vers >= std::pair<uint8_t, uint8_t>{cryptonote::network_version_18, 1})
+      REJECT_PROOF("Old format (non-bt) proofs are not acceptable from v18+1 onwards");
+
     auto& netconf = get_config(m_blockchain.nettype());
     auto now = std::chrono::system_clock::now();
 
@@ -2917,8 +2920,8 @@ namespace service_nodes
       REJECT_PROOF("timestamp is too far from now");
 
     for (auto const &min : MIN_UPTIME_PROOF_VERSIONS)
-      if (hf_version >= min.hardfork && proof.snode_version < min.version)
-        REJECT_PROOF("v" << min.version[0] << "." << min.version[1] << "." << min.version[2] << "+ oxen version is required for v" << std::to_string(hf_version) << "+ network proofs");
+      if (vers >= min.hardfork_revision && proof.snode_version < min.oxend)
+        REJECT_PROOF("v" << tools::join(".", min.oxend) << "+ oxend version is required for v" << +vers.first << "." << +vers.second << "+ network proofs");
 
     if (!debug_allow_local_ips && !epee::net_utils::is_ip_public(proof.public_ip))
       REJECT_PROOF("public_ip is not actually public");
@@ -3000,7 +3003,7 @@ namespace service_nodes
 
   bool service_node_list::handle_btencoded_uptime_proof(std::unique_ptr<uptime_proof::Proof> proof, bool &my_uptime_proof_confirmation, crypto::x25519_public_key &x25519_pkey)
   {
-    uint8_t const hf_version = m_blockchain.get_network_version();
+    auto vers = get_network_version_revision(m_blockchain.nettype(), m_blockchain.get_current_blockchain_height());
     auto& netconf = get_config(m_blockchain.nettype());
     auto now = std::chrono::system_clock::now();
 
@@ -3009,9 +3012,16 @@ namespace service_nodes
     if (time_deviation > netconf.UPTIME_PROOF_TOLERANCE || time_deviation < -netconf.UPTIME_PROOF_TOLERANCE)
       REJECT_PROOF("timestamp is too far from now");
 
-    for (auto const &min : MIN_UPTIME_PROOF_VERSIONS)
-      if (hf_version >= min.hardfork && proof->version < min.version)
-        REJECT_PROOF("v" << min.version[0] << "." << min.version[1] << "." << min.version[2] << "+ oxen version is required for v" << std::to_string(hf_version) << "+ network proofs");
+    for (auto const &min : MIN_UPTIME_PROOF_VERSIONS) {
+      if (vers >= min.hardfork_revision) {
+        if (proof->version < min.oxend)
+          REJECT_PROOF("v" << tools::join(".", min.oxend) << "+ oxend version is required for v" << +vers.first << "." << +vers.second << "+ network proofs");
+        if (proof->lokinet_version < min.lokinet)
+          REJECT_PROOF("v" << tools::join(".", min.lokinet) << "+ lokinet version is required for v" << +vers.first << "." << +vers.second << "+ network proofs");
+        if (proof->storage_server_version < min.storage_server)
+          REJECT_PROOF("v" << tools::join(".", min.storage_server) << "+ storage server version is required for v" << +vers.first << "." << +vers.second << "+ network proofs");
+      }
+    }
 
     if (!debug_allow_local_ips && !epee::net_utils::is_ip_public(proof->public_ip))
       REJECT_PROOF("public_ip is not actually public");

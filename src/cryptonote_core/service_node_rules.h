@@ -211,23 +211,21 @@ namespace service_nodes {
   // blocks out of sync and sending something that it thinks is legit.
   constexpr uint64_t VOTE_OR_TX_VERIFY_HEIGHT_BUFFER    = 5;
 
-  constexpr std::array<uint16_t, 3> MIN_STORAGE_SERVER_VERSION{{2, 1, 1}};
-  constexpr std::array<uint16_t, 3> MIN_LOKINET_VERSION{{0, 9, 3}};
+  constexpr std::array<uint16_t, 3> MIN_STORAGE_SERVER_VERSION{{2, 2, 0}};
+  constexpr std::array<uint16_t, 3> MIN_LOKINET_VERSION{{0, 9, 4}};
 
   // The minimum accepted version number, broadcasted by Service Nodes via uptime proofs for each hardfork
   struct proof_version
   {
-    uint8_t hardfork;
-    std::array<uint16_t, 3> version;
+    std::pair<uint8_t, uint8_t> hardfork_revision;
+    std::array<uint16_t, 3> oxend;
+    std::array<uint16_t, 3> lokinet;
+    std::array<uint16_t, 3> storage_server;
   };
 
-  constexpr proof_version MIN_UPTIME_PROOF_VERSIONS[] = {
-    {cryptonote::network_version_18,                      {9,1,0}},
-    {cryptonote::network_version_16_pulse,                {8,1,0}},
-    {cryptonote::network_version_15_ons,                  {7,1,2}},
-    {cryptonote::network_version_14_blink,                {6,1,0}},
-    {cryptonote::network_version_13_enforce_checkpoints,  {5,1,0}},
-    {cryptonote::network_version_12_checkpointing,        {4,0,3}},
+  constexpr std::array MIN_UPTIME_PROOF_VERSIONS = {
+    proof_version{{cryptonote::network_version_18, 1}, {9,2,0}, {0,9,4}, {2,2,0}},
+    proof_version{{cryptonote::network_version_18, 0}, {9,1,0}, {0,9,0}, {2,1,0}},
   };
 
   using swarm_id_t                         = uint64_t;
