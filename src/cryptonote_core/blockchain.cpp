@@ -3527,23 +3527,20 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         return false;
       }
 
-      auto const quorum_type  = service_nodes::quorum_type::obligations;
-      auto const quorum       = m_service_node_list.get_quorum(quorum_type, state_change.block_height);
+      auto quorum = m_service_node_list.get_quorum(service_nodes::quorum_type::obligations, state_change.block_height);
+      if (!quorum)
       {
-        if (!quorum)
-        {
-          MERROR_VER("could not get obligations quorum for recent state change tx");
-          return false;
-        }
+        MERROR_VER("could not get obligations quorum for recent state change tx");
+        return false;
+      }
 
-        if (!service_nodes::verify_tx_state_change(state_change, get_current_blockchain_height(), tvc, *quorum, hf_version))
-        {
-          // will be set by the above on serious failures (i.e. illegal value), but not for less
-          // serious ones like state change heights slightly outside of allowed bounds:
-          //tvc.m_verifivation_failed = true;
-          MERROR_VER("tx " << get_transaction_hash(tx) << ": state change tx could not be completely verified reason: " << print_vote_verification_context(tvc.m_vote_ctx));
-          return false;
-        }
+      if (!service_nodes::verify_tx_state_change(state_change, get_current_blockchain_height(), tvc, *quorum, hf_version))
+      {
+        // will be set by the above on serious failures (i.e. illegal value), but not for less
+        // serious ones like state change heights slightly outside of allowed bounds:
+        //tvc.m_verifivation_failed = true;
+        MERROR_VER("tx " << get_transaction_hash(tx) << ": state change tx could not be completely verified reason: " << print_vote_verification_context(tvc.m_vote_ctx));
+        return false;
       }
 
       crypto::public_key const &state_change_service_node_pubkey = quorum->workers[state_change.service_node_index];
