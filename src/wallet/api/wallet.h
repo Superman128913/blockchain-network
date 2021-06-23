@@ -53,7 +53,7 @@ struct Wallet2CallbackImpl;
 // indirection into the tools::wallet2 instance.
 struct LockedWallet {
     std::unique_lock<std::mutex> refresh_lock;
-    tools::wallet2* wallet;
+    tools::wallet2* const wallet;
     LockedWallet(const std::unique_ptr<tools::wallet2>& w, std::mutex& refresh_mutex)
         : refresh_lock{refresh_mutex}, wallet{w.get()} {}
     tools::wallet2* operator->() { return wallet; }
