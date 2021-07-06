@@ -359,17 +359,17 @@ void setup_cursor(const MDB_dbi& db, MDB_cursor*& cursor, MDB_txn* txn)
   }
 }
 
-void setup_rcursor(const MDB_dbi& db, MDB_cursor*& cursor, MDB_txn* txn, bool& rflag, bool using_wcursor)
+void setup_rcursor(const MDB_dbi& db, MDB_cursor*& cursor, MDB_txn* txn, bool* rflag, bool using_wcursor)
 {
   if (!cursor) {
     setup_cursor(db, cursor, txn);
     if (!using_wcursor)
-      rflag = true;
-  } else if (!using_wcursor && !rflag) {
+      *rflag = true;
+  } else if (!using_wcursor && !*rflag) {
     int result = mdb_cursor_renew(txn, cursor);
     if (result)
       throw0(cryptonote::DB_ERROR(lmdb_error("Failed to renew cursor: ", result)));
-    rflag = true;
+    *rflag = true;
   }
 }
 
@@ -377,7 +377,7 @@ void setup_rcursor(const MDB_dbi& db, MDB_cursor*& cursor, MDB_txn* txn, bool& r
 
 #define CURSOR(name) setup_cursor(m_##name, m_cursors->name, *m_write_txn);
 
-#define RCURSOR(name) setup_rcursor(m_##name, m_cursors->name, m_txn, m_tinfo->m_ti_rflags.m_rf_##name, m_cursors == &m_wcursors);
+#define RCURSOR(name) setup_rcursor(m_##name, m_cursors->name, m_txn, m_tinfo.get() ? &m_tinfo->m_ti_rflags.m_rf_##name : nullptr, m_cursors == &m_wcursors);
 
 #define m_cur_blocks	m_cursors->blocks
 #define m_cur_block_heights	m_cursors->block_heights
