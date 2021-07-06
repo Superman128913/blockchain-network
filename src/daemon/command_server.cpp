@@ -263,11 +263,6 @@ void command_server::init_commands(cryptonote::rpc::core_rpc_server* rpc_server)
     , "Set the <max_number> of in peers."
     );
     m_command_lookup.set_handler(
-      "hard_fork_info"
-    , [this](const auto &x) { return m_parser.hard_fork_info(x); }
-    , "Print the hard fork voting information."
-    );
-    m_command_lookup.set_handler(
       "bans"
     , [this](const auto &x) { return m_parser.show_bans(x); }
     , "Show the currently banned IPs."

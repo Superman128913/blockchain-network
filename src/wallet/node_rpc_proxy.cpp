@@ -161,7 +161,9 @@ bool NodeRPCProxy::get_earliest_height(uint8_t version, uint64_t &earliest_heigh
     req_t.version = version;
     try {
       auto resp_t = invoke_json_rpc<rpc::HARD_FORK_INFO>(req_t);
-      m_earliest_height[version] = resp_t.earliest_height;
+      if (!resp_t.earliest_height)
+        return false;
+      m_earliest_height[version] = *resp_t.earliest_height;
     } catch (...) { return false; }
   }
 

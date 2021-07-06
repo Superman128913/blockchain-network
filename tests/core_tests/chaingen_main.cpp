@@ -39,11 +39,6 @@ namespace po = boost::program_options;
 
 namespace
 {
-  const command_line::arg_descriptor<std::string> arg_test_data_path              = {"test_data_path", "", ""};
-  const command_line::arg_descriptor<bool>        arg_generate_test_data          = {"generate_test_data", ""};
-  const command_line::arg_descriptor<bool>        arg_play_test_data              = {"play_test_data", ""};
-  const command_line::arg_descriptor<bool>        arg_generate_and_play_test_data = {"generate_and_play_test_data", ""};
-  const command_line::arg_descriptor<bool>        arg_test_transactions           = {"test_transactions", ""};
   const command_line::arg_descriptor<std::string> arg_filter                      = { "filter", "Regular expression filter for which tests to run" };
   const command_line::arg_descriptor<bool>        arg_list_tests                  = {"list_tests", ""};
   const command_line::arg_descriptor<std::string> arg_log_level                   = {"log-level", ""};
@@ -63,11 +58,6 @@ int main(int argc, char* argv[])
   
   po::options_description desc_options("Allowed options");
   command_line::add_arg(desc_options, command_line::arg_help);
-  command_line::add_arg(desc_options, arg_test_data_path);
-  command_line::add_arg(desc_options, arg_generate_test_data);
-  command_line::add_arg(desc_options, arg_play_test_data);
-  command_line::add_arg(desc_options, arg_generate_and_play_test_data);
-  command_line::add_arg(desc_options, arg_test_transactions);
   command_line::add_arg(desc_options, arg_filter);
   command_line::add_arg(desc_options, arg_list_tests);
   command_line::add_arg(desc_options, arg_log_level);
@@ -97,21 +87,7 @@ int main(int argc, char* argv[])
 
   size_t tests_count = 0;
   std::vector<std::string> failed_tests;
-  std::string tests_folder = command_line::get_arg(vm, arg_test_data_path);
   bool list_tests = false;
-  if (command_line::get_arg(vm, arg_generate_test_data))
-  {
-    GENERATE("chain001.dat", gen_simple_chain_001);
-  }
-  else if (command_line::get_arg(vm, arg_play_test_data))
-  {
-    PLAY("chain001.dat", gen_simple_chain_001);
-  }
-  else if (command_line::get_arg(vm, arg_test_transactions))
-  {
-    CALL_TEST("TRANSACTIONS TESTS", test_transactions);
-  }
-  else
   {
     list_tests = command_line::get_arg(vm, arg_list_tests);
 

@@ -33,6 +33,7 @@
 #include <vector>
 #include <deque>
 #include <array>
+#include <optional>
 #include "../span.h"
 #include "../storages/portable_storage_base.h"
 

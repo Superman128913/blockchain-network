@@ -936,7 +936,7 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
       iter = std::copy_n(addr_info.address.m_view_public_key.data, sizeof(addr_info.address.m_view_public_key.data), iter);
 
       size_t counter = 65;
-      assert(std::distance(blob->buffer.begin(), iter) == counter);
+      assert(std::distance(blob->buffer.begin(), iter) == static_cast<int>(counter));
       if (addr_info.has_payment_id) {
         std::copy_n(addr_info.payment_id.data, sizeof(addr_info.payment_id.data), iter);
         counter+=sizeof(addr_info.payment_id);
