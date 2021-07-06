@@ -146,9 +146,6 @@ public:
                         , const crypto::hash& blk_hash
                         ) override { }
   virtual cryptonote::block get_block_from_height(uint64_t height) const override { return cryptonote::block(); }
-  virtual void set_hard_fork_version(uint64_t height, uint8_t version) override {}
-  virtual uint8_t get_hard_fork_version(uint64_t height) const override { return 0; }
-  virtual void check_hard_fork_info() override {}
 
   virtual uint32_t get_blockchain_pruning_seed() const override { return 0; }
   virtual bool prune_blockchain(uint32_t pruning_seed = 0) override { return true; }

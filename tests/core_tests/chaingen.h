@@ -50,6 +50,7 @@
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
+#include "cryptonote_basic/hardfork.h"
 #include "cryptonote_config.h"
 #include "cryptonote_core/cryptonote_core.h"
 #include "cryptonote_basic/cryptonote_boost_serialization.h"
@@ -203,11 +204,10 @@ private:
   }
 };
 
-typedef std::vector<std::pair<uint8_t, uint64_t>> v_hardforks_t;
 struct event_replay_settings
 {
   event_replay_settings() = default;
-  std::optional<v_hardforks_t> hard_forks;
+  std::optional<std::vector<cryptonote::hard_fork>> hard_forks;
 
 private:
   friend class boost::serialization::access;
@@ -588,7 +588,7 @@ uint64_t get_amount(const cryptonote::account_base& account, const cryptonote::t
 uint64_t get_balance(const cryptonote::account_base& addr, const std::vector<cryptonote::block>& blockchain, const map_hash2tx_t& mtx);
 uint64_t get_unlocked_balance(const cryptonote::account_base& addr, const std::vector<cryptonote::block>& blockchain, const map_hash2tx_t& mtx);
 
-bool extract_hard_forks(const std::vector<test_event_entry>& events, v_hardforks_t& hard_forks);
+bool extract_hard_forks(const std::vector<test_event_entry>& events, std::vector<cryptonote::hard_fork>& hard_forks);
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
@@ -908,7 +908,7 @@ inline bool replay_events_through_core_plain(cryptonote::core& cr, const std::ve
 //--------------------------------------------------------------------------
 template<typename t_test_class>
 struct get_test_options {
-  const std::vector<std::pair<uint8_t, uint64_t>> hard_forks = {{7, 0}};
+  const std::vector<cryptonote::hard_fork> hard_forks = {{7, 0, 0, 0}};
   const cryptonote::test_options test_options = {
     hard_forks, 0
   };
@@ -947,7 +947,7 @@ inline bool do_replay_events_get_core(std::vector<test_event_entry>& events, cry
   // events should be passed a testing context which should have this specific
   // testing situation
   // Hardforks can be specified in events.
-  v_hardforks_t derived_hardforks;
+  std::vector<cryptonote::hard_fork> derived_hardforks;
   bool use_derived_hardforks = extract_hard_forks(events, derived_hardforks);
   const cryptonote::test_options derived_test_options =
   {
@@ -1152,18 +1152,6 @@ inline bool do_replay_file(const std::string& filename)
 
 #define SET_EVENT_VISITOR_SETT(VEC_EVENTS, SETT, VAL) VEC_EVENTS.push_back(event_visitor_settings(SETT, VAL));
 
-#define GENERATE(filename, generator_class) \
-    { \
-        std::vector<test_event_entry> events; \
-        generator_class g; \
-        g.generate(events); \
-        if (!tools::serialize_obj_to_file(events, filename)) \
-        { \
-            MERROR("Failed to serialize data to file: " << filename); \
-            throw std::runtime_error("Failed to serialize data to file"); \
-        } \
-    }
-
 
 #define PLAY(filename, generator_class) \
     if(!do_replay_file<generator_class>(filename)) \
@@ -1242,19 +1230,6 @@ inline bool do_replay_file(const std::string& filename)
     CATCH_GENERATE_REPLAY_CORE(generator_class, generator_class_instance, CORE);                                       \
   }
 
-#define CALL_TEST(test_name, function)                                                                     \
-  {                                                                                                        \
-    if(!function())                                                                                        \
-    {                                                                                                      \
-      MERROR("#TEST# Failed " << test_name);                                                               \
-      return 1;                                                                                            \
-    }                                                                                                      \
-    else                                                                                                   \
-    {                                                                                                      \
-      MGINFO_GREEN("#TEST# Succeeded " << test_name);                                                      \
-    }                                                                                                      \
-  }
-
 #define QUOTEME(x) #x
 #define DEFINE_TESTS_ERROR_CONTEXT(text) const char* perr_context = text;
 #define CHECK_TEST_CONDITION(cond) CHECK_AND_ASSERT_MES(cond, false, "[" << perr_context << "] failed: \"" << QUOTEME(cond) << "\"")
@@ -1263,7 +1238,7 @@ inline bool do_replay_file(const std::string& filename)
 #define CHECK_NOT_EQ(v1, v2) CHECK_AND_ASSERT_MES(!(v1 == v2), false, "[" << perr_context << "] failed: \"" << QUOTEME(v1) << " != " << QUOTEME(v2) << "\", " << v1 << " == " << v2)
 #define MK_COINS(amount) (UINT64_C(amount) * COIN)
 
-static std::string make_junk() {
+inline std::string make_junk() {
   std::string junk;
   junk.reserve(1024);
   for (size_t i = 0; i < 256; i++)
@@ -1393,7 +1368,7 @@ public:
 
 void fill_nonce_with_oxen_generator(struct oxen_chain_generator const *generator, cryptonote::block& blk, const cryptonote::difficulty_type& diffic, uint64_t height);
 void oxen_register_callback(std::vector<test_event_entry> &events, std::string const &callback_name, oxen_callback callback);
-std::vector<std::pair<uint8_t, uint64_t>> oxen_generate_hard_fork_table(uint8_t hf_version = cryptonote::network_version_count - 1, uint64_t pos_delay = 60);
+std::vector<cryptonote::hard_fork> oxen_generate_hard_fork_table(uint8_t hf_version = cryptonote::network_version_count - 1, uint64_t pos_delay = 60);
 
 struct oxen_blockchain_entry
 {
@@ -1460,10 +1435,10 @@ struct oxen_chain_generator
   oxen_chain_generator_db                                            db_;
   uint8_t                                                            hf_version_ = cryptonote::network_version_7;
   std::vector<test_event_entry>&                                     events_;
-  const std::vector<std::pair<uint8_t, uint64_t>>                    hard_forks_;
+  const std::vector<cryptonote::hard_fork>                           hard_forks_;
   cryptonote::account_base                                           first_miner_;
 
-  oxen_chain_generator(std::vector<test_event_entry> &events, const std::vector<std::pair<uint8_t, uint64_t>> &hard_forks);
+  oxen_chain_generator(std::vector<test_event_entry> &events, const std::vector<cryptonote::hard_fork>& hard_forks);
 
   uint64_t                                             height()       const { return cryptonote::get_block_height(db_.blocks.back().block); }
   uint64_t                                             chain_height() const { return height() + 1; }

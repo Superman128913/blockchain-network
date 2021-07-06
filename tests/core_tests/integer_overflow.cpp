@@ -98,10 +98,10 @@ bool gen_uint_overflow_base::mark_last_valid_block(cryptonote::core& c, size_t e
 
 bool gen_uint_overflow_1::generate(std::vector<test_event_entry>& events) const
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_n_blocks(40);
   gen.add_mined_money_unlock_blocks();
 

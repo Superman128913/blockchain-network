@@ -26,6 +26,7 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include "cryptonote_config.h"
 #define IN_UNIT_TESTS
 
 #include <stdio.h>
@@ -101,8 +102,6 @@ public:
     return top;
   }
   virtual void pop_block(cryptonote::block &blk, std::vector<cryptonote::transaction> &txs) override { blocks.pop_back(); }
-  virtual void set_hard_fork_version(uint64_t height, uint8_t version) override { if (height >= hf.size()) hf.resize(height + 1); hf[height] = version; }
-  virtual uint8_t get_hard_fork_version(uint64_t height) const override { if (height >= hf.size()) return 255; return hf[height]; }
 
 private:
   std::vector<block_t> blocks;
@@ -110,26 +109,6 @@ private:
 };
 
 }
-
-#define PREFIX_WINDOW(hf_version,window) \
-  blockchain_objects_t bc_objects = {}; \
-  struct get_test_options { \
-    const std::vector<std::pair<uint8_t, uint64_t>> hard_forks; \
-    const cryptonote::test_options test_options = { \
-      hard_forks, \
-      window, \
-    }; \
-    get_test_options(): hard_forks{{std::make_pair(cryptonote::network_version_7, (uint64_t)0), std::make_pair((uint8_t)hf_version, (uint64_t)LONG_TERM_BLOCK_WEIGHT_WINDOW)}} {} \
-  } opts; \
-  cryptonote::Blockchain *bc = &bc_objects.m_blockchain; \
-  bool r = bc->init(new TestDB(), nullptr /*ons_db*/, cryptonote::FAKECHAIN, true, &opts.test_options, 0); \
-  if (!r) \
-  { \
-    fprintf(stderr, "Failed to init blockchain\n"); \
-    exit(1); \
-  }
-
-#define PREFIX(hf_version) PREFIX_WINDOW(hf_version, LONG_TERM_BLOCK_WEIGHT_WINDOW)
 
 static uint32_t lcg_seed = 0;
 
@@ -141,15 +120,27 @@ static uint32_t lcg()
 
 static void test(test_t t, uint64_t blocks)
 {
-  PREFIX(HF_VERSION_LONG_TERM_BLOCK_WEIGHT);
+  blockchain_objects_t bc_objects = {};
+
+  const std::vector<cryptonote::hard_fork> hard_forks{
+      {cryptonote::network_version_7, 0, 0, 0},
+      {cryptonote::network_version_11_infinite_staking, 0, 5000, 0}};
+
+  const cryptonote::test_options test_options{hard_forks, 5000};
+
+  auto& bc = bc_objects.m_blockchain;
+  if (!bc.init(new TestDB(), nullptr, cryptonote ::FAKECHAIN, true, &test_options, 0)) {
+    fprintf(stderr, "Failed to init blockchain\n");
+    exit(1);
+  };
 
   for (uint64_t h = 0; h < LONG_TERM_BLOCK_WEIGHT_WINDOW; ++h)
   {
     cryptonote::block b;
     b.major_version = cryptonote::network_version_7;
     b.minor_version = cryptonote::network_version_7;
-    bc->get_db().add_block(std::make_pair(b, ""), 300000, 300000, bc->get_db().height(), bc->get_db().height(), {});
-    if (!bc->update_next_cumulative_weight_limit())
+    bc.get_db().add_block(std::make_pair(b, ""), 300000, 300000, bc.get_db().height(), bc.get_db().height(), {});
+    if (!bc.update_next_cumulative_weight_limit())
     {
       fprintf(stderr, "Failed to update cumulative weight limit 1\n");
       exit(1);
@@ -159,7 +150,7 @@ static void test(test_t t, uint64_t blocks)
   for (uint64_t h = 0; h < blocks; ++h)
   {
     uint64_t w;
-    uint64_t effective_block_weight_median = bc->get_current_cumulative_block_weight_median();
+    uint64_t effective_block_weight_median = bc.get_current_cumulative_block_weight_median();
     switch (t)
     {
       case test_lcg:
@@ -170,7 +161,7 @@ static void test(test_t t, uint64_t blocks)
         break;
       }
       case test_max:
-        w = bc->get_current_cumulative_block_weight_limit();
+        w = bc.get_current_cumulative_block_weight_limit();
         break;
       case test_min:
         w = 90;
@@ -178,13 +169,13 @@ static void test(test_t t, uint64_t blocks)
       default:
         exit(1);
     }
-    uint64_t ltw = bc->get_next_long_term_block_weight(w);
+    uint64_t ltw = bc.get_next_long_term_block_weight(w);
     cryptonote::block b;
     b.major_version = HF_VERSION_LONG_TERM_BLOCK_WEIGHT;
     b.minor_version = HF_VERSION_LONG_TERM_BLOCK_WEIGHT;
-    bc->get_db().add_block(std::make_pair(std::move(b), ""), w, ltw, bc->get_db().height(), bc->get_db().height(), {});
+    bc.get_db().add_block(std::make_pair(std::move(b), ""), w, ltw, bc.get_db().height(), bc.get_db().height(), {});
 
-    if (!bc->update_next_cumulative_weight_limit())
+    if (!bc.update_next_cumulative_weight_limit())
     {
       fprintf(stderr, "Failed to update cumulative weight limit\n");
       exit(1);

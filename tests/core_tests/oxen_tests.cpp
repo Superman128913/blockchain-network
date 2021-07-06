@@ -69,10 +69,10 @@ static void add_service_nodes(oxen_chain_generator &gen, size_t count)
 // code path" again
 bool oxen_checkpointing_alt_chain_handle_alt_blocks_at_tip::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
   add_service_nodes(gen, service_nodes::CHECKPOINT_QUORUM_SIZE);
 
@@ -128,10 +128,10 @@ bool oxen_checkpointing_alt_chain_handle_alt_blocks_at_tip::generate(std::vector
 // NOTE: - Checks that a chain with a checkpoint but less PoW is preferred over a chain that is longer with more PoW but no checkpoints
 bool oxen_checkpointing_alt_chain_more_service_node_checkpoints_less_pow_overtakes::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   int constexpr NUM_SERVICE_NODES = service_nodes::CHECKPOINT_QUORUM_SIZE;
@@ -165,10 +165,10 @@ bool oxen_checkpointing_alt_chain_more_service_node_checkpoints_less_pow_overtak
 // NOTE: - A chain that receives checkpointing votes sufficient to form a checkpoint should reorg back accordingly
 bool oxen_checkpointing_alt_chain_receive_checkpoint_votes_should_reorg_back::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   int constexpr NUM_SERVICE_NODES = service_nodes::CHECKPOINT_QUORUM_SIZE;
@@ -232,9 +232,9 @@ bool oxen_checkpointing_alt_chain_receive_checkpoint_votes_should_reorg_back::ge
 
 bool oxen_checkpointing_alt_chain_too_old_should_be_dropped::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   int constexpr NUM_SERVICE_NODES = service_nodes::CHECKPOINT_QUORUM_SIZE;
@@ -267,10 +267,10 @@ bool oxen_checkpointing_alt_chain_too_old_should_be_dropped::generate(std::vecto
 // available checkpoint heights whilst maintaining equal heights with the main chain
 bool oxen_checkpointing_alt_chain_with_increasing_service_node_checkpoints::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
   add_service_nodes(gen, service_nodes::CHECKPOINT_QUORUM_SIZE);
 
@@ -327,10 +327,10 @@ bool oxen_checkpointing_alt_chain_with_increasing_service_node_checkpoints::gene
 //       - Checks invalid vote (signature or key) is not accepted due to not being part of the quorum
 bool oxen_checkpointing_service_node_checkpoint_from_votes::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
   add_service_nodes(gen, service_nodes::CHECKPOINT_QUORUM_SIZE);
 
@@ -391,10 +391,10 @@ bool oxen_checkpointing_service_node_checkpoint_from_votes::generate(std::vector
 //       - Checks you can add a block after the 1st checkpoint out of 2 checkpoints.
 bool oxen_checkpointing_service_node_checkpoints_check_reorg_windows::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
   add_service_nodes(gen, service_nodes::CHECKPOINT_QUORUM_SIZE);
 
@@ -438,11 +438,11 @@ bool oxen_checkpointing_service_node_checkpoints_check_reorg_windows::generate(s
 
 bool oxen_core_block_reward_unpenalized_pre_pulse::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table(cryptonote::network_version_16_pulse - 1);
+  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::network_version_16_pulse - 1);
   oxen_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
 
-  uint8_t newest_hf = hard_forks.back().first;
+  uint8_t newest_hf = hard_forks.back().version;
   assert(newest_hf >= cryptonote::network_version_13_enforce_checkpoints);
 
   gen.add_mined_money_unlock_blocks();
@@ -478,13 +478,13 @@ bool oxen_core_block_reward_unpenalized_pre_pulse::generate(std::vector<test_eve
 
 bool oxen_core_block_reward_unpenalized_post_pulse::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table(cryptonote::network_version_count -1, 150 /*Proof Of Stake Delay*/);
+  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::network_version_count -1, 150 /*Proof Of Stake Delay*/);
   oxen_chain_generator gen(events, hard_forks);
 
-  uint8_t const newest_hf = hard_forks.back().first;
+  uint8_t const newest_hf = hard_forks.back().version;
   assert(newest_hf >= cryptonote::network_version_13_enforce_checkpoints);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   // Make big chunky TX's to trigger the block size penalty
@@ -527,11 +527,11 @@ bool oxen_core_block_reward_unpenalized_post_pulse::generate(std::vector<test_ev
 
 bool oxen_core_fee_burning::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
 
-  uint8_t newest_hf = hard_forks.back().first;
+  uint8_t newest_hf = hard_forks.back().version;
   assert(newest_hf >= cryptonote::network_version_14_blink);
 
   gen.add_mined_money_unlock_blocks();
@@ -609,14 +609,14 @@ bool oxen_core_fee_burning::generate(std::vector<test_event_entry>& events)
 
 bool oxen_core_governance_batched_reward::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table(cryptonote::network_version_10_bulletproofs);
+  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::network_version_10_bulletproofs);
 
   uint64_t hf10_height = 0;
-  for (std::pair<uint8_t, uint64_t> hf_pair : hard_forks)
+  for (const auto& [maj, sn_rev, height, ts] : hard_forks)
   {
-    if (hf_pair.first == cryptonote::network_version_10_bulletproofs)
+    if (maj == cryptonote::network_version_10_bulletproofs)
     {
-      hf10_height = hf_pair.second;
+      hf10_height = height;
       break;
     }
   }
@@ -635,14 +635,14 @@ bool oxen_core_governance_batched_reward::generate(std::vector<test_event_entry>
     // NOTE(oxen): Since hard fork 8 we have an emissions curve change, so if
     // you don't atleast progress and generate blocks from hf8 you will run into
     // problems
-    std::vector<std::pair<uint8_t, uint64_t>> other_hard_forks = {
-        std::make_pair(cryptonote::network_version_7, 0),
-        std::make_pair(cryptonote::network_version_8, 1),
-        std::make_pair(cryptonote::network_version_9_service_nodes, hf10_height)};
+    std::vector<cryptonote::hard_fork> other_hard_forks = {
+        {7,0,0,0},
+        {8,0,1,0},
+        {9,0,hf10_height,0}};
 
     std::vector<test_event_entry> unused_events;
     oxen_chain_generator no_batched_governance_generator(unused_events, other_hard_forks);
-    no_batched_governance_generator.add_blocks_until_version(other_hard_forks.back().first);
+    no_batched_governance_generator.add_blocks_until_version(other_hard_forks.back().version);
 
     while(no_batched_governance_generator.height() < batched_governance_generator.height())
       no_batched_governance_generator.create_and_add_next_block();
@@ -685,9 +685,9 @@ bool oxen_core_governance_batched_reward::generate(std::vector<test_event_entry>
 bool oxen_core_block_rewards_lrc6::generate(std::vector<test_event_entry>& events)
 {
   constexpr auto& network = cryptonote::get_config(cryptonote::FAKECHAIN);
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table(cryptonote::network_version_15_ons);
-  hard_forks.emplace_back(cryptonote::network_version_16_pulse, hard_forks.back().second + network.GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS + 10);
-  hard_forks.emplace_back(cryptonote::network_version_17, hard_forks.back().second + network.GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS);
+  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::network_version_15_ons);
+  hard_forks.push_back({cryptonote::network_version_16_pulse, 0, hard_forks.back().height + network.GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS + 10, 0});
+  hard_forks.push_back({cryptonote::network_version_17, 0, hard_forks.back().height + network.GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS});
   oxen_chain_generator batched_governance_generator(events, hard_forks);
   batched_governance_generator.add_blocks_until_version(cryptonote::network_version_17);
   batched_governance_generator.add_n_blocks(network.GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS);
@@ -695,12 +695,12 @@ bool oxen_core_block_rewards_lrc6::generate(std::vector<test_event_entry>& event
   uint64_t hf15_height = 0, hf16_height = 0, hf17_height = 0;
   for (const auto &hf : hard_forks)
   {
-    if (hf.first == cryptonote::network_version_15_ons)
-      hf15_height = hf.second;
-    else if (hf.first == cryptonote::network_version_16_pulse)
-      hf16_height = hf.second;
+    if (hf.version == cryptonote::network_version_15_ons)
+      hf15_height = hf.height;
+    else if (hf.version == cryptonote::network_version_16_pulse)
+      hf16_height = hf.height;
     else
-      hf17_height = hf.second;
+      hf17_height = hf.height;
   }
 
   oxen_register_callback(events, "check_lrc6_7_block_rewards", [hf15_height, hf16_height, hf17_height, interval=network.GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS](cryptonote::core &c, size_t ev_index)
@@ -768,12 +768,12 @@ bool oxen_core_block_rewards_lrc6::generate(std::vector<test_event_entry>& event
 
 bool oxen_core_test_deregister_preferred::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
   const auto miner                 = gen.first_miner();
   const auto alice                 = gen.add_account();
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_n_blocks(10); /// give miner some outputs to spend and unlock them
   add_service_nodes(gen, 12);
   gen.add_mined_money_unlock_blocks();
@@ -831,11 +831,11 @@ bool oxen_core_test_deregister_preferred::generate(std::vector<test_event_entry>
 // to test), they don't get deregistered.
 bool oxen_core_test_deregister_safety_buffer::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
   const auto miner = gen.first_miner();
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
   add_service_nodes(gen, service_nodes::STATE_CHANGE_QUORUM_SIZE * 2 + 1);
   gen.add_n_blocks(1);
@@ -880,9 +880,9 @@ bool oxen_core_test_deregister_safety_buffer::generate(std::vector<test_event_en
 // Daemon A accepts the block without X. Now X is too old and should not be added in future blocks.
 bool oxen_core_test_deregister_too_old::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
 
   /// generate some outputs and unlock them
   gen.add_n_blocks(20);
@@ -906,10 +906,10 @@ bool oxen_core_test_deregister_too_old::generate(std::vector<test_event_entry>& 
 
 bool oxen_core_test_deregister_zero_fee::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   size_t const NUM_SERVICE_NODES = 11;
@@ -931,10 +931,10 @@ bool oxen_core_test_deregister_zero_fee::generate(std::vector<test_event_entry> 
 // those sitting on Chain 1 should not have problems switching over.
 bool oxen_core_test_deregister_on_split::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
  
   add_service_nodes(gen, service_nodes::CHECKPOINT_QUORUM_SIZE + 1);
@@ -991,10 +991,10 @@ bool oxen_core_test_deregister_on_split::generate(std::vector<test_event_entry> 
 
 bool oxen_core_test_state_change_ip_penalty_disallow_dupes::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   add_service_nodes(gen, service_nodes::STATE_CHANGE_QUORUM_SIZE + 1);
@@ -1053,11 +1053,11 @@ static bool verify_ons_mapping_record(char const *perr_context,
 
 bool oxen_name_system_disallow_reserved_type::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   ons::mapping_value mapping_value = {};
@@ -1091,8 +1091,8 @@ static ons_keys_t make_ons_keys(cryptonote::account_base const &src)
   auto iter = result.wallet_value.buffer.begin();
   uint8_t identifier = 0;
   iter = std::copy_n(&identifier, 1, iter);
-  iter = std::copy_n(src.get_keys().m_account_address.m_spend_public_key.data, sizeof(&src.get_keys().m_account_address.m_spend_public_key.data), iter);
-  iter = std::copy_n(src.get_keys().m_account_address.m_view_public_key.data, sizeof(&src.get_keys().m_account_address.m_view_public_key.data), iter);
+  iter = std::copy_n(src.get_keys().m_account_address.m_spend_public_key.data, sizeof(src.get_keys().m_account_address.m_spend_public_key.data), iter);
+  iter = std::copy_n(src.get_keys().m_account_address.m_view_public_key.data, sizeof(src.get_keys().m_account_address.m_view_public_key.data), iter);
 
   // NOTE: Just needs a 32 byte key. Reuse spend key
   memcpy(&result.lokinet_value.buffer[0], (char *)&result.owner.wallet.address.m_spend_public_key, result.lokinet_value.len);
@@ -1110,11 +1110,11 @@ uint64_t lokinet_expiry(ons::mapping_type type) {
 
 bool oxen_name_system_expiration::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
   cryptonote::account_base miner = gen.first_miner_;
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   ons_keys_t miner_key = make_ons_keys(miner);
@@ -1182,12 +1182,12 @@ bool oxen_name_system_expiration::generate(std::vector<test_event_entry> &events
 
 bool oxen_name_system_get_mappings_by_owner::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
   cryptonote::account_base bob   = gen.add_account();
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
 
   // NOTE: Fund Bob's wallet
   {
@@ -1258,9 +1258,10 @@ bool oxen_name_system_get_mappings_by_owner::generate(std::vector<test_event_ent
     std::vector<ons::mapping_record> records = ons_db.get_mappings_by_owner(bob_key.owner);
 
     size_t expected_size = 0;
-    if (ons::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), ons::mapping_type::session)) expected_size += 2;
-    if (ons::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), ons::mapping_type::wallet)) expected_size += 2;
-    if (ons::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), ons::mapping_type::lokinet)) expected_size += 2;
+    auto netv = get_network_version(c.get_nettype(), c.get_current_blockchain_height());
+    if (ons::mapping_type_allowed(netv, ons::mapping_type::session)) expected_size += 2;
+    if (ons::mapping_type_allowed(netv, ons::mapping_type::wallet)) expected_size += 2;
+    if (ons::mapping_type_allowed(netv, ons::mapping_type::lokinet)) expected_size += 2;
     CHECK_EQ(records.size(), expected_size);
 
     std::sort(records.begin(), records.end(), [](const auto& a, const auto& b) {
@@ -1268,7 +1269,7 @@ bool oxen_name_system_get_mappings_by_owner::generate(std::vector<test_event_ent
            < std::make_tuple(b.update_height, b.name_hash);
     });
 
-    if (ons::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), ons::mapping_type::session))
+    if (ons::mapping_type_allowed(netv, ons::mapping_type::session))
     {
       CHECK_EQ(records[0].name_hash, session_name_hash1);
       CHECK_TEST_CONDITION(verify_ons_mapping_record(perr_context, records[0], ons::mapping_type::session, session_name1, bob_key.session_value, session_height, std::nullopt, session_name1_txid, bob_key.owner, {} /*backup_owner*/));
@@ -1276,7 +1277,7 @@ bool oxen_name_system_get_mappings_by_owner::generate(std::vector<test_event_ent
       CHECK_TEST_CONDITION(verify_ons_mapping_record(perr_context, records[1], ons::mapping_type::session, session_name2, bob_key.session_value, session_height, std::nullopt, session_name2_txid, bob_key.owner, {} /*backup_owner*/));
     }
 
-    if (ons::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), ons::mapping_type::lokinet))
+    if (ons::mapping_type_allowed(netv, ons::mapping_type::lokinet))
     {
       CHECK_EQ(records[2].name_hash, lokinet_name_hash1);
       CHECK_TEST_CONDITION(verify_ons_mapping_record(perr_context, records[2], ons::mapping_type::lokinet, lokinet_name1, bob_key.lokinet_value, lokinet_height, lokinet_height + lokinet_expiry(ons::mapping_type::lokinet), lokinet_name1_txid, bob_key.owner, {} /*backup_owner*/));
@@ -1284,7 +1285,7 @@ bool oxen_name_system_get_mappings_by_owner::generate(std::vector<test_event_ent
       CHECK_TEST_CONDITION(verify_ons_mapping_record(perr_context, records[3], ons::mapping_type::lokinet, lokinet_name2, bob_key.lokinet_value, lokinet_height, lokinet_height + lokinet_expiry(ons::mapping_type::lokinet_5years), lokinet_name2_txid, bob_key.owner, {} /*backup_owner*/));
     }
 
-    if (ons::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), ons::mapping_type::wallet))
+    if (ons::mapping_type_allowed(netv, ons::mapping_type::wallet))
     {
       CHECK_EQ(records[4].name_hash, wallet_name_hash1);
       CHECK_TEST_CONDITION(verify_ons_mapping_record(perr_context, records[4], ons::mapping_type::wallet, wallet_name1, bob_key.wallet_value, wallet_height, std::nullopt, wallet_name1_txid, bob_key.owner, {} /*backup_owner*/));
@@ -1299,12 +1300,12 @@ bool oxen_name_system_get_mappings_by_owner::generate(std::vector<test_event_ent
 
 bool oxen_name_system_get_mappings_by_owners::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
   cryptonote::account_base bob   = gen.add_account();
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
 
   // NOTE: Fund Bob's wallet
   {
@@ -1369,12 +1370,12 @@ bool oxen_name_system_get_mappings_by_owners::generate(std::vector<test_event_en
 
 bool oxen_name_system_get_mappings::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
   cryptonote::account_base bob   = gen.add_account();
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
 
   // NOTE: Fund Bob's wallet
   {
@@ -1411,13 +1412,13 @@ bool oxen_name_system_get_mappings::generate(std::vector<test_event_entry> &even
 
 bool oxen_name_system_handles_duplicate_in_ons_db::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
   cryptonote::account_base bob   = gen.add_account();
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   cryptonote::transaction transfer = gen.create_and_add_tx(miner, bob.get_keys().m_account_address, MK_COINS(400));
@@ -1471,7 +1472,8 @@ bool oxen_name_system_handles_duplicate_in_ons_db::generate(std::vector<test_eve
     CHECK_TEST_CONDITION(verify_ons_mapping_record(perr_context, record1, ons::mapping_type::session, session_name, bob_key.session_value, height_of_ons_entry, std::nullopt, session_tx_hash, miner_key.owner, {} /*backup_owner*/));
     CHECK_EQ(record1.owner_id, owner.id);
 
-    if (ons::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), ons::mapping_type::lokinet))
+    auto netv = get_network_version(c.get_nettype(), c.get_current_blockchain_height());
+    if (ons::mapping_type_allowed(netv, ons::mapping_type::lokinet))
     {
       ons::mapping_record record2 = ons_db.get_mapping(ons::mapping_type::lokinet, session_name_hash);
       CHECK_TEST_CONDITION(verify_ons_mapping_record(perr_context, record2, ons::mapping_type::lokinet, lokinet_name, miner_key.lokinet_value, height_of_ons_entry, height_of_ons_entry + lokinet_expiry(ons::mapping_type::lokinet_2years), lokinet_tx_hash, miner_key.owner, {} /*backup_owner*/));
@@ -1488,13 +1490,13 @@ bool oxen_name_system_handles_duplicate_in_ons_db::generate(std::vector<test_eve
 
 bool oxen_name_system_handles_duplicate_in_tx_pool::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
   cryptonote::account_base bob   = gen.add_account();
   {
-    gen.add_blocks_until_version(hard_forks.back().first);
+    gen.add_blocks_until_version(hard_forks.back().version);
     gen.add_mined_money_unlock_blocks();
 
     cryptonote::transaction transfer = gen.create_and_add_tx(miner, bob.get_keys().m_account_address, MK_COINS(400));
@@ -1522,11 +1524,11 @@ bool oxen_name_system_handles_duplicate_in_tx_pool::generate(std::vector<test_ev
 
 bool oxen_name_system_invalid_tx_extra_params::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   ons_keys_t miner_key = make_ons_keys(miner);
@@ -1653,7 +1655,7 @@ bool oxen_name_system_invalid_tx_extra_params::generate(std::vector<test_event_e
 
 bool oxen_name_system_large_reorg::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base const miner = gen.first_miner_;
@@ -1661,7 +1663,7 @@ bool oxen_name_system_large_reorg::generate(std::vector<test_event_entry> &event
   ons_keys_t const miner_key           = make_ons_keys(miner);
   ons_keys_t const bob_key             = make_ons_keys(bob);
   {
-    gen.add_blocks_until_version(hard_forks.back().first);
+    gen.add_blocks_until_version(hard_forks.back().version);
     gen.add_mined_money_unlock_blocks();
 
     cryptonote::transaction transfer = gen.create_and_add_tx(miner, bob.get_keys().m_account_address, MK_COINS(400));
@@ -1708,8 +1710,9 @@ bool oxen_name_system_large_reorg::generate(std::vector<test_event_entry> &event
       CHECK_EQ(ons_db.height(), first_ons_height);
 
       size_t expected_size = 1;
-      if (ons::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), ons::mapping_type::wallet)) expected_size += 1;
-      if (ons::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), ons::mapping_type::lokinet)) expected_size += 1;
+      auto netv = get_network_version(c.get_nettype(), c.get_current_blockchain_height());
+      if (ons::mapping_type_allowed(netv, ons::mapping_type::wallet)) expected_size += 1;
+      if (ons::mapping_type_allowed(netv, ons::mapping_type::lokinet)) expected_size += 1;
       CHECK_EQ(records.size(), expected_size);
 
       for (ons::mapping_record const &record : records)
@@ -1814,8 +1817,9 @@ bool oxen_name_system_large_reorg::generate(std::vector<test_event_entry> &event
     {
       std::vector<ons::mapping_record> records = ons_db.get_mappings_by_owner(miner_key.owner);
       size_t expected_size = 1;
-      if (ons::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), ons::mapping_type::wallet)) expected_size += 1;
-      if (ons::mapping_type_allowed(c.get_blockchain_storage().get_current_hard_fork_version(), ons::mapping_type::lokinet)) expected_size += 1;
+      auto netv = get_network_version(c.get_nettype(), c.get_current_blockchain_height());
+      if (ons::mapping_type_allowed(netv, ons::mapping_type::wallet)) expected_size += 1;
+      if (ons::mapping_type_allowed(netv, ons::mapping_type::lokinet)) expected_size += 1;
       CHECK_EQ(records.size(), expected_size);
 
       for (ons::mapping_record const &record : records)
@@ -1863,15 +1867,15 @@ bool oxen_name_system_large_reorg::generate(std::vector<test_event_entry> &event
 
 bool oxen_name_system_name_renewal::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
   cryptonote::account_base miner = gen.first_miner_;
 
-  if (!ons::mapping_type_allowed(hard_forks.back().first, ons::mapping_type::lokinet))
+  if (!ons::mapping_type_allowed(hard_forks.back().version, ons::mapping_type::lokinet))
       return true;
 
   {
-    gen.add_blocks_until_version(hard_forks.back().first);
+    gen.add_blocks_until_version(hard_forks.back().version);
     gen.add_mined_money_unlock_blocks();
   }
 
@@ -1946,11 +1950,11 @@ bool oxen_name_system_name_renewal::generate(std::vector<test_event_entry> &even
 
 bool oxen_name_system_name_value_max_lengths::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   auto make_ons_tx_with_custom_extra = [&](oxen_chain_generator &gen,
@@ -2016,11 +2020,11 @@ bool oxen_name_system_name_value_max_lengths::generate(std::vector<test_event_en
 
 bool oxen_name_system_update_mapping_after_expiry_fails::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
   cryptonote::account_base miner = gen.first_miner_;
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   ons_keys_t miner_key = make_ons_keys(miner);
@@ -2070,9 +2074,9 @@ uint8_t oxen_name_system_update_mapping::hf() { return cryptonote::network_versi
 uint8_t oxen_name_system_update_mapping_argon2::hf() { return cryptonote::network_version_15_ons; }
 bool oxen_name_system_update_mapping::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table(hf());
+  auto hard_forks = oxen_generate_hard_fork_table(hf());
   oxen_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   cryptonote::account_base miner     = gen.first_miner_;
@@ -2149,9 +2153,9 @@ ons::generic_signature ons_monero_signature(const crypto::hash& h, const crypto:
 
 bool oxen_name_system_update_mapping_multiple_owners::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_n_blocks(10); /// generate some outputs and unlock them
   gen.add_mined_money_unlock_blocks();
 
@@ -2413,9 +2417,9 @@ bool oxen_name_system_update_mapping_multiple_owners::generate(std::vector<test_
 
 bool oxen_name_system_update_mapping_non_existent_name_fails::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   cryptonote::account_base miner = gen.first_miner_;
@@ -2428,9 +2432,9 @@ bool oxen_name_system_update_mapping_non_existent_name_fails::generate(std::vect
 
 bool oxen_name_system_update_mapping_invalid_signature::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   cryptonote::account_base miner = gen.first_miner_;
@@ -2450,9 +2454,9 @@ bool oxen_name_system_update_mapping_invalid_signature::generate(std::vector<tes
 
 bool oxen_name_system_update_mapping_replay::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   cryptonote::account_base miner = gen.first_miner_;
@@ -2502,10 +2506,10 @@ bool oxen_name_system_update_mapping_replay::generate(std::vector<test_event_ent
 
 bool oxen_name_system_wrong_burn::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
   cryptonote::account_base miner = gen.first_miner_;
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
 
   // NOTE: Fund Miner's wallet
   {
@@ -2563,11 +2567,11 @@ bool oxen_name_system_wrong_burn::generate(std::vector<test_event_entry> &events
 
 bool oxen_name_system_wrong_version::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
   cryptonote::account_base miner = gen.first_miner_;
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   std::string name = "ons_name";
@@ -2601,10 +2605,10 @@ bool oxen_name_system_wrong_version::generate(std::vector<test_event_entry> &eve
 // NOTE: Generate forked block, check that alternative quorums are generated and accessible
 bool oxen_service_nodes_alt_quorums::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
   add_service_nodes(gen, service_nodes::STATE_CHANGE_QUORUM_SIZE + 3);
 
@@ -2649,10 +2653,10 @@ bool oxen_service_nodes_alt_quorums::generate(std::vector<test_event_entry>& eve
 
 bool oxen_service_nodes_checkpoint_quorum_size::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
   add_service_nodes(gen, service_nodes::CHECKPOINT_QUORUM_SIZE - 1);
 
@@ -2689,13 +2693,13 @@ bool oxen_service_nodes_checkpoint_quorum_size::generate(std::vector<test_event_
 
 bool oxen_service_nodes_gen_nodes::generate(std::vector<test_event_entry> &events)
 {
-  const std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table(cryptonote::network_version_9_service_nodes);
+  const auto hard_forks = oxen_generate_hard_fork_table(cryptonote::network_version_9_service_nodes);
   oxen_chain_generator gen(events, hard_forks);
   const auto miner                      = gen.first_miner();
   const auto alice                      = gen.add_account();
   size_t alice_account_base_event_index = gen.event_index();
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_n_blocks(10);
   gen.add_mined_money_unlock_blocks();
 
@@ -2768,9 +2772,9 @@ static bool contains(const std::vector<sn_info_t>& infos, const crypto::public_k
 
 bool oxen_service_nodes_test_rollback::generate(std::vector<test_event_entry>& events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   add_service_nodes(gen, 11);
 
   gen.add_n_blocks(5);   /// create a few blocks with active service nodes
@@ -2805,8 +2809,8 @@ bool oxen_service_nodes_test_rollback::generate(std::vector<test_event_entry>& e
       CHECK_TEST_CONDITION(dereg_tx.data.tx.type == cryptonote::txtype::state_change);
 
       cryptonote::tx_extra_service_node_state_change deregistration;
-      cryptonote::get_service_node_state_change_from_tx_extra(
-          dereg_tx.data.tx.extra, deregistration, c.get_blockchain_storage().get_current_hard_fork_version());
+      auto netv = get_network_version(c.get_nettype(), c.get_current_blockchain_height());
+      cryptonote::get_service_node_state_change_from_tx_extra(dereg_tx.data.tx.extra, deregistration, netv);
 
       const auto uptime_quorum = c.get_quorum(service_nodes::quorum_type::obligations, deregistration.block_height);
       CHECK_TEST_CONDITION(uptime_quorum);
@@ -2842,11 +2846,11 @@ bool oxen_service_nodes_test_rollback::generate(std::vector<test_event_entry>& e
 
 bool oxen_service_nodes_test_swarms_basic::generate(std::vector<test_event_entry>& events)
 {
-  const std::vector<std::pair<uint8_t, uint64_t>> hard_forks = {
-      std::make_pair(7, 0), std::make_pair(8, 1), std::make_pair(9, 2), std::make_pair(10, 150)};
+  const std::vector<cryptonote::hard_fork> hard_forks = {
+      {7,0,0,0}, {8,0,1,0}, {9,0,2,0}, {10,0,150,0}};
 
   oxen_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.rbegin()[1].first);
+  gen.add_blocks_until_version(hard_forks.rbegin()[1].version);
 
   /// Create some service nodes before hf version 10
   constexpr size_t INIT_SN_COUNT  = 13;
@@ -2973,10 +2977,10 @@ bool oxen_service_nodes_test_swarms_basic::generate(std::vector<test_event_entry
 
 bool oxen_service_nodes_insufficient_contribution::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   uint64_t operator_portions = STAKING_PORTIONS / 2;
@@ -3005,10 +3009,10 @@ bool oxen_service_nodes_insufficient_contribution::generate(std::vector<test_eve
 
 static oxen_chain_generator setup_pulse_tests(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator result(events, hard_forks);
 
-  result.add_blocks_until_version(hard_forks.back().first);
+  result.add_blocks_until_version(hard_forks.back().version);
   result.add_mined_money_unlock_blocks();
 
   std::vector<cryptonote::transaction> registration_txs(service_nodes::pulse_min_service_nodes(cryptonote::FAKECHAIN));
@@ -3177,10 +3181,10 @@ bool oxen_pulse_reject_miner_block::generate(std::vector<test_event_entry> &even
 
 bool oxen_pulse_generate_blocks::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   add_service_nodes(gen, service_nodes::pulse_min_service_nodes(cryptonote::FAKECHAIN));
@@ -3201,10 +3205,10 @@ bool oxen_pulse_generate_blocks::generate(std::vector<test_event_entry> &events)
 
 bool oxen_pulse_fallback_to_pow_and_back::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
   add_service_nodes(gen, service_nodes::pulse_min_service_nodes(cryptonote::FAKECHAIN));
@@ -3249,10 +3253,10 @@ bool oxen_pulse_fallback_to_pow_and_back::generate(std::vector<test_event_entry>
 
 bool oxen_pulse_chain_split::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
   add_service_nodes(gen, std::max(service_nodes::pulse_min_service_nodes(cryptonote::FAKECHAIN), service_nodes::CHECKPOINT_QUORUM_SIZE));
 
@@ -3294,10 +3298,10 @@ bool oxen_pulse_chain_split::generate(std::vector<test_event_entry> &events)
 // Pulse chain weight to switch over.
 bool oxen_pulse_chain_split_with_no_checkpoints::generate(std::vector<test_event_entry> &events)
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
 
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
   add_service_nodes(gen, std::max(service_nodes::pulse_min_service_nodes(cryptonote::FAKECHAIN), service_nodes::CHECKPOINT_QUORUM_SIZE));
 
