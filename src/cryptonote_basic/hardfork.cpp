@@ -47,7 +47,7 @@ static constexpr std::array mainnet_hard_forks =
   hard_fork{16, 0,   641111, 1602464400 /*2020-10-12 12:00 AEDT (01:00 UTC)*/ }, // Loki 8: Pulse
   hard_fork{17, 0,   770711, 1618016400 /*Saturday, April 10, 2021 1:00:00 UTC*/ },  // Oxen 8: Eliminate 6/block emissions after 180 days (not a separate release)
   hard_fork{18, 0,   785000, 1619736143 /*Thursday, April 29, 2021 22:42:23 UTC*/ }, // Oxen 9: Timesync, new proofs, reasons, wallet ONS
-  hard_fork{18, 1,   840433, 1626388200 /*Thursday, July 15, 2021 22:30:00 UTC */ }, // Oxen 9.2: mandatory SS 2.2.0 & lokinet 0.9.4 updates
+  hard_fork{18, 1,   839009, 1626217200 /*Tuesday, July 13, 2021 23:00 UTC */ }, // Oxen 9.2: mandatory SS 2.2.0 & lokinet 0.9.5 updates
 };
 
 static constexpr std::array testnet_hard_forks =
