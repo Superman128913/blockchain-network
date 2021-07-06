@@ -519,6 +519,7 @@ else()
   endif()
   build_external(hidapi
     DEPENDS ${maybe_eudev} libusb_external
+    PATCH_COMMAND patch -p1 -i ${PROJECT_SOURCE_DIR}/utils/build_scripts/hidapi-autoconf-duplicate-macro-dir.patch
     CONFIGURE_COMMAND autoreconf -ivf && ./configure ${cross_host} --prefix=${DEPS_DESTDIR} --disable-shared --enable-static --with-pic
       "CC=${deps_cc}" "CXX=${deps_cxx}" "CFLAGS=${deps_CFLAGS}" "CXXFLAGS=${deps_CXXFLAGS}"
       ${cross_extra}
