@@ -156,7 +156,7 @@ template <typename T>
 class BlockchainDBTest : public testing::Test
 {
 protected:
-  BlockchainDBTest() : m_db(new T()), m_hardfork(*m_db, 1, 0)
+  BlockchainDBTest() : m_db(new T())
   {
     for (auto& i : t_blocks)
     {
@@ -185,17 +185,10 @@ protected:
   }
 
   BlockchainDB* m_db;
-  HardFork m_hardfork;
   fs::path m_prefix;
   std::vector<std::pair<block, blobdata>> m_blocks;
   std::vector<std::vector<std::pair<transaction, blobdata>>> m_txs;
   std::vector<fs::path> m_filenames;
-
-  void init_hard_fork()
-  {
-    m_hardfork.init();
-    m_db->set_hard_fork(&m_hardfork);
-  }
 
   void get_filenames()
   {
@@ -265,7 +258,6 @@ TYPED_TEST(BlockchainDBTest, AddBlock)
   // make sure open does not throw
   ASSERT_NO_THROW(this->m_db->open(dirPath, cryptonote::FAKECHAIN));
   this->get_filenames();
-  this->init_hard_fork();
 
   db_wtxn_guard guard(this->m_db);
 
@@ -313,7 +305,6 @@ TYPED_TEST(BlockchainDBTest, RetrieveBlockData)
   // make sure open does not throw
   ASSERT_NO_THROW(this->m_db->open(dirPath, cryptonote::FAKECHAIN));
   this->get_filenames();
-  this->init_hard_fork();
 
   db_wtxn_guard guard(this->m_db);
 

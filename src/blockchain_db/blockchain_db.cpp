@@ -27,6 +27,7 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include "cryptonote_basic/hardfork.h"
 #include "cryptonote_core/service_node_rules.h"
 #include "checkpoints/checkpoints.h"
 #include "epee/string_tools.h"
@@ -222,16 +223,9 @@ uint64_t BlockchainDB::add_block( const std::pair<block, blobdata>& blck
   TIME_MEASURE_FINISH(time1);
   time_add_block1 += time1;
 
-  m_hardfork->add(blk, prev_height);
-
   ++num_calls;
 
   return prev_height;
-}
-
-void BlockchainDB::set_hard_fork(HardFork* hf)
-{
-  m_hardfork = hf;
 }
 
 void BlockchainDB::pop_block(block& blk, std::vector<transaction>& txs)
@@ -438,8 +432,7 @@ void BlockchainDB::fill_timestamps_and_difficulties_for_pow(cryptonote::network_
     return;
 
   uint64_t const top_block_height   = chain_height - 1;
-  static const uint64_t hf16_height = HardFork::get_hardcoded_hard_fork_height(nettype, cryptonote::network_version_16_pulse);
-  bool const before_hf16            = chain_height < hf16_height;
+  bool const before_hf16            = !is_hard_fork_at_least(nettype, network_version_16_pulse, chain_height);
   uint64_t const block_count        = DIFFICULTY_BLOCKS_COUNT(before_hf16);
 
   timestamps.reserve(block_count);

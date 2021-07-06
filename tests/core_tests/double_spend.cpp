@@ -39,9 +39,9 @@ using namespace cryptonote;
 
 bool gen_double_spend_in_tx::generate(std::vector<test_event_entry>& events) const
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_n_blocks(20);
   gen.add_mined_money_unlock_blocks();
 
@@ -114,9 +114,9 @@ bool gen_double_spend_in_tx::generate(std::vector<test_event_entry>& events) con
 
 bool gen_double_spend_in_the_same_block::generate(std::vector<test_event_entry>& events) const
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_n_blocks(10);
   gen.add_mined_money_unlock_blocks();
 
@@ -157,9 +157,9 @@ bool gen_double_spend_in_the_same_block::generate(std::vector<test_event_entry>&
 
 bool gen_double_spend_in_different_blocks::generate(std::vector<test_event_entry>& events) const
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_n_blocks(10);
   gen.add_mined_money_unlock_blocks();
 
@@ -200,9 +200,9 @@ bool gen_double_spend_in_different_blocks::generate(std::vector<test_event_entry
 
 bool gen_double_spend_in_alt_chain_in_the_same_block::generate(std::vector<test_event_entry>& events) const
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_n_blocks(10);
   gen.add_mined_money_unlock_blocks();
 
@@ -244,9 +244,9 @@ bool gen_double_spend_in_alt_chain_in_the_same_block::generate(std::vector<test_
 
 bool gen_double_spend_in_alt_chain_in_different_blocks::generate(std::vector<test_event_entry>& events) const
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_n_blocks(10);
   gen.add_mined_money_unlock_blocks();
 
@@ -285,9 +285,9 @@ bool gen_double_spend_in_alt_chain_in_different_blocks::generate(std::vector<tes
 
 bool gen_double_spend_in_different_chains::generate(std::vector<test_event_entry>& events) const
 {
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = oxen_generate_hard_fork_table();
+  auto hard_forks = oxen_generate_hard_fork_table();
   oxen_chain_generator gen(events, hard_forks);
-  gen.add_blocks_until_version(hard_forks.back().first);
+  gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_n_blocks(10);
   gen.add_mined_money_unlock_blocks();
 

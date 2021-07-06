@@ -93,7 +93,7 @@ namespace service_nodes
   void service_node_list::init()
   {
     std::lock_guard lock(m_sn_mutex);
-    if (m_blockchain.get_current_hard_fork_version() < 9)
+    if (m_blockchain.get_network_version() < cryptonote::network_version_9_service_nodes)
     {
       reset(true);
       return;
@@ -471,7 +471,7 @@ namespace service_nodes
     hw::device &hwdev         = hw::get_device("default");
     contribution->transferred = 0;
     bool stake_decoded        = true;
-    if (hf_version >= cryptonote::network_version_11_infinite_staking || hf_version == cryptonote::HardFork::INVALID_HF_VERSION)
+    if (hf_version >= cryptonote::network_version_11_infinite_staking)
     {
       // In Infinite Staking, we lock the key image that would be generated if
       // you tried to send your stake and prevent it from being transacted on
@@ -552,7 +552,7 @@ namespace service_nodes
       }
     }
 
-    if (hf_version < cryptonote::network_version_11_infinite_staking || (hf_version == cryptonote::HardFork::INVALID_HF_VERSION && !stake_decoded))
+    if (hf_version < cryptonote::network_version_11_infinite_staking)
     {
       // Pre Infinite Staking, we only need to prove the amount sent is
       // sufficient to become a contributor to the Service Node and that there
@@ -889,7 +889,7 @@ namespace service_nodes
 
     // check the initial contribution exists
 
-    uint64_t staking_requirement = get_staking_requirement(nettype, block_height, hf_version);
+    uint64_t staking_requirement = get_staking_requirement(nettype, block_height);
     cryptonote::account_public_address address;
 
     staking_components stake = {};
@@ -2666,7 +2666,7 @@ namespace service_nodes
     if (!m_blockchain.has_db())
         return false; // Haven't been initialized yet
 
-    uint8_t hf_version = m_blockchain.get_current_hard_fork_version();
+    uint8_t hf_version = m_blockchain.get_network_version();
     if (hf_version < cryptonote::network_version_9_service_nodes)
       return true;
 
@@ -2747,7 +2747,7 @@ namespace service_nodes
     return true;
   }
 
-  //TODO: remove after HF18
+  //TODO: remove after HF18, snode revision 1
   crypto::hash service_node_list::hash_uptime_proof(const cryptonote::NOTIFY_UPTIME_PROOF::request &proof) const
   {
     size_t buf_size;
@@ -2850,7 +2850,7 @@ namespace service_nodes
   };
 
 
-  //TODO remove after HF18
+  //TODO remove after HF18, snode revision 1
   bool proof_info::update(uint64_t ts,
                           uint32_t ip,
                           uint16_t s_https_port,
@@ -2904,10 +2904,13 @@ namespace service_nodes
 
 #define REJECT_PROOF(log) do { LOG_PRINT_L2("Rejecting uptime proof from " << proof.pubkey << ": " log); return false; } while (0)
 
-  //TODO remove after HF18
+  //TODO remove after HF18, snode revision 1
   bool service_node_list::handle_uptime_proof(cryptonote::NOTIFY_UPTIME_PROOF::request const &proof, bool &my_uptime_proof_confirmation, crypto::x25519_public_key &x25519_pkey)
   {
-    uint8_t const hf_version = m_blockchain.get_current_hard_fork_version();
+    auto vers = get_network_version_revision(m_blockchain.nettype(), m_blockchain.get_current_blockchain_height());
+    if (vers >= std::pair<uint8_t, uint8_t>{cryptonote::network_version_18, 1})
+      REJECT_PROOF("Old format (non-bt) proofs are not acceptable from v18+1 onwards");
+
     auto& netconf = get_config(m_blockchain.nettype());
     auto now = std::chrono::system_clock::now();
 
@@ -2917,8 +2920,8 @@ namespace service_nodes
       REJECT_PROOF("timestamp is too far from now");
 
     for (auto const &min : MIN_UPTIME_PROOF_VERSIONS)
-      if (hf_version >= min.hardfork && proof.snode_version < min.version)
-        REJECT_PROOF("v" << min.version[0] << "." << min.version[1] << "." << min.version[2] << "+ oxen version is required for v" << std::to_string(hf_version) << "+ network proofs");
+      if (vers >= min.hardfork_revision && proof.snode_version < min.oxend)
+        REJECT_PROOF("v" << tools::join(".", min.oxend) << "+ oxend version is required for v" << +vers.first << "." << +vers.second << "+ network proofs");
 
     if (!debug_allow_local_ips && !epee::net_utils::is_ip_public(proof.public_ip))
       REJECT_PROOF("public_ip is not actually public");
@@ -3000,7 +3003,7 @@ namespace service_nodes
 
   bool service_node_list::handle_btencoded_uptime_proof(std::unique_ptr<uptime_proof::Proof> proof, bool &my_uptime_proof_confirmation, crypto::x25519_public_key &x25519_pkey)
   {
-    uint8_t const hf_version = m_blockchain.get_current_hard_fork_version();
+    auto vers = get_network_version_revision(m_blockchain.nettype(), m_blockchain.get_current_blockchain_height());
     auto& netconf = get_config(m_blockchain.nettype());
     auto now = std::chrono::system_clock::now();
 
@@ -3009,9 +3012,16 @@ namespace service_nodes
     if (time_deviation > netconf.UPTIME_PROOF_TOLERANCE || time_deviation < -netconf.UPTIME_PROOF_TOLERANCE)
       REJECT_PROOF("timestamp is too far from now");
 
-    for (auto const &min : MIN_UPTIME_PROOF_VERSIONS)
-      if (hf_version >= min.hardfork && proof->version < min.version)
-        REJECT_PROOF("v" << min.version[0] << "." << min.version[1] << "." << min.version[2] << "+ oxen version is required for v" << std::to_string(hf_version) << "+ network proofs");
+    for (auto const &min : MIN_UPTIME_PROOF_VERSIONS) {
+      if (vers >= min.hardfork_revision) {
+        if (proof->version < min.oxend)
+          REJECT_PROOF("v" << tools::join(".", min.oxend) << "+ oxend version is required for v" << +vers.first << "." << +vers.second << "+ network proofs");
+        if (proof->lokinet_version < min.lokinet)
+          REJECT_PROOF("v" << tools::join(".", min.lokinet) << "+ lokinet version is required for v" << +vers.first << "." << +vers.second << "+ network proofs");
+        if (proof->storage_server_version < min.storage_server)
+          REJECT_PROOF("v" << tools::join(".", min.storage_server) << "+ storage server version is required for v" << +vers.first << "." << +vers.second << "+ network proofs");
+      }
+    }
 
     if (!debug_allow_local_ips && !epee::net_utils::is_ip_public(proof->public_ip))
       REJECT_PROOF("public_ip is not actually public");
@@ -3322,7 +3332,7 @@ namespace service_nodes
       if (info.version < version_t::v1_add_registration_hf_version)
       {
         info.version = version_t::v1_add_registration_hf_version;
-        info.registration_hf_version = sn_list->m_blockchain.get_hard_fork_version(pubkey_info.info->registration_height);
+        info.registration_hf_version = sn_list->m_blockchain.get_network_version(pubkey_info.info->registration_height);
       }
       if (info.version < version_t::v4_noproofs)
       {
@@ -3552,13 +3562,7 @@ namespace service_nodes
       m_blockchain.get_db().clear_service_node_data();
     }
 
-    uint64_t hardfork_9_from_height = 0;
-    {
-      uint32_t window, votes, threshold;
-      uint8_t voting;
-      m_blockchain.get_hard_fork_voting_info(9, window, votes, threshold, hardfork_9_from_height, voting);
-    }
-    m_state.height = hardfork_9_from_height - 1;
+    m_state.height = hard_fork_begins(m_blockchain.nettype(), cryptonote::network_version_9_service_nodes).value_or(1) - 1;
   }
 
   size_t service_node_info::total_num_locked_contributions() const

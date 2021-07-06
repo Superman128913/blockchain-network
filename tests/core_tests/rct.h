@@ -85,7 +85,7 @@ private:
 
 template<>
 struct get_test_options<gen_rct_tx_validation_base> {
-  const std::vector<std::pair<uint8_t, uint64_t>> hard_forks = {std::make_pair(1, 0), std::make_pair(2, 1), std::make_pair(4, 65)};
+  const std::vector<cryptonote::hard_fork> hard_forks = {{1,0,0,0}, {2,0,1,0}, {4,0,65,0}};
   const cryptonote::test_options test_options = {
     hard_forks, 0
   };
@@ -271,7 +271,7 @@ struct gen_rct_tx_uses_output_too_early : public gen_rct_tx_validation_base
   bool generate(std::vector<test_event_entry>& events) const;
 };
 template<> struct get_test_options<gen_rct_tx_uses_output_too_early> {
-  const std::vector<std::pair<uint8_t, uint64_t>> hard_forks = {std::make_pair(1, 0), std::make_pair(2, 1), std::make_pair(4, 65), std::make_pair(12, 69), std::make_pair(0, 0)};
+  const std::vector<cryptonote::hard_fork> hard_forks = {{1,0,0,0}, {2,0,1,0}, {4,0,65,0}, {12,0,69,0}, {0,0,0,0}};
   const cryptonote::test_options test_options = {
     hard_forks, 0
   };

@@ -71,21 +71,21 @@ void oxen_register_callback(std::vector<test_event_entry> &events,
   events.push_back(oxen_callback_entry{callback_name, callback});
 }
 
-std::vector<std::pair<uint8_t, uint64_t>>
+std::vector<cryptonote::hard_fork>
 oxen_generate_hard_fork_table(uint8_t hf_version, uint64_t pos_delay)
 {
   assert(hf_version < cryptonote::network_version_count);
   // We always need block 0 == v7 for the genesis block:
-  std::vector<std::pair<uint8_t, uint64_t>> result{{cryptonote::network_version_7, 0}};
+  std::vector<cryptonote::hard_fork> result{{cryptonote::network_version_7, 0, 0}};
   uint64_t version_height = 1;
   // HF15 reduces and HF16+ eliminates miner block rewards, so we need to ensure we have enough
   // HF14 blocks to generate enough LOKI for tests:
   if (hf_version > cryptonote::network_version_14_blink) {
-      result.emplace_back(cryptonote::network_version_14_blink, version_height);
+      result.push_back({cryptonote::network_version_14_blink, 0, version_height});
       version_height += pos_delay;
   }
 
-  result.emplace_back(hf_version, version_height);
+  result.push_back({hf_version, 0, version_height});
   return result;
 }
 
@@ -163,7 +163,7 @@ std::vector<cryptonote::block> oxen_chain_generator_db::get_blocks_range(const u
   return result;
 }
 
-oxen_chain_generator::oxen_chain_generator(std::vector<test_event_entry> &events, const std::vector<std::pair<uint8_t, uint64_t>> &hard_forks)
+oxen_chain_generator::oxen_chain_generator(std::vector<test_event_entry> &events, const std::vector<cryptonote::hard_fork>& hard_forks)
 : events_(events)
 , hard_forks_(hard_forks)
 {
@@ -270,7 +270,7 @@ cryptonote::account_base oxen_chain_generator::add_account()
 void oxen_chain_generator::add_blocks_until_version(uint8_t hf_version)
 {
   assert(hard_forks_.size());
-  assert(hf_version_ <= hard_forks_.back().first);
+  assert(hf_version_ <= hard_forks_.back().version);
   assert(db_.blocks.size() >= 1); // NOTE: We must have genesis block
   for (;;)
   {
@@ -462,7 +462,7 @@ oxen_chain_generator::create_registration_tx(const cryptonote::account_base &src
 
     uint64_t new_height    = get_block_height(top().block) + 1;
     uint8_t new_hf_version = get_hf_version_at(new_height);
-    const auto staking_requirement = service_nodes::get_staking_requirement(cryptonote::FAKECHAIN, new_height, new_hf_version);
+    const auto staking_requirement = service_nodes::get_staking_requirement(cryptonote::FAKECHAIN, new_height);
     uint64_t amount                = service_nodes::portions_to_amount(portions[0], staking_requirement);
 
     uint64_t unlock_time = 0;
@@ -1115,8 +1115,8 @@ uint8_t oxen_chain_generator::get_hf_version_at(uint64_t height) const {
   uint8_t cur_hf_ver = 0;
   for (auto i = 0u; i < hard_forks_.size(); ++i)
   {
-    if (height < hard_forks_[i].second) break;
-    cur_hf_ver = hard_forks_[i].first;
+    if (height < hard_forks_[i].height) break;
+    cur_hf_ver = hard_forks_[i].version;
   }
 
   assert(cur_hf_ver != 0);
@@ -1447,7 +1447,7 @@ cryptonote::transaction make_registration_tx(std::vector<test_event_entry>& even
                                              uint8_t hf_version)
 {
   const auto new_height          = cryptonote::get_block_height(head) + 1;
-  const auto staking_requirement = service_nodes::get_staking_requirement(cryptonote::FAKECHAIN, new_height, hf_version);
+  const auto staking_requirement = service_nodes::get_staking_requirement(cryptonote::FAKECHAIN, new_height);
   uint64_t amount                = service_nodes::portions_to_amount(portions[0], staking_requirement);
 
   cryptonote::transaction tx;
@@ -2269,7 +2269,7 @@ uint64_t get_unlocked_balance(const cryptonote::account_base& addr, const std::v
     return res;
 }
 
-bool extract_hard_forks(const std::vector<test_event_entry>& events, v_hardforks_t& hard_forks)
+bool extract_hard_forks(const std::vector<test_event_entry>& events, std::vector<cryptonote::hard_fork>& hard_forks)
 {
   for(auto & ev : events)
   {

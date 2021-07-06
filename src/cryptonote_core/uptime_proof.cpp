@@ -30,10 +30,10 @@ Proof::Proof(
     qnet_port{quorumnet_port},
     storage_https_port{sn_storage_https_port},
     storage_omq_port{sn_storage_omq_port},
-    storage_server_version{ss_version}
+    storage_server_version{ss_version},
+    lokinet_version{lokinet_version}
 {
-  this->lokinet_version = lokinet_version;
-  crypto::hash hash = this->hash_uptime_proof();
+  crypto::hash hash = hash_uptime_proof();
 
   crypto::generate_signature(hash, keys.pub, keys.key, sig);
   crypto_sign_detached(sig_ed25519.data, NULL, reinterpret_cast<unsigned char *>(hash.data), sizeof(hash.data), keys.key_ed25519.data);

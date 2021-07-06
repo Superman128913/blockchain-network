@@ -27,6 +27,7 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "quorumnet.h"
+#include "cryptonote_basic/hardfork.h"
 #include "cryptonote_core/cryptonote_core.h"
 #include "cryptonote_core/service_node_voting.h"
 #include "cryptonote_core/service_node_rules.h"
@@ -853,7 +854,9 @@ void handle_blink(oxenmq::Message& m, QnetState& qnet) {
 
     auto tag = get_or<uint64_t>(data, "!", 0);
 
-    auto hf_version = qnet.core.get_blockchain_storage().get_current_hard_fork_version();
+    auto local_height = qnet.core.get_current_blockchain_height();
+
+    auto hf_version = get_network_version(qnet.core.get_nettype(), local_height);
     if (hf_version < HF_VERSION_BLINK) {
         MWARNING("Rejecting blink message: blink is not available for hardfork " << (int) hf_version);
         if (tag)
@@ -863,7 +866,6 @@ void handle_blink(oxenmq::Message& m, QnetState& qnet) {
 
     // verify that height is within-2 of current height
     auto blink_height = get_int<uint64_t>(data.at("h"));
-    auto local_height = qnet.core.get_current_blockchain_height();
 
     if (blink_height < local_height - 2) {
         MINFO("Rejecting blink tx because blink auth height is too low (" << blink_height << " vs. " << local_height << ")");

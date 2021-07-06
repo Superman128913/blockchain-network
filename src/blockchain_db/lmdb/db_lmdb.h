@@ -403,12 +403,6 @@ private:
 
   uint64_t num_outputs() const;
 
-  // Hard fork
-  void set_hard_fork_version(uint64_t height, uint8_t version) override;
-  uint8_t get_hard_fork_version(uint64_t height) const override;
-  void check_hard_fork_info() override;
-  void drop_hard_fork_info() override;
-
   inline void check_open() const;
 
   bool prune_worker(int mode, uint32_t pruning_seed);

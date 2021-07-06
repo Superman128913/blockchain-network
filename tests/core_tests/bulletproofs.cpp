@@ -61,11 +61,11 @@ bool gen_bp_tx_validation_base::generate_with(std::vector<test_event_entry>& eve
       ++amounts_paid_len;
   }
 
-  std::vector<std::pair<uint8_t, uint64_t>> hard_forks = {
-    {7,0}, {8,1}, {target_hf, NUM_UNLOCKED_BLOCKS + CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW + 1},
+  std::vector<cryptonote::hard_fork> hard_forks = {
+    {7,0,0}, {8,0,1}, {target_hf, 0, NUM_UNLOCKED_BLOCKS + CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW + 1},
   };
   event_replay_settings settings = {};
-  settings.hard_forks            = hard_forks;
+  settings.hard_forks = hard_forks;
   events.push_back(settings);
 
   // create 12 miner accounts, and have them mine the next 48 blocks
@@ -78,8 +78,8 @@ bool gen_bp_tx_validation_base::generate_with(std::vector<test_event_entry>& eve
   for (size_t i = 0; i < NUM_MINERS; ++i)
     miner_accounts[i].generate();
 
-  uint8_t const first_hf = hard_forks[1].first;
-  uint8_t const last_hf  = hard_forks.back().first;
+  uint8_t const first_hf = hard_forks[1].version;
+  uint8_t const last_hf  = hard_forks.back().version;
   generator.m_hf_version = first_hf;
   for (size_t n = 0; n < NUM_UNLOCKED_BLOCKS; ++n) {
     CHECK_AND_ASSERT_MES(
