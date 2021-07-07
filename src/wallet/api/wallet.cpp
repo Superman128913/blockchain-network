@@ -1085,18 +1085,15 @@ std::vector<std::pair<std::string, uint64_t>>* WalletImpl::listCurrentStakes() c
     return stakes;
 }
 
-uint64_t WalletImpl::blockChainHeight(LockedWallet& w) {
+EXPORT
+uint64_t WalletImpl::blockChainHeight() const
+{
+    // This call is thread-safe
+    auto& w = m_wallet_ptr;
     if(w->light_wallet()) {
         return w->get_light_wallet_scanned_block_height();
     }
     return w->get_blockchain_current_height();
-}
-
-EXPORT
-uint64_t WalletImpl::blockChainHeight() const
-{
-    auto w = wallet();
-    return blockChainHeight(w);
 }
 EXPORT
 uint64_t WalletImpl::approximateBlockChainHeight() const
@@ -1113,7 +1110,10 @@ uint64_t WalletImpl::estimateBlockChainHeight() const
 EXPORT
 uint64_t WalletImpl::daemonBlockChainHeight() const
 {
-    auto w = wallet();
+    // I *think* the calls here are thread-safe, so we can do this without locking
+    //auto w = wallet();
+    auto& w = m_wallet_ptr;
+
     if(w->light_wallet()) {
         return w->get_light_wallet_scanned_block_height();
     }
@@ -1134,7 +1134,10 @@ uint64_t WalletImpl::daemonBlockChainHeight() const
 EXPORT
 uint64_t WalletImpl::daemonBlockChainTargetHeight() const
 {
-    auto w = wallet();
+    // As above
+    //auto w = wallet();
+    auto& w = m_wallet_ptr;
+
     if(w->light_wallet()) {
         return w->get_light_wallet_blockchain_height();
     }
@@ -1186,6 +1189,12 @@ void WalletImpl::refreshAsync()
     LOG_PRINT_L3(__FUNCTION__ << ": Refreshing asynchronously..");
     clearStatus();
     m_refreshCV.notify_one();
+}
+
+EXPORT
+bool WalletImpl::isRefreshing(std::chrono::milliseconds max_wait) {
+    std::unique_lock lock{m_refreshMutex2, std::defer_lock};
+    return !lock.try_lock_for(max_wait);
 }
 
 EXPORT

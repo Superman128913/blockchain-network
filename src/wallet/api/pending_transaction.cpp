@@ -163,7 +163,7 @@ uint64_t PendingTransactionImpl::amount() const
             result += dest.amount;
         }
         service_nodes::staking_components sc;
-        uint64_t height = m_wallet.blockChainHeight(w);
+        uint64_t height = m_wallet.blockChainHeight();
         std::optional<uint8_t> hf_version = m_wallet.hardForkVersion();
         if (hf_version)
         {
