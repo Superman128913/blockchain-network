@@ -7783,7 +7783,10 @@ uint64_t wallet2::get_fee_percent(uint32_t priority, txtype type) const
       THROW_WALLET_EXCEPTION(error::invalid_priority);
 
     uint64_t burn_pct = 0;
-    if (use_fork_rules(network_version_18, 0))
+    // v9.2.0 introduced minor versions to forks, this use_fork_rules(18,0) will return the height
+    // for HF18.1 when we want 18.0. Workaround this by allowing the use of 18 fork rules 4000
+    // blocks before 18.1
+    if (use_fork_rules(network_version_18, 4000))
       burn_pct = BLINK_BURN_TX_FEE_PERCENT_V18;
     else
       THROW_WALLET_EXCEPTION(error::invalid_priority);

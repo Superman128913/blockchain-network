@@ -121,7 +121,7 @@ get_hard_fork_heights(network_type nettype, uint8_t version) {
       if (found.first) // Found something suitable in the previous iteration, so one before this hf is the max
         found.second = it->height - 1;
       break;
-    } else if (it->version == version) {
+    } else if (it->version == version && !found.first) {
       found.first = it->height;
     }
   }
