@@ -1033,6 +1033,13 @@ namespace hw {
 
     }
 
+    crypto::key_derivation device_ledger::generate_key_derivation(const crypto::public_key &pub, const crypto::secret_key &sec) {
+      //TODO: replace entirely the bool return version of this
+      crypto::key_derivation d;
+      generate_key_derivation(pub, sec, d);
+      return d;
+    }
+
     bool device_ledger::generate_key_derivation(const crypto::public_key &pub, const crypto::secret_key &sec, crypto::key_derivation &derivation) {
         auto locks = tools::unique_locks(device_locker, command_locker);
         bool r = false;

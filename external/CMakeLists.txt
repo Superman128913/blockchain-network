@@ -80,6 +80,8 @@ else()
   message(STATUS "Found liboxenmq ${OXENMQ_VERSION}")
 endif()
 
+add_subdirectory(oxenc)
+
 add_subdirectory(db_drivers)
 add_subdirectory(easylogging++ easyloggingpp)
 add_subdirectory(randomx EXCLUDE_FROM_ALL)
@@ -168,3 +170,5 @@ set(SQLITECPP_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(SQLITECPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(SQLiteCpp)
+
+add_subdirectory(Catch2)

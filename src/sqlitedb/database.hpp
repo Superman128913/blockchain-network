@@ -197,13 +197,10 @@ namespace db
   // Storage database class.
   class Database
   {
-    public:
-    // This must be declared *before* the prepared statements container,
-    // so that it is destroyed *after* because sqlite_close() fails if any
-    // prepared statements are not finalized.
+   public:
     SQLite::Database db;
 
-    private:
+   private:
     // SQLiteCpp's statements are not thread-safe, so we prepare them thread-locally when needed
     std::unordered_map<std::thread::id, std::unordered_map<std::string, SQLite::Statement>>
         prepared_sts;
@@ -242,7 +239,6 @@ namespace db
     };
 
    public:
-
     StatementWrapper
     prepared_st(const std::string& query)
     {
@@ -285,7 +281,10 @@ namespace db
     }
 
     explicit Database(const std::filesystem::path& db_path, const std::string_view db_password)
-        : db{db_path, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE | SQLite::OPEN_FULLMUTEX, 5000/*ms*/}
+        : db{
+            db_path,
+            SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE | SQLite::OPEN_FULLMUTEX,
+            5000 /*ms*/}
     {
       // Don't fail on these because we can still work even if they fail
       if (int rc = db.tryExec("PRAGMA journal_mode = WAL"); rc != SQLITE_OK)
@@ -294,15 +293,18 @@ namespace db
       if (int rc = db.tryExec("PRAGMA synchronous = NORMAL"); rc != SQLITE_OK)
         MERROR("Failed to set synchronous mode to NORMAL: {}" << sqlite3_errstr(rc));
 
-      if (int rc = db.tryExec("PRAGMA foreign_keys = ON");
-          rc != SQLITE_OK) {
+      if (int rc = db.tryExec("PRAGMA foreign_keys = ON"); rc != SQLITE_OK)
+      {
         auto m = fmt::format("Failed to enable foreign keys constraints: {}", sqlite3_errstr(rc));
         MERROR(m);
         throw std::runtime_error{m};
       }
       int fk_enabled = db.execAndGet("PRAGMA foreign_keys").getInt();
-      if (fk_enabled != 1) {
-        MERROR("Failed to enable foreign key constraints; perhaps this sqlite3 is compiled without it?");
+      if (fk_enabled != 1)
+      {
+        MERROR(
+            "Failed to enable foreign key constraints; perhaps this sqlite3 is compiled without "
+            "it?");
         throw std::runtime_error{"Foreign key support is required"};
       }
 

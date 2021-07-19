@@ -1,6 +1,8 @@
 
 #include "lmq_server.h"
+#include "param_parser.hpp"
 #include "oxenmq/oxenmq.h"
+#include "oxenc/bt.h"
 
 // FIXME: Rename this to omq_server.{h,cpp}
 
@@ -244,87 +246,22 @@ omq_rpc::omq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
     });
   }
 
+  omq.add_request_command("rpc", "get_blocks", [this](oxenmq::Message& m) {
+      OnGetBlocks(m);
+  });
+
   // Subscription commands
 
   // The "subscribe" category is for public subscriptions; i.e. anyone on a public RPC node, or
   // anyone on a private RPC node with public access level.
   omq.add_category("sub", AuthLevel::basic);
 
-  // TX mempool subscriptions: [sub.mempool, blink] or [sub.mempool, all] to subscribe to new
-  // approved mempool blink txes, or to all new mempool txes.  You get back a reply of "OK" or
-  // "ALREADY" -- the former indicates that you are newly subscribed for tx updates (either because
-  // you weren't subscribed before, or your subscription type changed); the latter indicates that
-  // you were already subscribed for the request tx types.  Any other value should be considered an
-  // error.
-  //
-  // Subscriptions expire after 30 minutes.  It is recommended that the client periodically
-  // re-subscribe on a much shorter interval than this (perhaps once per minute) and use "OK"
-  // replies as a indicator that there was some server-side interruption (such as a restart) that
-  // might necessitate the client rechecking the mempool.
-  //
-  // When a tx arrives the node sends back [notify.mempool, txhash, txblob] every time a new
-  // transaction is added to the mempool (minus some additions that aren't really new transactions
-  // such as txes that came from an existing block during a rollback).  Note that both txhash and
-  // txblob are binary: in particular, txhash is *not* hex-encoded.
-  //
   omq.add_request_command("sub", "mempool", [this](oxenmq::Message& m) {
-
-    if (m.data.size() != 1) {
-      m.send_reply("Invalid subscription request: no subscription type given");
-      return;
-    }
-
-    mempool_sub_type sub_type;
-    if (m.data[0] == "blink"sv)
-      sub_type = mempool_sub_type::blink;
-    else if (m.data[0] == "all"sv)
-      sub_type = mempool_sub_type::all;
-    else {
-      m.send_reply("Invalid mempool subscription type '" + std::string{m.data[0]} + "'");
-      return;
-    }
-
-    {
-      std::unique_lock lock{subs_mutex_};
-      auto expiry = std::chrono::steady_clock::now() + 30min;
-      auto result = mempool_subs_.emplace(m.conn, mempool_sub{expiry, sub_type});
-      if (!result.second) {
-        result.first->second.expiry = expiry;
-        if (result.first->second.type == sub_type) {
-          MTRACE("Renewed mempool subscription request from conn id " << m.conn << " @ " << m.remote);
-          m.send_reply("ALREADY");
-          return;
-        }
-        result.first->second.type = sub_type;
-      }
-      MDEBUG("New " << (sub_type == mempool_sub_type::blink ? "blink" : "all") << " mempool subscription request from conn " << m.conn << " @ " << m.remote);
-      m.send_reply("OK");
-    }
+      OnMempoolSubRequest(m);
   });
 
-  // New block subscriptions: [sub.block].  This sends a notification every time a new block is
-  // added to the blockchain.
-  //
-  // TODO: make this support [sub.block, sn] so that we can receive notification only for blocks
-  // that change the SN composition.
-  //
-  // The subscription request returns the current [height, blockhash] as a reply.
-  //
-  // The block notification for new blocks consists of a message [notify.block, height, blockhash]
-  // containing the latest height/hash.  (Note that blockhash is the hash in bytes, *not* the hex
-  // encoded block hash).
   omq.add_request_command("sub", "block", [this](oxenmq::Message& m) {
-      std::unique_lock lock{subs_mutex_};
-    auto expiry = std::chrono::steady_clock::now() + 30min;
-    auto result = block_subs_.emplace(m.conn, block_sub{expiry});
-    if (!result.second) {
-      result.first->second.expiry = expiry;
-      MTRACE("Renewed block subscription request from conn id " << m.conn << " @ " << m.remote);
-      m.send_reply("ALREADY");
-    } else {
-      MDEBUG("New block subscription request from conn " << m.conn << " @ " << m.remote);
-      m.send_reply("OK");
-    }
+      OnBlockSubRequest(m);
   });
 
   core_.get_blockchain_storage().hook_block_added(*this);
@@ -389,5 +326,251 @@ void omq_rpc::send_mempool_notifications(const crypto::hash& id, const transacti
   });
 }
 
+/// Get a set of blocks, their transactions, and their created outputs' global indices
+///
+/// Inputs:
+///
+/// - \p start_height -- height of first requested block.  Requesting past the end of the chain is valid;
+///   The resulting block list will be empty if this happens.
+/// - \p size_limit -- limit for the response message size.  If a single block would go over this limit,
+///   status will indicate with "TOO BIG"
+/// - \p max_count -- maximum number of blocks to send
+///
+/// Outputs:
+///
+/// - \p status -- General RPC status string.
+///      "OK" means the request was ok.
+///      "END" means the request reached the end of the chain (still ok).
+///      Anything else indicates an error, specified by the string given.
+///
+///   Blocks will be encoded based on the request parameters' encoding.
+///
+/// - \p block (top-level object/dict):
+///   - \p hash -- the block hash
+///   - \p height -- the block height
+///   - \p timestamp -- the block timestamp
+///   - \p transactions -- list of the block's transactions (including miner tx), each a dict as follows:
+///     - \p global_indices -- list of output indices for the transaction's created outputs
+///     - \p hash -- the transaction hash
+///     - \p tx -- base64 string of raw transaction data \todo properly serialized transaction
+void omq_rpc::OnGetBlocks(oxenmq::Message& m)
+{
+  if (m.data.size() == 0)
+  {
+    m.send_reply("Invalid rpc.get_blocks request: no parameters given.");
+    return;
+  }
+
+  if (m.data[0].front() != 'd')
+  {
+    m.send_reply("Invalid rpc.get_blocks request: parameters must be bt-encoded.");
+    return;
+  }
+
+  uint64_t start_height;
+  uint64_t max_count;
+  uint64_t size_limit;
+  try
+  {
+    get_values(m.data[0],
+        "max_count", required{max_count},
+        "size_limit", required{size_limit},
+        "start_height", required{start_height});
+  }
+  catch (const std::exception& e)
+  {
+    m.send_reply(std::string("Invalid rpc.get_blocks request: ") + e.what());
+  }
+
+  size_limit = std::min<uint64_t>(size_limit, 2000000);
+
+  auto chain_height = core_.get_current_blockchain_height();
+  if (start_height > chain_height)
+  {
+    m.send_reply("Invalid rpc.get_blocks request: start_height given is above current chain height.");
+    return;
+  }
+
+  size_t message_size = 128; // initial size conservative overhead assumption
+
+  auto end = chain_height;
+  if (max_count != 0)
+    end = std::min(start_height + max_count, chain_height);
+
+  using bt_list = oxenc::bt_list;
+  using bt_dict = oxenc::bt_dict;
+
+  std::vector<std::string> bt_blocks;
+
+  uint64_t i;
+  for (i = start_height; i < end; i++)
+  {
+    bt_dict block_bt;
+
+    auto hash = core_.get_block_id_by_height(i);
+    block b;
+    if (!core_.get_block_by_height(i, b))
+    {
+      m.send_reply("Unknown error fetching blocks.");
+      return;
+    }
+
+    block_bt["hash"] = std::string_view{hash.data, sizeof(hash.data)};
+    block_bt["height"] = i;
+    block_bt["timestamp"] = b.timestamp;
+
+    std::vector<cryptonote::blobdata> txs;
+    core_.get_transactions(b.tx_hashes, txs);
+    if (txs.size() != b.tx_hashes.size())
+    {
+      m.send_reply("Unknown error fetching transactions.");
+      return;
+    }
+
+    bt_list tx_list_bt;
+
+    std::vector<uint64_t> indices;
+
+    {
+      bt_dict tx_bt;
+
+      crypto::hash miner_tx_hash;
+      cryptonote::get_transaction_hash(b.miner_tx, miner_tx_hash, nullptr);
+
+      if (not core_.get_tx_outputs_gindexs(miner_tx_hash, indices))
+      {
+        m.send_reply("Unknown error fetching output info.");
+        return;
+      }
+
+      tx_bt["global_indices"] = bt_list(indices.begin(), indices.end());
+      tx_bt["hash"] = std::string{miner_tx_hash.data, sizeof(miner_tx_hash.data)};
+      tx_bt["tx"] = tx_to_blob(b.miner_tx);
+
+      tx_list_bt.push_back(std::move(tx_bt));
+    }
+
+    for (size_t tx_index = 0; tx_index < txs.size(); tx_index++)
+    {
+      bt_dict tx_bt;
+
+      indices.clear();
+
+      const auto& txhash = b.tx_hashes[tx_index];
+
+      if (not core_.get_tx_outputs_gindexs(txhash, indices))
+      {
+        m.send_reply("Unknown error fetching output info.");
+        return;
+      }
+
+      tx_bt["global_indices"] = bt_list(indices.begin(), indices.end());
+      tx_bt["hash"] = std::string{txhash.data, sizeof(txhash.data)};
+      tx_bt["tx"] = std::move(txs[tx_index]);
+
+      tx_list_bt.push_back(std::move(tx_bt));
+    }
+
+    block_bt["transactions"] = std::move(tx_list_bt);
+
+    auto block_str = oxenc::bt_serialize(block_bt);
+    size_t sz = block_str.size() + 16; // conservative estimate of 16 bytes wire overhead per block
+
+    if (message_size + sz > size_limit)
+    {
+      // i is checked after loop to signal "end of chain", so decrement if we don't add the block
+      i--;
+      break;
+    }
+
+    bt_blocks.push_back(std::move(block_str));
+  }
+
+  std::string status = "OK";
+  if (i == chain_height)
+    status = "END";
+  else if (bt_blocks.empty())
+    status = "TOO BIG";
+
+  m.send_reply(status, oxenmq::send_option::data_parts(bt_blocks));
+}
+
+// TX mempool subscriptions: [sub.mempool, blink] or [sub.mempool, all] to subscribe to new
+// approved mempool blink txes, or to all new mempool txes.  You get back a reply of "OK" or
+// "ALREADY" -- the former indicates that you are newly subscribed for tx updates (either because
+// you weren't subscribed before, or your subscription type changed); the latter indicates that
+// you were already subscribed for the request tx types.  Any other value should be considered an
+// error.
+//
+// Subscriptions expire after 30 minutes.  It is recommended that the client periodically
+// re-subscribe on a much shorter interval than this (perhaps once per minute) and use "OK"
+// replies as a indicator that there was some server-side interruption (such as a restart) that
+// might necessitate the client rechecking the mempool.
+//
+// When a tx arrives the node sends back [notify.mempool, txhash, txblob] every time a new
+// transaction is added to the mempool (minus some additions that aren't really new transactions
+// such as txes that came from an existing block during a rollback).  Note that both txhash and
+// txblob are binary: in particular, txhash is *not* hex-encoded.
+//
+void omq_rpc::OnMempoolSubRequest(oxenmq::Message& m)
+{
+  if (m.data.size() != 1) {
+    m.send_reply("Invalid subscription request: no subscription type given");
+    return;
+  }
+
+  mempool_sub_type sub_type;
+  if (m.data[0] == "blink"sv)
+    sub_type = mempool_sub_type::blink;
+  else if (m.data[0] == "all"sv)
+    sub_type = mempool_sub_type::all;
+  else {
+    m.send_reply("Invalid mempool subscription type '" + std::string{m.data[0]} + "'");
+    return;
+  }
+
+  {
+    std::unique_lock lock{subs_mutex_};
+    auto expiry = std::chrono::steady_clock::now() + 30min;
+    auto result = mempool_subs_.emplace(m.conn, mempool_sub{expiry, sub_type});
+    if (!result.second) {
+      result.first->second.expiry = expiry;
+      if (result.first->second.type == sub_type) {
+        MTRACE("Renewed mempool subscription request from conn id " << m.conn << " @ " << m.remote);
+        m.send_reply("ALREADY");
+        return;
+      }
+      result.first->second.type = sub_type;
+    }
+    MDEBUG("New " << (sub_type == mempool_sub_type::blink ? "blink" : "all") << " mempool subscription request from conn " << m.conn << " @ " << m.remote);
+    m.send_reply("OK");
+  }
+}
+
+// New block subscriptions: [sub.block].  This sends a notification every time a new block is
+// added to the blockchain.
+//
+// TODO: make this support [sub.block, sn] so that we can receive notification only for blocks
+// that change the SN composition.
+//
+// The subscription request returns the current [height, blockhash] as a reply.
+//
+// The block notification for new blocks consists of a message [notify.block, height, blockhash]
+// containing the latest height/hash.  (Note that blockhash is the hash in bytes, *not* the hex
+// encoded block hash).
+void omq_rpc::OnBlockSubRequest(oxenmq::Message& m)
+{
+  std::unique_lock lock{subs_mutex_};
+  auto expiry = std::chrono::steady_clock::now() + 30min;
+  auto result = block_subs_.emplace(m.conn, block_sub{expiry});
+  if (!result.second) {
+    result.first->second.expiry = expiry;
+    MTRACE("Renewed block subscription request from conn id " << m.conn << " @ " << m.remote);
+    m.send_reply("ALREADY");
+  } else {
+    MDEBUG("New block subscription request from conn " << m.conn << " @ " << m.remote);
+    m.send_reply("OK");
+  }
+}
 
 }} // namespace cryptonote::rpc

@@ -198,6 +198,13 @@ namespace crypto {
     return true;
   }
 
+  crypto::key_derivation generate_key_derivation(const public_key &key1, const secret_key &key2) {
+    //TODO: replace the bool return type version of this function entirely
+    crypto::key_derivation d;
+    generate_key_derivation(key1, key2, d);
+    return d;
+  }
+
   bool generate_key_derivation(const public_key &key1, const secret_key &key2, key_derivation &derivation) {
     ge_p3 point;
     ge_p2 point2;

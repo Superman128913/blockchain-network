@@ -68,6 +68,13 @@ public:
   bool block_added(const block& block, const std::vector<transaction>& txs, const checkpoint_t *) override;
 
   void send_mempool_notifications(const crypto::hash& id, const transaction& tx, const std::string& blob, const tx_pool_options& opts);
+
+private:
+  void OnGetBlocks(oxenmq::Message& m);
+
+  void OnMempoolSubRequest(oxenmq::Message& m);
+
+  void OnBlockSubRequest(oxenmq::Message& m);
 };
 
 }} // namespace cryptonote::rpc

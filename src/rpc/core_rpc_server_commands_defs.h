@@ -516,18 +516,6 @@ namespace cryptonote::rpc {
       std::string tx;
       bool blink = false;
     } request;
-
-//    struct response
-//    {
-//      std::string status; // General RPC error code. "OK" means everything looks good. Any other value means that something went wrong.
-//      std::string reason; // Additional information. Currently empty, "Not relayed" if transaction was accepted but not relayed, or some descriptive message of why the tx failed.
-//      bool not_relayed;   // Transaction was not relayed (true) or relayed (false).
-//      tx_verification_context tvc;
-//      bool sanity_check_failed;
-//      blink_result blink_status; // 0 for a non-blink tx.  For a blink tx: 1 means rejected, 2 means accepted, 3 means timeout.
-//
-//      KV_MAP_SERIALIZABLE
-//    };
   };
 
   //-----------------------------------------------
