@@ -213,7 +213,7 @@ application.
 * To git clone, run:
 
     ```bash
-    git clone --recursive https://github.com/loki-project/loki.git
+    git clone --recursive https://github.com/oxen-io/oxen-core.git
     ```
 
 **Building**
@@ -221,7 +221,7 @@ application.
 * Change to the cloned directory, run:
 	
     ```bash
-    cd loki
+    cd oxen-core
     ```
 
 * If you would like a specific [version/tag](https://github.com/oxen-io/oxen-core/tags), do a git checkout for that version. eg. 'v5.1.2'. If you don't care about the version and just want binaries from master, skip this step:
