@@ -85,6 +85,7 @@ add_subdirectory(easylogging++ easyloggingpp)
 add_subdirectory(randomx EXCLUDE_FROM_ALL)
 add_subdirectory(fmt)
 add_subdirectory(date EXCLUDE_FROM_ALL)
+add_subdirectory(fmt)
 
 set(JSON_BuildTests OFF CACHE INTERNAL "")
 set(JSON_MultipleHeaders ON CACHE BOOL "") # Allows multi-header nlohmann use

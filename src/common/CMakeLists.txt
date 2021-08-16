@@ -68,6 +68,7 @@ target_link_libraries(common
     filesystem
     fmt::fmt
     date::date
+    fmt::fmt
   PRIVATE
     libunbound
     OpenSSL::SSL
