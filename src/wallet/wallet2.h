@@ -72,7 +72,6 @@
 #include "pending_tx.h"
 #include "multisig_sig.h"
 
-#include "common/oxen_integration_test_hooks.h"
 #include "epee/wipeable_string.h"
 
 #include "rpc/http_client.h"

@@ -57,7 +57,6 @@
 PUSH_WARNINGS
 DISABLE_VS_WARNINGS(4355)
 
-#include "common/oxen_integration_test_hooks.h"
 namespace cryptonote
 {
    struct test_options {

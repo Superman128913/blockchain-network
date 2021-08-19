@@ -429,17 +429,7 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, const network_type nett
 
   m_db = db;
 
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-  // NOTE(doyle): Passing in test options in integration mode means we're
-  // overriding fork heights for any nettype in our integration tests using
-  // a command line argument. So m_nettype should just be nettype. In
-  // non-integration test mode passing in test options means you started the
-  // daemon with --regtest OR you're running core_tests. So don't run core tests
-  // in integration mode or --regtest
-  m_nettype = nettype;
-#else
   m_nettype = test_options != NULL ? FAKECHAIN : nettype;
-#endif
 
   if (!m_checkpoints.init(m_nettype, m_db))
     throw std::runtime_error("Failed to initialize checkpoints");
@@ -447,7 +437,7 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, const network_type nett
   m_offline = offline;
   m_fixed_difficulty = fixed_difficulty;
 
-  if (test_options) // Fakechain mode or in integration testing mode we're overriding hardfork heights
+  if (test_options) // Fakechain mode
     fakechain_hardforks = test_options->hard_forks;
 
   // if the blockchain is new, add the genesis block

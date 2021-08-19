@@ -36,8 +36,6 @@
 #include "epee/string_tools.h"
 #include "version.h"
 
-#include "common/oxen_integration_test_hooks.h"
-
 #if defined(WIN32)
 #include <crtdbg.h>
 #endif
@@ -128,10 +126,6 @@ namespace wallet_args
     command_line::add_arg(desc_params, arg_max_concurrency);
     command_line::add_arg(desc_params, arg_config_file);
 
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    command_line::add_arg(desc_params, integration_test::arg_pipe_name);
-#endif
-
     i18n_set_language("translations", "oxen", lang);
 
     po::options_description desc_all, desc_visible;
@@ -143,13 +137,6 @@ namespace wallet_args
     {
       auto parser = po::command_line_parser(argc, argv).options(desc_all).positional(positional_options);
       po::store(parser.run(), vm);
-
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-      {
-        const std::string arg_pipe_name = command_line::get_arg(vm, integration_test::arg_pipe_name);
-        integration_test::init(arg_pipe_name);
-      }
-#endif
 
       if (command_line::get_arg(vm, command_line::arg_help))
       {

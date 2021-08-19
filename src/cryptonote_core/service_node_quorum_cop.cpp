@@ -39,8 +39,6 @@
 #include "epee/net/local_ip.h"
 #include <boost/endian/conversion.hpp>
 
-#include "common/oxen_integration_test_hooks.h"
-
 #undef OXEN_DEFAULT_LOG_CATEGORY
 #define OXEN_DEFAULT_LOG_CATEGORY "quorum_cop"
 
@@ -110,11 +108,6 @@ namespace service_nodes
 
     bool check_uptime_obligation     = true;
     bool check_checkpoint_obligation = true;
-
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    if (integration_test::state.disable_obligation_uptime_proof) check_uptime_obligation = false;
-    if (integration_test::state.disable_obligation_checkpointing) check_checkpoint_obligation = false;
-#endif
 
     if (check_uptime_obligation && time_since_last_uptime_proof > netconf.UPTIME_PROOF_VALIDITY)
     {
@@ -262,11 +255,6 @@ namespace service_nodes
     {
       quorum_type const type = static_cast<quorum_type>(i);
 
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-      if (integration_test::state.disable_checkpoint_quorum && type == quorum_type::checkpointing) continue;
-      if (integration_test::state.disable_obligation_quorum && type == quorum_type::obligations) continue;
-#endif
-
       switch(type)
       {
         default:
@@ -312,12 +300,10 @@ namespace service_nodes
               }
             }
 
-#ifndef OXEN_ENABLE_INTEGRATION_TEST_HOOKS
             // NOTE: Wait at least 2 hours before we're allowed to vote so that we collect necessary
             // voting information from people on the network
             if (live_time < m_core.get_net_config().UPTIME_PROOF_VALIDITY)
               continue;
-#endif
 
             if (!m_core.service_node())
               continue;

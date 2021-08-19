@@ -33,12 +33,6 @@
 #include "epee/string_tools.h"
 #include "daemon/command_server.h"
 
-#include "common/oxen_integration_test_hooks.h"
-
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-#include <thread>
-#endif
-
 #undef OXEN_DEFAULT_LOG_CATEGORY
 #define OXEN_DEFAULT_LOG_CATEGORY "daemon"
 
@@ -391,98 +385,11 @@ void command_server::init_commands(cryptonote::rpc::core_rpc_server* rpc_server)
         },
     "");
 
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    m_command_lookup.set_handler(
-      "relay_votes_and_uptime", [rpc_server](const auto&) {
-        rpc_server->on_relay_uptime_and_votes();
-        return true;
-      }
-    , ""
-    );
-    m_command_lookup.set_handler(
-      "integration_test", [rpc_server](const auto& args) {
-        bool valid_cmd = false;
-        if (args.size() == 1)
-        {
-          valid_cmd = true;
-          if (args[0] == "toggle_checkpoint_quorum")
-          {
-            integration_test::state.disable_checkpoint_quorum = !integration_test::state.disable_checkpoint_quorum;
-          }
-          else if (args[0] == "toggle_obligation_quorum")
-          {
-            integration_test::state.disable_obligation_quorum = !integration_test::state.disable_obligation_quorum;
-          }
-          else if (args[0] == "toggle_obligation_uptime_proof")
-          {
-            integration_test::state.disable_obligation_uptime_proof = !integration_test::state.disable_obligation_uptime_proof;
-          }
-          else if (args[0] == "toggle_obligation_checkpointing")
-          {
-            integration_test::state.disable_obligation_checkpointing = !integration_test::state.disable_obligation_checkpointing;
-          }
-          else
-          {
-            valid_cmd = false;
-          }
-
-          if (valid_cmd) std::cout << args[0] << " toggled";
-        }
-        else if (args.size() == 3)
-        {
-          uint64_t num_blocks = 0;
-          if (args[0] == "debug_mine_n_blocks" && epee::string_tools::get_xtype_from_string(num_blocks, args[2]))
-          {
-            rpc_server->on_debug_mine_n_blocks(args[1], num_blocks);
-            valid_cmd = true;
-          }
-        }
-
-        if (!valid_cmd)
-          std::cout << "integration_test invalid command";
-
-        integration_test::write_buffered_stdout();
-        return true;
-      }
-    , ""
-    );
-#endif
 }
 
 bool command_server::start_handling(std::function<void(void)> exit_handler)
 {
   if (m_is_rpc) return false;
-
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-  auto handle_pipe = [&]()
-  {
-    // TODO(doyle): Hack, don't hook into input until the daemon has completely initialised, i.e. you can print the status
-    while(!integration_test::state.core_is_idle) {}
-    mlog_set_categories(""); // TODO(doyle): We shouldn't have to do this.
-
-    for (;;)
-    {
-      integration_test::write_buffered_stdout();
-      std::string const input       = integration_test::read_from_pipe();
-      std::vector<std::string> args = integration_test::space_delimit_input(input);
-      {
-        std::unique_lock<std::mutex> scoped_lock(integration_test::state.mutex);
-        integration_test::use_standard_cout();
-        std::cout << input << std::endl;
-        integration_test::use_redirected_cout();
-      }
-
-      process_command_and_log(args);
-      if (args.size() == 1 && args[0] == "exit")
-      {
-        integration_test::deinit();
-        break;
-      }
-
-    }
-  };
-  static std::thread handle_pipe_thread(handle_pipe);
-#endif
 
   m_command_lookup.start_handling("", get_commands_str(), std::move(exit_handler));
   return true;

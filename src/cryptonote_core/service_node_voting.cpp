@@ -591,11 +591,7 @@ namespace service_nodes
     std::unique_lock lock{m_lock};
 
     // TODO(doyle): Rate-limiting: A better threshold value that follows suite with transaction relay time back-off
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    constexpr uint64_t TIME_BETWEEN_RELAY = 0;
-#else
     constexpr uint64_t TIME_BETWEEN_RELAY = 60 * 2;
-#endif
 
     const uint64_t max_last_sent = static_cast<uint64_t>(time(nullptr)) - TIME_BETWEEN_RELAY;
     const uint64_t min_height = height > VOTE_LIFETIME ? height - VOTE_LIFETIME : 0;
