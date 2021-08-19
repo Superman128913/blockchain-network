@@ -51,8 +51,8 @@
 #include <functional>
 #include <random>
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "net"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "net"
 
 #define AGGRESSIVE_TIMEOUT_THRESHOLD 120 // sockets
 #define NEW_CONNECTION_TIMEOUT_LOCAL 1200000 // 2 minutes

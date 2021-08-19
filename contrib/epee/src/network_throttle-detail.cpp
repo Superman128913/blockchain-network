@@ -48,8 +48,8 @@
 // TODO:
 #include "epee/net/network_throttle-detail.hpp"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "net.throttle"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "net.throttle"
 
 // ################################################################################################
 // ################################################################################################
