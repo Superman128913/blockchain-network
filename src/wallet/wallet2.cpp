@@ -6245,10 +6245,7 @@ void wallet2::get_transfers(get_transfers_args_t args, std::vector<wallet::trans
     args.subaddr_indices.clear();
   }
   if (args.filter_by_height)
-  {
-    args.max_height = std::max<uint64_t>(args.max_height, args.min_height);
-    args.max_height = std::min<uint64_t>(args.max_height, MAX_BLOCK_NUMBER);
-  }
+    args.max_height = std::clamp<uint64_t>(args.max_height, args.min_height, MAX_BLOCK_NUMBER);
 
   int args_count = args.in + args.out + args.stake + args.pending + args.failed + args.pool + args.coinbase;
   if (args_count == 0) args.in = args.out = args.stake = args.pending = args.failed = args.pool = args.coinbase = true;
@@ -6326,42 +6323,19 @@ void wallet2::get_transfers(get_transfers_args_t args, std::vector<wallet::trans
 std::string wallet2::transfers_to_csv(const std::vector<wallet::transfer_view>& transfers, bool formatting) const
 {
   uint64_t running_balance = 0;
-  auto data_formatter  = boost::format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'%s',%s");
-  auto title_formatter = boost::format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s");
+  auto title_format = "{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n"sv;
+  auto data_format  = "{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n"sv;
+  auto coin_format = "{:d}.{:09d}"sv;
   if (formatting)
   {
-    title_formatter = boost::format("%8.8s,%9.9s,%8.8s,%14.14s,%16.16s,%20.20s,%20.20s,%64.64s,%16.16s,%14.14s,%100.100s,%20.20s,%s,%s");
-    data_formatter  = boost::format("%8.8s,%9.9s,%8.8s,%14.14s,%16.16s,%20.20s,%20.20s,%64.64s,%16.16s,%14.14s,%100.100s,%20.20s,\"%s\",%s");
+    title_format = "{:>8s}, {:>9s}, {:>9s}, {:>12s}, {:^23s}, {:>21s}, {:>21s}, {:^64s}, {:^16s}, {:>21s}, {:^97s}, {:>21s}, {:>5s}, {:s}\n"sv;
+    data_format  = "{:>8s}, {:>9s}, {:>9s}, {:>12s}, {:>23s}, {:>21s}, {:>21s}, {:>64s}, {:^16s}, {:>21s}, {:>97s}, {:>21s}, {:>5s}, {:s}\n"sv;
+    coin_format = "{:11d}.{:09d}"sv;
   }
 
-  auto new_line = [&](std::stringstream& output){
-    if (formatting)
-    {
-      output << std::endl;
-    } else
-    {
-      output << "\r\n";
-    }
-  };
-
-
   std::stringstream output;
-  output << title_formatter
-    % tr("block")
-    % tr("type")
-    % tr("lock")
-    % tr("checkpointed")
-    % tr("timestamp")
-    % tr("amount")
-    % tr("running balance")
-    % tr("hash")
-    % tr("payment ID")
-    % tr("fee")
-    % tr("destination")
-    % tr("amount")
-    % tr("index")
-    % tr("note");
-  new_line(output);
+  output << fmt::format(title_format, tr("block"), tr("type"), tr("lock"), tr("checkpointed"), tr("timestamp"), tr("amount"),
+      tr("running balance"), tr("hash"), tr("payment ID"), tr("fee"), tr("destination"), tr("sent_amount"), tr("index"), tr("note"));
 
   for (const auto& transfer : transfers)
   {
@@ -6387,51 +6361,36 @@ std::string wallet2::transfers_to_csv(const std::vector<wallet::transfer_view>& 
 
     std::string indices;
     for (auto &index : transfer.subaddr_indices) {
-      if (!indices.empty()) indices += ", ";
+      if (!indices.empty()) indices += ",";
       indices += std::to_string(index.minor);
     }
+    if (transfer.subaddr_indices.size() > 1)
+      indices = '"' + indices + '"';
 
-    output << data_formatter
-      % (transfer.type.size() ? transfer.type : std::to_string(transfer.height))
-      % pay_type_string(transfer.pay_type)
-      % transfer.lock_msg
-      % (transfer.checkpointed ? "checkpointed" : "no")
-      % tools::get_human_readable_timestamp(transfer.timestamp)
-      % cryptonote::print_money(transfer.amount)
-      % cryptonote::print_money(running_balance)
-      % transfer.txid
-      % transfer.payment_id
-      % cryptonote::print_money(transfer.fee)
-      % (transfer.destinations.size() ? transfer.destinations.front().address : "-")
-      % (transfer.destinations.size() ? cryptonote::print_money(transfer.destinations.front().amount) : "")
-      % indices
-      % transfer.note;
-    new_line(output);
+    output << fmt::format(data_format,
+      transfer.type.size() ? transfer.type : std::to_string(transfer.height),
+      pay_type_string(transfer.pay_type),
+      transfer.lock_msg,
+      (transfer.checkpointed ? "yes" : "no"),
+      tools::get_human_readable_timestamp(transfer.timestamp),
+      fmt::format(coin_format, transfer.amount / COIN, transfer.amount % COIN),
+      fmt::format(coin_format, running_balance / COIN, running_balance % COIN),
+      transfer.txid,
+      transfer.payment_id,
+      cryptonote::print_money(transfer.fee),
+      (transfer.destinations.size() ? transfer.destinations.front().address : "-"),
+      (transfer.destinations.size() ? fmt::format(coin_format, transfer.destinations.front().amount / COIN, transfer.destinations.front().amount % COIN) : ""),
+      indices,
+      transfer.note);
 
     if (transfer.destinations.size() <= 1)
       continue;
 
     // print subsequent destination addresses and amounts
-    // (start at begin + 1 with std::next)
     for (auto it = std::next(transfer.destinations.cbegin()); it != transfer.destinations.cend(); ++it)
-    {
-      output << data_formatter
-        % ""
-        % ""
-        % ""
-        % ""
-        % ""
-        % ""
-        % ""
-        % ""
-        % ""
-        % ""
-        % it->address
-        % cryptonote::print_money(it->amount)
-        % ""
-        % "";
-      new_line(output);
-    }
+      output << fmt::format(data_format,
+          "", "", "", "", "", "", "", "", "", "",
+          it->address, fmt::format(coin_format, it->amount / COIN, it->amount % COIN), "", "");
   }
   return output.str();
 }
@@ -6452,38 +6411,39 @@ void wallet2::get_payments(const crypto::hash& payment_id, std::list<wallet2::pa
 void wallet2::get_payments(std::list<std::pair<crypto::hash,wallet2::payment_details>>& payments, uint64_t min_height, uint64_t max_height, const std::optional<uint32_t>& subaddr_account, const std::set<uint32_t>& subaddr_indices) const
 {
   auto range = std::make_pair(m_payments.begin(), m_payments.end());
-  std::for_each(range.first, range.second, [&payments, &min_height, &max_height, &subaddr_account, &subaddr_indices](const payment_container::value_type& x) {
-      if (min_height <= x.second.m_block_height && max_height >= x.second.m_block_height &&
-          (!subaddr_account || *subaddr_account == x.second.m_subaddr_index.major) &&
-          (subaddr_indices.empty() || subaddr_indices.count(x.second.m_subaddr_index.minor) == 1))
-      {
-      payments.push_back(x);
-      }
-      });
+  for (auto it = range.first; it != range.second; it++) {
+    const auto& [hash, details] = *it;
+    if (min_height <= details.m_block_height && max_height >= details.m_block_height &&
+        (!subaddr_account || *subaddr_account == details.m_subaddr_index.major) &&
+        (subaddr_indices.empty() || subaddr_indices.count(details.m_subaddr_index.minor) == 1))
+    {
+      payments.emplace_back(hash, details);
+    }
+  }
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::get_payments_out(std::list<std::pair<crypto::hash,wallet2::confirmed_transfer_details>>& confirmed_payments,
     uint64_t min_height, uint64_t max_height, const std::optional<uint32_t>& subaddr_account, const std::set<uint32_t>& subaddr_indices) const
 {
-  for (auto i = m_confirmed_txs.begin(); i != m_confirmed_txs.end(); ++i) {
-    if (i->second.m_block_height < min_height || i->second.m_block_height > max_height)
+  for (const auto& [hash, details] : m_confirmed_txs) {
+    if (details.m_block_height < min_height || details.m_block_height > max_height)
       continue;
-    if (subaddr_account && *subaddr_account != i->second.m_subaddr_account)
+    if (subaddr_account && *subaddr_account != details.m_subaddr_account)
       continue;
-    if (!subaddr_indices.empty() && std::count_if(i->second.m_subaddr_indices.begin(), i->second.m_subaddr_indices.end(), [&subaddr_indices](uint32_t index) { return subaddr_indices.count(index) == 1; }) == 0)
+    if (!subaddr_indices.empty() && std::none_of(details.m_subaddr_indices.begin(), details.m_subaddr_indices.end(), [&subaddr_indices](uint32_t index) { return subaddr_indices.count(index) > 0; }))
       continue;
-    confirmed_payments.push_back(*i);
+    confirmed_payments.emplace_back(hash, details);
   }
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::get_unconfirmed_payments_out(std::list<std::pair<crypto::hash,wallet2::unconfirmed_transfer_details>>& unconfirmed_payments, const std::optional<uint32_t>& subaddr_account, const std::set<uint32_t>& subaddr_indices) const
 {
-  for (auto i = m_unconfirmed_txs.begin(); i != m_unconfirmed_txs.end(); ++i) {
-    if (subaddr_account && *subaddr_account != i->second.m_subaddr_account)
+  for (const auto& [hash, details] : m_unconfirmed_txs) {
+    if (subaddr_account && *subaddr_account != details.m_subaddr_account)
       continue;
-    if (!subaddr_indices.empty() && std::count_if(i->second.m_subaddr_indices.begin(), i->second.m_subaddr_indices.end(), [&subaddr_indices](uint32_t index) { return subaddr_indices.count(index) == 1; }) == 0)
+    if (!subaddr_indices.empty() && std::none_of(details.m_subaddr_indices.begin(), details.m_subaddr_indices.end(), [&subaddr_indices](uint32_t index) { return subaddr_indices.count(index) > 0; }))
       continue;
-    unconfirmed_payments.push_back(*i);
+    unconfirmed_payments.emplace_back(hash, details);
   }
 }
 //----------------------------------------------------------------------------------------------------
