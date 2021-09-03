@@ -369,21 +369,21 @@ private:
 
     struct confirmed_transfer_details
     {
-      uint64_t m_amount_in;
-      uint64_t m_amount_out;
-      uint64_t m_change;
-      uint64_t m_block_height;
+      uint64_t m_amount_in = 0;
+      uint64_t m_amount_out = 0;
+      uint64_t m_change = std::numeric_limits<std::uint64_t>::max();
+      uint64_t m_block_height = 0;
       std::vector<cryptonote::tx_destination_entry> m_dests;
-      crypto::hash m_payment_id;
-      uint64_t m_timestamp;
-      uint64_t m_unlock_time; // NOTE(oxen): Not used after TX v2.
+      crypto::hash m_payment_id = crypto::null_hash;
+      uint64_t m_timestamp = 0;
+      uint64_t m_unlock_time = 0; // NOTE(oxen): Not used after TX v2.
       std::vector<uint64_t> m_unlock_times;
-      uint32_t m_subaddr_account;   // subaddress account of your wallet to be used in this transfer
+      uint32_t m_subaddr_account = std::numeric_limits<uint32_t>::max(); // subaddress account of your wallet to be used in this transfer
       std::set<uint32_t> m_subaddr_indices;  // set of address indices used as inputs in this transfer
       std::vector<std::pair<crypto::key_image, std::vector<uint64_t>>> m_rings; // relative
       wallet::pay_type m_pay_type = wallet::pay_type::out;
 
-      confirmed_transfer_details(): m_amount_in(0), m_amount_out(0), m_change((uint64_t)-1), m_block_height(0), m_payment_id(crypto::null_hash), m_timestamp(0), m_unlock_time(0), m_subaddr_account((uint32_t)-1) {}
+      confirmed_transfer_details() = default;
       confirmed_transfer_details(const unconfirmed_transfer_details &utd, uint64_t height)
       : m_amount_in(utd.m_amount_in)
       , m_amount_out(utd.m_amount_out)
@@ -1284,7 +1284,7 @@ private:
      */
     const char* const ATTRIBUTE_DESCRIPTION = "wallet2.description";
     void set_attribute(const std::string &key, const std::string &value);
-    bool get_attribute(const std::string &key, std::string &value) const;
+    std::optional<std::string> get_attribute(const std::string &key) const;
 
     crypto::public_key get_multisig_signer_public_key(const crypto::secret_key &spend_skey) const;
     crypto::public_key get_multisig_signer_public_key() const;
