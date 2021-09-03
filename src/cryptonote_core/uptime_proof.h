@@ -1,8 +1,13 @@
 #pragma once
 
-#include "service_node_list.h"
-#include "../cryptonote_protocol/cryptonote_protocol_defs.h"
+#include "cryptonote_protocol/cryptonote_protocol_defs.h"
 #include <oxenmq/bt_serialize.h>
+
+namespace service_nodes {
+
+struct service_node_keys;
+
+}
 
 namespace uptime_proof
 {

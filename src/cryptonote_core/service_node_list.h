@@ -38,6 +38,7 @@
 #include "cryptonote_core/service_node_voting.h"
 #include "cryptonote_core/service_node_quorum_cop.h"
 #include "common/util.h"
+#include "uptime_proof.h"
 
 namespace cryptonote
 {
@@ -45,11 +46,6 @@ class Blockchain;
 class BlockchainDB;
 struct checkpoint_t;
 }; // namespace cryptonote
-
-namespace uptime_proof
-{
-  class Proof;
-}
 
 namespace service_nodes
 {
