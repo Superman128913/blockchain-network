@@ -13579,13 +13579,12 @@ uint64_t wallet2::import_key_images(const std::vector<std::pair<crypto::key_imag
       process_outgoing(*spent_txid, spent_tx, e.block_height, e.block_timestamp, tx_money_spent_in_ins, tx_money_got_in_outs, subaddr_account, subaddr_indices);
 
       // erase corresponding incoming payment
-      for (auto j = m_payments.begin(); j != m_payments.end(); ++j)
+      for (auto j = m_payments.begin(); j != m_payments.end(); )
       {
         if (j->second.m_tx_hash == *spent_txid)
-        {
-          m_payments.erase(j);
-          break;
-        }
+          j = m_payments.erase(j);
+        else
+          ++j;
       }
 
       ++spent_txid;
