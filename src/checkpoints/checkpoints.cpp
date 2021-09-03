@@ -39,7 +39,6 @@
 #include "blockchain_db/blockchain_db.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
 
-#include "common/oxen_integration_test_hooks.h"
 #include "common/oxen.h"
 #include "common/file.h"
 #include "common/hex.h"
@@ -309,7 +308,6 @@ namespace cryptonote
     if (db->is_read_only())
       return true;
 
-#if !defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
     if (nettype == MAINNET)
     {
       for (size_t i = 0; i < oxen::array_count(HARDCODED_MAINNET_CHECKPOINTS); ++i)
@@ -318,7 +316,6 @@ namespace cryptonote
         ADD_CHECKPOINT(checkpoint.height, checkpoint.hash);
       }
     }
-#endif
 
     return true;
   }

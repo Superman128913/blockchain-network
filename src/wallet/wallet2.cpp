@@ -88,7 +88,6 @@
 #include "cryptonote_core/service_node_list.h"
 #include "cryptonote_core/service_node_rules.h"
 #include "common/oxen.h"
-#include "common/oxen_integration_test_hooks.h"
 #include "oxen_economy.h"
 #include "epee/string_coding.h"
 

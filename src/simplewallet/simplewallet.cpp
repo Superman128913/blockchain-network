@@ -62,7 +62,6 @@
 #include "common/dns_utils.h"
 #include "common/base58.h"
 #include "common/scoped_message_writer.h"
-#include "common/oxen_integration_test_hooks.h"
 #include "cryptonote_protocol/cryptonote_protocol_handler.h"
 #include "cryptonote_core/service_node_voting.h"
 #include "cryptonote_core/service_node_list.h"
@@ -264,17 +263,6 @@ namespace
   const char* USAGE_ONS_BY_OWNER("ons_by_owner [<owner> ...]");
   const char* USAGE_ONS_LOOKUP("ons_lookup [type=session|wallet|lokinet] <name> [<name> ...]");
 
-#if defined (OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-  std::string input_line(const std::string &prompt, bool yesno = false)
-  {
-    if (yesno) std::cout << prompt << " (Y/Yes/N/No): ";
-    else       std::cout << prompt << ": ";
-    integration_test::write_buffered_stdout();
-    std::string buf = integration_test::read_from_pipe();
-    epee::string_tools::trim(buf);
-    return buf;
-  }
-#else // OXEN_ENABLE_INTEGRATION_TEST_HOOKS
   std::string input_line(const std::string& prompt, bool yesno = false)
   {
     std::string buf;
@@ -294,16 +282,9 @@ namespace
     epee::string_tools::trim(buf);
     return buf;
   }
-#endif // OXEN_ENABLE_INTEGRATION_TEST_HOOKS
 
   epee::wipeable_string input_secure_line(const char *prompt)
   {
-#if defined (OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    std::cout << prompt;
-    integration_test::write_buffered_stdout();
-    epee::wipeable_string buf = integration_test::read_from_pipe();
-#else
-
     rdln::suspend_readline pause_readline;
     auto pwd_container = tools::password_container::prompt(false, prompt, false);
     if (!pwd_container)
@@ -315,24 +296,17 @@ namespace
     epee::wipeable_string buf = pwd_container->password();
 
     buf.trim();
-#endif
     return buf;
   }
 
   std::optional<tools::password_container> password_prompter(const char *prompt, bool verify)
   {
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    std::cout << prompt << ": NOTE(oxen): Passwords not supported, defaulting to empty password";
-    integration_test::write_buffered_stdout();
-    tools::password_container pwd_container(std::string(""));
-#else
     rdln::suspend_readline pause_readline;
     auto pwd_container = tools::password_container::prompt(verify, prompt);
     if (!pwd_container)
     {
       tools::fail_msg_writer() << sw::tr("failed to read wallet password");
     }
-#endif
     return pwd_container;
   }
 
@@ -8966,15 +8940,8 @@ std::string simple_wallet::get_prompt() const
 }
 //----------------------------------------------------------------------------------------------------
 
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-#include <thread>
-#endif
-
 bool simple_wallet::run()
 {
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-  integration_test::use_redirected_cout();
-#endif
   // check and display warning, but go on anyway
   try_connect_to_daemon();
 
@@ -9002,27 +8969,6 @@ bool simple_wallet::run()
 
   message_writer(epee::console_color_green, false) << "Background refresh thread started";
 
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-  for (;;)
-  {
-    integration_test::write_buffered_stdout();
-    std::string const input       = integration_test::read_from_pipe();
-    std::vector<std::string> args = integration_test::space_delimit_input(input);
-    {
-      std::unique_lock<std::mutex> scoped_lock(integration_test::state.mutex);
-      integration_test::use_standard_cout();
-      std::cout << input << std::endl;
-      integration_test::use_redirected_cout();
-    }
-
-    this->process_command_and_log(args);
-    if (args.size() == 1 && args[0] == "exit")
-    {
-      integration_test::deinit();
-      return true;
-    }
-  }
-#endif
   return m_cmd_binder.run_handling([this]() {return get_prompt(); }, "");
 }
 //----------------------------------------------------------------------------------------------------
@@ -10189,7 +10135,7 @@ void simple_wallet::interrupt()
 void simple_wallet::commit_or_save(std::vector<tools::wallet2::pending_tx>& ptx_vector, bool do_not_relay, bool blink)
 {
   size_t i = 0;
-  std::string msg_buf; // NOTE(oxen): Buffer output so integration tests read the entire output
+  std::string msg_buf;
   msg_buf.reserve(128);
 
   while (!ptx_vector.empty())

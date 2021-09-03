@@ -44,8 +44,6 @@
 #include <oxenmq/base32z.h>
 #include <fmt/core.h>
 
-#include "common/oxen_integration_test_hooks.h"
-
 #include <fstream>
 #include <ctime>
 #include <string>
@@ -66,13 +64,8 @@ namespace {
   {
     std::cout << prompt << std::flush;
     std::string result;
-#if defined (OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    integration_test::write_buffered_stdout();
-    result = integration_test::read_from_pipe();
-#else
     rdln::suspend_readline pause_readline;
     std::cin >> result;
-#endif
 
     return result;
   }
@@ -1204,13 +1197,6 @@ bool rpc_command_executor::ban(const std::string &address, time_t seconds, bool 
     if (!invoke<SETBANS>(std::move(req), res, clear_ban ? "Failed to clear ban" : "Failed to set ban"))
       return false;
 
-    // TODO(doyle): Work around because integration tests break when using
-    // mlog_set_categories(""), so emit the block message using msg writer
-    // instead of the logging system.
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    tools::success_msg_writer() << "Host " << address << (clear_ban ? " unblocked." : " blocked.");
-#endif
-
     return true;
 }
 
@@ -1973,16 +1959,12 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
 
   uint64_t block_height = std::max(res.height, res.target_height);
   uint8_t hf_version = hf_res.version;
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-  cryptonote::network_type const nettype = cryptonote::FAKECHAIN;
-#else
   cryptonote::network_type const nettype =
     res.mainnet  ? cryptonote::MAINNET :
     res.devnet ? cryptonote::DEVNET :
     res.testnet  ? cryptonote::TESTNET :
     res.nettype == "fakechain" ? cryptonote::FAKECHAIN :
     cryptonote::UNDEFINED;
-#endif
 
   // Query the latest block we've synced and check that the timestamp is sensible, issue a warning if not
   {

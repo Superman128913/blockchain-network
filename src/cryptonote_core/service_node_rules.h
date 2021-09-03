@@ -7,18 +7,6 @@
 
 namespace service_nodes {
   constexpr size_t PULSE_QUORUM_ENTROPY_LAG    = 21; // How many blocks back from the tip of the Blockchain to source entropy for the Pulse quorums.
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-  constexpr auto PULSE_ROUND_TIME                                   = 20s;
-  constexpr auto PULSE_WAIT_FOR_HANDSHAKES_DURATION                 = 3s;
-  constexpr auto PULSE_WAIT_FOR_OTHER_VALIDATOR_HANDSHAKES_DURATION = 3s;
-  constexpr auto PULSE_WAIT_FOR_BLOCK_TEMPLATE_DURATION             = 3s;
-  constexpr auto PULSE_WAIT_FOR_RANDOM_VALUE_HASH_DURATION          = 3s;
-  constexpr auto PULSE_WAIT_FOR_RANDOM_VALUE_DURATION               = 3s;
-  constexpr auto PULSE_WAIT_FOR_SIGNED_BLOCK_DURATION               = 5s;
-
-  constexpr size_t PULSE_QUORUM_NUM_VALIDATORS     = 7;
-  constexpr size_t PULSE_BLOCK_REQUIRED_SIGNATURES = 6;  // A block must have exactly N signatures to be considered properly
-#else
   constexpr auto PULSE_ROUND_TIME                                   = 60s;
   constexpr auto PULSE_WAIT_FOR_HANDSHAKES_DURATION                 = 10s;
   constexpr auto PULSE_WAIT_FOR_OTHER_VALIDATOR_HANDSHAKES_DURATION = 10s;
@@ -29,7 +17,6 @@ namespace service_nodes {
 
   constexpr size_t PULSE_QUORUM_NUM_VALIDATORS     = 11;
   constexpr size_t PULSE_BLOCK_REQUIRED_SIGNATURES = 7;  // A block must have exactly N signatures to be considered properly
-#endif
 
   constexpr auto PULSE_MIN_TARGET_BLOCK_TIME = TARGET_BLOCK_TIME - 30s;
   constexpr auto PULSE_MAX_TARGET_BLOCK_TIME = TARGET_BLOCK_TIME + 30s;
@@ -153,28 +140,17 @@ namespace service_nodes {
   constexpr size_t   STATE_CHANGE_MIN_NODES_TO_TEST          = 50;
   constexpr uint64_t VOTE_LIFETIME                           = BLOCKS_EXPECTED_IN_HOURS(2);
 
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-  constexpr size_t STATE_CHANGE_QUORUM_SIZE               = 5;
-  constexpr size_t STATE_CHANGE_MIN_VOTES_TO_CHANGE_STATE = 1;
-  constexpr size_t CHECKPOINT_QUORUM_SIZE                 = 5;
-  constexpr size_t CHECKPOINT_MIN_VOTES                   = 1;
-  constexpr int    BLINK_SUBQUORUM_SIZE                   = 5;
-  constexpr int    BLINK_MIN_VOTES                        = 1;
-#else
   constexpr size_t STATE_CHANGE_MIN_VOTES_TO_CHANGE_STATE = 7;
   constexpr size_t STATE_CHANGE_QUORUM_SIZE               = 10;
   constexpr size_t CHECKPOINT_QUORUM_SIZE                 = 20;
   constexpr size_t CHECKPOINT_MIN_VOTES                   = 13;
   constexpr int    BLINK_SUBQUORUM_SIZE                   = 10;
   constexpr int    BLINK_MIN_VOTES                        = 7;
-#endif
 
   static_assert(STATE_CHANGE_MIN_VOTES_TO_CHANGE_STATE <= STATE_CHANGE_QUORUM_SIZE, "The number of votes required to kick can't exceed the actual quorum size, otherwise we never kick.");
   static_assert(CHECKPOINT_MIN_VOTES <= CHECKPOINT_QUORUM_SIZE, "The number of votes required to add a checkpoint can't exceed the actual quorum size, otherwise we never add checkpoints.");
   static_assert(BLINK_MIN_VOTES <= BLINK_SUBQUORUM_SIZE, "The number of votes required can't exceed the actual blink subquorum size, otherwise we never approve.");
-#ifndef OXEN_ENABLE_INTEGRATION_TEST_HOOKS
   static_assert(BLINK_MIN_VOTES > BLINK_SUBQUORUM_SIZE / 2, "Blink approvals must require a majority of quorum members to prevent conflicting, signed blinks.");
-#endif
 
   // NOTE: We can reorg up to last 2 checkpoints + the number of extra blocks before the next checkpoint is set
   constexpr uint64_t  REORG_SAFETY_BUFFER_BLOCKS_POST_HF12 = (CHECKPOINT_INTERVAL * CHECKPOINT_NUM_CHECKPOINTS_FOR_CHAIN_FINALITY) + (CHECKPOINT_INTERVAL - 1);

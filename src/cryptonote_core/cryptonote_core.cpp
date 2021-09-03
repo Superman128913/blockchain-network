@@ -73,8 +73,6 @@ extern "C" {
 #include "common/i18n.h"
 #include "epee/net/local_ip.h"
 
-#include "common/oxen_integration_test_hooks.h"
-
 #undef OXEN_DEFAULT_LOG_CATEGORY
 #define OXEN_DEFAULT_LOG_CATEGORY "cn"
 
@@ -359,10 +357,6 @@ namespace cryptonote
     command_line::add_arg(desc, arg_keep_alt_blocks);
 
     command_line::add_arg(desc, arg_store_quorum_history);
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    command_line::add_arg(desc, integration_test::arg_hardforks_override);
-    command_line::add_arg(desc, integration_test::arg_pipe_name);
-#endif
     command_line::add_arg(desc, arg_omq_quorumnet_public);
 
     miner::init_options(desc);
@@ -566,40 +560,6 @@ namespace cryptonote
   {
     start_time = std::time(nullptr);
 
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    const std::string arg_hardforks_override = command_line::get_arg(vm, integration_test::arg_hardforks_override);
-
-    std::vector<std::pair<uint8_t, uint64_t>> integration_test_hardforks;
-    if (!arg_hardforks_override.empty())
-    {
-      // Expected format: <fork_version>:<fork_height>, ...
-      // Example: 7:0, 8:10, 9:20, 10:100
-      char const *ptr = arg_hardforks_override.c_str();
-      while (ptr[0])
-      {
-        int hf_version = atoi(ptr);
-        while(ptr[0] != ':') ptr++;
-        ++ptr;
-
-        int hf_height = atoi(ptr);
-        while(ptr[0] && ptr[0] != ',') ptr++;
-        integration_test_hardforks.push_back(std::make_pair(static_cast<uint8_t>(hf_version), static_cast<uint64_t>(hf_height)));
-
-        if (!ptr[0]) break;
-        ptr++;
-      }
-    }
-
-    cryptonote::test_options integration_hardfork_override = {integration_test_hardforks};
-    if (!arg_hardforks_override.empty())
-      test_options = &integration_hardfork_override;
-
-    {
-      const std::string arg_pipe_name = command_line::get_arg(vm, integration_test::arg_pipe_name);
-      integration_test::init(arg_pipe_name);
-    }
-#endif
-
     const bool regtest = command_line::get_arg(vm, arg_regtest_on);
     if (test_options != NULL || regtest)
     {
@@ -659,7 +619,6 @@ namespace cryptonote
     bool sync_on_blocks = true;
     uint64_t sync_threshold = 1;
 
-#if !defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS) // In integration mode, don't delete the DB. This should be explicitly done in the tests. Otherwise the more likely behaviour is persisting the DB across multiple daemons in the same test.
     if (m_nettype == FAKECHAIN && !keep_fakechain)
     {
       // reset the db by removing the database file before opening it
@@ -670,7 +629,6 @@ namespace cryptonote
       }
       fs::remove(ons_db_file_path);
     }
-#endif
 
     try
     {
@@ -2405,10 +2363,6 @@ namespace cryptonote
     m_miner.on_idle();
     m_mempool.on_idle();
 
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    integration_test::state.core_is_idle = true;
-#endif
-
 #ifdef ENABLE_SYSTEMD
     m_systemd_notify_interval.do_call([this] { sd_notify(0, ("WATCHDOG=1\nSTATUS=" + get_status_string()).c_str()); });
 #endif
@@ -2466,11 +2420,6 @@ namespace cryptonote
       MDEBUG("Not checking block rate, offline or syncing");
       return true;
     }
-
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    MDEBUG("Not checking block rate, integration test mode");
-    return true;
-#endif
 
     static constexpr double threshold = 1. / ((24h * 10) / TARGET_BLOCK_TIME); // one false positive every 10 days
     static constexpr unsigned int max_blocks_checked = 150;

@@ -32,8 +32,6 @@
 #include "epee/readline_suspend.h"
 #include <iostream>
 
-#include "common/oxen_integration_test_hooks.h"
-
 namespace tools
 {
 
@@ -60,9 +58,6 @@ public:
     , m_bright(bright)
     , m_log_level(log_level)
   {
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    m_color = epee::console_color_default; // NOTE(oxen): No ANSI color codes in the output. Makes parsing harder.
-#endif
     m_oss << prefix;
   }
 

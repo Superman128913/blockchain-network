@@ -43,10 +43,6 @@
 #include "p2p/net_node.h"
 #include "cryptonote_protocol/cryptonote_protocol_handler.h"
 
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-#include "common/oxen_integration_test_hooks.h"
-#endif
-
 #undef OXEN_DEFAULT_LOG_CATEGORY
 #define OXEN_DEFAULT_LOG_CATEGORY "daemon.rpc"
 
@@ -271,44 +267,6 @@ namespace cryptonote::rpc {
     ONS_OWNERS_TO_NAMES::response                       invoke(ONS_OWNERS_TO_NAMES::request&& req, rpc_context context);
     ONS_RESOLVE::response                               invoke(ONS_RESOLVE::request&& req, rpc_context context);
     FLUSH_CACHE::response                               invoke(FLUSH_CACHE::request&& req, rpc_context);
-
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    void on_relay_uptime_and_votes()
-    {
-      m_core.submit_uptime_proof();
-      m_core.relay_service_node_votes();
-      std::cout << "Votes and uptime relayed";
-      integration_test::write_buffered_stdout();
-    }
-
-    void on_debug_mine_n_blocks(std::string const &address, uint64_t num_blocks)
-    {
-      cryptonote::miner &miner = m_core.get_miner();
-      if (miner.is_mining())
-      {
-        std::cout << "Already mining";
-        return;
-      }
-
-      cryptonote::address_parse_info info;
-      if(!get_account_address_from_str(info, m_core.get_nettype(), address))
-      {
-        std::cout << "Failed, wrong address";
-        return;
-      }
-
-      uint64_t height = m_core.get_current_blockchain_height();
-      if (!miner.start(info.address, 1, num_blocks))
-      {
-        std::cout << "Failed, mining not started";
-        return;
-      }
-
-      while (m_core.get_current_blockchain_height() != (height + num_blocks))
-        std::this_thread::sleep_for(500ms);
-      std::cout << "Mining stopped in daemon";
-    }
-#endif
 
 private:
     bool check_core_ready();
