@@ -6269,9 +6269,9 @@ struct service_node_proof_serialized : service_node_proof_serialized_old {
       storage_server_version{native_to_little_container(info.proof->storage_server_version)},
       lokinet_version{native_to_little_container(info.proof->lokinet_version)}
   {}
-  std::array<uint16_t, 3> storage_server_version;
-  std::array<uint16_t, 3> lokinet_version;
-  char _padding[4];
+  std::array<uint16_t, 3> storage_server_version{};
+  std::array<uint16_t, 3> lokinet_version{};
+  char _padding[4]{};
 
   void update(service_nodes::proof_info& info) const {
     if (!info.proof) info.proof = std::unique_ptr<uptime_proof::Proof>(new uptime_proof::Proof());
