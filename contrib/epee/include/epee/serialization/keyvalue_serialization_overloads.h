@@ -37,8 +37,8 @@
 #include "../span.h"
 #include "../storages/portable_storage_base.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "serialization"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "serialization"
 
 namespace epee
 {

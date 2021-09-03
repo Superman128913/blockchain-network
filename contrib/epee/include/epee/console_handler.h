@@ -48,8 +48,8 @@
 #endif
 #include "readline_suspend.h"
 
-#undef MONERO_DEFAULT_LOG_CATEGORY
-#define MONERO_DEFAULT_LOG_CATEGORY "console_handler"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "console_handler"
 
 namespace epee
 {
