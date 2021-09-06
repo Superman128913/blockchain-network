@@ -1048,7 +1048,7 @@ namespace tools
       uint32_t priority = convert_priority(req.priority);
       std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
       if (!hf_version)
-        throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
+        throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
       cryptonote::oxen_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, cryptonote::txtype::standard, priority);
       std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_2(dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, req.unlock_time, priority, extra, req.account_index, req.subaddr_indices, tx_params);
 
@@ -1082,7 +1082,7 @@ namespace tools
       uint32_t priority = convert_priority(req.priority);
       std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
       if (!hf_version)
-        throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
+        throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
 
       cryptonote::oxen_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, cryptonote::txtype::standard, priority);
       LOG_PRINT_L2("on_transfer_split calling create_transactions_2");
@@ -3233,7 +3233,7 @@ namespace {
     std::string reason;
     ons::mapping_type type;
     std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
-    if (!hf_version) throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
+    if (!hf_version) throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
     if (!ons::validate_mapping_type(req.type, *hf_version, ons::ons_tx_type::update, &type, &reason))
       throw wallet_rpc_error{error_code::WRONG_ONS_TYPE, "Wrong ons type given=" + reason};
 
@@ -3260,7 +3260,7 @@ namespace {
     std::string reason;
     ons::mapping_type type;
     std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
-    if (!hf_version) throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
+    if (!hf_version) throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
     if (!ons::validate_mapping_type(req.type, *hf_version, ons::ons_tx_type::lookup, &type, &reason))
       throw wallet_rpc_error{error_code::WRONG_ONS_TYPE, "Wrong ons type given=" + reason};
 
@@ -3368,7 +3368,7 @@ namespace {
     require_open();
 
     std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
-    if (!hf_version) throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
+    if (!hf_version) throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
 
     std::string reason;
     for (auto& rec : req.names)
@@ -3415,7 +3415,7 @@ namespace {
     ons::mapping_type type = {};
 
     std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
-    if (!hf_version) throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
+    if (!hf_version) throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
     {
       if (!ons::validate_mapping_type(req.type, *hf_version, ons::ons_tx_type::lookup, &type, &reason))
         throw wallet_rpc_error{error_code::WRONG_ONS_TYPE, "Invalid ONS type: " + reason};
@@ -3450,7 +3450,7 @@ namespace {
 
     std::string reason;
     std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
-    if (!hf_version) throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
+    if (!hf_version) throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
 
     ons::mapping_type type;
     if (!ons::validate_mapping_type(req.type, *hf_version, ons::ons_tx_type::lookup, &type, &reason))
