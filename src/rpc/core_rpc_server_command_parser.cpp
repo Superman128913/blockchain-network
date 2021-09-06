@@ -455,4 +455,10 @@ namespace cryptonote::rpc {
     get_values(in, "start_height", get_sn_state_changes.request.start_height);
     get_values(in, "end_height", get_sn_state_changes.request.end_height);
   }
+
+  void parse_request(REPORT_PEER_STATUS& report_peer_status, rpc_input in) {
+    get_values(in, "type", report_peer_status.request.type);
+    get_values(in, "pubkey", report_peer_status.request.pubkey);
+    get_values(in, "passed", report_peer_status.request.passed);
+  }
 }
