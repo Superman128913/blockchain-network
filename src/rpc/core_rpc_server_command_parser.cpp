@@ -450,4 +450,9 @@ namespace cryptonote::rpc {
   void parse_request(PRUNE_BLOCKCHAIN& prune_blockchain, rpc_input in){
     get_values(in, "check", prune_blockchain.request.check);
   }
+
+  void parse_request(GET_SN_STATE_CHANGES& get_sn_state_changes, rpc_input in) {
+    get_values(in, "start_height", get_sn_state_changes.request.start_height);
+    get_values(in, "end_height", get_sn_state_changes.request.end_height);
+  }
 }

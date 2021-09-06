@@ -34,4 +34,5 @@ namespace cryptonote::rpc {
   void parse_request(LOKINET_PING& lokinet_ping, rpc_input in);
   void parse_request(STORAGE_SERVER_PING& storage_server_ping, rpc_input in);
   void parse_request(PRUNE_BLOCKCHAIN& prune_blockchain, rpc_input in);
+  void parse_request(GET_SN_STATE_CHANGES& get_sn_state_changes, rpc_input in);
 }

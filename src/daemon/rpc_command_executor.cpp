@@ -321,23 +321,20 @@ bool rpc_command_executor::print_checkpoints(uint64_t start_height, uint64_t end
 
 bool rpc_command_executor::print_sn_state_changes(uint64_t start_height, uint64_t end_height)
 {
-  GET_SN_STATE_CHANGES::request  req{};
-  GET_SN_STATE_CHANGES::response res{};
-
-  req.start_height = start_height;
-  req.end_height   = end_height;
-
-  if (!invoke<GET_SN_STATE_CHANGES>(std::move(req), res, "Failed to query service nodes state changes"))
+  auto maybe_sn_state = try_running([&] { return invoke<GET_SN_STATE_CHANGES>(json{{"start_height", start_height}, {"end_height", end_height}}); }, "Failed to query service node state changes");
+  if (!maybe_sn_state) 
     return false;
+
+  auto sn_state_changes = *maybe_sn_state;
 
   std::stringstream output;
 
-  output << "Service Node State Changes (blocks " << res.start_height << "-" << res.end_height << ")" << std::endl;
-  output << " Recommissions:\t\t" << res.total_recommission << std::endl;
-  output << " Unlocks:\t\t" << res.total_unlock << std::endl;
-  output << " Decommissions:\t\t" << res.total_decommission << std::endl;
-  output << " Deregistrations:\t" << res.total_deregister << std::endl;
-  output << " IP change penalties:\t" << res.total_ip_change_penalty << std::endl;
+  output << "Service Node State Changes (blocks " << sn_state_changes["start_height"].get<std::string_view>() << "-" << sn_state_changes["end_height"].get<std::string_view>() << ")" << std::endl;
+  output << " Recommissions:\t\t" << sn_state_changes["total_recommission"].get<std::string_view>() << std::endl;
+  output << " Unlocks:\t\t" << sn_state_changes["total_unlock"].get<std::string_view>() << std::endl;
+  output << " Decommissions:\t\t" << sn_state_changes["total_decommission"].get<std::string_view>() << std::endl;
+  output << " Deregistrations:\t" << sn_state_changes["total_deregister"].get<std::string_view>() << std::endl;
+  output << " IP change penalties:\t" << sn_state_changes["total_ip_change_penalty"].get<std::string_view>() << std::endl;
 
   tools::success_msg_writer() << output.str();
   return true;

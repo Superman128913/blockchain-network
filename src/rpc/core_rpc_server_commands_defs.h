@@ -2160,36 +2160,34 @@ namespace cryptonote::rpc {
     };
   };
 
-  OXEN_RPC_DOC_INTROSPECT
-  // Query hardcoded/service node checkpoints stored for the blockchain. Omit all arguments to retrieve the latest "count" checkpoints.
+  /// Query hardcoded/service node checkpoints stored for the blockchain. Omit all arguments to retrieve the latest "count" checkpoints.
+  ///
+  /// Inputs:
+  /// 
+  /// - /p start_height The starting block's height.
+  /// - /p end_height The ending block's height.
+  ///
+  /// Output values available from a public RPC endpoint:
+  ///
+  /// - /p status Generic RPC error code. "OK" is the success value.
+  /// - /p untrusted If the result is obtained using bootstrap mode then this will be set to true, otherwise will be omitted.
+  /// - /p total_deregister
+  /// - /p total_ip_change_penalty
+  /// - /p total_decommission
+  /// - /p total_recommission
+  /// - /p total_unlock
+  /// - /p start_height
+  /// - /p end_height
   struct GET_SN_STATE_CHANGES : PUBLIC
   {
     static constexpr auto names() { return NAMES("get_service_nodes_state_changes"); }
 
     static constexpr uint64_t HEIGHT_SENTINEL_VALUE = std::numeric_limits<uint64_t>::max() - 1;
-    struct request
+    struct request_parameters
     {
       uint64_t start_height;
       uint64_t end_height;   // Optional: If omitted, the tally runs until the current block
-
-      KV_MAP_SERIALIZABLE
-    };
-
-    struct response
-    {
-      std::string status;                    // Generic RPC error code. "OK" is the success value.
-      bool untrusted;                        // If the result is obtained using bootstrap mode, and therefore not trusted `true`, or otherwise `false`.
-
-      uint32_t total_deregister;
-      uint32_t total_ip_change_penalty;
-      uint32_t total_decommission;
-      uint32_t total_recommission;
-      uint32_t total_unlock;
-      uint64_t start_height;
-      uint64_t end_height;
-
-      KV_MAP_SERIALIZABLE
-    };
+    } request;
   };
 
 
@@ -2411,7 +2409,8 @@ namespace cryptonote::rpc {
     POP_BLOCKS,
     STORAGE_SERVER_PING,
     LOKINET_PING,
-    PRUNE_BLOCKCHAIN
+    PRUNE_BLOCKCHAIN,
+    GET_SN_STATE_CHANGES
   >;
 
   using FIXME_old_rpc_types = tools::type_list<
@@ -2436,7 +2435,6 @@ namespace cryptonote::rpc {
     GET_STAKING_REQUIREMENT,
     GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES,
     GET_CHECKPOINTS,
-    GET_SN_STATE_CHANGES,
     REPORT_PEER_STATUS,
     TEST_TRIGGER_P2P_RESYNC,
     TEST_TRIGGER_UPTIME_PROOF,
