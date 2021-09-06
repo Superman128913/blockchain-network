@@ -1,8 +1,13 @@
 #pragma once
 
-#include "service_node_list.h"
-#include "../cryptonote_protocol/cryptonote_protocol_defs.h"
+#include "cryptonote_protocol/cryptonote_protocol_defs.h"
 #include <oxenmq/bt_serialize.h>
+
+namespace service_nodes {
+
+struct service_node_keys;
+
+}
 
 namespace uptime_proof
 {
@@ -36,6 +41,7 @@ public:
   cryptonote::NOTIFY_BTENCODED_UPTIME_PROOF::request generate_request() const;
 };
 
+bool operator==(const Proof& lhs, const Proof& rhs);
+bool operator!=(const Proof& lhs, const Proof& rhs);
+
 }
-bool operator==(const uptime_proof::Proof& lhs, const uptime_proof::Proof& rhs);
-bool operator!=(const uptime_proof::Proof& lhs, const uptime_proof::Proof& rhs);
