@@ -461,4 +461,9 @@ namespace cryptonote::rpc {
     get_values(in, "pubkey", report_peer_status.request.pubkey);
     get_values(in, "passed", report_peer_status.request.passed);
   }
+
+  void parse_request(FLUSH_CACHE& flush_cache, rpc_input in) {
+    get_values(in, "bad_txs", flush_cache.request.bad_txs);
+    get_values(in, "bad_blocks", flush_cache.request.bad_blocks);
+  }
 }

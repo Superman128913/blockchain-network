@@ -2366,19 +2366,24 @@ namespace cryptonote::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
-  // Clear TXs from the daemon cache, currently only the cache storing TX hashes that were previously verified bad by the daemon.
+  /// Clear TXs from the daemon cache, currently only the cache storing TX hashes that were previously verified bad by the daemon.
+  ///
+  /// Inputs:
+  ///
+  /// - /p bad_txs Clear the cache storing TXs that failed verification.
+  /// - /p bad_blocks Clear the cache storing blocks that failed verfication.
+  ///
+  /// Output values available from a private/admin RPC endpoint:
+  ///
+  /// - /p status Generic RPC error code. "OK" is the success value.
   struct FLUSH_CACHE : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("flush_cache"); }
-    struct request
+    struct request_parameter
     {
       bool bad_txs; // Clear the cache storing TXs that failed verification.
       bool bad_blocks; // Clear the cache storing blocks that failed verfication.
-      KV_MAP_SERIALIZABLE;
-    };
-
-    struct response : STATUS { };
+    } request;
   };
 
   /// List of all supported rpc command structs to allow compile-time enumeration of all supported
@@ -2427,7 +2432,8 @@ namespace cryptonote::rpc {
     GET_SN_STATE_CHANGES,
     TEST_TRIGGER_P2P_RESYNC,
     TEST_TRIGGER_UPTIME_PROOF,
-    REPORT_PEER_STATUS
+    REPORT_PEER_STATUS,
+    FLUSH_CACHE
   >;
 
   using FIXME_old_rpc_types = tools::type_list<
@@ -2453,8 +2459,7 @@ namespace cryptonote::rpc {
     GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES,
     GET_CHECKPOINTS,
     ONS_NAMES_TO_OWNERS,
-    ONS_OWNERS_TO_NAMES,
-    FLUSH_CACHE
+    ONS_OWNERS_TO_NAMES
   >;
 
 } // namespace cryptonote::rpc
