@@ -505,9 +505,7 @@ if (WITH_SYSTEMD AND NOT BUILD_STATIC_DEPS)
 endif()
 
 
-if(BUILD_STATIC_DEPS)
-  # sqlite3 target already set up
-else()
+if(NOT BUILD_STATIC_DEPS)
   add_library(sqlite3 INTERFACE)
   pkg_check_modules(SQLITE3 REQUIRED sqlite3 IMPORTED_TARGET)
   message(STATUS "Found sqlite3 ${SQLITE3_VERSION}")
