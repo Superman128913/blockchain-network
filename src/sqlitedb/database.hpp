@@ -4,6 +4,7 @@
 
 #include <SQLiteCpp/SQLiteCpp.h>
 #include <sqlite3.h>
+#include <fmt/format.h>
 
 #include <chrono>
 #include <cstdlib>
@@ -280,6 +281,18 @@ namespace db
 
       if (int rc = db.tryExec("PRAGMA synchronous = NORMAL"); rc != SQLITE_OK)
         MERROR("Failed to set synchronous mode to NORMAL: {}" << sqlite3_errstr(rc));
+
+      if (int rc = db.tryExec("PRAGMA foreign_keys = ON");
+          rc != SQLITE_OK) {
+        auto m = fmt::format("Failed to enable foreign keys constraints: {}", sqlite3_errstr(rc));
+        MERROR(m);
+        throw std::runtime_error{m};
+      }
+      int fk_enabled = db.execAndGet("PRAGMA foreign_keys").getInt();
+      if (fk_enabled != 1) {
+        MERROR("Failed to enable foreign key constraints; perhaps this sqlite3 is compiled without it?");
+        throw std::runtime_error{"Foreign key support is required"};
+      }
 
       // FIXME: SQLite / SQLiteCPP may not have encryption available
       //       so this may fail, or worse silently fail and do nothing
