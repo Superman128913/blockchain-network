@@ -506,10 +506,9 @@ endif()
 
 
 if(NOT BUILD_STATIC_DEPS)
-  add_library(sqlite3 INTERFACE)
-  pkg_check_modules(SQLITE3 REQUIRED sqlite3 IMPORTED_TARGET)
+  pkg_check_modules(SQLITE3 REQUIRED sqlite3 IMPORTED_TARGET GLOBAL)
   message(STATUS "Found sqlite3 ${SQLITE3_VERSION}")
-  target_link_libraries(sqlite3 INTERFACE PkgConfig::SQLITE3)
+  add_library(SQLite::SQLite3 ALIAS PkgConfig::SQLITE3)
 endif()
 
 add_subdirectory(external)

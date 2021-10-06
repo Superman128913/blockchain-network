@@ -128,7 +128,7 @@ if (STATIC AND BUILD_STATIC_DEPS)
             OpenSSL::SSL OpenSSL::Crypto
             expat
             libunbound
-            sqlite3
+            SQLite::SQLite3
             ${merged_protobuf}
             sodium
             libzmq

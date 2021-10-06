@@ -145,8 +145,21 @@ target_include_directories(cpr PUBLIC cpr/include)
 target_compile_definitions(cpr PUBLIC CPR_CURL_NOSIGNAL)
 add_library(cpr::cpr ALIAS cpr)
 
-# disable bundled sqlite3 in sqlitecpp
-if(TARGET sqlite3)
-  option(SQLITECPP_INTERNAL_SQLITE "" OFF)
-endif()
+# Hack around SQLiteCpp's attempts to locate sqlite3 because we *don't* want to link against the
+# system one, but don't download and build the embedded one until build time.  Thankfully it
+# actually links against the SQLite::SQLite3 cmake target if it already exists, so all we have to do
+# is set that up and circumvent some of the non-target bits of its FindSQLite3.cmake.
+set(SQLite3_FOUND TRUE CACHE BOOL "" FORCE)
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/ignored")
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/ignored/sqlite3.h" "#define SQLITE_VERSION \"${SQLite3_VERSION}\"")
+set(SQLite3_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/ignored" CACHE STRING "" FORCE)
+set(SQLite3_LIBRARY "ignored" CACHE STRING "" FORCE)
+set(SQLITECPP_INTERNAL_SQLITE OFF CACHE BOOL "don't build SQLiteCpp's internal sqlite3" FORCE)
+set(SQLITE_ENABLE_COLUMN_METADATA OFF CACHE BOOL "" FORCE)
+set(SQLITECPP_RUN_CPPLINT OFF CACHE BOOL "" FORCE)
+set(SQLITECPP_RUN_CPPCHECK OFF CACHE BOOL "" FORCE)
+set(SQLITECPP_RUN_DOXYGEN OFF CACHE BOOL "" FORCE)
+set(SQLITECPP_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(SQLITECPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+
 add_subdirectory(SQLiteCpp)
