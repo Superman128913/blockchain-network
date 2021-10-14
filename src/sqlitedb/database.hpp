@@ -14,6 +14,7 @@
 #include <shared_mutex>
 #include <thread>
 #include <unordered_set>
+#include <optional>
 
 namespace db
 {
@@ -158,7 +159,7 @@ namespace db
     if (!maybe_result)
     {
       MERROR("Expected single-row result, got no rows from {}" << st.getQuery());
-      throw std::runtime_error{"DB error: expected single-row result, got not rows"};
+      throw std::runtime_error{"DB error: expected single-row result, got no rows"};
     }
     return *std::move(maybe_result);
   }
@@ -270,6 +271,13 @@ namespace db
     prepared_get(const std::string& query, const Bind&... bind)
     {
       return exec_and_get<T...>(prepared_st(query), bind...);
+    }
+
+    template <typename... T, typename... Bind>
+    auto
+    prepared_maybe_get(const std::string& query, const Bind&... bind)
+    {
+      return exec_and_maybe_get<T...>(prepared_st(query), bind...);
     }
 
     explicit Database(const std::filesystem::path& db_path, const std::string_view db_password)
