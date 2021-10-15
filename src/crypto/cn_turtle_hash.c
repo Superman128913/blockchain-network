@@ -191,7 +191,7 @@ extern int aesb_pseudo_round(const uint8_t *in, uint8_t *out, const uint8_t *exp
   } while (0)
 
 
-#ifdef HAS_INTEL_HW // ARCH x86, x86-64
+#if defined(__x86_64__) || defined(__i386__) || defined(_M_X86) || defined(_M_X64)
 
 #include "cn_turtle_hash-intel.inl"
 
