@@ -40,7 +40,7 @@ namespace db
   };
 
   // Binds a string_view as a no-copy blob at parameter index i.
-  void
+  inline void
   bind_blob_ref(SQLite::Statement& st, int i, std::string_view blob)
   {
     st.bindNoCopy(i, static_cast<const void*>(blob.data()), blob.size());
@@ -132,8 +132,7 @@ namespace db
   std::optional<type_or_tuple<T...>>
   exec_and_maybe_get(SQLite::Statement& st, const Args&... bind)
   {
-    int i = 1;
-    (bind_oneshot(st, i, bind), ...);
+    (bind_oneshot(st, bind...));
     std::optional<type_or_tuple<T...>> result;
     while (st.executeStep())
     {
@@ -170,8 +169,7 @@ namespace db
   std::vector<type_or_tuple<T...>>
   get_all(SQLite::Statement& st, const Bind&... bind)
   {
-    int i = 1;
-    (bind_oneshot(st, i, bind), ...);
+    (bind_oneshot(st, bind...));
     std::vector<type_or_tuple<T...>> results;
     while (st.executeStep())
       results.push_back(get<T...>(st));
@@ -199,6 +197,10 @@ namespace db
   // Storage database class.
   class Database
   {
+    public:
+    SQLite::Database db;
+
+    private:
     // SQLiteCpp's statements are not thread-safe, so we prepare them thread-locally when needed
     std::unordered_map<std::thread::id, std::unordered_map<std::string, SQLite::Statement>>
         prepared_sts;
@@ -237,7 +239,6 @@ namespace db
     };
 
    public:
-    SQLite::Database db;
 
     StatementWrapper
     prepared_st(const std::string& query)
@@ -281,7 +282,7 @@ namespace db
     }
 
     explicit Database(const std::filesystem::path& db_path, const std::string_view db_password)
-        : db{db_path, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE | SQLite::OPEN_FULLMUTEX}
+        : db{db_path, SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE | SQLite::OPEN_FULLMUTEX, 5000/*ms*/}
     {
       // Don't fail on these because we can still work even if they fail
       if (int rc = db.tryExec("PRAGMA journal_mode = WAL"); rc != SQLITE_OK)
