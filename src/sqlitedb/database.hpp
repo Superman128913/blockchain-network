@@ -132,7 +132,7 @@ namespace db
   std::optional<type_or_tuple<T...>>
   exec_and_maybe_get(SQLite::Statement& st, const Args&... bind)
   {
-    (bind_oneshot(st, bind...));
+    bind_oneshot(st, bind...);
     std::optional<type_or_tuple<T...>> result;
     while (st.executeStep())
     {
@@ -169,7 +169,7 @@ namespace db
   std::vector<type_or_tuple<T...>>
   get_all(SQLite::Statement& st, const Bind&... bind)
   {
-    (bind_oneshot(st, bind...));
+    bind_oneshot(st, bind...);
     std::vector<type_or_tuple<T...>> results;
     while (st.executeStep())
       results.push_back(get<T...>(st));
@@ -198,6 +198,9 @@ namespace db
   class Database
   {
     public:
+    // This must be declared *before* the prepared statements container,
+    // so that it is destroyed *after* because sqlite_close() fails if any
+    // prepared statements are not finalized.
     SQLite::Database db;
 
     private:
