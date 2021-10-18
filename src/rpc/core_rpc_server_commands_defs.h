@@ -207,12 +207,14 @@ namespace cryptonote::rpc {
   ///
   /// Outputs:
   ///
-  /// - /p height -- The current blockchain height according to the queried daemon.
-  /// - /p status -- Generic RPC error code. "OK" is the success value.
-  /// - /p untrusted -- If the result is obtained using bootstrap mode then this will be set to true, otherwise will be omitted.
-  /// - /p hash -- Hash of the block at the current height
-  /// - /p immutable_height -- The latest height in the blockchain that cannot be reorganized because of a hardcoded checkpoint or 2 SN checkpoints.  Omitted if not available.
-  /// - /p immutable_hash -- Hash of the highest block in the chain that cannot be reorganized.
+  /// - \p height -- The current blockchain height according to the queried daemon.
+  /// - \p status -- Generic RPC error code. "OK" is the success value.
+  /// - \p untrusted -- If the result is obtained using bootstrap mode then this will be set to
+  ///   true, otherwise will be omitted.
+  /// - \p hash -- Hash of the block at the current height
+  /// - \p immutable_height -- The latest height in the blockchain that cannot be reorganized
+  ///   because of a hardcoded checkpoint or 2 SN checkpoints.  Omitted if not available.
+  /// - \p immutable_hash -- Hash of the highest block in the chain that cannot be reorganized.
   struct GET_HEIGHT : PUBLIC, LEGACY, NO_ARGS
   {
     static constexpr auto names() { return NAMES("get_height", "getheight"); }
@@ -222,8 +224,8 @@ namespace cryptonote::rpc {
   ///
   /// Outputs:
   ///
-  /// - /p status -- Generic RPC error code. "OK" is the success value.
-  /// - /p untrusted -- If the result is obtained using bootstrap mode then this will be set to
+  /// - \p status -- Generic RPC error code. "OK" is the success value.
+  /// - \p untrusted -- If the result is obtained using bootstrap mode then this will be set to
   ///   true, otherwise will be omitted.
   /// - \p missed_tx -- set of transaction hashes that were not found.  If all were found then this
   ///   field is omitted.  There is no particular ordering of hashes in this list.
@@ -536,8 +538,10 @@ namespace cryptonote::rpc {
   ///
   /// - \p miner_address Account address to mine to.
   /// - \p threads_count Number of mining threads to run.  Defaults to 1 thread if omitted or 0.
-  /// - \p num_blocks Mine until the blockchain has this many new blocks, then stop (no limit if 0, the default).
-  /// - \p slow_mining Do slow mining (i.e. don't allocate RandomX cache); primarily intended for testing.
+  /// - \p num_blocks Mine until the blockchain has this many new blocks, then stop (no limit if 0,
+  ///   the default).
+  /// - \p slow_mining Do slow mining (i.e. don't allocate RandomX cache); primarily intended for
+  ///   testing.
   ///
   /// Output values available from a restricted/admin RPC endpoint:
   ///
@@ -922,15 +926,20 @@ namespace cryptonote::rpc {
 
   };
 
-  /// Set the daemon log categories. Categories are represented as a comma separated list of `<Category>:<level>` (similarly to syslog standard `<Facility>:<Severity-level>`), where:
-  /// Category is one of the following: * (all facilities), default, net, net.http, net.p2p, logging, net.trottle, blockchain.db, blockchain.db.lmdb, bcutil, checkpoints, net.dns, net.dl,
-  /// i18n, perf,stacktrace, updates, account, cn ,difficulty, hardfork, miner, blockchain, txpool, cn.block_queue, net.cn, daemon, debugtools.deserialize, debugtools.objectsizes, device.ledger,
-  /// wallet.gen_multisig, multisig, bulletproofs, ringct, daemon.rpc, wallet.simplewallet, WalletAPI, wallet.ringdb, wallet.wallet2, wallet.rpc, tests.core.
+  /// Set the daemon log categories. Categories are represented as a comma separated list of
+  /// `<Category>:<level>` (similarly to syslog standard `<Facility>:<Severity-level>`), where:
+  /// Category is one of the following: * (all facilities), default, net, net.http, net.p2p,
+  /// logging, net.trottle, blockchain.db, blockchain.db.lmdb, bcutil, checkpoints, net.dns, net.dl,
+  /// i18n, perf,stacktrace, updates, account, cn ,difficulty, hardfork, miner, blockchain, txpool,
+  /// cn.block_queue, net.cn, daemon, debugtools.deserialize, debugtools.objectsizes, device.ledger,
+  /// wallet.gen_multisig, multisig, bulletproofs, ringct, daemon.rpc, wallet.simplewallet,
+  /// WalletAPI, wallet.ringdb, wallet.wallet2, wallet.rpc, tests.core.
   ///
   /// Level is one of the following: FATAL - higher level, ERROR, WARNING, INFO, DEBUG, TRACE.
+  ///
   /// Lower level A level automatically includes higher level. By default, categories are set to:
   /// `*:WARNING,net:FATAL,net.p2p:FATAL,net.cn:FATAL,global:INFO,verify:FATAL,stacktrace:INFO,logging:INFO,msgwriter:INFO`
-  /// Setting the categories to "" prevent any logs to be outputed.
+  /// Setting the categories to "" prevents any log output.
   ///
   /// You can append to the current the log level for updating just one or more categories while
   /// leaving other log levels unchanged by specifying one or more "<category>:<level>" pairs
@@ -963,7 +972,8 @@ namespace cryptonote::rpc {
   ///
   /// - \p status General RPC status string. `"OK"` means everything looks good.
   /// - \p tx_hashes List of transaction hashes,
-  /// - \p untrusted States if the result is obtained using the bootstrap mode, and is therefore not trusted (`true`), or when the daemon is fully synced (`false`).
+  /// - \p untrusted States if the result is obtained using the bootstrap mode, and is therefore not
+  ///   trusted (`true`), or when the daemon is fully synced (`false`).
   struct GET_TRANSACTION_POOL_HASHES : PUBLIC, LEGACY, NO_ARGS
   {
     static constexpr auto names() { return NAMES("get_transaction_pool_hashes"); }
@@ -1045,7 +1055,8 @@ namespace cryptonote::rpc {
   ///     - \c normal - this is a regular, synchronized peer
   ///   - \p live_ms - number of milliseconds since this connection was initiated
   ///   - \p avg_download - the average download speed from this peer in bytes per second
-  ///   - \p current_download - the current (i.e. average over a very recent period) download speed from this peer in bytes per second.
+  ///   - \p current_download - the current (i.e. average over a very recent period) download speed
+  ///     from this peer in bytes per second.
   ///   - \p avg_upload - the average upload speed to this peer in bytes per second
   ///   - \p current_upload - the current upload speed to this peer in bytes per second
   ///   - \p connection_id - a unique random string identifying this connection
@@ -1132,6 +1143,13 @@ namespace cryptonote::rpc {
 
   /// Set daemon p2p bandwidth limits.
   ///
+  /// Inputs:
+  ///
+  /// - \p limit_down Download limit in kBytes per second.  -1 means reset to default; 0 (or
+  ///   omitted) means don't change the current limit
+  /// - \p limit_up Upload limit in kBytes per second.  -1 means reset to default; 0 (or omitted)
+  ///   means don't change the current limit
+  ///
   /// Output values available from a restricted/admin RPC endpoint:
   ///
   /// - \p status General RPC status string. `"OK"` means everything looks good.
@@ -1142,8 +1160,8 @@ namespace cryptonote::rpc {
     static constexpr auto names() { return NAMES("set_limit"); }
 
     struct request_parameters {
-      int64_t limit_down = 0; ///< Download limit in kBytes per second.  -1 means reset to default; 0 (or omitted) means don't change the current limit
-      int64_t limit_up = 0;   ///< Upload limit in kBytes per second.  -1 means reset to default; 0 (or omitted) means don't change the current limit
+      int64_t limit_down = 0;
+      int64_t limit_up = 0;
     } request;
   };
 
@@ -1151,7 +1169,8 @@ namespace cryptonote::rpc {
   ///
   /// Inputs:
   ///
-  /// - \p set If true, set the number of outgoing peers, otherwise the response returns the current limit of outgoing peers. (Defaults to true)
+  /// - \p set If true, set the number of outgoing peers, otherwise the response returns the current
+  ///   limit of outgoing peers. (Defaults to true)
   /// - \p out_peers Max number of outgoing peers
   ///
   /// Output values available from a restricted/admin RPC endpoint:
@@ -1164,8 +1183,8 @@ namespace cryptonote::rpc {
 
     struct request_parameters
     {
-      bool set; // If true, set the number of outgoing peers, otherwise the response returns the current limit of outgoing peers. (Defaults to true)
-      uint32_t out_peers; // Max number of outgoing peers
+      bool set;
+      uint32_t out_peers;
     } request;
   };
 
@@ -1173,7 +1192,8 @@ namespace cryptonote::rpc {
   ///
   /// Inputs:
   ///
-  /// - \p set If true, set the number of incoming peers, otherwise the response returns the current limit of incoming peers. (Defaults to true)
+  /// - \p set If true, set the number of incoming peers, otherwise the response returns the current
+  ///   limit of incoming peers. (Defaults to true)
   /// - \p in_peers Max number of incoming peers
   ///
   /// Output values available from a restricted/admin RPC endpoint:
@@ -1186,8 +1206,8 @@ namespace cryptonote::rpc {
 
     struct request_parameters
     {
-      bool set; // If true, set the number of incoming peers, otherwise the response returns the current limit of incoming peers. (Defaults to true)
-      uint32_t in_peers; // Max number of incoming peers
+      bool set;
+      uint32_t in_peers;
     } request;
   };
 
@@ -1284,7 +1304,7 @@ namespace cryptonote::rpc {
     static constexpr auto names() { return NAMES("banned"); }
 
     struct request_parameters {
-      std::string address; // The IP address to check
+      std::string address;
     } request;
   };
 
@@ -1302,7 +1322,7 @@ namespace cryptonote::rpc {
 
     struct request_parameters
     {
-      std::vector<std::string> txids; // Optional, list of transactions IDs to flush from pool (all tx ids flushed if empty).
+      std::vector<std::string> txids;
     } request;
   };
 
@@ -1356,7 +1376,8 @@ namespace cryptonote::rpc {
   ///
   /// - \p status General RPC status string. `"OK"` means everything looks good.
   /// - \p version RPC current version.
-  /// - \p untrusted States if the result is obtained using the bootstrap mode, and is therefore not trusted (`true`), or when the daemon is fully synced
+  /// - \p untrusted States if the result is obtained using the bootstrap mode, and is therefore not
+  ///   trusted (`true`), or when the daemon is fully synced
   struct GET_VERSION : PUBLIC, NO_ARGS
   {
     static constexpr auto names() { return NAMES("get_version"); }
@@ -1381,8 +1402,8 @@ namespace cryptonote::rpc {
 
     struct request_parameters
     {
-      uint64_t height; // Block height from which getting the amounts.
-      uint64_t count;  // Number of blocks to include in the sum.
+      uint64_t height;
+      uint64_t count;
     } request;
   };
 
@@ -1390,7 +1411,8 @@ namespace cryptonote::rpc {
   ///
   /// Inputs:
   ///
-  /// - \p grace_blocks Optional.
+  /// - \p grace_blocks If specified, make sure that the fee is high enough to cover any fee
+  ///   increases in the next `grace_blocks` blocks.
   ///
   /// Output values available from a public RPC endpoint:
   ///
@@ -1399,19 +1421,24 @@ namespace cryptonote::rpc {
   /// - \p fee_amount Amount of fees in atomic units.
   /// - \p burn_amount Amount of burnt oxen.
   /// - \p fee_per_byte Amount of fees estimated per byte in atomic units
-  /// - \p fee_per_output Amount of fees per output generated by the tx (adds to the `fee_per_byte` per-byte value)
-  /// - \p blink_fee_per_byte Value for sending a blink. The portion of the overall blink fee above the overall base fee is burned.
-  /// - \p blink_fee_per_output Value for sending a blink. The portion of the overall blink fee above the overall base fee is burned.
-  /// - \p blink_fee_fixed Fixed blink fee in addition to the per-output and per-byte amounts. The portion of the overall blink fee above the overall base fee is burned.
+  /// - \p fee_per_output Amount of fees per output generated by the tx (adds to the `fee_per_byte`
+  ///   per-byte value)
+  /// - \p blink_fee_per_byte Value for sending a blink. The portion of the overall blink fee above
+  ///   the overall base fee is burned.
+  /// - \p blink_fee_per_output Value for sending a blink. The portion of the overall blink fee
+  ///   above the overall base fee is burned.
+  /// - \p blink_fee_fixed Fixed blink fee in addition to the per-output and per-byte amounts. The
+  ///   portion of the overall blink fee above the overall base fee is burned.
   /// - \p quantization_mask
-  /// - \p untrusted States if the result is obtained using the bootstrap mode, and is therefore not trusted (`true`), or when the daemon is fully synced (`false`).
+  /// - \p untrusted States if the result is obtained using the bootstrap mode, and is therefore not
+  ///   trusted (`true`), or when the daemon is fully synced (`false`).
   struct GET_BASE_FEE_ESTIMATE : PUBLIC
   {
     static constexpr auto names() { return NAMES("get_fee_estimate"); }
 
     struct request_parameters
     {
-      uint64_t grace_blocks; // Optional
+      uint64_t grace_blocks;
     } request;
   };
 
@@ -1482,7 +1509,8 @@ namespace cryptonote::rpc {
   ///   contains:
   ///   - \p start_block_height Block height of the first block in the span
   ///   - \p nblocks the number of blocks in the span
-  ///   - \p connection_id the connection_id of the connection from which we are downloading the span
+  ///   - \p connection_id the connection_id of the connection from which we are downloading the
+  ///     span
   ///   - \p rate the most recent connection speed measurement
   ///   - \p speed the average connection speed over recent downloaded blocks
   ///   - \p size total number of block and transaction data stored in the span
@@ -1746,10 +1774,10 @@ namespace cryptonote::rpc {
   /// - \p snode_revision the current snode revision for non-hardfork, but mandatory, service node
   ///   updates.
   /// - \p status generic RPC error code; "OK" means the request was successful.
-  /// - \p unchanged when using poll_block_hash, this value is set to true and results are omitted if
-  ///   the current block hash has not changed from the requested polling block hash.  If block hash
-  ///   has changed this is set to false (and results included).  When not polling this value is
-  ///   omitted entirely.
+  /// - \p unchanged when using poll_block_hash, this value is set to true and results are omitted
+  ///   if the current block hash has not changed from the requested polling block hash.  If block
+  ///   hash has changed this is set to false (and results included).  When not polling this value
+  ///   is omitted entirely.
   /// - \p service_node_states list of information about all known service nodes; each element is a
   ///   dict containing the following keys (which fields are included/omitted can be controlled via
   ///   the "fields" input parameter):
@@ -2160,24 +2188,26 @@ namespace cryptonote::rpc {
     };
   };
 
-  /// Query hardcoded/service node checkpoints stored for the blockchain. Omit all arguments to retrieve the latest "count" checkpoints.
+  /// Query hardcoded/service node checkpoints stored for the blockchain. Omit all arguments to
+  /// retrieve the latest "count" checkpoints.
   ///
   /// Inputs:
   /// 
-  /// - /p start_height The starting block's height.
-  /// - /p end_height The ending block's height.
+  /// - \p start_height The starting block's height.
+  /// - \p end_height The ending block's height.
   ///
   /// Output values available from a public RPC endpoint:
   ///
-  /// - /p status Generic RPC error code. "OK" is the success value.
-  /// - /p untrusted If the result is obtained using bootstrap mode then this will be set to true, otherwise will be omitted.
-  /// - /p total_deregister
-  /// - /p total_ip_change_penalty
-  /// - /p total_decommission
-  /// - /p total_recommission
-  /// - /p total_unlock
-  /// - /p start_height
-  /// - /p end_height
+  /// - \p status Generic RPC error code. "OK" is the success value.
+  /// - \p untrusted If the result is obtained using bootstrap mode then this will be set to true,
+  ///   otherwise will be omitted.
+  /// - \p total_deregister
+  /// - \p total_ip_change_penalty
+  /// - \p total_decommission
+  /// - \p total_recommission
+  /// - \p total_unlock
+  /// - \p start_height
+  /// - \p end_height
   struct GET_SN_STATE_CHANGES : PUBLIC
   {
     static constexpr auto names() { return NAMES("get_service_nodes_state_changes"); }
@@ -2195,13 +2225,14 @@ namespace cryptonote::rpc {
   ///
   /// Inputs:
   /// 
-  /// - /p type test type; currently supported are: "storage" and "lokinet" for storage server and lokinet tests, respectively.
-  /// - /p pubkey service node pubkey
-  /// - /p passed whether node is passing the test
+  /// - \p type test type; currently supported are: "storage" and "lokinet" for storage server and
+  ///   lokinet tests, respectively.
+  /// - \p pubkey service node pubkey
+  /// - \p passed whether node is passing the test
   ///
   /// Output values available from a private/admin RPC endpoint:
   ///
-  /// - /p status Generic RPC error code. "OK" is the success value.
+  /// - \p status Generic RPC error code. "OK" is the success value.
   struct REPORT_PEER_STATUS : RPC_COMMAND
   {
     // TODO: remove the `report_peer_storage_server_status` once we require a storage server version
@@ -2223,7 +2254,7 @@ namespace cryptonote::rpc {
   ///
   /// Output values available from a private/admin RPC endpoint:
   ///
-  /// - /p status Generic RPC error code. "OK" is the success value.
+  /// - \p status Generic RPC error code. "OK" is the success value.
   struct TEST_TRIGGER_P2P_RESYNC : NO_ARGS
   {
     static constexpr auto names() { return NAMES("test_trigger_p2p_resync"); }
@@ -2236,7 +2267,7 @@ namespace cryptonote::rpc {
   ///
   /// Output values available from a private/admin RPC endpoint:
   ///
-  /// - /p status Generic RPC error code. "OK" is the success value.
+  /// - \p status Generic RPC error code. "OK" is the success value.
   struct TEST_TRIGGER_UPTIME_PROOF : NO_ARGS
   {
     static constexpr auto names() { return NAMES("test_trigger_uptime_proof"); }
@@ -2344,8 +2375,8 @@ namespace cryptonote::rpc {
   ///
   /// Technical details: the returned value is encrypted using the name itself so that neither this
   /// oxend responding to the RPC request nor any other blockchain observers can (easily) obtain the
-  /// name of registered addresses or the registration details.  Thus, from a client's point of view,
-  /// resolving an ONS record involves:
+  /// name of registered addresses or the registration details.  Thus, from a client's point of
+  /// view, resolving an ONS record involves:
   ///
   /// 1. Lower-case the name.
   /// 2. Calculate the name hash as a null-key, 32-byte BLAKE2b hash of the lower-case name.
@@ -2361,21 +2392,27 @@ namespace cryptonote::rpc {
     static constexpr auto names() { return NAMES("ons_resolve", "lns_resolve"); }
 
     struct request_parameters {
-      int type = -1;         ///< The ONS type (mandatory); currently supported values are: 0 = session, 1 = wallet, 2 = lokinet.
-      std::string name_hash; ///< The 32-byte BLAKE2b hash of the name to look up, encoded as 64 hex digits or 44/43 base64 characters (with/without padding).  For bt-encoded requests this can also be the raw 32 bytes.
+      /// The ONS type (mandatory); currently supported values are: 0 = session, 1 = wallet, 2 =
+      /// lokinet.
+      int type = -1;
+      /// The 32-byte BLAKE2b hash of the name to look up, encoded as 64 hex digits or 44/43 base64
+      /// characters (with/without padding).  For bt-encoded requests this can also be the raw 32
+      /// bytes.
+      std::string name_hash;
     } request;
   };
 
-  /// Clear TXs from the daemon cache, currently only the cache storing TX hashes that were previously verified bad by the daemon.
+  /// Clear TXs from the daemon cache, currently only the cache storing TX hashes that were
+  /// previously verified bad by the daemon.
   ///
   /// Inputs:
   ///
-  /// - /p bad_txs Clear the cache storing TXs that failed verification.
-  /// - /p bad_blocks Clear the cache storing blocks that failed verfication.
+  /// - \p bad_txs Clear the cache storing TXs that failed verification.
+  /// - \p bad_blocks Clear the cache storing blocks that failed verfication.
   ///
   /// Output values available from a private/admin RPC endpoint:
   ///
-  /// - /p status Generic RPC error code. "OK" is the success value.
+  /// - \p status Generic RPC error code. "OK" is the success value.
   struct FLUSH_CACHE : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("flush_cache"); }
