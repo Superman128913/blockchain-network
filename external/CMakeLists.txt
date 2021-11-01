@@ -83,7 +83,6 @@ endif()
 add_subdirectory(db_drivers)
 add_subdirectory(easylogging++ easyloggingpp)
 add_subdirectory(randomx EXCLUDE_FROM_ALL)
-add_subdirectory(fmt)
 add_subdirectory(date EXCLUDE_FROM_ALL)
 add_subdirectory(fmt)
 
