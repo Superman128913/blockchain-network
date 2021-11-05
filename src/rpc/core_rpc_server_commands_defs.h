@@ -1237,31 +1237,26 @@ namespace cryptonote::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
-  // Get list of banned IPs.
+  /// Get list of banned IPs.
+  ///
+  /// Inputs: None
+  ///
+  /// Output values available from a restricted/admin RPC endpoint:
+  ///
+  /// - \p status General RPC status string. `"OK"` means everything looks good.
+  /// - \p bans List of banned nodes
   struct GETBANS : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("get_bans"); }
-
-    struct request : EMPTY {};
-
-    struct ban
-    {
-      std::string host; // Banned host (IP in A.B.C.D form).
-      uint32_t ip;      // Banned IP address, in Int format.
-      uint32_t seconds; // Local Unix time that IP is banned until.
-
-      KV_MAP_SERIALIZABLE
-    };
-
-    struct response
-    {
-      std::string status;    // General RPC error code. "OK" means everything looks good.
-      std::vector<ban> bans; // List of banned nodes:
-
-      KV_MAP_SERIALIZABLE
-    };
   };
+
+  struct ban
+  {
+    std::string host; // Banned host (IP in A.B.C.D form).
+    uint32_t ip;      // Banned IP address, in Int format.
+    uint32_t seconds; // Local Unix time that IP is banned until.
+  };
+  inline void to_json(nlohmann::json& j, const ban& b) { j = nlohmann::json{{"host", b.host}, {"ip", b.ip}, {"seconds", b.seconds}}; };
 
   OXEN_RPC_DOC_INTROSPECT
   // Ban another node by IP.

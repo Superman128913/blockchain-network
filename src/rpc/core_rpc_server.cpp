@@ -1896,10 +1896,8 @@ namespace cryptonote::rpc {
     hfinfo.response["status"] = STATUS_OK;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  GETBANS::response core_rpc_server::invoke(GETBANS::request&& req, rpc_context context)
+  void core_rpc_server::invoke(GETBANS& get_bans, rpc_context context)
   {
-    GETBANS::response res{};
-
     PERF_TIMER(on_get_bans);
 
     auto now = time(nullptr);
@@ -1907,30 +1905,30 @@ namespace cryptonote::rpc {
     for (std::map<std::string, time_t>::const_iterator i = blocked_hosts.begin(); i != blocked_hosts.end(); ++i)
     {
       if (i->second > now) {
-        GETBANS::ban b;
+        ban b;
         b.host = i->first;
         b.ip = 0;
         uint32_t ip;
         if (epee::string_tools::get_ip_int32_from_string(ip, b.host))
           b.ip = ip;
         b.seconds = i->second - now;
-        res.bans.push_back(b);
+        get_bans.response["bans"].push_back(b);
       }
     }
     std::map<epee::net_utils::ipv4_network_subnet, time_t> blocked_subnets = m_p2p.get_blocked_subnets();
     for (std::map<epee::net_utils::ipv4_network_subnet, time_t>::const_iterator i = blocked_subnets.begin(); i != blocked_subnets.end(); ++i)
     {
       if (i->second > now) {
-        GETBANS::ban b;
+        ban b;
         b.host = i->first.host_str();
         b.ip = 0;
         b.seconds = i->second - now;
-        res.bans.push_back(b);
+        get_bans.response["bans"].push_back(b);
       }
     }
 
-    res.status = STATUS_OK;
-    return res;
+    get_bans.response["status"] = STATUS_OK;
+    return;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(BANNED& banned, rpc_context context)

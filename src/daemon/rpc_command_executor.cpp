@@ -1154,16 +1154,16 @@ bool rpc_command_executor::in_peers(bool set, uint32_t limit)
 
 bool rpc_command_executor::print_bans()
 {
-    GETBANS::response res{};
-
-    if (!invoke<GETBANS>({}, res, "Failed to retrieve ban list"))
+    auto maybe_bans = try_running([this] { return invoke<GETBANS>(); }, "Failed to retrieve ban list");
+    if (!maybe_bans)
       return false;
+    auto bans = *maybe_bans;
 
-    if (!res.bans.empty())
+    if (!bans.empty())
     {
-        for (auto i = res.bans.begin(); i != res.bans.end(); ++i)
+        for (auto i = bans.begin(); i != bans.end(); ++i)
         {
-            tools::msg_writer() << i->host << " banned for " << i->seconds << " seconds";
+            tools::msg_writer() << (*i)["host"] << " banned for " << (*i)["seconds"] << " seconds";
         }
     }
     else

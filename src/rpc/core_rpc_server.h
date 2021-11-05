@@ -246,6 +246,7 @@ namespace cryptonote::rpc {
     void invoke(FLUSH_CACHE& flush_cache, rpc_context context);
     void invoke(GET_LAST_BLOCK_HEADER& get_last_block_header, rpc_context context);
     void invoke(GET_BLOCK_HEADER_BY_HASH& get_block_header_by_hash, rpc_context context);
+    void invoke(GETBANS& get_bans, rpc_context context);
 
     // Deprecated Monero NIH binary endpoints:
     GET_ALT_BLOCKS_HASHES_BIN::response         invoke(GET_ALT_BLOCKS_HASHES_BIN::request&& req, rpc_context context);
@@ -265,7 +266,6 @@ namespace cryptonote::rpc {
     GET_BLOCK_HEADERS_RANGE::response                   invoke(GET_BLOCK_HEADERS_RANGE::request&& req, rpc_context context);
     GET_BLOCK::response                                 invoke(GET_BLOCK::request&& req, rpc_context context);
     SETBANS::response                                   invoke(SETBANS::request&& req, rpc_context context);
-    GETBANS::response                                   invoke(GETBANS::request&& req, rpc_context context);
     GET_OUTPUT_HISTOGRAM::response                      invoke(GET_OUTPUT_HISTOGRAM::request&& req, rpc_context context);
     GET_ALTERNATE_CHAINS::response                      invoke(GET_ALTERNATE_CHAINS::request&& req, rpc_context context);
     RELAY_TX::response                                  invoke(RELAY_TX::request&& req, rpc_context context);
