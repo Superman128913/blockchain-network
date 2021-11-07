@@ -39,4 +39,5 @@ namespace cryptonote::rpc {
   void parse_request(FLUSH_CACHE& flush_cache, rpc_input in);
   void parse_request(GET_LAST_BLOCK_HEADER& get_last_block_header, rpc_input in);
   void parse_request(GET_BLOCK_HEADER_BY_HASH& get_block_header_by_hash, rpc_input in);
+  void parse_request(SETBANS& set_bans, rpc_input in);
 }
