@@ -2745,19 +2745,16 @@ namespace cryptonote::rpc {
     return;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  GET_SERVICE_PRIVKEYS::response core_rpc_server::invoke(GET_SERVICE_PRIVKEYS::request&& req, rpc_context context)
+  void core_rpc_server::invoke(GET_SERVICE_PRIVKEYS& get_service_privkeys, rpc_context context)
   {
-    GET_SERVICE_PRIVKEYS::response res{};
-
     PERF_TIMER(on_get_service_node_key);
-
     const auto& keys = m_core.get_service_keys();
     if (keys.key != crypto::null_skey)
-      res.service_node_privkey = tools::type_to_hex(keys.key.data);
-    res.service_node_ed25519_privkey = tools::type_to_hex(keys.key_ed25519.data);
-    res.service_node_x25519_privkey = tools::type_to_hex(keys.key_x25519.data);
-    res.status = STATUS_OK;
-    return res;
+      get_service_privkeys.response["service_node_privkey"] = tools::type_to_hex(keys.key.data);
+    get_service_privkeys.response["service_node_ed25519_privkey"] = tools::type_to_hex(keys.key_ed25519.data);
+    get_service_privkeys.response["service_node_x25519_privkey"] = tools::type_to_hex(keys.key_x25519.data);
+    get_service_privkeys.response["status"] = STATUS_OK;
+    return;
   }
 
   static time_t reachable_to_time_t(

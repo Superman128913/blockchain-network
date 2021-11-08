@@ -1727,26 +1727,22 @@ namespace cryptonote::rpc {
     static constexpr auto names() { return NAMES("get_service_keys", "get_service_node_key"); }
   };
 
-  OXEN_RPC_DOC_INTROSPECT
-  // Get the service private keys of the queried daemon, encoded in hex.  Do not ever share
-  // these keys: they would allow someone to impersonate your service node.  All three keys are used
-  // when running as a service node; when running as a regular node only the x25519 key is regularly
-  // used for some RPC and and node-to-SN communication requests.
+  /// Get the service private keys of the queried daemon, encoded in hex.  Do not ever share
+  /// these keys: they would allow someone to impersonate your service node.  All three keys are used
+  /// when running as a service node; when running as a regular node only the x25519 key is regularly
+  /// used for some RPC and and node-to-SN communication requests.
+  ///
+  /// Inputs: None
+  ///
+  /// Output values available from a restricted/admin RPC endpoint:
+  ///
+  /// - \p status General RPC status string. `"OK"` means everything looks good.
+  /// - \p service_node_privkey The queried daemon's service node private key.  Will be empty if not running as a service node.
+  /// - \p service_node_ed25519_privkey The daemon's ed25519 private key (note that this is in sodium's format, which consists of the private and public keys concatenated together)
+  /// - \p service_node_x25519_privkey The daemon's x25519 private key.
   struct GET_SERVICE_PRIVKEYS : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("get_service_privkeys", "get_service_node_privkey"); }
-
-    struct request : EMPTY {};
-
-    struct response
-    {
-      std::string service_node_privkey;         // The queried daemon's service node private key.  Will be empty if not running as a service node.
-      std::string service_node_ed25519_privkey; // The daemon's ed25519 private key (note that this is in sodium's format, which consists of the private and public keys concatenated together)
-      std::string service_node_x25519_privkey;  // The daemon's x25519 private key.
-      std::string status;                       // Generic RPC error code. "OK" is the success value.
-
-      KV_MAP_SERIALIZABLE
-    };
   };
 
   /// Get information on some, all, or a random subset of Service Nodes.
