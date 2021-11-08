@@ -249,6 +249,7 @@ namespace cryptonote::rpc {
     void invoke(GETBANS& get_bans, rpc_context context);
     void invoke(SETBANS& set_bans, rpc_context context);
     void invoke(GET_CHECKPOINTS& get_checkpoints, rpc_context context);
+    void invoke(GET_STAKING_REQUIREMENT& get_staking_requirement, rpc_context context);
 
     // Deprecated Monero NIH binary endpoints:
     GET_ALT_BLOCKS_HASHES_BIN::response         invoke(GET_ALT_BLOCKS_HASHES_BIN::request&& req, rpc_context context);
@@ -276,7 +277,6 @@ namespace cryptonote::rpc {
     GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES::response   invoke(GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES::request&& req, rpc_context context);
     GET_SERVICE_KEYS::response                          invoke(GET_SERVICE_KEYS::request&& req, rpc_context context);
     GET_SERVICE_PRIVKEYS::response                      invoke(GET_SERVICE_PRIVKEYS::request&& req, rpc_context context);
-    GET_STAKING_REQUIREMENT::response                   invoke(GET_STAKING_REQUIREMENT::request&& req, rpc_context context);
     ONS_NAMES_TO_OWNERS::response                       invoke(ONS_NAMES_TO_OWNERS::request&& req, rpc_context context);
     ONS_OWNERS_TO_NAMES::response                       invoke(ONS_OWNERS_TO_NAMES::request&& req, rpc_context context);
 

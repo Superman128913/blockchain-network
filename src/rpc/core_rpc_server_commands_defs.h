@@ -2051,29 +2051,27 @@ namespace cryptonote::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
-  // Get the required amount of Loki to become a Service Node at the queried height.
+  // Get the required amount of Oxen to become a Service Node at the queried height.
   // For devnet and testnet values, ensure the daemon is started with the
   // `--devnet` or `--testnet` flags respectively.
+  ///
+  /// Inputs:
+  ///
+  /// - \p height The height to query the staking requirement for.  0 (or omitting) means current height.
+  ///
+  /// Output values available from a public RPC endpoint:
+  ///
+  /// - \p status generic RPC error code; "OK" means the request was successful.
+  /// - \p staking_requirement The staking requirement in Oxen, in atomic units.
+  /// - \p height The height requested (or current height if 0 was requested)
   struct GET_STAKING_REQUIREMENT : PUBLIC
   {
     static constexpr auto names() { return NAMES("get_staking_requirement"); }
 
-    struct request
+    struct request_parameters
     {
       uint64_t height; // The height to query the staking requirement for.  0 (or omitting) means current height.
-
-      KV_MAP_SERIALIZABLE
-    };
-
-    struct response
-    {
-      uint64_t staking_requirement; // The staking requirement in Loki, in atomic units.
-      uint64_t height;              // The height requested (or current height if 0 was requested)
-      std::string status;           // Generic RPC error code. "OK" is the success value.
-
-      KV_MAP_SERIALIZABLE
-    };
+    } request;
   };
 
   OXEN_RPC_DOC_INTROSPECT
@@ -2127,8 +2125,6 @@ namespace cryptonote::rpc {
       uint64_t end_height;   // Optional: Get the first count checkpoints before end height. Specify both start and end to get the checkpoints inbetween.
       uint32_t count;        // Optional: Number of checkpoints to query.
     } request;
-
-
   };
 
   /// Query hardcoded/service node checkpoints stored for the blockchain. Omit all arguments to

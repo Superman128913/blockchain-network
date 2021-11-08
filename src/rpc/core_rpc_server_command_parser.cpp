@@ -485,4 +485,8 @@ namespace cryptonote::rpc {
     get_values(in, "seconds", set_bans.request.seconds);
     get_values(in, "ban", set_bans.request.ban);
   }
+
+  void parse_request(GET_STAKING_REQUIREMENT& get_staking_requirement, rpc_input in) {
+    get_values(in, "height", get_staking_requirement.request.height);
+  }
 }
