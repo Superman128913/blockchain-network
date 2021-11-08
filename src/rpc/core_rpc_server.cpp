@@ -2733,19 +2733,16 @@ namespace cryptonote::rpc {
     return res;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  GET_SERVICE_KEYS::response core_rpc_server::invoke(GET_SERVICE_KEYS::request&& req, rpc_context context)
+  void core_rpc_server::invoke(GET_SERVICE_KEYS& get_service_keys, rpc_context context)
   {
-    GET_SERVICE_KEYS::response res{};
-
     PERF_TIMER(on_get_service_node_key);
-
     const auto& keys = m_core.get_service_keys();
     if (keys.pub)
-      res.service_node_pubkey = tools::type_to_hex(keys.pub);
-    res.service_node_ed25519_pubkey = tools::type_to_hex(keys.pub_ed25519);
-    res.service_node_x25519_pubkey = tools::type_to_hex(keys.pub_x25519);
-    res.status = STATUS_OK;
-    return res;
+      get_service_keys.response["service_node_pubkey"] = tools::type_to_hex(keys.pub);
+    get_service_keys.response["service_node_ed25519_pubkey"] = tools::type_to_hex(keys.pub_ed25519);
+    get_service_keys.response["service_node_x25519_pubkey"] = tools::type_to_hex(keys.pub_x25519);
+    get_service_keys.response["status"] = STATUS_OK;
+    return;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   GET_SERVICE_PRIVKEYS::response core_rpc_server::invoke(GET_SERVICE_PRIVKEYS::request&& req, rpc_context context)

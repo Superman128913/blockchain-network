@@ -469,12 +469,11 @@ bool rpc_command_executor::show_status() {
   bool my_sn_registered = false, my_sn_staked = false, my_sn_active = false;
   uint16_t my_reason_all = 0, my_reason_any = 0;
   if (info["service_node"].get<bool>()) {
-    GET_SERVICE_KEYS::response res{};
-
-    if (!invoke<GET_SERVICE_KEYS>({}, res, "Failed to retrieve service node keys"))
+    auto maybe_service_keys = try_running([this] { return invoke<GET_SERVICE_KEYS>(json{}); }, "Failed to retrieve service node keys");
+    if (!maybe_service_keys)
       return false;
 
-    my_sn_key = std::move(res.service_node_pubkey);
+    my_sn_key = (*maybe_service_keys)["service_node_pubkey"];
 
     auto maybe_sns = try_running([&] { return invoke<GET_SERVICE_NODES>(json{{"service_node_pubkeys", json::array({my_sn_key})}}); }, "Failed to retrieve service node info");
     if (maybe_sns) {
@@ -1890,15 +1889,17 @@ bool rpc_command_executor::pop_blocks(uint64_t num_blocks)
 
 bool rpc_command_executor::print_sn_key()
 {
-  GET_SERVICE_KEYS::response res{};
 
-  if (!invoke<GET_SERVICE_KEYS>({}, res, "Failed to retrieve service node keys"))
+  auto maybe_service_keys = try_running([this] { return invoke<GET_SERVICE_KEYS>(json{}); }, "Failed to retrieve service node keys");
+  if (!maybe_service_keys)
     return false;
 
+  auto my_sn_keys = *maybe_service_keys;
+
   tools::success_msg_writer()
-    <<   "Service Node Public Key: " << res.service_node_pubkey
-    << "\n     Ed25519 Public Key: " << res.service_node_ed25519_pubkey
-    << "\n      X25519 Public Key: " << res.service_node_x25519_pubkey;
+    <<   "Service Node Public Key: " << my_sn_keys["service_node_pubkey"]
+    << "\n     Ed25519 Public Key: " << my_sn_keys["service_node_ed25519_pubkey"]
+    << "\n      X25519 Public Key: " << my_sn_keys["service_node_x25519_pubkey"];
   return true;
 }
 
@@ -1943,10 +1944,6 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
   if (!maybe_hf)
     return false;
   auto& hfinfo = *maybe_hf;
-
-  GET_SERVICE_KEYS::response kres{};
-  if (!invoke<GET_SERVICE_KEYS>({}, kres, "Failed to retrieve service node keys"))
-    return false;
 
   if (!info.value("service_node", false))
   {

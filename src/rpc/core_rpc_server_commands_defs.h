@@ -1710,25 +1710,21 @@ namespace cryptonote::rpc {
     using response = GET_SERVICE_NODE_REGISTRATION_CMD_RAW::response;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
-  // Get the service public keys of the queried daemon, encoded in hex.  All three keys are used
-  // when running as a service node; when running as a regular node only the x25519 key is regularly
-  // used for some RPC and and node-to-SN communication requests.
+  /// Get the service public keys of the queried daemon, encoded in hex.  All three keys are used
+  /// when running as a service node; when running as a regular node only the x25519 key is regularly
+  /// used for some RPC and and node-to-SN communication requests.
+  ///
+  /// Inputs: None
+  ///
+  /// Output values available from a restricted/admin RPC endpoint:
+  ///
+  /// - \p status General RPC status string. `"OK"` means everything looks good.
+  /// - \p service_node_pubkey The queried daemon's service node public key.  Will be empty if not running as a service node.
+  /// - \p service_node_ed25519_pubkey The daemon's ed25519 auxiliary public key.
+  /// - \p service_node_x25519_pubkey The daemon's x25519 auxiliary public key.
   struct GET_SERVICE_KEYS : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("get_service_keys", "get_service_node_key"); }
-
-    struct request : EMPTY {};
-
-    struct response
-    {
-      std::string service_node_pubkey;         // The queried daemon's service node public key.  Will be empty if not running as a service node.
-      std::string service_node_ed25519_pubkey; // The daemon's ed25519 auxiliary public key.
-      std::string service_node_x25519_pubkey;  // The daemon's x25519 auxiliary public key.
-      std::string status;                      // Generic RPC error code. "OK" is the success value.
-
-      KV_MAP_SERIALIZABLE
-    };
   };
 
   OXEN_RPC_DOC_INTROSPECT
