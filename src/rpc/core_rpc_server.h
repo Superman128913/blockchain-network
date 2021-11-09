@@ -253,6 +253,7 @@ namespace cryptonote::rpc {
     void invoke(GET_SERVICE_KEYS& get_service_keys, rpc_context context);
     void invoke(GET_SERVICE_PRIVKEYS& get_service_privkeys, rpc_context context);
     void invoke(GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES& get_service_node_blacklisted_key_images, rpc_context context);
+    void invoke(RELAY_TX& relay_tx, rpc_context context);
 
     // Deprecated Monero NIH binary endpoints:
     GET_ALT_BLOCKS_HASHES_BIN::response         invoke(GET_ALT_BLOCKS_HASHES_BIN::request&& req, rpc_context context);
@@ -273,7 +274,6 @@ namespace cryptonote::rpc {
     GET_BLOCK::response                                 invoke(GET_BLOCK::request&& req, rpc_context context);
     GET_OUTPUT_HISTOGRAM::response                      invoke(GET_OUTPUT_HISTOGRAM::request&& req, rpc_context context);
     GET_ALTERNATE_CHAINS::response                      invoke(GET_ALTERNATE_CHAINS::request&& req, rpc_context context);
-    RELAY_TX::response                                  invoke(RELAY_TX::request&& req, rpc_context context);
     GET_QUORUM_STATE::response                          invoke(GET_QUORUM_STATE::request&& req, rpc_context context);
     GET_SERVICE_NODE_REGISTRATION_CMD_RAW::response     invoke(GET_SERVICE_NODE_REGISTRATION_CMD_RAW::request&& req, rpc_context context);
     GET_SERVICE_NODE_REGISTRATION_CMD::response         invoke(GET_SERVICE_NODE_REGISTRATION_CMD::request&& req, rpc_context context);

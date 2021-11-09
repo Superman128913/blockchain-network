@@ -1465,20 +1465,23 @@ namespace cryptonote::rpc {
     };
   };
 
-  OXEN_RPC_DOC_INTROSPECT
-  // Relay a list of transaction IDs.
+  /// Relay a list of transaction IDs.
+  ///
+  /// Inputs: 
+  ///
+  /// - \p txids List of transactions IDs to relay from pool.
+  ///
+  /// Output values available from a restricted/admin RPC endpoint:
+  ///
+  /// - \p status General RPC status string. `"OK"` means everything looks good.
   struct RELAY_TX : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("relay_tx"); }
 
-    struct request
+    struct request_parameters
     {
       std::vector<std::string> txids; // List of transactions IDs to relay from pool.
-
-      KV_MAP_SERIALIZABLE
-    };
-
-    struct response : STATUS {};
+    } request;
   };
 
   /// Get node synchronisation information.  This returns information on the node's syncing "spans"
@@ -1490,7 +1493,7 @@ namespace cryptonote::rpc {
   ///
   /// Inputs: none
   ///
-  /// Output values available from an admin RPC endpoint:
+  /// Output values available from a restricted/admin RPC endpoint:
   ///
   /// - \p status General RPC status string. `"OK"` means everything looks good.
   /// - \p height Current block height
