@@ -496,4 +496,11 @@ namespace cryptonote::rpc {
     get_values(in, "fill_pow_hash", get_block_headers_range.request.fill_pow_hash);
     get_values(in, "get_tx_hashes", get_block_headers_range.request.get_tx_hashes);
   }
+
+  void parse_request(GET_BLOCK_HEADER_BY_HEIGHT& get_block_header_by_height, rpc_input in) {
+    get_values(in, "height",        get_block_header_by_height.request.height);
+    get_values(in, "heights",       get_block_header_by_height.request.heights);
+    get_values(in, "fill_pow_hash", get_block_header_by_height.request.fill_pow_hash);
+    get_values(in, "get_tx_hashes", get_block_header_by_height.request.get_tx_hashes);
+  }
 }
