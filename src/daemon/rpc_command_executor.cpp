@@ -1210,12 +1210,12 @@ bool rpc_command_executor::output_histogram(const std::vector<uint64_t> &amounts
     if (!invoke<GET_OUTPUT_HISTOGRAM>(std::move(req), res, "Failed to retrieve output histogram"))
       return false;
 
-    //std::sort(res.histogram.begin(), res.histogram.end(),
-        //[](const auto& e1, const auto& e2)->bool { return e1.total_instances < e2.total_instances; });
-    //for (const auto &e: res.histogram)
-    //{
-        //tools::msg_writer() << e.total_instances << "  " << cryptonote::print_money(e.amount);
-    //}
+    std::sort(res.histogram.begin(), res.histogram.end(),
+        [](const auto& e1, const auto& e2)->bool { return e1.total_instances < e2.total_instances; });
+    for (const auto &e: res.histogram)
+    {
+        tools::msg_writer() << e.total_instances << "  " << cryptonote::print_money(e.amount);
+    }
 
     return true;
 }
@@ -2437,18 +2437,12 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
   scoped_log_cats.reset();
 
   {
-    GET_SERVICE_NODE_REGISTRATION_CMD_RAW::request req{};
-    GET_SERVICE_NODE_REGISTRATION_CMD_RAW::response res{};
-
-    req.args = args;
-    req.make_friendly = true;
-    req.staking_requirement = staking_requirement;
-
-    if (!invoke<GET_SERVICE_NODE_REGISTRATION_CMD_RAW>(std::move(req), res, "Failed to validate registration arguments; "
-          "check the addresses and registration parameters and that the Daemon is running with the '--service-node' flag"))
+    auto maybe_registration = try_running([this, staking_requirement, &args] { return invoke<GET_SERVICE_NODE_REGISTRATION_CMD_RAW>(json{{"staking_requirement", staking_requirement}, {"args", args}, {"make_friendly", true}}); }, "Failed to validate registration arguments; check the addresses and registration parameters and that the Daemon is running with the '--service-node' flag");
+    if (!maybe_registration)
       return false;
+    auto& registration = *maybe_registration;
 
-    tools::success_msg_writer() << res.registration_cmd;
+    tools::success_msg_writer() << registration["registration_cmd"];
   }
 
   return true;

@@ -1625,27 +1625,30 @@ namespace cryptonote::rpc {
     };
   };
 
-  OXEN_RPC_DOC_INTROSPECT
+  /// Returns the command that should be run to prepare a service node, includes correct parameters 
+  /// and service node ids formatted ready for cut and paste into daemon console.
+  ///
+  /// Inputs:
+  ///
+  /// - \p check Instead of running check if the blockchain has already been pruned.
+  /// - \p args (Developer) The list of arguments used in raw registration, i.e. portions
+  /// - \p make_friendly Provide information about how to use the command in the result.
+  /// - \p staking_requirement The staking requirement to become a Service Node the registration command will be generated upon
+  ///
+  /// Output values available from a restricted/admin RPC endpoint:
+  ///
+  /// - \p status General RPC status string. `"OK"` means everything looks good.
+  /// - \p registration_cmd The command to execute in the wallet CLI to register the queried daemon as a Service Node.
   struct GET_SERVICE_NODE_REGISTRATION_CMD_RAW : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("get_service_node_registration_cmd_raw"); }
 
-    struct request
+    struct request_parameters
     {
       std::vector<std::string> args; // (Developer) The arguments used in raw registration, i.e. portions
       bool make_friendly;            // Provide information about how to use the command in the result.
       uint64_t staking_requirement;  // The staking requirement to become a Service Node the registration command will be generated upon
-
-      KV_MAP_SERIALIZABLE
-    };
-
-    struct response
-    {
-      std::string status;           // Generic RPC error code. "OK" is the success value.
-      std::string registration_cmd; // The command to execute in the wallet CLI to register the queried daemon as a Service Node.
-
-      KV_MAP_SERIALIZABLE
-    };
+    } request;
   };
 
   OXEN_RPC_DOC_INTROSPECT
@@ -1670,7 +1673,13 @@ namespace cryptonote::rpc {
       KV_MAP_SERIALIZABLE
     };
 
-    using response = GET_SERVICE_NODE_REGISTRATION_CMD_RAW::response;
+    struct response
+    {
+      std::string status;           // Generic RPC error code. "OK" is the success value.
+      std::string registration_cmd; // The command to execute in the wallet CLI to register the queried daemon as a Service Node.
+
+      KV_MAP_SERIALIZABLE
+    };
   };
 
   /// Get the service public keys of the queried daemon, encoded in hex.  All three keys are used

@@ -2391,21 +2391,27 @@ namespace cryptonote::rpc {
     flush_cache.response["status"] = STATUS_OK;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  GET_SERVICE_NODE_REGISTRATION_CMD_RAW::response core_rpc_server::invoke(GET_SERVICE_NODE_REGISTRATION_CMD_RAW::request&& req, rpc_context context)
+  void core_rpc_server::invoke(GET_SERVICE_NODE_REGISTRATION_CMD_RAW& get_service_node_registration_cmd_raw, rpc_context context)
   {
-    GET_SERVICE_NODE_REGISTRATION_CMD_RAW::response res{};
-
     PERF_TIMER(on_get_service_node_registration_cmd_raw);
 
     if (!m_core.service_node())
       throw rpc_error{ERROR_WRONG_PARAM, "Daemon has not been started in service node mode, please relaunch with --service-node flag."};
 
     uint8_t hf_version = get_network_version(nettype(), m_core.get_current_blockchain_height());
-    if (!service_nodes::make_registration_cmd(m_core.get_nettype(), hf_version, req.staking_requirement, req.args, m_core.get_service_keys(), res.registration_cmd, req.make_friendly))
+    std::string registration_cmd;
+    if (!service_nodes::make_registration_cmd(m_core.get_nettype(),
+          hf_version,
+          get_service_node_registration_cmd_raw.request.staking_requirement,
+          get_service_node_registration_cmd_raw.request.args,
+          m_core.get_service_keys(),
+          registration_cmd,
+          get_service_node_registration_cmd_raw.request.make_friendly))
       throw rpc_error{ERROR_INTERNAL, "Failed to make registration command"};
 
-    res.status = STATUS_OK;
-    return res;
+    get_service_node_registration_cmd_raw.response["registration_cmd"] = registration_cmd;
+    get_service_node_registration_cmd_raw.response["status"] = STATUS_OK;
+    return;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   GET_SERVICE_NODE_REGISTRATION_CMD::response core_rpc_server::invoke(GET_SERVICE_NODE_REGISTRATION_CMD::request&& req, rpc_context context)
@@ -2438,12 +2444,16 @@ namespace cryptonote::rpc {
         args.push_back(std::to_string(num_portions));
     }
 
-    GET_SERVICE_NODE_REGISTRATION_CMD_RAW::request req_old{};
+    GET_SERVICE_NODE_REGISTRATION_CMD_RAW req_old{};
 
-    req_old.staking_requirement = req.staking_requirement;
-    req_old.args = std::move(args);
-    req_old.make_friendly = false;
-    return invoke(std::move(req_old), context);
+    req_old.request.staking_requirement = req.staking_requirement;
+    req_old.request.args = std::move(args);
+    req_old.request.make_friendly = false;
+
+    invoke(req_old, context);
+    res.status = req_old.response["status"];
+    res.registration_cmd = req_old.response["registration_cmd"];
+    return res;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES& get_service_node_blacklisted_key_images, rpc_context context)
