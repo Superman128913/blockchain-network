@@ -239,11 +239,6 @@ public:
 
   bool print_net_stats();
 
-  bool set_bootstrap_daemon(
-    const std::string &address,
-    const std::string &username,
-    const std::string &password);
-
   bool flush_cache(bool bad_txs, bool invalid_blocks);
 
   bool version();

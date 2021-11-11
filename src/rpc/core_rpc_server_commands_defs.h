@@ -209,7 +209,6 @@ namespace cryptonote::rpc {
   ///
   /// - \p height -- The current blockchain height according to the queried daemon.
   /// - \p status -- Generic RPC error code. "OK" is the success value.
-  /// - \p untrusted -- If the result is obtained using bootstrap mode then this will be set to
   ///   true, otherwise will be omitted.
   /// - \p hash -- Hash of the block at the current height
   /// - \p immutable_height -- The latest height in the blockchain that cannot be reorganized
@@ -225,7 +224,6 @@ namespace cryptonote::rpc {
   /// Outputs:
   ///
   /// - \p status -- Generic RPC error code. "OK" is the success value.
-  /// - \p untrusted -- If the result is obtained using bootstrap mode then this will be set to
   ///   true, otherwise will be omitted.
   /// - \p missed_tx -- set of transaction hashes that were not found.  If all were found then this
   ///   field is omitted.  There is no particular ordering of hashes in this list.
@@ -401,7 +399,6 @@ namespace cryptonote::rpc {
   /// Outputs
   ///
   /// - \p status General RPC status string. `"OK"` means everything looks good.
-  /// - \p untrusted States if the result is obtained using the bootstrap mode, and is therefore
   ///   untrusted ('true'), or when the daemon is fully synced ('false').
   /// - \p spent_status array of status codes returned in the same order as the `key_images` input.
   ///   Each value is one of:
@@ -437,7 +434,6 @@ namespace cryptonote::rpc {
   /// Output values available from a public RPC endpoint:
   ///
   /// - \p status General RPC status string. `"OK"` means everything looks good.
-  /// - \p untrusted States if the result is obtained using the bootstrap mode, and is therefore
   ///   untrusted ('true'), or when the daemon is fully synced ('false').
   /// - \p outs List of outkey information; if `as_tuple` is not set then these are dicts containing
   ///   keys:
@@ -477,7 +473,6 @@ namespace cryptonote::rpc {
   /// Output values available from a public RPC endpoint:
   ///
   /// - \p status General RPC status string. `"OK"` means everything looks good.
-  /// - \p untrusted States if the result is obtained using the bootstrap mode, and is therefore
   ///   untrusted ('true'), or when the daemon is fully synced ('false').
   /// - \p reason String containing additional information on why a transaction failed.
   /// - \p blink_status Set to the result of submitting this transaction to the Blink quorum.  1
@@ -522,7 +517,6 @@ namespace cryptonote::rpc {
 //      std::string status; // General RPC error code. "OK" means everything looks good. Any other value means that something went wrong.
 //      std::string reason; // Additional information. Currently empty, "Not relayed" if transaction was accepted but not relayed, or some descriptive message of why the tx failed.
 //      bool not_relayed;   // Transaction was not relayed (true) or relayed (false).
-//      bool untrusted;     // States if the result is obtained using the bootstrap mode, and is therefore not trusted (`true`), or when the daemon is fully synced (`false`).
 //      tx_verification_context tvc;
 //      bool sanity_check_failed;
 //      blink_result blink_status; // 0 for a non-blink tx.  For a blink tx: 1 means rejected, 2 means accepted, 3 means timeout.
@@ -633,7 +627,6 @@ namespace cryptonote::rpc {
   /// - \p block_size_median Median block size of latest 100 blocks.
   /// - \p ons_counts ONS registration counts, as a three-element list: [session, wallet, lokinet]
   /// - \p offline Indicates that the node is offline, if true.  Omitted for online nodes.
-  /// - \p untrusted Indicates that the result was obtained using a bootstrap mode, and is therefore
   ///   not trusted (`true`).  Omitted for non-bootstrap responses.
   /// - \p database_size Current size of Blockchain data.  Over public RPC this is rounded up to the
   ///   next-largest GB value.
@@ -658,12 +651,6 @@ namespace cryptonote::rpc {
   ///   as a service node)
   /// - \p last_lokinet_ping Last ping time of lokinet (0 if never or not running as a service node)
   /// - \p free_space Available disk space on the node.
-  /// - \p bootstrap_daemon_address Bootstrap node to give immediate usability to wallets while
-  ///   syncing by proxying RPC to it. (Note: the replies may be untrustworthy).
-  /// - \p height_without_bootstrap Current length of the local chain of the daemon.  Only included
-  ///   if a bootstrap daemon is configured.
-  /// - \p was_bootstrap_ever_used States if the bootstrap node has ever been used since the daemon
-  ///   started.  Omitted if no bootstrap node is configured.
   struct GET_INFO : PUBLIC, LEGACY, NO_ARGS
   {
     static constexpr auto names() { return NAMES("get_info", "getinfo"); }
@@ -971,7 +958,6 @@ namespace cryptonote::rpc {
   ///
   /// - \p status General RPC status string. `"OK"` means everything looks good.
   /// - \p tx_hashes List of transaction hashes,
-  /// - \p untrusted States if the result is obtained using the bootstrap mode, and is therefore not
   ///   trusted (`true`), or when the daemon is fully synced (`false`).
   struct GET_TRANSACTION_POOL_HASHES : PUBLIC, LEGACY, NO_ARGS
   {
@@ -1015,7 +1001,6 @@ namespace cryptonote::rpc {
   ///       `histo_98pc`.
   ///   - \p histo_98pc See `histo` for details.
   ///   - \p histo_max See `histo` for details.
-  /// - \p untrusted States if the result is obtained using the bootstrap mode, and is therefore not
   ///   trusted (`true`), or when the daemon is fully synced (`false`).
   struct GET_TRANSACTION_POOL_STATS : PUBLIC, LEGACY
   {
@@ -1095,24 +1080,6 @@ namespace cryptonote::rpc {
       bool fill_pow_hash;    // Tell the daemon if it should fill out pow_hash field.
       bool get_tx_hashes;    // If true (default false) then include the hashes or txes in the block details
     } request;
-  };
-
-  OXEN_RPC_DOC_INTROSPECT
-  // Set the bootstrap daemon to use for data on the blockchain whilst syncing the chain.
-  struct SET_BOOTSTRAP_DAEMON : RPC_COMMAND
-  {
-    static constexpr auto names() { return NAMES("set_bootstrap_daemon"); }
-    struct request
-    {
-
-      std::string address;
-      std::string username;
-      std::string password;
-
-      KV_MAP_SERIALIZABLE
-    };
-
-    struct response : STATUS {};
   };
 
   //-----------------------------------------------
@@ -1213,7 +1180,6 @@ namespace cryptonote::rpc {
   /// Output values available from a public RPC endpoint:
   ///
   /// - \p status General RPC status string. `"OK"` means everything looks good.
-  /// - \p untrusted States if the result is obtained using the bootstrap mode, and is therefore
   ///   untrusted ('true'), or when the daemon is fully synced ('false').
   /// - \p version The major block version for the fork.
   /// - \p enabled Indicates whether the hard fork is enforced on the blockchain (that is, whether
@@ -1355,7 +1321,6 @@ namespace cryptonote::rpc {
     {
       std::string status;           // General RPC error code. "OK" means everything looks good.
       std::vector<entry> histogram; // List of histogram entries:
-      bool untrusted;               // States if the result is obtained using the bootstrap mode, and is therefore not trusted (`true`), or when the daemon is fully synced (`false`).
 
       KV_MAP_SERIALIZABLE
     };
@@ -1369,7 +1334,6 @@ namespace cryptonote::rpc {
   ///
   /// - \p status General RPC status string. `"OK"` means everything looks good.
   /// - \p version RPC current version.
-  /// - \p untrusted States if the result is obtained using the bootstrap mode, and is therefore not
   ///   trusted (`true`), or when the daemon is fully synced
   struct GET_VERSION : PUBLIC, NO_ARGS
   {
@@ -1423,7 +1387,6 @@ namespace cryptonote::rpc {
   /// - \p blink_fee_fixed Fixed blink fee in addition to the per-output and per-byte amounts. The
   ///   portion of the overall blink fee above the overall base fee is burned.
   /// - \p quantization_mask
-  /// - \p untrusted States if the result is obtained using the bootstrap mode, and is therefore not
   ///   trusted (`true`), or when the daemon is fully synced (`false`).
   struct GET_BASE_FEE_ESTIMATE : PUBLIC
   {
@@ -1556,7 +1519,6 @@ namespace cryptonote::rpc {
     {
       std::string status;                      // General RPC error code. "OK" means everything looks good.
       std::vector<distribution> distributions; //
-      bool untrusted;                          // States if the result is obtained using the bootstrap mode, and is therefore not trusted (`true`), or when the daemon is fully synced (`false`).
 
       KV_MAP_SERIALIZABLE
     };
@@ -1658,7 +1620,6 @@ namespace cryptonote::rpc {
     {
       std::string status;                     // Generic RPC error code. "OK" is the success value.
       std::vector<quorum_for_height> quorums; // An array of quorums associated with the requested height
-      bool untrusted;                         // If the result is obtained using bootstrap mode, and therefore not trusted `true`, or otherwise `false`.
 
       KV_MAP_SERIALIZABLE
     };
@@ -2122,7 +2083,6 @@ namespace cryptonote::rpc {
   /// Output values available from a public RPC endpoint:
   ///
   /// - \p status Generic RPC error code. "OK" is the success value.
-  /// - \p untrusted If the result is obtained using bootstrap mode then this will be set to true,
   ///   otherwise will be omitted.
   /// - \p total_deregister
   /// - \p total_ip_change_penalty
@@ -2403,7 +2363,6 @@ namespace cryptonote::rpc {
     GET_BLOCK_HEADER_BY_HEIGHT,
     GET_BLOCK,
     GET_BLOCK_HEADERS_RANGE,
-    SET_BOOTSTRAP_DAEMON,
     GETBANS,
     SETBANS,
     GET_OUTPUT_HISTOGRAM,
