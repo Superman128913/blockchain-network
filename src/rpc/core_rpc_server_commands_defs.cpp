@@ -68,6 +68,14 @@ void from_json(const nlohmann::json& j, block_header_response& h)
   j.at("service_node_winner").get_to(h.service_node_winner);
 };
 
+void to_json(nlohmann::json& j, const GET_QUORUM_STATE::quorum_t& q)
+{
+  j = nlohmann::json{{"validators", q.validators}, {"workers", q.workers}};
+};
+void to_json(nlohmann::json& j, const GET_QUORUM_STATE::quorum_for_height& q)
+{
+  j = nlohmann::json{{"height", q.height}, {"quorum_type", q.quorum_type}, {"quorum", q.quorum}};
+};
 
 KV_SERIALIZE_MAP_CODE_BEGIN(STATUS)
   KV_SERIALIZE(status)
@@ -215,32 +223,6 @@ KV_SERIALIZE_MAP_CODE_END()
 KV_SERIALIZE_MAP_CODE_BEGIN(GET_OUTPUT_DISTRIBUTION::response)
   KV_SERIALIZE(status)
   KV_SERIALIZE(distributions)
-KV_SERIALIZE_MAP_CODE_END()
-
-
-KV_SERIALIZE_MAP_CODE_BEGIN(GET_QUORUM_STATE::request)
-  KV_SERIALIZE_OPT(start_height, HEIGHT_SENTINEL_VALUE)
-  KV_SERIALIZE_OPT(end_height, HEIGHT_SENTINEL_VALUE)
-  KV_SERIALIZE_OPT(quorum_type, ALL_QUORUMS_SENTINEL_VALUE)
-KV_SERIALIZE_MAP_CODE_END()
-
-
-KV_SERIALIZE_MAP_CODE_BEGIN(GET_QUORUM_STATE::quorum_t)
-  KV_SERIALIZE(validators)
-  KV_SERIALIZE(workers)
-KV_SERIALIZE_MAP_CODE_END()
-
-
-KV_SERIALIZE_MAP_CODE_BEGIN(GET_QUORUM_STATE::quorum_for_height)
-  KV_SERIALIZE(height)
-  KV_SERIALIZE(quorum_type)
-  KV_SERIALIZE(quorum)
-KV_SERIALIZE_MAP_CODE_END()
-
-
-KV_SERIALIZE_MAP_CODE_BEGIN(GET_QUORUM_STATE::response)
-  KV_SERIALIZE(status)
-  KV_SERIALIZE(quorums)
 KV_SERIALIZE_MAP_CODE_END()
 
 

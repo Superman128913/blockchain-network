@@ -143,7 +143,6 @@ public:
     return invoke<Response>(params)["response"];
   }
 
-
   bool print_checkpoints(uint64_t start_height, uint64_t end_height, bool print_json);
 
   bool print_sn_state_changes(uint64_t start_height, uint64_t end_height);
