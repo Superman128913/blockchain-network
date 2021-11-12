@@ -1399,12 +1399,23 @@ namespace cryptonote::rpc {
   };
 
   OXEN_RPC_DOC_INTROSPECT
-  // Display alternative chains seen by the node.
+  /// Display alternative chains seen by the node.
+  ///
+  /// Inputs: None
+  ///
+  /// Output values available from a public RPC endpoint:
+  ///
+  /// - \p status General RPC status string. `"OK"` means everything looks good.
+  /// - \p chains Array of Chains. Each element is contains the following keys:
+  ///   - \p block_hash The block hash of the first diverging block of this alternative chain.
+  ///   - \p height The block height of the first diverging block of this alternative chain.
+  ///   - \p length The length in blocks of this alternative chain, after divergence.
+  ///   - \p difficulty The cumulative difficulty of all blocks in the alternative chain.
+  ///   - \p block_hashes List containing hex block hashes
+  ///   - \p main_chain_parent_block
   struct GET_ALTERNATE_CHAINS : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("get_alternative_chains"); }
-
-    struct request : EMPTY {};
 
     struct chain_info
     {
@@ -1414,18 +1425,10 @@ namespace cryptonote::rpc {
       uint64_t difficulty;                   // The cumulative difficulty of all blocks in the alternative chain.
       std::vector<std::string> block_hashes;
       std::string main_chain_parent_block;
-
-      KV_MAP_SERIALIZABLE
-    };
-
-    struct response
-    {
-      std::string status;             // General RPC error code. "OK" means everything looks good.
-      std::vector<chain_info> chains; // Array of Chains.
-
-      KV_MAP_SERIALIZABLE
     };
   };
+  void to_json(nlohmann::json& j, const GET_ALTERNATE_CHAINS::chain_info& c);
+  void from_json(const nlohmann::json& j, GET_ALTERNATE_CHAINS::chain_info& c);
 
   /// Relay a list of transaction IDs.
   ///
@@ -1615,8 +1618,8 @@ namespace cryptonote::rpc {
       quorum_t quorum;          // Quorum of Service Nodes
     };
   };
-  inline void to_json(nlohmann::json& j, const GET_QUORUM_STATE::quorum_t& q);
-  inline void to_json(nlohmann::json& j, const GET_QUORUM_STATE::quorum_for_height& q);
+  void to_json(nlohmann::json& j, const GET_QUORUM_STATE::quorum_t& q);
+  void to_json(nlohmann::json& j, const GET_QUORUM_STATE::quorum_for_height& q);
 
   /// Returns the command that should be run to prepare a service node, includes correct parameters 
   /// and service node ids formatted ready for cut and paste into daemon console.
