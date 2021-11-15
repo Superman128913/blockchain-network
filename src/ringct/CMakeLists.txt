@@ -40,7 +40,6 @@ target_link_libraries(ringct_basic
   PRIVATE
     OpenSSL::SSL
     OpenSSL::Crypto
-    nlohmann_json::nlohmann_json
     extra)
 
 add_library(ringct
@@ -54,5 +53,4 @@ target_link_libraries(ringct
   PRIVATE
     OpenSSL::SSL
     OpenSSL::Crypto
-    nlohmann_json::nlohmann_json
     extra)
