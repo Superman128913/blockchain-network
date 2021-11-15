@@ -2,6 +2,28 @@
 #include <nlohmann/json.hpp>
 #include <oxenmq/base64.h>
 
+namespace nlohmann {
+
+	template <class T>
+	void to_json(nlohmann::json& j, const std::optional<T>& v)
+	{
+		if (v.has_value())
+			j = *v;
+		else
+			j = nullptr;
+	}
+
+	template <class T>
+	void from_json(const nlohmann::json& j, std::optional<T>& v)
+	{
+		if (j.is_null())
+			v = std::nullopt;
+		else
+			v = j.get<T>();
+	}
+	
+}
+
 namespace cryptonote::rpc {
 
 void RPC_COMMAND::set_bt() {
@@ -107,6 +129,7 @@ void to_json(nlohmann::json& j, const GET_OUTPUT_HISTOGRAM::entry& e)
     {"recent_instances", e.recent_instances},
   };
 }
+
 void from_json(const nlohmann::json& j, GET_OUTPUT_HISTOGRAM::entry& e)
 {
   j.at("amount").get_to(e.amount);
@@ -114,6 +137,21 @@ void from_json(const nlohmann::json& j, GET_OUTPUT_HISTOGRAM::entry& e)
   j.at("unlocked_instances").get_to(e.unlocked_instances);
   j.at("recent_instances").get_to(e.recent_instances);
 };
+
+void to_json(nlohmann::json& j, const ONS_OWNERS_TO_NAMES::response_entry& r)
+{
+  j = nlohmann::json{
+    {"request_index", r.request_index},
+    {"type", r.type},
+    {"name_hash", r.name_hash},
+    {"owner", r.owner},
+    {"backup_owner", r.backup_owner},
+    {"encrypted_value", r.encrypted_value},
+    {"update_height", r.update_height},
+    {"expiration_height", r.expiration_height},
+    {"txid", r.txid},
+  };
+}
 
 KV_SERIALIZE_MAP_CODE_BEGIN(STATUS)
   KV_SERIALIZE(status)
@@ -268,27 +306,4 @@ KV_SERIALIZE_MAP_CODE_BEGIN(ONS_NAMES_TO_OWNERS::response)
   KV_SERIALIZE(status)
 KV_SERIALIZE_MAP_CODE_END()
 
-KV_SERIALIZE_MAP_CODE_BEGIN(ONS_OWNERS_TO_NAMES::request)
-  KV_SERIALIZE(entries)
-  KV_SERIALIZE(include_expired)
-KV_SERIALIZE_MAP_CODE_END()
-
-
-KV_SERIALIZE_MAP_CODE_BEGIN(ONS_OWNERS_TO_NAMES::response_entry)
-  KV_SERIALIZE(request_index)
-  KV_SERIALIZE_ENUM(type)
-  KV_SERIALIZE(name_hash)
-  KV_SERIALIZE(owner)
-  KV_SERIALIZE(backup_owner)
-  KV_SERIALIZE(encrypted_value)
-  KV_SERIALIZE(update_height)
-  KV_SERIALIZE(expiration_height)
-  KV_SERIALIZE(txid)
-KV_SERIALIZE_MAP_CODE_END()
-
-
-KV_SERIALIZE_MAP_CODE_BEGIN(ONS_OWNERS_TO_NAMES::response)
-  KV_SERIALIZE(entries)
-  KV_SERIALIZE(status)
-KV_SERIALIZE_MAP_CODE_END()
 }

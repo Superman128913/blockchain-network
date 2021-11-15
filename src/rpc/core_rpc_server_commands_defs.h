@@ -209,7 +209,6 @@ namespace cryptonote::rpc {
   ///
   /// - \p height -- The current blockchain height according to the queried daemon.
   /// - \p status -- Generic RPC error code. "OK" is the success value.
-  ///   true, otherwise will be omitted.
   /// - \p hash -- Hash of the block at the current height
   /// - \p immutable_height -- The latest height in the blockchain that cannot be reorganized
   ///   because of a hardcoded checkpoint or 2 SN checkpoints.  Omitted if not available.
@@ -224,7 +223,6 @@ namespace cryptonote::rpc {
   /// Outputs:
   ///
   /// - \p status -- Generic RPC error code. "OK" is the success value.
-  ///   true, otherwise will be omitted.
   /// - \p missed_tx -- set of transaction hashes that were not found.  If all were found then this
   ///   field is omitted.  There is no particular ordering of hashes in this list.
   /// - \p txs -- list of transaction details; each element is a dict containing:
@@ -2081,7 +2079,6 @@ namespace cryptonote::rpc {
   /// Output values available from a public RPC endpoint:
   ///
   /// - \p status Generic RPC error code. "OK" is the success value.
-  ///   otherwise will be omitted.
   /// - \p total_deregister
   /// - \p total_ip_change_penalty
   /// - \p total_decommission
@@ -2203,21 +2200,37 @@ namespace cryptonote::rpc {
     };
   };
 
-  OXEN_RPC_DOC_INTROSPECT
-  // Get all the name mappings for the queried owner. The owner can be either a ed25519 public key or Monero style
-  // public key; by default purchases are owned by the spend public key of the purchasing wallet.
+  /// Get all the name mappings for the queried owner. The owner can be either a ed25519 public key or Monero style
+  /// public key; by default purchases are owned by the spend public key of the purchasing wallet.
+  ///
+  /// Inputs:
+  /// 
+  /// - \p entries List of owner's public keys to find all Oxen Name Service entries for.
+  /// - \p include_expired Optional: if provided and true, include entries in the results even if they are expired
+  ///
+  /// Output values available from a public RPC endpoint:
+  ///
+  /// - \p status Generic RPC error code. "OK" is the success value.
+  /// - \p entries List of ONS names. Each element is structured as follows:
+  ///   - \p request_index (Deprecated) The index in request's `entries` array that was resolved via Loki Name Service.
+  ///   - \p type The category the Loki Name Service entry belongs to; currently 0 for Session, 1 for Wallet and 2 for Lokinet.
+  ///   - \p name_hash The hash of the name that the owner purchased via Loki Name Service in base64
+  ///   - \p owner The backup public key specified by the owner that purchased the Loki Name Service entry.
+  ///   - \p backup_owner The backup public key specified by the owner that purchased the Loki Name Service entry. Omitted if no backup owner.
+  ///   - \p encrypted_value The encrypted value that the name maps to, in hex. This value is encrypted using the name (not the hash) as the secret.
+  ///   - \p update_height The last height that this Loki Name Service entry was updated on the Blockchain.
+  ///   - \p expiration_height For records that expire, this will be set to the expiration block height.
+  ///   - \p txid The txid of the mapping's most recent update or purchase.
   struct ONS_OWNERS_TO_NAMES : PUBLIC
   {
     static constexpr auto names() { return NAMES("ons_owners_to_names", "lns_owners_to_names"); }
 
     static constexpr size_t MAX_REQUEST_ENTRIES = 256;
-    struct request
+    struct request_parameters
     {
       std::vector<std::string> entries; // The owner's public key to find all Loki Name Service entries for.
       bool include_expired;             // Optional: if provided and true, include entries in the results even if they are expired
-
-      KV_MAP_SERIALIZABLE
-    };
+    } request;
 
     struct response_entry
     {
@@ -2230,18 +2243,9 @@ namespace cryptonote::rpc {
       uint64_t    update_height;   // The last height that this Loki Name Service entry was updated on the Blockchain.
       std::optional<uint64_t> expiration_height; // For records that expire, this will be set to the expiration block height.
       std::string txid;                     // The txid of the mapping's most recent update or purchase.
-
-      KV_MAP_SERIALIZABLE
-    };
-
-    struct response
-    {
-      std::vector<response_entry> entries;
-      std::string status; // Generic RPC error code. "OK" is the success value.
-
-      KV_MAP_SERIALIZABLE
     };
   };
+  void to_json(nlohmann::json& j, const ONS_OWNERS_TO_NAMES::response_entry& r);
 
   /// Performs a simple ONS lookup of a BLAKE2b-hashed name.  This RPC method is meant for simple,
   /// single-value resolutions that do not care about registration details, etc.; if you need more
