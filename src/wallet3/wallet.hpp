@@ -25,7 +25,7 @@ namespace wallet
 
   class Wallet : public std::enable_shared_from_this<Wallet>
   {
-   private:
+   protected:
     Wallet(
         std::shared_ptr<oxenmq::OxenMQ> oxenMQ,
         std::shared_ptr<Keyring> keys,
@@ -92,7 +92,7 @@ namespace wallet
     void
     Deregister();
 
-   private:
+   protected:
     void
     StoreTransaction(
         const crypto::hash& tx_hash, const int64_t height, const std::vector<Output>& outputs);

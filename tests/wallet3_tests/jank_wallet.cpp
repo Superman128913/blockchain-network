@@ -16,7 +16,7 @@ int main(void)
 {
   auto oxenmq = std::make_shared<oxenmq::OxenMQ>();
 
-  auto ctor = std::make_shared<wallet::TransactionConstructor>();
+  auto ctor = std::make_shared<wallet::TransactionConstructor>(nullptr, nullptr);
 
   crypto::secret_key spend_priv;
   tools::hex_to_type<crypto::secret_key>("d6a2eac72d1432fb816793aa7e8e86947116ac1423cbad5804ca49893e03b00c", spend_priv);
