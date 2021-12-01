@@ -27,10 +27,10 @@ class MockWallet : public Wallet
 
     int64_t height = 0;
 
-    std::shared_ptr<db::Database> GetDB() { return db; };
+    std::shared_ptr<db::Database> get_db() { return db; };
 
     void
-    StoreTestTransaction(const int64_t amount) 
+    store_test_transaction(const int64_t amount) 
     {
       height++;
 
@@ -38,7 +38,7 @@ class MockWallet : public Wallet
       b.height = height;
       auto hash = debug_random_filled<crypto::hash>(height);
       b.hash = hash;
-      AddBlock(b);
+      add_block(b);
 
       std::vector<wallet::Output> dummy_outputs;
       wallet::Output o{};
@@ -49,7 +49,7 @@ class MockWallet : public Wallet
       dummy_outputs.push_back(o);
 
       SQLite::Transaction db_tx(db->db);
-      StoreTransaction(hash, height, dummy_outputs);
+      store_transaction(hash, height, dummy_outputs);
       db_tx.commit();
     };
 };

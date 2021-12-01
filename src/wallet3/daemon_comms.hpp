@@ -35,6 +35,9 @@ namespace wallet
 
     virtual void
     deregister_wallet(Wallet& wallet, std::promise<void>& p) = 0;
+
+    virtual std::pair<int64_t, int64_t>
+    get_fee_parameters() = 0;
   };
 
 }  // namespace wallet

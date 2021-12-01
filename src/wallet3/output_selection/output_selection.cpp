@@ -11,7 +11,14 @@ namespace wallet
         available_outputs.end(),
         0,
         [](const auto& accumulator, const auto& x) { return accumulator + x.amount; });
-    if (wallet_balance < amount)
+    int64_t fee = 0;
+    auto pos = fee_map.find(1);
+    if (pos == fee_map.end()) {
+      throw std::runtime_error("Missing fee amount");
+    } else {
+        fee = pos->second;
+    }
+    if (wallet_balance < amount + fee)
       throw std::runtime_error("Insufficient Wallet Balance");
 
     // Prefer a single output if suitable
@@ -20,7 +27,7 @@ namespace wallet
         available_outputs.begin(),
         available_outputs.end(),
         std::back_inserter(outputs_bigger_than_amount),
-        [amount](const auto& x) { return static_cast<int64_t>(x.amount) > amount; });
+        [amount, fee](const auto& x) { return static_cast<int64_t>(x.amount) > amount + fee; });
 
     if (outputs_bigger_than_amount.size() > 0)
     {
@@ -73,8 +80,14 @@ namespace wallet
     // Iterate through the list until we have sufficient return value
     std::vector<Output> multiple_outputs{};
     int i = 0;
-    while (amount > 0)
+    while (amount + fee > 0)
     {
+      auto pos = fee_map.find(i+1);
+      if (pos == fee_map.end()) {
+        throw std::runtime_error("Missing fee amount");
+      } else {
+          fee = pos->second;
+      }
       multiple_outputs.push_back(available_outputs[indices[i]]);
       amount = amount - available_outputs[indices[i]].amount;
       i++;
