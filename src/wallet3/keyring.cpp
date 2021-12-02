@@ -94,7 +94,7 @@ namespace wallet
       unsigned int i,
       rct::key& mask)
   {
-    return wallet2½::output_amount(rv, derivation, i, mask, key_device);
+    return wallet25::output_amount(rv, derivation, i, mask, key_device);
   }
 
 }  // namespace wallet

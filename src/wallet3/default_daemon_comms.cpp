@@ -87,7 +87,7 @@ namespace wallet
           if (tx_dict.key() != "tx")
             return;
 
-          tx.tx = wallet2½::tx_from_blob(tx_dict.consume_string_view());
+          tx.tx = wallet25::tx_from_blob(tx_dict.consume_string_view());
 
           if (not tx_dict.is_finished())
             return;
