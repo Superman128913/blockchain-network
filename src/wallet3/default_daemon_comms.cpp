@@ -13,20 +13,20 @@
 namespace wallet
 {
   void
-  DefaultDaemonComms::OnGetBlocksResponse(std::vector<std::string> response)
+  DefaultDaemonComms::on_get_blocks_response(std::vector<std::string> response)
   {
     if (not response.size())
     {
-      std::cout << "OnGetBlocksResponse(): empty GetBlocks response\n";
+      std::cout << "on_get_blocks_response(): empty get_blocks response\n";
       //TODO: error handling
       return;
     }
-    std::cout << "OnGetBlocksResponse() got " << response.size() - 1 << " blocks.\n";
+    std::cout << "on_get_blocks_response() got " << response.size() - 1 << " blocks.\n";
 
     const auto& status = response[0];
     if (status != "OK" and status != "END")
     {
-      std::cout << "GetBlocks response: " << response[0] << "\n";
+      std::cout << "get_blocks response: " << response[0] << "\n";
       //TODO: error handling
       return;
     }
@@ -35,7 +35,7 @@ namespace wallet
     // TODO: decide/confirm this behavior on the daemon side of things
     if (response.size() == 1)
     {
-      std::cout << "GetBlocks response.size() == 1\n";
+      std::cout << "get_blocks response.size() == 1\n";
       return;
     }
 
@@ -115,43 +115,43 @@ namespace wallet
 
     int64_t start_height = blocks.front().height;
     int64_t end_height = blocks.back().height;
-    std::cout << "OnGetBlocksResponse() got blocks [" << start_height << " to " << end_height << "]\n";
+    std::cout << "on_get_blocks_response() got blocks [" << start_height << " to " << end_height << "]\n";
 
     if (status == "END")
     {
       std::cout << "Finished syncing wallets, height: " << end_height << "\n";
-      oxenMQ->job([this](){ syncing = false; }, sync_thread);
+      omq->job([this](){ syncing = false; }, sync_thread);
     }
     else
     {
-      oxenMQ->job([this,start_height,end_height](){GotBlocks(start_height, end_height);}, sync_thread);
+      omq->job([this,start_height,end_height](){got_blocks(start_height, end_height);}, sync_thread);
     }
 
-    oxenMQ->job([blocks=std::move(blocks),this](){
-        ForEachWallet([&](std::shared_ptr<Wallet> wallet){
-            wallet->AddBlocks(blocks);
+    omq->job([blocks=std::move(blocks),this](){
+        for_each_wallet([&](std::shared_ptr<Wallet> wallet){
+            wallet->add_blocks(blocks);
             });
         }, sync_thread);
 
   }
 
   void
-  DefaultDaemonComms::RequestTopBlockInfo()
+  DefaultDaemonComms::request_top_block_info()
   {
     auto timeout_job = [self=weak_from_this()](){
       if (auto comms = self.lock())
-        comms->RequestTopBlockInfo();
+        comms->request_top_block_info();
     };
 
-    oxenMQ->cancel_timer(status_timer);
+    omq->cancel_timer(status_timer);
     if (top_block_height == 0)
     {
-      oxenMQ->add_timer(status_timer, timeout_job, 3s);
+      omq->add_timer(status_timer, timeout_job, 3s);
     }
     else
-      oxenMQ->add_timer(status_timer, timeout_job, 15s);
+      omq->add_timer(status_timer, timeout_job, 15s);
 
-    oxenMQ->request(conn, "rpc.get_height",
+    omq->request(conn, "rpc.get_height",
         [this](bool ok, std::vector<std::string> response)
         {
           if (not ok or response.size() != 2 or response[0] != "200")
@@ -177,15 +177,15 @@ namespace wallet
         }, "de");
   }
 
-  DefaultDaemonComms::DefaultDaemonComms(std::shared_ptr<oxenmq::OxenMQ> oxenMQ)
-    : oxenMQ(oxenMQ),
-      sync_thread(oxenMQ->add_tagged_thread("sync"))
+  DefaultDaemonComms::DefaultDaemonComms(std::shared_ptr<oxenmq::OxenMQ> omq)
+    : omq(omq),
+      sync_thread(omq->add_tagged_thread("sync"))
   {
-    oxenMQ->MAX_MSG_SIZE = max_response_size;
+    omq->MAX_MSG_SIZE = max_response_size;
   }
 
   void
-  DefaultDaemonComms::SetRemote(std::string_view address)
+  DefaultDaemonComms::set_remote(std::string_view address)
   {
     try
     {
@@ -198,13 +198,13 @@ namespace wallet
     }
 
     // TODO: proper callbacks
-    conn = oxenMQ->connect_remote(remote, [](auto){}, [](auto,auto){});
+    conn = omq->connect_remote(remote, [](auto){}, [](auto,auto){});
 
-    RequestTopBlockInfo();
+    request_top_block_info();
   }
 
   void
-  DefaultDaemonComms::GetBlocks()
+  DefaultDaemonComms::get_blocks()
   {
     auto req_cb = [this](bool ok, std::vector<std::string> response)
     {
@@ -215,9 +215,9 @@ namespace wallet
         // Retry after a delay to not spam/spin
         auto timer = std::make_shared<oxenmq::TimerID>();
         auto& timer_ref = *timer;
-        oxenMQ->add_timer(timer_ref, [this,timer=std::move(timer)]{
-            oxenMQ->cancel_timer(*timer);
-            GetBlocks();
+        omq->add_timer(timer_ref, [this,timer=std::move(timer)]{
+            omq->cancel_timer(*timer);
+            get_blocks();
             },
             500ms,
             true,
@@ -225,7 +225,7 @@ namespace wallet
         return;
       }
 
-      OnGetBlocksResponse(response);
+      on_get_blocks_response(response);
     };
 
     std::map<std::string, int64_t> req_params_dict{
@@ -233,38 +233,38 @@ namespace wallet
       {"size_limit", max_response_size},
       {"start_height", sync_from_height}};
 
-    oxenMQ->request(conn, "rpc.get_blocks", req_cb, oxenmq::bt_serialize(req_params_dict));
+    omq->request(conn, "rpc.get_blocks", req_cb, oxenmq::bt_serialize(req_params_dict));
   }
 
   void
-  DefaultDaemonComms::RegisterWallet(wallet::Wallet& wallet, int64_t height, bool check_sync_height)
+  DefaultDaemonComms::register_wallet(wallet::Wallet& wallet, int64_t height, bool check_sync_height)
   {
-    oxenMQ->job([this,w=wallet.shared_from_this(),height,check_sync_height](){
+    omq->job([this,w=wallet.shared_from_this(),height,check_sync_height](){
         wallets.insert_or_assign(w, height);
         if (check_sync_height)
           sync_from_height = std::min(sync_from_height, height);
-        StartSyncing();
+        start_syncing();
         }, sync_thread);
   }
 
   void
-  DefaultDaemonComms::DeregisterWallet(wallet::Wallet& wallet, std::promise<void>& p)
+  DefaultDaemonComms::deregister_wallet(wallet::Wallet& wallet, std::promise<void>& p)
   {
-    oxenMQ->job([this,w=wallet.shared_from_this(),&p]() mutable {
+    omq->job([this,w=wallet.shared_from_this(),&p]() mutable {
           wallets.erase(w);
           w.reset();
           p.set_value();
           auto itr = std::min_element(wallets.begin(), wallets.end(),
               [](const auto& l, const auto& r){ return l.second < r.second; });
           sync_from_height = itr->second;
-          std::cout << "DeregisterWallet() setting sync_from_height to " << sync_from_height << "\n";
+          std::cout << "deregister_wallet() setting sync_from_height to " << sync_from_height << "\n";
           if (sync_from_height != 0 and sync_from_height == top_block_height)
             syncing = false;
         }, sync_thread);
   }
 
   void
-  DefaultDaemonComms::ForEachWallet(std::function<void(std::shared_ptr<Wallet>)> func)
+  DefaultDaemonComms::for_each_wallet(std::function<void(std::shared_ptr<Wallet>)> func)
   {
     for (auto [wallet,h] : wallets)
     {
@@ -273,7 +273,7 @@ namespace wallet
   }
 
   void
-  DefaultDaemonComms::GotBlocks(int64_t start_height, int64_t end_height)
+  DefaultDaemonComms::got_blocks(int64_t start_height, int64_t end_height)
   {
     // if we get caught up, or all wallets are removed, no need to request more blocks
     if (not syncing)
@@ -283,16 +283,16 @@ namespace wallet
     {
       sync_from_height = end_height + 1;
     }
-    GetBlocks();
+    get_blocks();
   }
 
   void
-  DefaultDaemonComms::StartSyncing()
+  DefaultDaemonComms::start_syncing()
   {
     if ((not syncing and sync_from_height < top_block_height) or (top_block_height == 0))
     {
       syncing = true;
-      GetBlocks();
+      get_blocks();
     }
   }
 

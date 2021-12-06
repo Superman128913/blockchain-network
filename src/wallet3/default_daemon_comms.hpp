@@ -22,47 +22,44 @@ namespace wallet
     static constexpr int64_t DEFAULT_MAX_SYNC_BLOCKS = 200;
 
     void
-    OnGetBlocksResponse(std::vector<std::string> response);
+    on_get_blocks_response(std::vector<std::string> response);
 
     void
-    RequestTopBlockInfo();
-
-    void
-    UpdateTopBlockInfo();
+    request_top_block_info();
 
    public:
 
-    DefaultDaemonComms(std::shared_ptr<oxenmq::OxenMQ> oxenMQ);
+    DefaultDaemonComms(std::shared_ptr<oxenmq::OxenMQ> omq);
 
     void
-    SetRemote(std::string_view address);
+    set_remote(std::string_view address);
 
     int64_t
-    GetHeight() { return top_block_height; }
+    get_height() { return top_block_height; }
 
     void
-    RegisterWallet(wallet::Wallet& wallet, int64_t height, bool check_sync_height);
+    register_wallet(wallet::Wallet& wallet, int64_t height, bool check_sync_height);
 
     void
-    DeregisterWallet(Wallet& wallet, std::promise<void>& p);
+    deregister_wallet(Wallet& wallet, std::promise<void>& p);
 
    private:
 
     void
-    ForEachWallet(std::function<void(std::shared_ptr<Wallet>)> func);
+    for_each_wallet(std::function<void(std::shared_ptr<Wallet>)> func);
 
     void
-    GetBlocks();
+    get_blocks();
 
     void
-    GotBlocks(int64_t start_height, int64_t end_height);
+    got_blocks(int64_t start_height, int64_t end_height);
 
     void
-    StartSyncing();
+    start_syncing();
 
     std::unordered_map<std::shared_ptr<Wallet>, int64_t> wallets;
 
-    std::shared_ptr<oxenmq::OxenMQ> oxenMQ;
+    std::shared_ptr<oxenmq::OxenMQ> omq;
     oxenmq::address remote;
     oxenmq::ConnectionID conn;
     oxenmq::TimerID status_timer;

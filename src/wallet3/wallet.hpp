@@ -27,10 +27,10 @@ namespace wallet
   {
    protected:
     Wallet(
-        std::shared_ptr<oxenmq::OxenMQ> oxenMQ,
+        std::shared_ptr<oxenmq::OxenMQ> omq,
         std::shared_ptr<Keyring> keys,
-        std::shared_ptr<TransactionConstructor> txConstructor,
-        std::shared_ptr<DaemonComms> daemonComms,
+        std::shared_ptr<TransactionConstructor> tx_constructor,
+        std::shared_ptr<DaemonComms> daemon_comms,
         std::string_view dbFilename,
         std::string_view dbPassword);
 
@@ -40,7 +40,7 @@ namespace wallet
    public:
     template <typename... T>
     [[nodiscard]] static std::shared_ptr<Wallet>
-    MakeWallet(T&&... args)
+    create(T&&... args)
     {
       std::shared_ptr<Wallet> p{new Wallet(std::forward<T>(args)...)};
       p->init();
@@ -50,73 +50,64 @@ namespace wallet
     ~Wallet();
 
     uint64_t
-    GetBalance();
+    get_balance();
     uint64_t
-    GetUnlockedBalance();
+    get_unlocked_balance();
     address
-    GetAddress();
+    get_address();
 
     // FIXME: argument nomenclature
     address
-    GetSubaddress(int32_t account, int32_t index);
-
-    int64_t
-    ScannedHeight();
-
-    int64_t
-    ScanTargetHeight();
+    get_subaddress(int32_t account, int32_t index);
 
     // TODO: error types to throw
     PendingTransaction
-    CreateTransaction(
+    create_transaction(
         const std::vector<std::pair<address, int64_t>>& recipients, int64_t feePerKB);
     void
-    SignTransaction(PendingTransaction& tx);
+    sign_transaction(PendingTransaction& tx);
     void
-    SubmitTransaction(const PendingTransaction& tx);
+    submit_transaction(const PendingTransaction& tx);
 
     void
-    AddBlock(const Block& block);
+    add_block(const Block& block);
 
     void
-    AddBlocks(const std::vector<Block>& blocks);
+    add_blocks(const std::vector<Block>& blocks);
 
     // Called by daemon comms to inform of new sync target.
     void
-    UpdateTopBlockInfo(int64_t height, const crypto::hash& hash);
+    update_top_block_info(int64_t height, const crypto::hash& hash);
 
     /* Tells the wallet to inform comms that it is going away.
      *
      * This MUST be called before the wallet is destroyed.
      */
     void
-    Deregister();
+    deregister();
+
+    int64_t scan_target_height = 0;
+    int64_t last_scanned_height = -1;
 
    protected:
     void
-    StoreTransaction(
+    store_transaction(
         const crypto::hash& tx_hash, const int64_t height, const std::vector<Output>& outputs);
 
     void
-    StoreSpends(
+    store_spends(
         const crypto::hash& tx_hash,
         const int64_t height,
         const std::vector<crypto::key_image>& spends);
 
-    void
-    RequestNextBlocks();
-
-    std::shared_ptr<oxenmq::OxenMQ> oxenMQ;
+    std::shared_ptr<oxenmq::OxenMQ> omq;
 
     std::shared_ptr<db::Database> db;
 
     std::shared_ptr<Keyring> keys;
-    TransactionScanner txScanner;
-    std::shared_ptr<TransactionConstructor> txConstructor;
-    std::shared_ptr<DaemonComms> daemonComms;
-
-    int64_t scan_target_height = 0;
-    int64_t last_scanned_height = -1;
+    TransactionScanner tx_scanner;
+    std::shared_ptr<TransactionConstructor> tx_constructor;
+    std::shared_ptr<DaemonComms> daemon_comms;
     bool running = true;
   };
 

@@ -10,7 +10,7 @@
 namespace wallet
 {
   std::vector<Output>
-  TransactionScanner::ScanTransactionReceived(
+  TransactionScanner::scan_received(
       const BlockTX& tx, int64_t height, int64_t timestamp)
   {
     const auto tx_public_keys = tx.tx.get_public_keys();
@@ -92,7 +92,7 @@ namespace wallet
   }
 
   std::vector<crypto::key_image>
-  TransactionScanner::ScanTransactionSpent(const cryptonote::transaction& tx)
+  TransactionScanner::scan_spent(const cryptonote::transaction& tx)
   {
     std::vector<crypto::key_image> spends;
 

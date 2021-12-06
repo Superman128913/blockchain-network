@@ -19,18 +19,18 @@
 namespace wallet
 {
   Wallet::Wallet(
-      std::shared_ptr<oxenmq::OxenMQ> oxenMQ,
+      std::shared_ptr<oxenmq::OxenMQ> omq,
       std::shared_ptr<Keyring> keys,
-      std::shared_ptr<TransactionConstructor> txConstructor,
-      std::shared_ptr<DaemonComms> daemonComms,
+      std::shared_ptr<TransactionConstructor> tx_constructor,
+      std::shared_ptr<DaemonComms> daemon_comms,
       std::string_view dbFilename,
       std::string_view dbPassword)
-      : oxenMQ(oxenMQ)
+      : omq(omq)
       , db{std::make_shared<db::Database>(std::filesystem::path(dbFilename), dbPassword)}
       , keys{keys}
-      , txScanner{keys, db}
-      , txConstructor{txConstructor}
-      , daemonComms{daemonComms}
+      , tx_scanner{keys, db}
+      , tx_constructor{tx_constructor}
+      , daemon_comms{daemon_comms}
   {
     create_schema(db->db);
     last_scanned_height = db->prepared_get<int64_t>("SELECT last_scan_height FROM metadata WHERE id=0;");
@@ -40,7 +40,7 @@ namespace wallet
   void
   Wallet::init()
   {
-    daemonComms->RegisterWallet(*this, last_scanned_height + 1 /*next needed block*/, true);
+    daemon_comms->register_wallet(*this, last_scanned_height + 1 /*next needed block*/, true);
   }
 
   Wallet::~Wallet()
@@ -49,25 +49,13 @@ namespace wallet
   }
 
   uint64_t
-  Wallet::GetBalance()
+  Wallet::get_balance()
   {
     return db->prepared_get<int64_t>("SELECT balance FROM metadata WHERE id=0;");
   }
 
-  int64_t
-  Wallet::ScannedHeight()
-  {
-    return last_scanned_height;
-  }
-
-  int64_t
-  Wallet::ScanTargetHeight()
-  {
-    return scan_target_height;
-  }
-
   void
-  Wallet::AddBlock(const Block& block)
+  Wallet::add_block(const Block& block)
   {
     SQLite::Transaction db_tx(db->db);
 
@@ -79,15 +67,15 @@ namespace wallet
 
     for (const auto& tx : block.transactions)
     {
-      if (auto outputs = txScanner.ScanTransactionReceived(tx, block.height, block.timestamp);
+      if (auto outputs = tx_scanner.scan_received(tx, block.height, block.timestamp);
           not outputs.empty())
       {
-        StoreTransaction(tx.hash, block.height, outputs);
+        store_transaction(tx.hash, block.height, outputs);
       }
 
-      if (auto spends = txScanner.ScanTransactionSpent(tx.tx); not spends.empty())
+      if (auto spends = tx_scanner.scan_spent(tx.tx); not spends.empty())
       {
-        StoreSpends(tx.hash, block.height, spends);
+        store_spends(tx.hash, block.height, spends);
       }
     }
 
@@ -96,7 +84,7 @@ namespace wallet
   }
 
   void
-  Wallet::AddBlocks(const std::vector<Block>& blocks)
+  Wallet::add_blocks(const std::vector<Block>& blocks)
   {
     if (not running)
       return;
@@ -107,20 +95,20 @@ namespace wallet
 
     if (blocks.front().height > last_scanned_height + 1)
     {
-      daemonComms->RegisterWallet(*this, last_scanned_height + 1 /*next needed block*/, true);
+      daemon_comms->register_wallet(*this, last_scanned_height + 1 /*next needed block*/, true);
       return;
     }
 
     for (const auto& block : blocks)
     {
       if (block.height == last_scanned_height + 1)
-        AddBlock(block);
+        add_block(block);
     }
-    daemonComms->RegisterWallet(*this, last_scanned_height + 1 /*next needed block*/, false);
+    daemon_comms->register_wallet(*this, last_scanned_height + 1 /*next needed block*/, false);
   }
 
   void
-  Wallet::UpdateTopBlockInfo(int64_t height, const crypto::hash& hash)
+  Wallet::update_top_block_info(int64_t height, const crypto::hash& hash)
   {
     if (not running)
       return;
@@ -133,20 +121,20 @@ namespace wallet
   }
 
   void
-  Wallet::Deregister()
+  Wallet::deregister()
   {
     auto self = weak_from_this();
-    std::cout << "Wallet ref count before Deregister: " << self.use_count() << "\n";
+    std::cout << "Wallet ref count before deregister: " << self.use_count() << "\n";
     running = false;
     std::promise<void> p;
     auto f = p.get_future();
-    daemonComms->DeregisterWallet(*this, p);
+    daemon_comms->deregister_wallet(*this, p);
     f.wait();
-    std::cout << "Wallet ref count after Deregister: " << self.use_count() << "\n";
+    std::cout << "Wallet ref count after deregister: " << self.use_count() << "\n";
   }
 
   void
-  Wallet::StoreTransaction(
+  Wallet::store_transaction(
       const crypto::hash& tx_hash, const int64_t height, const std::vector<Output>& outputs)
   {
     auto hash_str = tools::type_to_hex(tx_hash);
@@ -192,7 +180,7 @@ namespace wallet
   }
 
   void
-  Wallet::StoreSpends(
+  Wallet::store_spends(
       const crypto::hash& tx_hash,
       const int64_t height,
       const std::vector<crypto::key_image>& spends)
