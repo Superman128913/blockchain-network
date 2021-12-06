@@ -38,6 +38,9 @@ namespace wallet
 
     virtual std::pair<int64_t, int64_t>
     get_fee_parameters() = 0;
+
+    virtual std::future<std::vector<Decoy>>
+    fetch_decoys(std::vector<int64_t>& indexes) = 0;
   };
 
 }  // namespace wallet

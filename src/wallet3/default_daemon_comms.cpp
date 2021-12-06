@@ -7,6 +7,7 @@
 
 #include <common/string_util.h>
 #include <epee/misc_log_ex.h>
+#include "oxenmq/oxenmq.h"
 
 #include <iostream>
 
@@ -258,6 +259,110 @@ namespace wallet
       {"start_height", sync_from_height}};
 
     omq->request(conn, "rpc.get_blocks", req_cb, oxenmq::bt_serialize(req_params_dict));
+  }
+
+  std::future<std::vector<Decoy>>
+  DefaultDaemonComms::fetch_decoys(std::vector<int64_t>& indexes)
+  {
+    auto p = std::make_shared<std::promise<std::vector<Decoy> > >();
+    auto fut = p->get_future();
+    auto req_cb = [p=std::move(p)](bool ok, std::vector<std::string> response)
+    {
+      if (not ok or response.size() == 0)
+      {
+        //TODO: error logging/handling
+        return;
+      }
+
+      if (not response.size())
+      {
+        std::cout << "on_get_outputs_response(): empty get_outputs response\n";
+        //TODO: error handling
+        return;
+      }
+      std::cout << "on_get_outputs_response() got " << response.size() - 1 << " outputs.\n";
+
+      const auto& status = response[0];
+      if (status != "OK" and status != "END")
+      {
+        std::cout << "get_outputs response: " << response[0] << "\n";
+        //TODO: error handling
+        return;
+      }
+
+      // "OK" response with no outputs 
+      // TODO: decide/confirm this behavior on the daemon side of things
+      if (response.size() == 1)
+      {
+        std::cout << "get_blocks response.size() == 1\n";
+        return;
+      }
+
+      std::vector<Decoy> outputs;
+      try
+      {
+        auto itr = response.cbegin();
+        itr++;
+        while( itr != response.cend())
+        {
+          const auto& output_str = *itr;
+          auto output_dict = oxenmq::bt_dict_consumer{output_str};
+
+          Decoy& o = outputs.emplace_back();
+
+          if (output_dict.key() != "height")
+            return;
+          o.height = output_dict.consume_integer<int64_t>();
+
+          if (output_dict.key() != "key")
+            return;
+          o.key = output_dict.consume_string_view();
+
+          if (output_dict.key() != "mask")
+            return;
+          o.mask = output_dict.consume_string_view();
+
+          if (output_dict.key() != "txid")
+            return;
+          o.txid = output_dict.consume_string_view();
+
+          if (output_dict.key() != "unlocked")
+            return;
+          o.unlocked = output_dict.consume_integer<bool>();
+
+          if (not output_dict.is_finished())
+            return;
+
+          itr++;
+        }
+      }
+      catch (const std::exception& e)
+      {
+        std::cout << e.what() << "\n";
+        return;
+      }
+
+      if (outputs.size() == 0)
+      {
+        std::cout << "received no outputs, but server said response OK\n";
+        return;
+      }
+
+    }; // req_cb
+
+    oxenmq::bt_dict req_params_dict;
+    oxenmq::bt_list decoy_list_bt;
+    for (auto index : indexes)
+    {
+      oxenmq::bt_dict decoy_bt;
+      decoy_bt["amounts"] = 0;
+      decoy_bt["index"] = index;
+      decoy_list_bt.push_back(std::move(decoy_bt));
+    }
+    req_params_dict["outputs"] = std::move(decoy_list_bt);
+    omq->request(conn, "rpc.get_outs", req_cb, oxenmq::bt_serialize(req_params_dict));
+
+    return fut;
   }
 
   void

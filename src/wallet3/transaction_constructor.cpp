@@ -1,6 +1,8 @@
 #include "transaction_constructor.hpp"
 #include "pending_transaction.hpp"
+#include "decoy.hpp"
 #include "output_selection/output_selection.hpp"
+#include "decoy_selection/decoy_selection.hpp"
 #include <sqlitedb/database.hpp>
 
 namespace wallet
@@ -68,6 +70,17 @@ namespace wallet
     ptx.update_change();
   }
 
+  // select_decoys will choose some available outputs from the database and allocate to the
+  // transaction to sign as part of the ring signature
+  void
+  TransactionConstructor::select_decoys(PendingTransaction& ptx) const
+  {
+    ptx.decoys = {};
+    DecoySelector decoy_selection(daemon);
+    for (const auto& output : ptx.chosen_outputs)
+      ptx.decoys.emplace_back(decoy_selection(output));
+  }
+
   void
   TransactionConstructor::select_inputs_and_finalise(PendingTransaction& ptx) const
   {
@@ -78,5 +91,6 @@ namespace wallet
       else
         select_inputs(ptx);
     }
+    select_decoys(ptx);
   }
 }  // namespace wallet

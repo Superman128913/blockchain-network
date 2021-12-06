@@ -14,10 +14,6 @@
 
 int main(void)
 {
-  auto oxenmq = std::make_shared<oxenmq::OxenMQ>();
-
-  auto ctor = std::make_shared<wallet::TransactionConstructor>(nullptr, nullptr);
-
   crypto::secret_key spend_priv;
   tools::hex_to_type<crypto::secret_key>("d6a2eac72d1432fb816793aa7e8e86947116ac1423cbad5804ca49893e03b00c", spend_priv);
   crypto::public_key spend_pub;
@@ -30,13 +26,12 @@ int main(void)
 
   auto keyring = std::make_shared<wallet::Keyring>(spend_priv, spend_pub, view_priv, view_pub);
 
+  auto oxenmq = std::make_shared<oxenmq::OxenMQ>();
   auto comms = std::make_shared<wallet::DefaultDaemonComms>(oxenmq);
-  oxenmq->start();
-
   comms->set_remote("ipc://./oxend.sock");
-
+  oxenmq->start();
+  auto ctor = std::make_shared<wallet::TransactionConstructor>(nullptr, comms);
   auto wallet = wallet::Wallet::create(oxenmq, keyring, ctor, comms, ":memory:", "");
-
 
   std::this_thread::sleep_for(2s);
   auto chain_height = comms->get_height();

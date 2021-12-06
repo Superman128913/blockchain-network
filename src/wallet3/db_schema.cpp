@@ -17,6 +17,7 @@ namespace wallet
         R"(
           CREATE TABLE blocks (
             height INTEGER NOT NULL PRIMARY KEY,
+            transaction_count INTEGER NOT NULL,
             hash TEXT NOT NULL,
             timestamp INTEGER NOT NULL
           );
