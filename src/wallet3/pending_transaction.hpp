@@ -23,7 +23,7 @@ namespace wallet
 
   struct PendingTransaction
   {
-    version txVersion;
+    version tx_version;
 
     std::vector<TransactionRecipient> recipients;  // does not include change
 
@@ -33,23 +33,39 @@ namespace wallet
 
     cryptonote::transaction tx;
 
-    std::vector<Output> chosenOutputs;
+    std::vector<Output> chosen_outputs;
+
+    bool blink = true;
+
+    int64_t fee = 0;
+    uint64_t fee_per_byte = FEE_PER_BYTE_V13;
+    uint64_t fee_per_output = FEE_PER_OUTPUT_V18;
+    int8_t mixin_count = CRYPTONOTE_DEFAULT_TX_MIXIN;
+    size_t extra_size() const {return 0;};
 
     PendingTransaction() = default;
 
     PendingTransaction(const std::vector<TransactionRecipient>& new_recipients);
 
+    int64_t
+    get_fee() const;
+    int64_t
+    get_fee(int64_t n_inputs) const;
+
+    size_t
+    get_tx_weight(int64_t n_inputs) const;
+
     void
-    UpdateChange();
+    update_change();
 
     int64_t
-    SumInputs();
+    sum_inputs() const;
 
     int64_t
-    SumOutputs();
+    sum_outputs() const;
 
     bool
-    Finalise();
+    finalise();
   };
 
 }  // namespace wallet

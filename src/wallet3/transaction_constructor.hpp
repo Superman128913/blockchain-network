@@ -18,21 +18,28 @@ namespace wallet
   {
    public:
     TransactionConstructor(std::shared_ptr<db::Database> database, std::shared_ptr<DaemonComms> dmn)
-        : db(std::move(database)), daemon(std::move(dmn)){};
+        : db(std::move(database)), daemon(std::move(dmn))
+    {
+      std::tie(fee_per_byte, fee_per_output) = daemon->get_fee_parameters();
+    };
 
     PendingTransaction
-    CreateTransaction(const std::vector<TransactionRecipient>& recipients, int64_t feePerKB) const;
+    create_transaction(const std::vector<TransactionRecipient>& recipients) const;
+
+    uint64_t fee_per_byte = FEE_PER_BYTE_V13;
+    uint64_t fee_per_output = FEE_PER_OUTPUT_V18;
 
    private:
     void
-    SelectInputs(PendingTransaction& ptx, int64_t feePerKB) const;
+    select_inputs(PendingTransaction& ptx) const;
     void
-    SelectInputsAndFinalise(PendingTransaction& ptx, int64_t feePerKB) const;
+    select_inputs_and_finalise(PendingTransaction& ptx) const;
     int64_t
-    EstimateFee() const;
+    estimate_fee() const;
 
     std::shared_ptr<db::Database> db;
     std::shared_ptr<DaemonComms> daemon;
+
   };
 
 }  // namespace wallet

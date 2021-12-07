@@ -1,6 +1,7 @@
 #pragma once
 
 #include "daemon_comms.hpp"
+#include "cryptonote_config.h"
 
 #include <crypto/crypto.h>
 
@@ -43,6 +44,10 @@ namespace wallet
     void
     deregister_wallet(Wallet& wallet, std::promise<void>& p);
 
+    
+    std::pair<int64_t, int64_t>
+    get_fee_parameters();
+
    private:
 
     void
@@ -73,6 +78,9 @@ namespace wallet
     int64_t sync_from_height = 0;
     bool syncing = false;
     int64_t max_sync_blocks = DEFAULT_MAX_SYNC_BLOCKS;
+
+    int64_t fee_per_byte = FEE_PER_BYTE_V13;
+    int64_t fee_per_output = FEE_PER_OUTPUT_V18;
   };
 
 }  // namespace wallet

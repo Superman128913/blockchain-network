@@ -175,6 +175,30 @@ namespace wallet
           // RPC response is chain length, not top height
           top_block_height = new_height - 1;
         }, "de");
+
+    omq->request(conn, "rpc.get_fee_estimate",
+        [this](bool ok, std::vector<std::string> response)
+        {
+          if (not ok or response.size() != 2 or response[0] != "200")
+            return;
+
+          oxenmq::bt_dict_consumer dc{response[1]};
+
+          int64_t new_fee_per_byte = 0;
+          int64_t new_fee_per_output = 0;
+
+          if (not dc.skip_until("fee_per_byte"))
+            throw std::runtime_error("bad response from rpc.get_fee_estimate, key 'fee_per_byte' missing");
+          new_fee_per_byte = dc.consume_integer<int64_t>();
+
+          if (not dc.skip_until("fee_per_output"))
+            throw std::runtime_error("bad response from rpc.get_fee_estimate, key 'fee_per_output' missing");
+          new_fee_per_output = dc.consume_integer<int64_t>();
+
+          fee_per_byte = new_fee_per_byte;
+          fee_per_output = new_fee_per_output;
+
+        }, "de");
   }
 
   DefaultDaemonComms::DefaultDaemonComms(std::shared_ptr<oxenmq::OxenMQ> omq)
@@ -245,6 +269,12 @@ namespace wallet
           sync_from_height = std::min(sync_from_height, height);
         start_syncing();
         }, sync_thread);
+  }
+
+  std::pair<int64_t, int64_t>
+  DefaultDaemonComms::get_fee_parameters()
+  {
+    return std::make_pair(fee_per_byte,fee_per_output);
   }
 
   void
