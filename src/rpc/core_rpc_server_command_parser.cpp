@@ -211,17 +211,17 @@ namespace cryptonote::rpc {
 
   void parse_request(SET_LOG_LEVEL& set_log_level, rpc_input in) {
     get_values(in,
-        "level", set_log_level.request.level);
+        "level", required{set_log_level.request.level});
   }
 
   void parse_request(SET_LOG_CATEGORIES& set_log_categories, rpc_input in) {
     get_values(in,
-        "categories", set_log_categories.request.categories);
+        "categories", required{set_log_categories.request.categories});
   }
 
   void parse_request(BANNED& banned, rpc_input in) {
     get_values(in,
-        "address", banned.request.address);
+        "address", required{banned.request.address});
   }
 
   void parse_request(FLUSH_TRANSACTION_POOL& flush_transaction_pool, rpc_input in) {
@@ -254,23 +254,23 @@ namespace cryptonote::rpc {
 
   void parse_request(POP_BLOCKS& pop_blocks, rpc_input in){
     get_values(in,
-        "nblocks", pop_blocks.request.nblocks);
+        "nblocks", required{pop_blocks.request.nblocks});
   }
 
   void parse_request(LOKINET_PING& lokinet_ping, rpc_input in){
     get_values(in,
       "ed25519_pubkey", lokinet_ping.request.ed25519_pubkey,
       "error", lokinet_ping.request.error,
-      "version", lokinet_ping.request.version);
+      "version", required{lokinet_ping.request.version});
   }
 
   void parse_request(STORAGE_SERVER_PING& storage_server_ping, rpc_input in){
     get_values(in,
-      "ed25519_pubkey", storage_server_ping.request.ed25519_pubkey,
+      "ed25519_pubkey", required{storage_server_ping.request.ed25519_pubkey},
       "error", storage_server_ping.request.error,
-      "https_port", storage_server_ping.request.https_port,
-      "omq_port", storage_server_ping.request.omq_port,
-      "version", storage_server_ping.request.version);
+      "https_port", required{storage_server_ping.request.https_port},
+      "omq_port", required{storage_server_ping.request.omq_port},
+      "version", required{storage_server_ping.request.version});
   }
 
   void parse_request(PRUNE_BLOCKCHAIN& prune_blockchain, rpc_input in){
@@ -313,10 +313,9 @@ namespace cryptonote::rpc {
 
   void parse_request(SET_BANS& set_bans, rpc_input in) {
     get_values(in,
-        "ban", set_bans.request.ban,
-        "host", set_bans.request.host,
-        "ip", set_bans.request.ip,
-        "seconds", set_bans.request.seconds);
+        "ban", required{set_bans.request.ban},
+        "host", required{set_bans.request.host},
+        "seconds", required{set_bans.request.seconds});
   }
 
   void parse_request(GET_STAKING_REQUIREMENT& get_staking_requirement, rpc_input in) {
@@ -362,7 +361,7 @@ namespace cryptonote::rpc {
 
   void parse_request(ONS_OWNERS_TO_NAMES& ons_owners_to_names, rpc_input in) {
     get_values(in,
-        "entries", ons_owners_to_names.request.entries,
+        "entries", required{ons_owners_to_names.request.entries},
         "include_expired", ons_owners_to_names.request.include_expired);
   }
 
@@ -391,8 +390,8 @@ namespace cryptonote::rpc {
 
   void parse_request(GET_SERVICE_NODE_REGISTRATION_CMD_RAW& cmd, rpc_input in) {
     get_values(in,
-        "args", cmd.request.args,
+        "args", required{cmd.request.args},
         "make_friendly", cmd.request.make_friendly,
-        "staking_requirement", cmd.request.staking_requirement);
+        "staking_requirement", required{cmd.request.staking_requirement});
   }
 }

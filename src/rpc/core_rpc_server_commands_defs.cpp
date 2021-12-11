@@ -182,34 +182,6 @@ void to_json(nlohmann::json& j, const ONS_OWNERS_TO_NAMES::response_entry& r)
   };
 }
 
-KV_SERIALIZE_MAP_CODE_BEGIN(EMPTY)
-KV_SERIALIZE_MAP_CODE_END()
-
-
-KV_SERIALIZE_MAP_CODE_BEGIN(block_header_response)
-  KV_SERIALIZE(major_version)
-  KV_SERIALIZE(minor_version)
-  KV_SERIALIZE(timestamp)
-  KV_SERIALIZE(prev_hash)
-  KV_SERIALIZE(nonce)
-  KV_SERIALIZE(orphan_status)
-  KV_SERIALIZE(height)
-  KV_SERIALIZE(depth)
-  KV_SERIALIZE(hash)
-  KV_SERIALIZE(difficulty)
-  KV_SERIALIZE(cumulative_difficulty)
-  KV_SERIALIZE(reward)
-  KV_SERIALIZE(coinbase_payouts)
-  KV_SERIALIZE(block_size)
-  KV_SERIALIZE_OPT(block_weight, (uint64_t)0)
-  KV_SERIALIZE(num_txes)
-  KV_SERIALIZE(pow_hash)
-  KV_SERIALIZE_OPT(long_term_weight, (uint64_t)0)
-  KV_SERIALIZE(miner_tx_hash)
-  KV_SERIALIZE(tx_hashes)
-  KV_SERIALIZE(service_node_winner)
-KV_SERIALIZE_MAP_CODE_END()
-
 
 KV_SERIALIZE_MAP_CODE_BEGIN(GET_OUTPUT_DISTRIBUTION::request)
   KV_SERIALIZE(amounts)
