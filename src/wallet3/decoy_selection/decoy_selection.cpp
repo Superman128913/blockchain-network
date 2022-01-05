@@ -2,7 +2,7 @@
 
 namespace wallet
 {
-  std::vector<Decoy>
+  std::vector<int64_t>
   DecoySelector::operator()(const Output& selected_output)
   {
     std::vector<Decoy> return_decoys;
@@ -12,15 +12,10 @@ namespace wallet
     std::random_device rd;
     std::default_random_engine rng(rd());
 
-    // TODO(sean): these should be built using the distribution
-    int64_t min_output_index = 100;
-    int64_t max_output_index = 100000;
     constexpr int ALPHA = 1;
     constexpr int BETA = 2;
-    std::gamma_distribution<double> distribution(ALPHA, BETA);
+    std::gamma_distribution<double> distribution{ALPHA, BETA};
 
-    // Build a distribution and apply a score to each element of available outputs depending
-    // on distance from the number chosen. Lower score is better.
     std::vector<int64_t> decoy_indexes;
     for (size_t i = 0; i < n_decoys; ++i)
     {
@@ -28,9 +23,11 @@ namespace wallet
       decoy_indexes.push_back(output_height_from_distribution);
     }
 
-    // TODO(sean): we need to also request the chosen output
-    auto decoy_promise = daemon->fetch_decoys(decoy_indexes);
-    decoy_promise.wait();
-    return decoy_promise.get();
+    // TODO(sean): uncomment this line and figure out how to remove the real index
+    // We need to request the chosen output to ensure the daemon cant guess which output is real by elimination
+    //decoy_indexes.push_back(selected_output.global_index);
+
+    return decoy_indexes;
+
   }
 }  // namespace wallet

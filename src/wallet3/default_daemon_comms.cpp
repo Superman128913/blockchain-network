@@ -262,7 +262,7 @@ namespace wallet
   }
 
   std::future<std::vector<Decoy>>
-  DefaultDaemonComms::fetch_decoys(std::vector<int64_t>& indexes)
+  DefaultDaemonComms::fetch_decoys(const std::vector<int64_t>& indexes)
   {
     auto p = std::make_shared<std::promise<std::vector<Decoy> > >();
     auto fut = p->get_future();

@@ -7,6 +7,7 @@
 
 namespace wallet
 {
+  // create_transaction will create a vanilla spend transaction without any special features.
   PendingTransaction
   TransactionConstructor::create_transaction(
       const std::vector<TransactionRecipient>& recipients) const
@@ -55,6 +56,8 @@ namespace wallet
       transaction_total += additional_input * ptx.fee_per_byte;
 
     std::vector<Output> available_outputs{};
+
+    // Selects all outputs where the amount is greater than the estimated fee for an ADDITIONAL input.
     SQLite::Statement st{
         db->db,
         "SELECT amount, output_index, global_index, unlock_time, block_height, spending, "
@@ -70,15 +73,23 @@ namespace wallet
     ptx.update_change();
   }
 
-  // select_decoys will choose some available outputs from the database and allocate to the
-  // transaction to sign as part of the ring signature
+  // select_and_fetch_decoys will choose some available outputs from the database, fetch the
+  // details necessary for a ring signature from teh daemon and add them to the
+  // transaction ready to sign at a later point in time.
   void
-  TransactionConstructor::select_decoys(PendingTransaction& ptx) const
+  TransactionConstructor::select_and_fetch_decoys(PendingTransaction& ptx) const
   {
     ptx.decoys = {};
-    DecoySelector decoy_selection(daemon);
+    // TODO(sean): the min and max figures here for the decoys should be acquired somewhere better
+    DecoySelector decoy_selection(100, 100000);
+    std::vector<int64_t> indexes;
     for (const auto& output : ptx.chosen_outputs)
-      ptx.decoys.emplace_back(decoy_selection(output));
+    {
+      indexes = decoy_selection(output);
+      auto decoy_promise = daemon->fetch_decoys(indexes);
+      decoy_promise.wait();
+      ptx.decoys.emplace_back(decoy_promise.get());
+    }
   }
 
   void
@@ -91,6 +102,6 @@ namespace wallet
       else
         select_inputs(ptx);
     }
-    select_decoys(ptx);
+    select_and_fetch_decoys(ptx);
   }
 }  // namespace wallet

@@ -39,8 +39,11 @@ namespace wallet
     virtual std::pair<int64_t, int64_t>
     get_fee_parameters() = 0;
 
+    // Called by the wallet to fetch the necessary information to make a ring signature. The indexes are a global reference
+    // used by the daemon to uniquely identify outputs. In our distribution we find the earliest and latest indexes that are
+    // available and simply pick numbers between the indexes according to our distribution function.
     virtual std::future<std::vector<Decoy>>
-    fetch_decoys(std::vector<int64_t>& indexes) = 0;
+    fetch_decoys(const std::vector<int64_t>& indexes) = 0;
   };
 
 }  // namespace wallet

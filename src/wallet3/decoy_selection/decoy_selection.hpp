@@ -1,7 +1,6 @@
 #pragma once
 
 #include <vector>
-#include "../daemon_comms.hpp"
 #include "../output.hpp"
 #include "../decoy.hpp"
 
@@ -14,13 +13,12 @@ namespace wallet
   class DecoySelector
   {
    public:
-    std::vector<Decoy>
+    std::vector<int64_t>
     operator()(const Output& selected_output);
 
-    DecoySelector(std::shared_ptr<DaemonComms> dmn) : daemon(std::move(dmn)) {};
+    DecoySelector(int64_t min, int64_t max) : min_output_index(min), max_output_index(max) {};
 
-   private:
-    std::shared_ptr<DaemonComms> daemon;
-
+    int64_t min_output_index = 0;
+    int64_t max_output_index = 0;
   };
 }  // namespace wallet

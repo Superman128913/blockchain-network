@@ -34,7 +34,7 @@ namespace wallet
     select_inputs(PendingTransaction& ptx) const;
 
     void
-    select_decoys(PendingTransaction& ptx) const;
+    select_and_fetch_decoys(PendingTransaction& ptx) const;
 
     void
     select_inputs_and_finalise(PendingTransaction& ptx) const;

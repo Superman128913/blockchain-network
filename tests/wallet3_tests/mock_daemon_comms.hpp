@@ -21,7 +21,7 @@ class MockDaemonComms: public DefaultDaemonComms
     }
 
     std::future<std::vector<Decoy>>
-    fetch_decoys(std::vector<int64_t>& indexes) override {
+    fetch_decoys(const std::vector<int64_t>& indexes) override {
       auto p = std::promise<std::vector<Decoy>>();
       auto fut = p.get_future();
 

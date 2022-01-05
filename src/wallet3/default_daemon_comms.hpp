@@ -48,7 +48,7 @@ namespace wallet
     get_fee_parameters();
 
     std::future<std::vector<Decoy>>
-    fetch_decoys(std::vector<int64_t>& indexes);
+    fetch_decoys(const std::vector<int64_t>& indexes);
 
    private:
 
