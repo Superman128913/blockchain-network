@@ -80,8 +80,12 @@ namespace wallet
   TransactionConstructor::select_and_fetch_decoys(PendingTransaction& ptx) const
   {
     ptx.decoys = {};
-    // TODO(sean): the min and max figures here for the decoys should be acquired somewhere better
-    DecoySelector decoy_selection(100, 100000);
+    // This initialises the decoys to be selected from global_output_index= 0 to global_output_index = highest_output_index
+    // Oxen started with ringct transaction from its genesis so all transactions should be usable as decoys.
+    // We keep track of the number of transactions in each block so we can recreate the highest_output_index by summing
+    // all the transactions in every block.
+    int64_t max_output_index = db->prepared_get<int>("SELECT sum(transaction_count) FROM blocks;");
+    DecoySelector decoy_selection(0, max_output_index);
     std::vector<int64_t> indexes;
     for (const auto& output : ptx.chosen_outputs)
     {
