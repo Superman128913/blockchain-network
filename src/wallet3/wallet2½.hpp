@@ -5,7 +5,7 @@
 #include <device/device.hpp>
 #include <cryptonote_basic/cryptonote_basic.h>
 
-namespace wallet2½
+namespace wallet25
 {
   uint64_t
   output_amount(

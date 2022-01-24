@@ -3,7 +3,7 @@
 #include <ringct/rctSigs.h>
 #include <cryptonote_basic/cryptonote_format_utils.h>
 
-namespace wallet2½
+namespace wallet25
 {
   // TODO: copied from wallet2 for now, so to not redo crypto stuff just yet.
   //

@@ -60,8 +60,9 @@ namespace wallet
     SQLite::Transaction db_tx(db->db);
 
     db->prepared_exec(
-        "INSERT INTO blocks(height,hash,timestamp) VALUES(?,?,?)",
+        "INSERT INTO blocks(height,transaction_count,hash,timestamp) VALUES(?,?,?,?)",
         block.height,
+        static_cast<int64_t>(block.transactions.size()),
         tools::type_to_hex(block.hash),
         block.timestamp);
 

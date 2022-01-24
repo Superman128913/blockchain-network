@@ -1,10 +1,13 @@
 #include "transaction_constructor.hpp"
 #include "pending_transaction.hpp"
+#include "decoy.hpp"
 #include "output_selection/output_selection.hpp"
+#include "decoy_selection/decoy_selection.hpp"
 #include <sqlitedb/database.hpp>
 
 namespace wallet
 {
+  // create_transaction will create a vanilla spend transaction without any special features.
   PendingTransaction
   TransactionConstructor::create_transaction(
       const std::vector<TransactionRecipient>& recipients) const
@@ -53,6 +56,8 @@ namespace wallet
       transaction_total += additional_input * ptx.fee_per_byte;
 
     std::vector<Output> available_outputs{};
+
+    // Selects all outputs where the amount is greater than the estimated fee for an ADDITIONAL input.
     SQLite::Statement st{
         db->db,
         "SELECT amount, output_index, global_index, unlock_time, block_height, spending, "
@@ -68,6 +73,29 @@ namespace wallet
     ptx.update_change();
   }
 
+  // select_and_fetch_decoys will choose some available outputs from the database, fetch the
+  // details necessary for a ring signature from teh daemon and add them to the
+  // transaction ready to sign at a later point in time.
+  void
+  TransactionConstructor::select_and_fetch_decoys(PendingTransaction& ptx) const
+  {
+    ptx.decoys = {};
+    // This initialises the decoys to be selected from global_output_index= 0 to global_output_index = highest_output_index
+    // Oxen started with ringct transaction from its genesis so all transactions should be usable as decoys.
+    // We keep track of the number of transactions in each block so we can recreate the highest_output_index by summing
+    // all the transactions in every block.
+    int64_t max_output_index = db->prepared_get<int>("SELECT sum(transaction_count) FROM blocks;");
+    DecoySelector decoy_selection(0, max_output_index);
+    std::vector<int64_t> indexes;
+    for (const auto& output : ptx.chosen_outputs)
+    {
+      indexes = decoy_selection(output);
+      auto decoy_promise = daemon->fetch_decoys(indexes);
+      decoy_promise.wait();
+      ptx.decoys.emplace_back(decoy_promise.get());
+    }
+  }
+
   void
   TransactionConstructor::select_inputs_and_finalise(PendingTransaction& ptx) const
   {
@@ -78,5 +106,6 @@ namespace wallet
       else
         select_inputs(ptx);
     }
+    select_and_fetch_decoys(ptx);
   }
 }  // namespace wallet

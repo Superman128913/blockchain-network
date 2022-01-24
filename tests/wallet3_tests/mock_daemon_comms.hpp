@@ -19,6 +19,19 @@ class MockDaemonComms: public DefaultDaemonComms
     get_fee_parameters() override { 
       return std::make_pair(0,0);
     }
+
+    std::future<std::vector<Decoy>>
+    fetch_decoys(const std::vector<int64_t>& indexes) override {
+      auto p = std::promise<std::vector<Decoy>>();
+      auto fut = p.get_future();
+
+      std::vector<Decoy> returned_decoys;
+      for (auto index : indexes)
+        returned_decoys.push_back(Decoy{index, "","","",true});
+
+      p.set_value(returned_decoys);
+      return fut;
+    }
 };
 
 

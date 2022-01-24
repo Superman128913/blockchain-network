@@ -34,6 +34,9 @@ TEST_CASE("Transaction Creation", "[wallet,tx]")
     REQUIRE(ptx.recipients.size() == 1);
     REQUIRE(ptx.chosen_outputs.size() == 1);
     REQUIRE(ptx.change.amount == 1);
+    REQUIRE(ptx.decoys.size() == ptx.chosen_outputs.size());
+    for (const auto& decoys : ptx.decoys)
+      REQUIRE(decoys.size() == 13);
   }
 
   SECTION("Fails to create a transaction if amount is not enough")
@@ -53,6 +56,9 @@ TEST_CASE("Transaction Creation", "[wallet,tx]")
     REQUIRE(ptx.recipients.size() == 1);
     REQUIRE(ptx.chosen_outputs.size() == 1);
     REQUIRE(ptx.change.amount == 1);
+    REQUIRE(ptx.decoys.size() == ptx.chosen_outputs.size());
+    for (const auto& decoys : ptx.decoys)
+      REQUIRE(decoys.size() == 13);
   }
 
   SECTION("Creates a successful transaction using 2 inputs")
@@ -62,6 +68,9 @@ TEST_CASE("Transaction Creation", "[wallet,tx]")
     wallet::PendingTransaction ptx = ctor.create_transaction(recipients);
     REQUIRE(ptx.recipients.size() == 1);
     REQUIRE(ptx.chosen_outputs.size() == 2);
+    REQUIRE(ptx.decoys.size() == ptx.chosen_outputs.size());
+    for (const auto& decoys : ptx.decoys)
+      REQUIRE(decoys.size() == 13);
   }
 
   wallet.store_test_transaction(4000);
@@ -77,6 +86,9 @@ TEST_CASE("Transaction Creation", "[wallet,tx]")
     REQUIRE(ptx.chosen_outputs.size() == 2);
     // 8000 (Inputs) - 4001 (Recipient) - 1857 bytes x 1 oxen (Fee)
     REQUIRE(ptx.change.amount == 2142);
+    REQUIRE(ptx.decoys.size() == ptx.chosen_outputs.size());
+    for (const auto& decoys : ptx.decoys)
+      REQUIRE(decoys.size() == 13);
   }
 
   ctor.fee_per_output = 50;
@@ -89,5 +101,8 @@ TEST_CASE("Transaction Creation", "[wallet,tx]")
     REQUIRE(ptx.chosen_outputs.size() == 2);
     // 8000 (Inputs) - 4001 (Recipient) - 1857 bytes x 1 oxen (Fee) - 100 (Fee for 2x outputs @ 50 oxen) 
     REQUIRE(ptx.change.amount == 2042);
+    REQUIRE(ptx.decoys.size() == ptx.chosen_outputs.size());
+    for (const auto& decoys : ptx.decoys)
+      REQUIRE(decoys.size() == 13);
   }
 }

@@ -44,9 +44,11 @@ namespace wallet
     void
     deregister_wallet(Wallet& wallet, std::promise<void>& p);
 
-    
     std::pair<int64_t, int64_t>
     get_fee_parameters();
+
+    std::future<std::vector<Decoy>>
+    fetch_decoys(const std::vector<int64_t>& indexes);
 
    private:
 

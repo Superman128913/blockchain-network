@@ -3,6 +3,7 @@
 #include <cryptonote_basic/cryptonote_basic.h>
 #include "address.hpp"
 #include "output.hpp"
+#include "decoy.hpp"
 
 #include <vector>
 #include <string>
@@ -35,12 +36,14 @@ namespace wallet
 
     std::vector<Output> chosen_outputs;
 
+    std::vector<std::vector<Decoy>> decoys;
+
     bool blink = true;
 
     int64_t fee = 0;
     uint64_t fee_per_byte = FEE_PER_BYTE_V13;
     uint64_t fee_per_output = FEE_PER_OUTPUT_V18;
-    int8_t mixin_count = CRYPTONOTE_DEFAULT_TX_MIXIN;
+    size_t mixin_count = CRYPTONOTE_DEFAULT_TX_MIXIN;
     size_t extra_size() const {return 0;};
 
     PendingTransaction() = default;

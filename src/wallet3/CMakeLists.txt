@@ -6,6 +6,7 @@ add_library(wallet3
   transaction_scanner.cpp
   pending_transaction.cpp
   output_selection/output_selection.cpp
+  decoy_selection/decoy_selection.cpp
   wallet.cpp
   wallet2½.cpp)
 
