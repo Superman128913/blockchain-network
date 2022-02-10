@@ -53,7 +53,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
 #include <boost/format.hpp>
-#include <oxenmq/hex.h>
+#include <oxenc/hex.h>
 #include "epee/console_handler.h"
 #include "common/i18n.h"
 #include "common/command_line.h"
@@ -603,7 +603,7 @@ namespace
   {
     std::string_view data{k.data, sizeof(k.data)};
     std::ostream_iterator<char> osi{std::cout};
-    oxenmq::to_hex(data.begin(), data.end(), osi);
+    oxenc::to_hex(data.begin(), data.end(), osi);
   }
 
   bool long_payment_id_failure(bool ret)
@@ -6714,7 +6714,7 @@ bool simple_wallet::ons_update_mapping(std::vector<std::string> args)
     }
 
     auto& enc_hex = response[0].encrypted_value;
-    if (!oxenmq::is_hex(enc_hex) || enc_hex.size() % 2 != 0 || enc_hex.size() > 2*ons::mapping_value::BUFFER_SIZE)
+    if (!oxenc::is_hex(enc_hex) || enc_hex.size() % 2 != 0 || enc_hex.size() > 2*ons::mapping_value::BUFFER_SIZE)
     {
       LOG_ERROR("invalid ONS data returned from oxend");
       fail_msg_writer() << tr("invalid ONS data returned from oxend");
@@ -6724,7 +6724,7 @@ bool simple_wallet::ons_update_mapping(std::vector<std::string> args)
     ons::mapping_value mval{};
     mval.len = enc_hex.size() / 2;
     mval.encrypted = true;
-    oxenmq::from_hex(enc_hex.begin(), enc_hex.end(), mval.buffer.begin());
+    oxenc::from_hex(enc_hex.begin(), enc_hex.end(), mval.buffer.begin());
 
     if (!mval.decrypt(tools::lowercase_ascii_string(name), type))
     {
@@ -6847,7 +6847,7 @@ bool simple_wallet::ons_encrypt(std::vector<std::string> args)
     return false;
   }
 
-  tools::success_msg_writer() << "encrypted value=" << oxenmq::to_hex(mval.to_view());
+  tools::success_msg_writer() << "encrypted value=" << oxenc::to_hex(mval.to_view());
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -6956,7 +6956,7 @@ bool simple_wallet::ons_lookup(std::vector<std::string> args)
   for (auto const &mapping : response)
   {
     auto& enc_hex = mapping.encrypted_value;
-    if (mapping.entry_index >= args.size() || !oxenmq::is_hex(enc_hex) || enc_hex.size() % 2 != 0 || enc_hex.size() > 2*ons::mapping_value::BUFFER_SIZE)
+    if (mapping.entry_index >= args.size() || !oxenc::is_hex(enc_hex) || enc_hex.size() % 2 != 0 || enc_hex.size() > 2*ons::mapping_value::BUFFER_SIZE)
     {
       fail_msg_writer() << "Received invalid ONS mapping data from oxend";
       return false;
@@ -6971,7 +6971,7 @@ bool simple_wallet::ons_lookup(std::vector<std::string> args)
     ons::mapping_value value{};
     value.len = enc_hex.size() / 2;
     value.encrypted = true;
-    oxenmq::from_hex(enc_hex.begin(), enc_hex.end(), value.buffer.begin());
+    oxenc::from_hex(enc_hex.begin(), enc_hex.end(), value.buffer.begin());
 
     if (!value.decrypt(name, mapping.type))
     {
@@ -7040,7 +7040,7 @@ bool simple_wallet::ons_by_owner(const std::vector<std::string>& args)
         return false;
       }
 
-      if (!(oxenmq::is_hex(arg) && arg.size() == 64) && (!cryptonote::is_valid_address(arg, m_wallet->nettype())))
+      if (!(oxenc::is_hex(arg) && arg.size() == 64) && (!cryptonote::is_valid_address(arg, m_wallet->nettype())))
       {
         fail_msg_writer() << "arg contains non valid characters: " << arg;
         return false;
@@ -7077,7 +7077,7 @@ bool simple_wallet::ons_by_owner(const std::vector<std::string>& args)
       {
         name = got->second.name;
         ons::mapping_value mv;
-        if (ons::mapping_value::validate_encrypted(entry.type, oxenmq::from_hex(entry.encrypted_value), &mv)
+        if (ons::mapping_value::validate_encrypted(entry.type, oxenc::from_hex(entry.encrypted_value), &mv)
             && mv.decrypt(name, entry.type))
           value = mv.to_readable_value(nettype, entry.type);
       }
@@ -10150,7 +10150,7 @@ void simple_wallet::commit_or_save(std::vector<tools::wallet2::pending_tx>& ptx_
     {
       cryptonote::blobdata blob;
       tx_to_blob(ptx.tx, blob);
-      const std::string blob_hex = oxenmq::to_hex(blob);
+      const std::string blob_hex = oxenc::to_hex(blob);
       fs::path filename = fs::u8path("raw_oxen_tx");
       if (ptx_vector.size() > 1) filename += "_" + std::to_string(i++);
       bool success = m_wallet->save_to_file(filename, blob_hex, true);

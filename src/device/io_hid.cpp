@@ -72,7 +72,7 @@ namespace hw::io {
 
     void hid::io_hid_log(int read, unsigned char* buffer, int block_len) {
       if (hid_verbose)
-        MDEBUG("HID " << (read ? '<' : '>') << " : " << oxenmq::to_hex(buffer, buffer + block_len));
+        MDEBUG("HID " << (read ? '<' : '>') << " : " << oxenc::to_hex(buffer, buffer + block_len));
     }
  
     void hid::init() {
