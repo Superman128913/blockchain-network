@@ -5,39 +5,39 @@
 
 set(LOCAL_MIRROR "" CACHE STRING "local mirror path/URL for lib downloads")
 
-set(OPENSSL_VERSION 1.1.1k CACHE STRING "openssl version")
+set(OPENSSL_VERSION 3.0.2 CACHE STRING "openssl version")
 set(OPENSSL_MIRROR ${LOCAL_MIRROR} https://www.openssl.org/source CACHE STRING "openssl download mirror(s)")
 set(OPENSSL_SOURCE openssl-${OPENSSL_VERSION}.tar.gz)
-set(OPENSSL_HASH SHA256=892a0875b9872acd04a9fde79b1f943075d5ea162415de3047c327df33fbaee5
+set(OPENSSL_HASH SHA256=98e91ccead4d4756ae3c9cde5e09191a8e586d9f4d50838e7ec09d6411dfdb63
     CACHE STRING "openssl source hash")
 
-set(EXPAT_VERSION 2.3.0 CACHE STRING "expat version")
+set(EXPAT_VERSION 2.4.4 CACHE STRING "expat version")
 string(REPLACE "." "_" EXPAT_TAG "R_${EXPAT_VERSION}")
 set(EXPAT_MIRROR ${LOCAL_MIRROR} https://github.com/libexpat/libexpat/releases/download/${EXPAT_TAG}
     CACHE STRING "expat download mirror(s)")
 set(EXPAT_SOURCE expat-${EXPAT_VERSION}.tar.xz)
-set(EXPAT_HASH SHA512=dde8a9a094b18d795a0e86ca4aa68488b352dc67019e0d669e8b910ed149628de4c2a49bc3a5b832f624319336a01f9e4debe03433a43e1c420f36356d886820
+set(EXPAT_HASH SHA512=c88a82f4732e27340eb9480c082bcc909b0284e16b368ee9feeb4e2dd058e8f7c42fd48feacd5272cc76cb78bd183df33eb5d0b135fdd1d3c493cb156572ab76
     CACHE STRING "expat source hash")
 
-set(UNBOUND_VERSION 1.13.1 CACHE STRING "unbound version")
+set(UNBOUND_VERSION 1.15.0 CACHE STRING "unbound version")
 set(UNBOUND_MIRROR ${LOCAL_MIRROR} https://nlnetlabs.nl/downloads/unbound CACHE STRING "unbound download mirror(s)")
 set(UNBOUND_SOURCE unbound-${UNBOUND_VERSION}.tar.gz)
-set(UNBOUND_HASH SHA256=8504d97b8fc5bd897345c95d116e0ee0ddf8c8ff99590ab2b4bd13278c9f50b8
+set(UNBOUND_HASH SHA256=a480dc6c8937447b98d161fe911ffc76cfaffa2da18788781314e81339f1126f
     CACHE STRING "unbound source hash")
 
-set(BOOST_VERSION 1.76.0 CACHE STRING "boost version")
+set(BOOST_VERSION 1.79.0 CACHE STRING "boost version")
 set(BOOST_MIRROR ${LOCAL_MIRROR} https://boostorg.jfrog.io/artifactory/main/release/${BOOST_VERSION}/source
     CACHE STRING "boost download mirror(s)")
 string(REPLACE "." "_" BOOST_VERSION_ ${BOOST_VERSION})
 set(BOOST_SOURCE boost_${BOOST_VERSION_}.tar.bz2)
-set(BOOST_HASH SHA256=f0397ba6e982c4450f27bf32a2a83292aba035b827a5623a14636ea583318c41
+set(BOOST_HASH SHA256=475d589d51a7f8b3ba2ba4eda022b170e562ca3b760ee922c146b6c65856ef39
     CACHE STRING "boost source hash")
 
-set(NCURSES_VERSION 6.2 CACHE STRING "ncurses version")
+set(NCURSES_VERSION 6.3 CACHE STRING "ncurses version")
 set(NCURSES_MIRROR ${LOCAL_MIRROR} http://ftpmirror.gnu.org/gnu/ncurses
     CACHE STRING "ncurses download mirror(s)")
 set(NCURSES_SOURCE ncurses-${NCURSES_VERSION}.tar.gz)
-set(NCURSES_HASH SHA512=4c1333dcc30e858e8a9525d4b9aefb60000cfc727bc4a1062bace06ffc4639ad9f6e54f6bdda0e3a0e5ea14de995f96b52b3327d9ec633608792c99a1e8d840d
+set(NCURSES_HASH SHA512=5373f228cba6b7869210384a607a2d7faecfcbfef6dbfcd7c513f4e84fbd8bcad53ac7db2e7e84b95582248c1039dcfc7c4db205a618f7da22a166db482f0105
     CACHE STRING "ncurses source hash")
 
 set(READLINE_VERSION 8.1 CACHE STRING "readline version")
@@ -47,11 +47,11 @@ set(READLINE_SOURCE readline-${READLINE_VERSION}.tar.gz)
 set(READLINE_HASH SHA512=27790d0461da3093a7fee6e89a51dcab5dc61928ec42e9228ab36493b17220641d5e481ea3d8fee5ee0044c70bf960f55c7d3f1a704cf6b9c42e5c269b797e00
     CACHE STRING "readline source hash")
 
-set(SQLITE3_VERSION 3350500 CACHE STRING "sqlite3 version")
-set(SQLITE3_MIRROR ${LOCAL_MIRROR} https://www.sqlite.org/2021
+set(SQLITE3_VERSION 3380200 CACHE STRING "sqlite3 version")
+set(SQLITE3_MIRROR ${LOCAL_MIRROR} https://www.sqlite.org/2022
     CACHE STRING "sqlite3 download mirror(s)")
 set(SQLITE3_SOURCE sqlite-autoconf-${SQLITE3_VERSION}.tar.gz)
-set(SQLITE3_HASH SHA512=039af796f79fc4517be0bd5ba37886264d49da309e234ae6fccdb488ef0109ed2b917fc3e6c1fc7224dff4f736824c653aaf8f0a37550c5ebc14d035cb8ac737
+set(SQLITE3_HASH SHA512=2192675d8638a933ec75ec78dc4185f005c9d37453bc2bbe590b72235066f68ba2cac1be3b491a47d6a7ca74d5b3bfe4e548d576a6b324383bb9bc7739d0b635
     CACHE STRING "sqlite3 source hash")
 
 if(SQLITE3_VERSION MATCHES "^([0-9]+)(0([0-9])|([1-9][0-9]))(0([0-9])|([1-9][0-9]))[0-9][0-9]$")
@@ -63,25 +63,25 @@ else()
 endif()
 
 
-set(EUDEV_VERSION 3.2.10 CACHE STRING "eudev version")
-set(EUDEV_MIRROR ${LOCAL_MIRROR} https://github.com/gentoo/eudev/archive/
+set(EUDEV_VERSION 3.2.11 CACHE STRING "eudev version")
+set(EUDEV_MIRROR ${LOCAL_MIRROR} https://github.com/eudev-project/eudev/archive/
     CACHE STRING "eudev download mirror(s)")
 set(EUDEV_SOURCE v${EUDEV_VERSION}.tar.gz)
-set(EUDEV_HASH SHA512=37fc5e7f960a843fa68269697882123af4515555788a9e856474f51dd8c330a4c8e52e7c897aeb5d3eb36c6ad66cc99f5a38a284a75620b7e6c275c703e25d42
+set(EUDEV_HASH SHA512=17b328365913af3e434abe667dd0498c3702a41c6cb66f3793ca2c195b05ac06397b0a401077f81df7dd25193e4eeea13657a221ca6cb3d237c4d91e31e30b33
     CACHE STRING "eudev source hash")
 
-set(LIBUSB_VERSION 1.0.24 CACHE STRING "libusb version")
+set(LIBUSB_VERSION 1.0.25 CACHE STRING "libusb version")
 set(LIBUSB_MIRROR ${LOCAL_MIRROR} https://github.com/libusb/libusb/releases/download/v${LIBUSB_VERSION}
     CACHE STRING "libusb download mirror(s)")
 set(LIBUSB_SOURCE libusb-${LIBUSB_VERSION}.tar.bz2)
-set(LIBUSB_HASH SHA512=5aea36a530aaa15c6dd656d0ed3ce204522c9946d8d39ffbb290dab4a98cda388a2598da4995123d1032324056090bd429e702459626d3e8d7daeebc4e7ff3dc
+set(LIBUSB_HASH SHA512=f1e6e5577d4bd1ff136927dc66c615014a06ac332ddd797b1d1ad5f7b68e2405e66068dcb210e2f0ae3e31681603ef72efbd88bf7fbe0eb41ce700fdc3f92f9d
     CACHE STRING "libusb source hash")
 
-set(HIDAPI_VERSION 0.9.0 CACHE STRING "hidapi version")
+set(HIDAPI_VERSION 0.11.2 CACHE STRING "hidapi version")
 set(HIDAPI_MIRROR ${LOCAL_MIRROR} https://github.com/libusb/hidapi/archive
     CACHE STRING "hidapi download mirror(s)")
 set(HIDAPI_SOURCE hidapi-${HIDAPI_VERSION}.tar.gz)
-set(HIDAPI_HASH SHA512=d9f28d394b78daece7d2dfb946e62349a56b388b3a06241585c6fad5a4e24dc914723de6c0f12a9e51cd23fb245f6b5ac9b3721319646d5ba5912bbe0a3f9a52
+set(HIDAPI_HASH SHA512=c4d04bf570aa98dd88d7ce08ef1abb0675d500c9aa2c22f0437fa30b700a94446779f77e1170267926d5f6f0d9cdb2bb81ad1fe20d158c18587fddbca59e9517
     CACHE STRING "hidapi source hash")
 
 # NB: not currently built, used for (non-functional) trezor code
@@ -108,18 +108,18 @@ set(ZMQ_SOURCE zeromq-${ZMQ_VERSION}.tar.gz)
 set(ZMQ_HASH SHA512=e198ef9f82d392754caadd547537666d4fba0afd7d027749b3adae450516bcf284d241d4616cad3cb4ad9af8c10373d456de92dc6d115b037941659f141e7c0e
     CACHE STRING "libzmq source hash")
 
-set(ZLIB_VERSION 1.2.11 CACHE STRING "zlib version")
+set(ZLIB_VERSION 1.2.12 CACHE STRING "zlib version")
 set(ZLIB_MIRROR ${LOCAL_MIRROR} https://zlib.net
     CACHE STRING "zlib mirror(s)")
 set(ZLIB_SOURCE zlib-${ZLIB_VERSION}.tar.gz)
-set(ZLIB_HASH SHA512=73fd3fff4adeccd4894084c15ddac89890cd10ef105dd5e1835e1e9bbb6a49ff229713bd197d203edfa17c2727700fce65a2a235f07568212d820dca88b528ae
+set(ZLIB_HASH SHA512=cc2366fa45d5dfee1f983c8c51515e0cff959b61471e2e8d24350dea22d3f6fcc50723615a911b046ffc95f51ba337d39ae402131a55e6d1541d3b095d6c0a14
     CACHE STRING "zlib source hash")
 
-set(CURL_VERSION 7.76.1 CACHE STRING "curl version")
-set(CURL_MIRROR ${LOCAL_MIRROR} https://curl.haxx.se/download https://curl.askapache.com
+set(CURL_VERSION 7.82.0 CACHE STRING "curl version")
+set(CURL_MIRROR ${LOCAL_MIRROR} https://curl.se/download https://curl.askapache.com
   CACHE STRING "curl mirror(s)")
 set(CURL_SOURCE curl-${CURL_VERSION}.tar.xz)
-set(CURL_HASH SHA256=64bb5288c39f0840c07d077e30d9052e1cbb9fa6c2dc52523824cc859e679145
+set(CURL_HASH SHA256=0aaa12d7bd04b0966254f2703ce80dd5c38dbbd76af0297d3d690cdce58a583c
   CACHE STRING "curl source hash")
 
 
@@ -300,7 +300,8 @@ if(CMAKE_CROSSCOMPILING)
 endif()
 build_external(openssl
   CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=${openssl_cc} ${openssl_system_env} ${openssl_configure}
-    --prefix=${DEPS_DESTDIR} ${openssl_extra_opts} no-shared no-capieng no-dso no-dtls1 no-ec_nistp_64_gcc_128 no-gost
+    --prefix=${DEPS_DESTDIR} --libdir=lib ${openssl_extra_opts}
+    no-shared no-capieng no-dso no-dtls1 no-ec_nistp_64_gcc_128 no-gost
     no-heartbeats no-md2 no-rc5 no-rdrand no-rfc3779 no-sctp no-ssl-trace no-ssl2 no-ssl3
     no-static-engine no-tests no-weak-ssl-ciphers no-zlib-dynamic "CFLAGS=${deps_CFLAGS}"
   INSTALL_COMMAND make install_sw
@@ -338,8 +339,9 @@ build_external(unbound
   "CC=${deps_cc}" "CFLAGS=${deps_CFLAGS}" ${unbound_extra}
 )
 add_static_target(libunbound unbound_external libunbound.a)
+target_link_libraries(libunbound INTERFACE OpenSSL::SSL OpenSSL::Crypto)
 if(WIN32)
-  set_target_properties(libunbound PROPERTIES INTERFACE_LINK_LIBRARIES "ws2_32;crypt32;iphlpapi")
+  target_link_libraries(libunbound INTERFACE ws2_32 crypt32 iphlpapi)
 endif()
 
 
@@ -528,7 +530,6 @@ else()
   endif()
   build_external(hidapi
     DEPENDS ${maybe_eudev} libusb_external
-    PATCH_COMMAND patch -p1 -i ${PROJECT_SOURCE_DIR}/utils/build_scripts/hidapi-autoconf-duplicate-macro-dir.patch
     CONFIGURE_COMMAND autoreconf -ivf && ./configure ${cross_host} --prefix=${DEPS_DESTDIR} --disable-shared --enable-static --with-pic
       "CC=${deps_cc}" "CXX=${deps_cxx}" "CFLAGS=${deps_CFLAGS}" "CXXFLAGS=${deps_CXXFLAGS}"
       ${cross_extra}
@@ -665,7 +666,7 @@ foreach(curl_arch ${curl_arches})
     --enable-crypto-auth --disable-ntlm-wb --disable-tls-srp --disable-unix-sockets --disable-cookies
     --enable-http-auth --enable-doh --disable-mime --enable-dateparse --disable-netrc --without-libidn2
     --disable-progress-meter --without-brotli --with-zlib=${DEPS_DESTDIR} ${curl_ssl_opts}
-    --without-libmetalink --without-librtmp --disable-versioned-symbols --enable-hidden-symbols
+    --without-librtmp --disable-versioned-symbols --enable-hidden-symbols
     --without-zsh-functions-dir --without-fish-functions-dir
     "CC=${deps_cc}" "CFLAGS=${deps_noarch_CFLAGS}${cflags_extra}" ${curl_extra}
     BUILD_COMMAND true
