@@ -69,6 +69,5 @@ target_link_libraries(common
     fmt::fmt
   PRIVATE
     libunbound
-    OpenSSL::SSL
-    OpenSSL::Crypto
+    sodium
     extra)
