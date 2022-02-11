@@ -84,7 +84,6 @@
 #include "wallet/message_store.h"
 #endif
 #include "wallet/wallet_rpc_server_commands_defs.h"
-#include "epee/string_coding.h"
 
 extern "C"
 {
