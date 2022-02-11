@@ -6,7 +6,6 @@ local default_deps_nocxx = [
   'libevent-dev',
   'libgtest-dev',
   'libhidapi-dev',
-  'libminiupnpc-dev',
   'libreadline-dev',
   'libsodium-dev',
   'libsqlite3-dev',
