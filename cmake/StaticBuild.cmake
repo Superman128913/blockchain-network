@@ -141,16 +141,16 @@ if (ANDROID)
   endif()
   if(CMAKE_ANDROID_ARCH_ABI MATCHES x86_64)
     set(android_clang x86_64-linux-android${ANDROID_PLATFORM_LEVEL}-clang)
-    set(openssl_machine x86_64)
+    set(openssl_machine android-x86_64)
   elseif(CMAKE_ANDROID_ARCH_ABI MATCHES x86)
     set(android_clang i686-linux-android${ANDROID_PLATFORM_LEVEL}-clang)
-    set(openssl_machine i686)
+    set(openssl_machine android-x86)
   elseif(CMAKE_ANDROID_ARCH_ABI MATCHES armeabi-v7a)
     set(android_clang armv7a-linux-androideabi${ANDROID_PLATFORM_LEVEL}-clang)
-    set(openssl_machine armv7)
+    set(openssl_machine android-arm)
   elseif(CMAKE_ANDROID_ARCH_ABI MATCHES arm64-v8a)
     set(android_clang aarch64-linux-android${ANDROID_PLATFORM_LEVEL}-clang)
-    set(openssl_machine aarch64)
+    set(openssl_machine android-arm64)
   else()
     message(FATAL_ERROR "Don't know how to build for android arch abi ${CMAKE_ANDROID_ARCH_ABI}")
   endif()
@@ -276,16 +276,19 @@ add_static_target(zlib zlib_external libz.a)
 
 
 
-set(openssl_configure ./config)
+set(openssl_configure_extra)
 set(openssl_system_env "")
 set(openssl_cc "${deps_cc}")
 if(CMAKE_CROSSCOMPILING)
   if(ARCH_TRIPLET STREQUAL x86_64-w64-mingw32)
-    set(openssl_system_env SYSTEM=MINGW64 RC=${CMAKE_RC_COMPILER})
+    set(openssl_configure_extra mingw64)
+    set(openssl_system_env RC=${CMAKE_RC_COMPILER})
   elseif(ARCH_TRIPLET STREQUAL i686-w64-mingw32)
-    set(openssl_system_env SYSTEM=MINGW64 RC=${CMAKE_RC_COMPILER})
+    set(openssl_configure_extra mingw)
+    set(openssl_system_env RC=${CMAKE_RC_COMPILER})
   elseif(ANDROID)
-    set(openssl_system_env SYSTEM=Linux MACHINE=${openssl_machine} ${cross_extra})
+    set(openssl_configure_extra ${openssl_machine} -D__ANDROID_API__=21)
+    set(openssl_system_env ${cross_extra})
     set(openssl_extra_opts no-asm)
   elseif(IOS)
     get_filename_component(apple_toolchain "${CMAKE_C_COMPILER}" DIRECTORY)
@@ -299,10 +302,10 @@ if(CMAKE_CROSSCOMPILING)
   endif()
 endif()
 build_external(openssl
-  CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=${openssl_cc} ${openssl_system_env} ${openssl_configure}
+  CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=${openssl_cc} ${openssl_system_env} ./Configure ${openssl_configure_extra}
     --prefix=${DEPS_DESTDIR} --libdir=lib ${openssl_extra_opts}
     no-shared no-capieng no-dso no-dtls1 no-ec_nistp_64_gcc_128 no-gost
-    no-heartbeats no-md2 no-rc5 no-rdrand no-rfc3779 no-sctp no-ssl-trace no-ssl2 no-ssl3
+    no-md2 no-rc5 no-rdrand no-rfc3779 no-sctp no-ssl-trace no-ssl3
     no-static-engine no-tests no-weak-ssl-ciphers no-zlib-dynamic "CFLAGS=${deps_CFLAGS}"
   INSTALL_COMMAND make install_sw
   BUILD_BYPRODUCTS
@@ -312,7 +315,6 @@ build_external(openssl
 add_static_target(OpenSSL::SSL openssl_external libssl.a)
 add_static_target(OpenSSL::Crypto openssl_external libcrypto.a)
 set(OPENSSL_INCLUDE_DIR ${DEPS_DESTDIR}/include)
-set(OPENSSL_VERSION 1.1.1)
 
 
 
