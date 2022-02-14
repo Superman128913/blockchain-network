@@ -210,7 +210,7 @@ namespace cryptonote
   {
     uint64_t hi, lo, rewardhi, rewardlo;
     lo = mul128(total_service_node_reward, portions, &hi);
-    div128_64(hi, lo, STAKING_PORTIONS, &rewardhi, &rewardlo);
+    div128_64(hi, lo, STAKING_PORTIONS_V1, &rewardhi, &rewardlo);
     return rewardlo;
   }
 

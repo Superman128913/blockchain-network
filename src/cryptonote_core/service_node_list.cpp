@@ -333,13 +333,14 @@ namespace service_nodes
 
   void validate_contributor_args(uint8_t hf_version, contributor_args_t const &contributor_args)
   {
+    const size_t max_contributors = hf_version >= 19 ? MAX_NUMBER_OF_CONTRIBUTORS_V2 : MAX_NUMBER_OF_CONTRIBUTORS_V1;
     if (contributor_args.portions.empty())
       throw invalid_contributions{"No portions given"};
     if (contributor_args.portions.size() != contributor_args.addresses.size())
       throw invalid_contributions{"Number of portions (" + std::to_string(contributor_args.portions.size()) + ") doesn't match the number of addresses (" + std::to_string(contributor_args.portions.size()) + ")"};
-    if (contributor_args.portions.size() > MAX_NUMBER_OF_CONTRIBUTORS)
+    if (contributor_args.portions.size() > max_contributors)
       throw invalid_contributions{"Too many contributors"};
-    if (contributor_args.portions_for_operator > STAKING_PORTIONS)
+    if (contributor_args.portions_for_operator > STAKING_PORTIONS_V1)
       throw invalid_contributions{"Operator portions are too high"};
 
     if (!check_service_node_portions(hf_version, contributor_args.portions))
@@ -940,10 +941,10 @@ namespace service_nodes
 
       // Don't need this check for HF16+ because the number of reserved spots is already checked in
       // the registration details, and we disallow a non-operator registration.
-      if (total_num_of_addr > MAX_NUMBER_OF_CONTRIBUTORS)
+      if (total_num_of_addr > MAX_NUMBER_OF_CONTRIBUTORS_V1)
       {
         LOG_PRINT_L1("Register TX: Number of participants: " << total_num_of_addr <<
-                     " exceeded the max number of contributors: " << MAX_NUMBER_OF_CONTRIBUTORS <<
+                     " exceeded the max number of contributors: " << MAX_NUMBER_OF_CONTRIBUTORS_V1 <<
                      " on height: " << block_height <<
                      " for tx: " << cryptonote::get_transaction_hash(tx));
         return false;
@@ -976,7 +977,7 @@ namespace service_nodes
 
       uint64_t hi, lo, resulthi, resultlo;
       lo = mul128(info.staking_requirement, contributor_args.portions[i], &hi);
-      div128_64(hi, lo, STAKING_PORTIONS, &resulthi, &resultlo);
+      div128_64(hi, lo, STAKING_PORTIONS_V1, &resulthi, &resultlo);
 
       info.contributors.emplace_back();
       auto &contributor = info.contributors.back();
@@ -1145,20 +1146,23 @@ namespace service_nodes
     // Check node contributor counts
     {
       bool too_many_contributions = false;
-      if (hf_version >= cryptonote::network_version_16_pulse)
+      if (hf_version >= cryptonote::network_version_19)
+        // As of HF19 we allow up to 10 stakes total
+        too_many_contributions = existing_contributions + stake.locked_contributions.size() > MAX_NUMBER_OF_CONTRIBUTORS_V2;
+      else if (hf_version >= cryptonote::network_version_16_pulse)
         // Before HF16 we didn't properly take into account unfilled reservation spots
-        too_many_contributions = existing_contributions + other_reservations + 1 > MAX_NUMBER_OF_CONTRIBUTORS;
+        too_many_contributions = existing_contributions + other_reservations + 1 > MAX_NUMBER_OF_CONTRIBUTORS_V1;
       else if (hf_version >= cryptonote::network_version_11_infinite_staking)
         // As of HF11 we allow up to 4 stakes total (except for the loophole closed above)
-        too_many_contributions = existing_contributions + stake.locked_contributions.size() > MAX_NUMBER_OF_CONTRIBUTORS;
+        too_many_contributions = existing_contributions + stake.locked_contributions.size() > MAX_NUMBER_OF_CONTRIBUTORS_V1;
       else
         // Before HF11 we allowed up to 4 contributors, but each can contribute multiple times
-        too_many_contributions = new_contributor && contributors.size() >= MAX_NUMBER_OF_CONTRIBUTORS;
+        too_many_contributions = new_contributor && contributors.size() >= MAX_NUMBER_OF_CONTRIBUTORS_V1;
 
       if (too_many_contributions)
       {
         LOG_PRINT_L1("TX: Already hit the max number of contributions: "
-                     << MAX_NUMBER_OF_CONTRIBUTORS
+                     << (hf_version >= 19 ? MAX_NUMBER_OF_CONTRIBUTORS_V2 : MAX_NUMBER_OF_CONTRIBUTORS_V1)
                      << " for contributor: " << cryptonote::get_account_address_as_str(nettype, false, stake.address)
                      << " on height: " << block_height << " for tx: " << cryptonote::get_transaction_hash(tx));
         return false;
@@ -3665,24 +3669,25 @@ namespace service_nodes
       return result;
     }
 
-    if ((args.size()-1)/ 2 > MAX_NUMBER_OF_CONTRIBUTORS)
+    const size_t max_contributors = hf_version >= 19 ? MAX_NUMBER_OF_CONTRIBUTORS_V2 : MAX_NUMBER_OF_CONTRIBUTORS_V1;
+    if (args.size() > 1 + 2 * max_contributors)
     {
-      result.err_msg = tr("Exceeds the maximum number of contributors, which is ") + std::to_string(MAX_NUMBER_OF_CONTRIBUTORS);
+      result.err_msg = tr("Exceeds the maximum number of contributors, which is ") + std::to_string(max_contributors);
       return result;
     }
 
     try
     {
       result.portions_for_operator = boost::lexical_cast<uint64_t>(args[0]);
-      if (result.portions_for_operator > STAKING_PORTIONS)
+      if (result.portions_for_operator > STAKING_PORTIONS_V1)
       {
-        result.err_msg = tr("Invalid portion amount: ") + args[0] + tr(". Must be between 0 and ") + std::to_string(STAKING_PORTIONS);
+        result.err_msg = tr("Invalid portion amount: ") + args[0] + tr(". Must be between 0 and ") + std::to_string(STAKING_PORTIONS_V1);
         return result;
       }
     }
     catch (const std::exception &e)
     {
-      result.err_msg = tr("Invalid portion amount: ") + args[0] + tr(". Must be between 0 and ") + std::to_string(STAKING_PORTIONS);
+      result.err_msg = tr("Invalid portion amount: ") + args[0] + tr(". Must be between 0 and ") + std::to_string(STAKING_PORTIONS_V1);
       return result;
     }
 
@@ -3729,13 +3734,14 @@ namespace service_nodes
       }
     }
 
+
     //
     // FIXME(doyle): FIXME(oxen) !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     // This is temporary code to redistribute the insufficient portion dust
     // amounts between contributors. It should be removed in HF12.
     //
-    std::array<uint64_t, MAX_NUMBER_OF_CONTRIBUTORS> excess_portions;
-    std::array<uint64_t, MAX_NUMBER_OF_CONTRIBUTORS> min_contributions;
+    std::array<uint64_t, MAX_NUMBER_OF_CONTRIBUTORS_V2> excess_portions;
+    std::array<uint64_t, MAX_NUMBER_OF_CONTRIBUTORS_V2> min_contributions;
     {
       // NOTE: Calculate excess portions from each contributor
       uint64_t oxen_reserved = 0;
@@ -3755,7 +3761,7 @@ namespace service_nodes
       }
     }
 
-    uint64_t portions_left  = STAKING_PORTIONS;
+    uint64_t portions_left  = STAKING_PORTIONS_V1;
     uint64_t total_reserved = 0;
     for (size_t i = 0; i < addr_to_portions.size(); ++i)
     {
@@ -3769,7 +3775,7 @@ namespace service_nodes
           // the minimum by a dust amount.
           uint64_t needed             = min_portions - addr_to_portion.portions;
           const uint64_t FUDGE_FACTOR = 10;
-          const uint64_t DUST_UNIT    = (STAKING_PORTIONS / staking_requirement);
+          const uint64_t DUST_UNIT    = (STAKING_PORTIONS_V1 / staking_requirement);
           const uint64_t DUST         = DUST_UNIT * FUDGE_FACTOR;
           if (needed > DUST)
             continue;
@@ -3793,7 +3799,7 @@ namespace service_nodes
 
           // NOTE: Operator is sending in the minimum amount and it falls below
           // the minimum by dust, just increase the portions so it passes
-          if (needed > 0 && addr_to_portions.size() < MAX_NUMBER_OF_CONTRIBUTORS)
+          if (needed > 0 && addr_to_portions.size() < MAX_NUMBER_OF_CONTRIBUTORS_V2)
             addr_to_portion.portions += needed;
       }
 
@@ -3805,7 +3811,7 @@ namespace service_nodes
 
       if (min_portions == UINT64_MAX)
       {
-        result.err_msg = tr("Too many contributors specified, you can only split a node with up to: ") + std::to_string(MAX_NUMBER_OF_CONTRIBUTORS) + tr(" people.");
+        result.err_msg = tr("Too many contributors specified, you can only split a node with up to: ") + std::to_string(max_contributors) + tr(" people.");
         return result;
       }
 
@@ -3816,6 +3822,7 @@ namespace service_nodes
       uint64_t oxen_amount = service_nodes::portions_to_amount(addr_to_portion.portions, staking_requirement);
       total_reserved      += oxen_amount;
     }
+
 
     result.success = true;
     return result;
@@ -3840,6 +3847,7 @@ namespace service_nodes
     uint64_t exp_timestamp = time(nullptr) + STAKING_AUTHORIZATION_EXPIRATION_WINDOW;
 
     crypto::hash hash;
+
     bool hashed = cryptonote::get_registration_hash(contributor_args.addresses, contributor_args.portions_for_operator, contributor_args.portions, exp_timestamp, hash);
     if (!hashed)
     {
@@ -3959,7 +3967,7 @@ namespace service_nodes
 
     // Add contributors and their portions to winners.
     result.payouts.reserve(info.contributors.size());
-    const uint64_t remaining_portions = STAKING_PORTIONS - info.portions_for_operator;
+    const uint64_t remaining_portions = STAKING_PORTIONS_V1 - info.portions_for_operator;
     for (const auto& contributor : info.contributors)
     {
       uint64_t hi, lo, resulthi, resultlo;

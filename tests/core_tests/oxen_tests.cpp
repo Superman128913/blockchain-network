@@ -2980,14 +2980,20 @@ bool oxen_service_nodes_insufficient_contribution::generate(std::vector<test_eve
   gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
-  uint64_t operator_portions = STAKING_PORTIONS / 2;
-  uint64_t remaining_portions = STAKING_PORTIONS - operator_portions;
+  const auto alice = gen.add_account();
+  const auto tx0 = gen.create_and_add_tx(gen.first_miner_, alice.get_keys().m_account_address, MK_COINS(101));
+  gen.create_and_add_next_block({tx0});
+  gen.add_transfer_unlock_blocks();
+
+  uint64_t operator_portions = STAKING_PORTIONS_V1 / 2;
+  uint64_t remaining_portions = STAKING_PORTIONS_V1 - operator_portions;
   cryptonote::keypair sn_keys{hw::get_device("default")};
   cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_portions);
   gen.add_tx(register_tx);
   gen.create_and_add_next_block({register_tx});
+  gen.add_transfer_unlock_blocks();
 
-  cryptonote::transaction stake = gen.create_and_add_staking_tx(sn_keys.pub, gen.first_miner_, MK_COINS(1));
+  cryptonote::transaction stake = gen.create_and_add_staking_tx(sn_keys.pub, alice, MK_COINS(1));
   gen.create_and_add_next_block({stake});
 
   oxen_register_callback(events, "test_insufficient_stake_does_not_get_accepted", [sn_keys](cryptonote::core &c, size_t ev_index)
@@ -2998,6 +3004,118 @@ bool oxen_service_nodes_insufficient_contribution::generate(std::vector<test_eve
 
     service_nodes::service_node_pubkey_info const &pubkey_info = sn_list[0];
     CHECK_EQ(pubkey_info.info->total_contributed, MK_COINS(50));
+    return true;
+  });
+
+  return true;
+}
+
+bool oxen_service_nodes_insufficient_contribution_HF18::generate(std::vector<test_event_entry> &events)
+{
+  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::network_version_19 - 1);
+  oxen_chain_generator gen(events, hard_forks);
+
+  gen.add_blocks_until_version(hard_forks.back().version);
+  gen.add_mined_money_unlock_blocks();
+
+  const auto alice = gen.add_account();
+  const auto tx0 = gen.create_and_add_tx(gen.first_miner_, alice.get_keys().m_account_address, MK_COINS(101));
+  gen.create_and_add_next_block({tx0});
+  gen.add_transfer_unlock_blocks();
+
+  uint64_t operator_portions = STAKING_PORTIONS_V1 / MAX_NUMBER_OF_CONTRIBUTORS_V1;
+  uint64_t operator_amount = service_nodes::get_staking_requirement(cryptonote::FAKECHAIN, hard_forks.back().height) / MAX_NUMBER_OF_CONTRIBUTORS_V1;
+  uint64_t remaining_portions = STAKING_PORTIONS_V1 - operator_portions;
+  uint64_t single_portion_illegal_HF18_legal_HF19 = remaining_portions / (MAX_NUMBER_OF_CONTRIBUTORS_V2 - 1);
+  uint64_t single_contributed_amount = (service_nodes::get_staking_requirement(cryptonote::FAKECHAIN, hard_forks.back().height) - operator_amount) / (MAX_NUMBER_OF_CONTRIBUTORS_V2 - 1);
+  cryptonote::keypair sn_keys{hw::get_device("default")};
+  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_portions);
+  gen.add_tx(register_tx);
+  gen.create_and_add_next_block({register_tx});
+  gen.add_transfer_unlock_blocks();
+
+  assert(single_contributed_amount != 0);
+  cryptonote::transaction stake = gen.create_and_add_staking_tx(sn_keys.pub, alice, single_contributed_amount);
+  gen.create_and_add_next_block({stake});
+
+  oxen_register_callback(events, "test_insufficient_stake_does_not_get_accepted", [sn_keys, operator_amount](cryptonote::core &c, size_t ev_index)
+  {
+    DEFINE_TESTS_ERROR_CONTEXT("test_insufficient_stake_does_not_get_accepted");
+    const auto sn_list = c.get_service_node_list_state({sn_keys.pub});
+    CHECK_TEST_CONDITION(sn_list.size() == 1);
+    CHECK_TEST_CONDITION(sn_list[0].info->contributors.size() == 1);
+
+    service_nodes::service_node_pubkey_info const &pubkey_info = sn_list[0];
+    CHECK_EQ(pubkey_info.info->total_contributed, operator_amount);
+    return true;
+  });
+
+  return true;
+}
+
+bool oxen_service_nodes_sufficient_contribution_HF19::generate(std::vector<test_event_entry> &events)
+{
+  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::network_version_19);
+  oxen_chain_generator gen(events, hard_forks);
+
+  gen.add_blocks_until_version(hard_forks.back().version);
+  gen.add_mined_money_unlock_blocks();
+
+  const auto alice = gen.add_account();
+  const auto tx0 = gen.create_and_add_tx(gen.first_miner_, alice.get_keys().m_account_address, MK_COINS(101));
+  gen.create_and_add_next_block({tx0});
+  gen.add_transfer_unlock_blocks();
+
+  uint64_t operator_portions = STAKING_PORTIONS_V1 / MAX_NUMBER_OF_CONTRIBUTORS_V1;
+  uint64_t operator_amount = service_nodes::get_staking_requirement(cryptonote::FAKECHAIN, hard_forks.back().height) / MAX_NUMBER_OF_CONTRIBUTORS_V1;
+  uint64_t remaining_portions = STAKING_PORTIONS_V1 - operator_portions;
+  uint64_t single_portion_illegal_HF18_legal_HF19 = remaining_portions / (MAX_NUMBER_OF_CONTRIBUTORS_V2 - 1);
+  uint64_t single_contributed_amount = (service_nodes::get_staking_requirement(cryptonote::FAKECHAIN, hard_forks.back().height) - operator_amount) / (MAX_NUMBER_OF_CONTRIBUTORS_V2 - 1);
+  uint64_t total_amount = operator_amount + single_contributed_amount;
+  cryptonote::keypair sn_keys{hw::get_device("default")};
+  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_portions);
+  gen.add_tx(register_tx);
+  gen.create_and_add_next_block({register_tx});
+
+  assert(single_contributed_amount == 0);
+  cryptonote::transaction stake = gen.create_and_add_staking_tx(sn_keys.pub, alice, single_contributed_amount);
+  gen.create_and_add_next_block({stake});
+
+  oxen_register_callback(events, "test_sufficient_stake_does_get_accepted", [sn_keys, total_amount](cryptonote::core &c, size_t ev_index)
+  {
+    DEFINE_TESTS_ERROR_CONTEXT("test_sufficient_stake_does_get_accepted");
+    const auto sn_list = c.get_service_node_list_state({sn_keys.pub});
+    CHECK_TEST_CONDITION(sn_list.size() == 1);
+    CHECK_TEST_CONDITION(sn_list[0].info->contributors.size() == 2);
+
+    service_nodes::service_node_pubkey_info const &pubkey_info = sn_list[0];
+    CHECK_EQ(pubkey_info.info->total_contributed, total_amount);
+    return true;
+  });
+
+  return true;
+}
+
+bool oxen_service_nodes_insufficient_operator_contribution_HF19::generate(std::vector<test_event_entry> &events)
+{
+  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::network_version_19);
+  oxen_chain_generator gen(events, hard_forks);
+
+  gen.add_blocks_until_version(hard_forks.back().version);
+  gen.add_mined_money_unlock_blocks();
+
+  uint64_t operator_portions = STAKING_PORTIONS_V1 / MAX_NUMBER_OF_CONTRIBUTORS_V2;
+  uint64_t operator_amount = service_nodes::get_staking_requirement(cryptonote::FAKECHAIN, hard_forks.back().height) / MAX_NUMBER_OF_CONTRIBUTORS_V2;
+  cryptonote::keypair sn_keys{hw::get_device("default")};
+  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_portions);
+  gen.add_tx(register_tx);
+  gen.create_and_add_next_block({register_tx});
+
+  oxen_register_callback(events, "test_insufficient_operator_stake_does_not_get_accepted", [sn_keys, operator_amount](cryptonote::core &c, size_t ev_index)
+  {
+    DEFINE_TESTS_ERROR_CONTEXT("test_insufficient_operator_stake_does_not_get_accepted");
+    const auto sn_list = c.get_service_node_list_state({sn_keys.pub});
+    CHECK_TEST_CONDITION(sn_list.size() == 0);
     return true;
   });
 

@@ -1493,7 +1493,7 @@ struct oxen_chain_generator
   cryptonote::transaction                              create_tx(const cryptonote::account_base &src, const cryptonote::account_public_address &dest, uint64_t amount, uint64_t fee) const;
   cryptonote::transaction                              create_registration_tx(const cryptonote::account_base &src,
                                                                               const cryptonote::keypair &service_node_keys = cryptonote::keypair{hw::get_device("default")},
-                                                                              uint64_t src_portions = STAKING_PORTIONS,
+                                                                              uint64_t src_portions = STAKING_PORTIONS_V1,
                                                                               uint64_t src_operator_cut = 0,
                                                                               std::array<oxen_service_node_contribution, 3> const &contributors = {},
                                                                               int num_contributors = 0) const;

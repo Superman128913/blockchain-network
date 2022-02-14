@@ -126,18 +126,18 @@ TEST(SQLITE, CalculateRewards)
   EXPECT_TRUE(multiple_rewards[2].amount == 68);
 
   // Check that 3 contributors receives their portion of the block reward when the operator takes a 10% fee
-  multiple_contributors.portions_for_operator = STAKING_PORTIONS/10;
+  multiple_contributors.portions_for_operator = STAKING_PORTIONS_V1/10;
   multiple_contributors.operator_address = first_address.address;
   block.reward = 1000;
   auto multiple_rewards_with_fee = sqliteDB.calculate_rewards(block.major_version, block.reward, multiple_contributors);
   // Operator gets 10%
-  EXPECT_TRUE(multiple_rewards_with_fee[0].amount == 99);
-  EXPECT_TRUE(tools::view_guts(multiple_rewards_with_fee[0].address_info.address) == tools::view_guts(first_address.address));
+  EXPECT_EQ(multiple_rewards_with_fee[0].amount, 99);
+  EXPECT_EQ(tools::view_guts(multiple_rewards_with_fee[0].address_info.address), tools::view_guts(first_address.address));
   // Contributors (including operator) receive the balance
-  EXPECT_TRUE(multiple_rewards_with_fee[1].amount == 297);
-  EXPECT_TRUE(tools::view_guts(multiple_rewards_with_fee[1].address_info.address) == tools::view_guts(first_address.address));
-  EXPECT_TRUE(multiple_rewards_with_fee[2].amount == 297);
-  EXPECT_TRUE(tools::view_guts(multiple_rewards_with_fee[2].address_info.address) == tools::view_guts(second_address.address));
-  EXPECT_TRUE(multiple_rewards_with_fee[3].amount == 306);
-  EXPECT_TRUE(tools::view_guts(multiple_rewards_with_fee[3].address_info.address) == tools::view_guts(third_address.address));
+  EXPECT_EQ(multiple_rewards_with_fee[1].amount, 297);
+  EXPECT_EQ(tools::view_guts(multiple_rewards_with_fee[1].address_info.address), tools::view_guts(first_address.address));
+  EXPECT_EQ(multiple_rewards_with_fee[2].amount, 297);
+  EXPECT_EQ(tools::view_guts(multiple_rewards_with_fee[2].address_info.address), tools::view_guts(second_address.address));
+  EXPECT_EQ(multiple_rewards_with_fee[3].amount, 306);
+  EXPECT_EQ(tools::view_guts(multiple_rewards_with_fee[3].address_info.address), tools::view_guts(third_address.address));
 }

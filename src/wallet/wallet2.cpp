@@ -8137,6 +8137,7 @@ wallet2::stake_result wallet2::check_stake_allowed(const crypto::public_key& sn_
 
   uint8_t const hf_version   = *res;
   uint64_t max_contrib_total = snode_info.staking_requirement - snode_info.total_reserved;
+
   uint64_t min_contrib_total = service_nodes::get_min_node_contribution(hf_version, snode_info.staking_requirement, snode_info.total_reserved, total_existing_contributions);
 
   bool is_preexisting_contributor = false;
@@ -8165,7 +8166,7 @@ wallet2::stake_result wallet2::check_stake_allowed(const crypto::public_key& sn_
     return result;
   }
 
-  const bool full = snode_info.contributors.size() >= MAX_NUMBER_OF_CONTRIBUTORS;
+  const bool full = snode_info.contributors.size() >= MAX_NUMBER_OF_CONTRIBUTORS_V2;
   if (full && !is_preexisting_contributor)
   {
     result.status = stake_result_status::service_node_contributors_maxed;
@@ -8175,7 +8176,7 @@ wallet2::stake_result wallet2::check_stake_allowed(const crypto::public_key& sn_
 
   if (amount < min_contrib_total)
   {
-    const uint64_t DUST = MAX_NUMBER_OF_CONTRIBUTORS;
+    const uint64_t DUST = MAX_NUMBER_OF_CONTRIBUTORS_V2;
     if (min_contrib_total - amount <= DUST)
     {
       amount = min_contrib_total;
@@ -8225,7 +8226,9 @@ wallet2::stake_result wallet2::create_stake_tx(const crypto::public_key& service
   {
     result = check_stake_allowed(service_node_key, addr_info, amount, amount_fraction);
     if (result.status != stake_result_status::success)
+    {
       return result;
+    }
   }
   catch (const std::exception& e)
   {
@@ -8498,7 +8501,7 @@ wallet2::register_service_node_result wallet2::create_register_service_node_tx(c
   {
     uint64_t amount_payable_by_operator = 0;
     {
-      const uint64_t DUST                 = MAX_NUMBER_OF_CONTRIBUTORS;
+      const uint64_t DUST                 = MAX_NUMBER_OF_CONTRIBUTORS_V2;
       uint64_t amount_left                = staking_requirement;
       for (size_t i = 0; i < contributor_args.portions.size(); i++)
       {

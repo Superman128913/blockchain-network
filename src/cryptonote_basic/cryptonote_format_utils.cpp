@@ -1321,12 +1321,12 @@ namespace cryptonote
       LOG_ERROR("get_registration_hash addresses.size() != portions.size()");
       return false;
     }
-    uint64_t portions_left = STAKING_PORTIONS;
+    uint64_t portions_left = STAKING_PORTIONS_V1;
     for (uint64_t portion : portions)
     {
       if (portion > portions_left)
       {
-        LOG_ERROR(tr("Your registration has more than ") << STAKING_PORTIONS << tr(" portions, this registration is invalid!"));
+        LOG_ERROR(tr("Your registration has more than ") << STAKING_PORTIONS_V1 << tr(" portions, this registration is invalid!"));
         return false;
       }
       portions_left -= portion;

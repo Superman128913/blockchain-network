@@ -241,10 +241,11 @@ namespace service_nodes {
   constexpr uint8_t MAXIMUM_EXTERNAL_OUT_OF_SYNC = 80;
 
 
-static_assert(STAKING_PORTIONS != UINT64_MAX, "UINT64_MAX is used as the invalid value for failing to calculate the min_node_contribution");
+static_assert(STAKING_PORTIONS_V1 != UINT64_MAX, "UINT64_MAX is used as the invalid value for failing to calculate the min_node_contribution");
 // return: UINT64_MAX if (num_contributions > the max number of contributions), otherwise the amount in oxen atomic units
 uint64_t get_min_node_contribution            (uint8_t version, uint64_t staking_requirement, uint64_t total_reserved, size_t num_contributions);
 uint64_t get_min_node_contribution_in_portions(uint8_t version, uint64_t staking_requirement, uint64_t total_reserved, size_t num_contributions);
+uint64_t get_min_node_operator_contribution(uint64_t staking_requirement);
 
 // Gets the maximum allowed stake amount.  This is used to prevent significant overstaking.  The
 // wallet tries to avoid this when submitting a stake, but it can still happen when competing stakes
@@ -267,7 +268,7 @@ crypto::hash generate_request_stake_unlock_hash(uint32_t nonce);
 uint64_t     get_locked_key_image_unlock_height(cryptonote::network_type nettype, uint64_t node_register_height, uint64_t curr_height);
 
 // Returns lowest x such that (staking_requirement * x/STAKING_PORTIONS) >= amount
-uint64_t get_portions_to_make_amount(uint64_t staking_requirement, uint64_t amount, uint64_t max_portions = STAKING_PORTIONS);
+uint64_t get_portions_to_make_amount(uint64_t staking_requirement, uint64_t amount, uint64_t max_portions = STAKING_PORTIONS_V1);
 
 bool get_portions_from_percent_str(std::string cut_str, uint64_t& portions);
 

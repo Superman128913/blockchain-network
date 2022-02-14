@@ -51,11 +51,12 @@ using namespace std::literals;
 #define CRYPTONOTE_DEFAULT_TX_MIXIN                     9
 
 #define STAKING_REQUIREMENT_LOCK_BLOCKS_EXCESS          20
-#define STAKING_PORTIONS                                UINT64_C(0xfffffffffffffffc)
-#define MAX_NUMBER_OF_CONTRIBUTORS                      4
-#define MIN_PORTIONS                                    (STAKING_PORTIONS / MAX_NUMBER_OF_CONTRIBUTORS)
+#define STAKING_PORTIONS_V1                             UINT64_C(0xfffffffffffffffc)
+#define MAX_NUMBER_OF_CONTRIBUTORS_V1                   4
+#define MAX_NUMBER_OF_CONTRIBUTORS_V2                   10
+#define MIN_PORTIONS_V2                                 (STAKING_PORTIONS_V1 / MAX_NUMBER_OF_CONTRIBUTORS_V2)
 
-static_assert(STAKING_PORTIONS % 12 == 0, "Use a multiple of twelve, so that it divides evenly by two, three, or four contributors.");
+static_assert(STAKING_PORTIONS_V1 % 12 == 0, "Use a multiple of 12, so that it divides evenly by two, three, or four contributors.");
 
 #define STAKING_AUTHORIZATION_EXPIRATION_WINDOW         (60*60*24*7*2)  // 2 weeks
 

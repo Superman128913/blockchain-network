@@ -2981,6 +2981,7 @@ namespace {
 
     // NOTE(oxen): Pre-emptively set subaddr_account to 0. We don't support onwards from Infinite Staking which is when this call was implemented.
     tools::wallet2::register_service_node_result register_result = m_wallet->create_register_service_node_tx(args, 0 /*subaddr_account*/);
+
     if (register_result.status != tools::wallet2::register_service_node_result_status::success)
       throw wallet_rpc_error{error_code::TX_NOT_POSSIBLE, register_result.msg};
 

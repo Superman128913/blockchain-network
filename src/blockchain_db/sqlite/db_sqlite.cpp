@@ -233,7 +233,7 @@ namespace cryptonote {
       // This calculates the operator fee using (operator_portion / max_operator_portion) * distribution_amount but using 128 bit integer math
       uint64_t hi, lo, resulthi, resultlo;
       lo = mul128(sn_info.portions_for_operator, distribution_amount, &hi);
-      div128_64(hi, lo, STAKING_PORTIONS, &resulthi, &resultlo);
+      div128_64(hi, lo, STAKING_PORTIONS_V1, &resulthi, &resultlo);
       if (resulthi > 0)
         throw std::logic_error("overflow from calculating sn operator fee");
       operator_fee = resultlo;

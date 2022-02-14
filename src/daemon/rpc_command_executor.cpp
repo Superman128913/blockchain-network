@@ -1582,7 +1582,7 @@ static void append_printable_service_node_list_entry(cryptonote::network_type ne
 
   if (detailed_view) // Print operator information
   {
-    stream << indent2 << "Operator Cut (\% Of Reward): " << to_string_rounded((entry.portions_for_operator / (double)STAKING_PORTIONS) * 100.0, 2) << "%\n";
+    stream << indent2 << "Operator Cut (\% Of Reward): " << to_string_rounded((entry.portions_for_operator / (double)STAKING_PORTIONS_V1) * 100.0, 2) << "%\n";
     stream << indent2 << "Operator Address: " << entry.operator_address << "\n";
   }
 
@@ -1891,7 +1891,7 @@ static uint64_t get_actual_amount(uint64_t amount, uint64_t portions)
 {
   uint64_t lo, hi, resulthi, resultlo;
   lo = mul128(amount, portions, &hi);
-  div128_64(hi, lo, STAKING_PORTIONS, &resulthi, &resultlo);
+  div128_64(hi, lo, STAKING_PORTIONS_V1, &resulthi, &resultlo);
   return resultlo;
 }
 
@@ -2003,8 +2003,8 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
   };
 
   // anything less than DUST will be added to operator stake
-  const uint64_t DUST = MAX_NUMBER_OF_CONTRIBUTORS;
-  std::cout << "Current staking requirement: " << highlight_money(staking_requirement) << std::endl;
+  const uint64_t DUST = MAX_NUMBER_OF_CONTRIBUTORS_V2;
+  std::cout << "Current staking requirement: " << cryptonote::print_money(staking_requirement) << " " << cryptonote::get_unit() << std::endl;
 
   enum struct register_step
   {
@@ -2025,8 +2025,8 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
   {
     register_step            prev_step                    = register_step::ask_address;
     size_t                   num_participants             = 1;
-    uint64_t                 operator_fee_portions        = STAKING_PORTIONS;
-    uint64_t                 portions_remaining           = STAKING_PORTIONS;
+    uint64_t                 operator_fee_portions        = STAKING_PORTIONS_V1;
+    uint64_t                 portions_remaining           = STAKING_PORTIONS_V1;
     uint64_t                 total_reserved_contributions = 0;
     std::vector<std::string> addresses;
     std::vector<uint64_t>    contributions;
@@ -2114,7 +2114,7 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
         if (result == input_line_result::yes)
         {
           std::cout << std::endl;
-          state.contributions.push_back(STAKING_PORTIONS);
+          state.contributions.push_back(STAKING_PORTIONS_V1);
           state.portions_remaining = 0;
           state.total_reserved_contributions += staking_requirement;
 
@@ -2158,16 +2158,16 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
       case register_step::how_many_more_contributors:
       {
         auto [result, input] = input_line_value(
-            "Number of additional contributors [1-" + std::to_string(MAX_NUMBER_OF_CONTRIBUTORS - 1) + "]");
+            "Number of additional contributors [1-" + std::to_string(MAX_NUMBER_OF_CONTRIBUTORS_V2 - 1) + "]");
 
         if (check_cancel_back(result))
           break;
 
         size_t additional_contributors;
         if (!tools::parse_int(input, additional_contributors) ||
-            additional_contributors < 1 || additional_contributors > (MAX_NUMBER_OF_CONTRIBUTORS - 1))
+            additional_contributors < 1 || additional_contributors > (MAX_NUMBER_OF_CONTRIBUTORS_V2 - 1))
         {
-          tools::fail_msg_writer() << "Invalid value; must be between 1 and " << (MAX_NUMBER_OF_CONTRIBUTORS - 1) << "." << std::endl;
+          tools::fail_msg_writer() << "Invalid value; must be between 1 and " << (MAX_NUMBER_OF_CONTRIBUTORS_V2 - 1) << "." << std::endl;
           break;
         }
 
@@ -2182,7 +2182,7 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
         uint64_t amount_left = staking_requirement - state.total_reserved_contributions;
         uint64_t min_contribution_portions = service_nodes::get_min_node_contribution_in_portions(
             hf_version, staking_requirement, state.total_reserved_contributions, state.contributions.size());
-        uint64_t min_contribution = service_nodes::portions_to_amount(staking_requirement, min_contribution_portions);
+        uint64_t min_contribution = is_operator ? service_nodes::get_min_node_operator_contribution(staking_requirement) : service_nodes::portions_to_amount(staking_requirement, min_contribution_portions);
 
         auto [result, contribution_str] = input_line_value(fmt::format(
             "The {} contribution must be between {} and {} to meet the staking requirements.\n\n"
@@ -2236,7 +2236,7 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
 
       case register_step::summary_info:
       {
-        uint64_t open_spots = MAX_NUMBER_OF_CONTRIBUTORS - state.contributions.size();
+        uint64_t open_spots = MAX_NUMBER_OF_CONTRIBUTORS_V2 - state.contributions.size();
         const uint64_t amount_left = staking_requirement - state.total_reserved_contributions;
         fmt::print("Total reserved contributions: {}\n", highlight_money(state.total_reserved_contributions));
         if (amount_left > DUST)
@@ -2276,7 +2276,7 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
 
         if (amount_left > 0 || state.addresses.size() > 1)
           fmt::print("Operator fee (as % of Service Node rewards): \x1b[33;1m{}%\x1b[0m\n\n",
-              state.operator_fee_portions * 100.0 / static_cast<double>(STAKING_PORTIONS));
+              state.operator_fee_portions * 100.0 / static_cast<double>(STAKING_PORTIONS_V1));
 
         constexpr auto row = "{:^14}  {:^13}  {:>17}  {:>8}\n"sv;
         fmt::print(row, "Contributor", "Address", "Contribution", "Contr. %");
@@ -2293,12 +2293,12 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
               (i==0) ? "Operator" : "Contributor " + std::to_string(i),
               addr.substr(0, 9) + ".." + addr.substr(addr.size() - 2),
               cryptonote::print_money(amount),
-              fmt::format("{:.2f}%", state.contributions[i] * 100.0 / STAKING_PORTIONS));
+              fmt::format("{:.2f}%", state.contributions[i] * 100.0 / STAKING_PORTIONS_V1));
         }
 
         if (amount_left > DUST)
         {
-          size_t open_spots = MAX_NUMBER_OF_CONTRIBUTORS - state.contributions.size();
+          size_t open_spots = MAX_NUMBER_OF_CONTRIBUTORS_V2 - state.contributions.size();
           for (size_t i = 0; i < open_spots; i++) {
             fmt::print(row,
                 "(open)",

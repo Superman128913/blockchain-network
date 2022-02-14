@@ -134,6 +134,9 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(oxen_service_nodes_checkpoint_quorum_size);
     GENERATE_AND_PLAY(oxen_service_nodes_gen_nodes);
     GENERATE_AND_PLAY(oxen_service_nodes_insufficient_contribution);
+    GENERATE_AND_PLAY(oxen_service_nodes_insufficient_contribution_HF18);
+    GENERATE_AND_PLAY(oxen_service_nodes_sufficient_contribution_HF19);
+    GENERATE_AND_PLAY(oxen_service_nodes_insufficient_operator_contribution_HF19);
     GENERATE_AND_PLAY(oxen_service_nodes_test_rollback);
     GENERATE_AND_PLAY(oxen_service_nodes_test_swarms_basic);
     GENERATE_AND_PLAY(oxen_pulse_invalid_validator_bitset);

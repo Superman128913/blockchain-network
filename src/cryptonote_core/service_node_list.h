@@ -837,6 +837,6 @@ namespace service_nodes
 
   payout service_node_info_to_payout(crypto::public_key const &key, service_node_info const &info);
 
-  const static payout_entry null_payout_entry = {cryptonote::null_address, STAKING_PORTIONS};
+  const static payout_entry null_payout_entry = {cryptonote::null_address, STAKING_PORTIONS_V1};
   const static payout null_payout             = {crypto::null_pkey, {null_payout_entry}};
 }

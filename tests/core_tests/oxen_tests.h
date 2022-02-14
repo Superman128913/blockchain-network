@@ -77,6 +77,9 @@ struct oxen_service_nodes_alt_quorums                                           
 struct oxen_service_nodes_checkpoint_quorum_size                                     : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_service_nodes_gen_nodes                                                  : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_service_nodes_insufficient_contribution                                  : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
+struct oxen_service_nodes_insufficient_contribution_HF18                             : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
+struct oxen_service_nodes_sufficient_contribution_HF19                               : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
+struct oxen_service_nodes_insufficient_operator_contribution_HF19                    : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_service_nodes_test_rollback                                              : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_service_nodes_test_swarms_basic                                          : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_pulse_invalid_validator_bitset                                           : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
