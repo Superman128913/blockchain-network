@@ -316,11 +316,11 @@ namespace wallet
 
           if (output_dict.key() != "key")
             return;
-          o.key = output_dict.consume_string_view();
+          o.key = tools::make_from_guts<crypto::public_key>(output_dict.consume_string_view());
 
           if (output_dict.key() != "mask")
             return;
-          o.mask = output_dict.consume_string_view();
+          o.mask = tools::make_from_guts<rct::key>(output_dict.consume_string_view());
 
           if (output_dict.key() != "txid")
             return;
