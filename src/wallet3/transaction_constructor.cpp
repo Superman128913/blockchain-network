@@ -10,7 +10,7 @@ namespace wallet
   // create_transaction will create a vanilla spend transaction without any special features.
   PendingTransaction
   TransactionConstructor::create_transaction(
-      const std::vector<TransactionRecipient>& recipients) const
+      const std::vector<cryptonote::tx_destination_entry>& recipients) const
   {
     PendingTransaction new_tx(recipients);
     new_tx.fee_per_byte = fee_per_byte;

@@ -52,6 +52,26 @@ class MockWallet : public Wallet
       store_transaction(hash, height, dummy_outputs);
       db_tx.commit();
     };
+
+    void
+    store_test_output(wallet::Output o) 
+    {
+      height++;
+
+      wallet::Block b{};
+      b.height = height;
+      auto hash = debug_random_filled<crypto::hash>(height);
+      b.hash = hash;
+      add_block(b);
+
+      std::vector<wallet::Output> dummy_outputs;
+      o.block_height = height;
+      dummy_outputs.push_back(o);
+
+      SQLite::Transaction db_tx(db->db);
+      store_transaction(hash, height, dummy_outputs);
+      db_tx.commit();
+    };
 };
 
 

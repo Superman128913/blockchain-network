@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cryptonote_basic/cryptonote_basic.h>
+#include <cryptonote_core/cryptonote_tx_utils.h>
 #include "address.hpp"
 #include "output.hpp"
 #include "decoy.hpp"
@@ -13,22 +14,13 @@ namespace wallet
   struct version
   {};  // XXX: placeholder type
 
-  struct TransactionRecipient
-  {
-    address recipient_address;
-    int64_t amount;
-
-    TransactionRecipient() = default;
-    TransactionRecipient(address addr, int64_t amt) : recipient_address(addr), amount(amt){};
-  };
-
   struct PendingTransaction
   {
     version tx_version;
 
-    std::vector<TransactionRecipient> recipients;  // does not include change
+    std::vector<cryptonote::tx_destination_entry> recipients;  // does not include change
 
-    TransactionRecipient change;
+    cryptonote::tx_destination_entry change;
 
     std::string memo;
 
@@ -48,7 +40,7 @@ namespace wallet
 
     PendingTransaction() = default;
 
-    PendingTransaction(const std::vector<TransactionRecipient>& new_recipients);
+    PendingTransaction(const std::vector<cryptonote::tx_destination_entry>& new_recipients);
 
     int64_t
     get_fee() const;
