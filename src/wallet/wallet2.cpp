@@ -6399,7 +6399,7 @@ std::string wallet2::transfers_to_csv(const std::vector<wallet::transfer_view>& 
         running_balance -= transfer.amount + transfer.fee;
         break;
       default:
-        MERROR("Warning: Unhandled pay type, this is most likely a developer error, please report it to the Loki developers.");
+        MERROR("Warning: Unhandled pay type, this is most likely a developer error, please report it to the Oxen developers.");
         break;
     }
 
@@ -8167,7 +8167,7 @@ wallet2::stake_result wallet2::check_stake_allowed(const crypto::public_key& sn_
   if (max_contrib_total == 0)
   {
     result.status = stake_result_status::service_node_contribution_maxed;
-    result.msg = tr("The service node cannot receive any more Loki from this wallet");
+    result.msg = tr("The service node cannot receive any more Oxen from this wallet");
     return result;
   }
 
@@ -8633,7 +8633,7 @@ wallet2::request_stake_unlock_result wallet2::can_request_stake_unlock(const cry
 
       result.msg.append("You are requesting to unlock a stake of: ");
       result.msg.append(cryptonote::print_money(contribution.amount));
-      result.msg.append(" Loki from the service node network.\nThis will schedule the service node: ");
+      result.msg.append(" Oxen from the service node network.\nThis will schedule the service node: ");
       result.msg.append(node_info.service_node_pubkey);
       result.msg.append(" for deactivation.");
       if (node_info.contributors.size() > 1) {
@@ -9211,7 +9211,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
     {
       MWARNING("More than 5% of outputs are blacklisted ("
                << output_blacklist.size() << "/" << rct_offsets.size()
-               << "), please notify the Loki developers");
+               << "), please notify the Oxen developers");
     }
 
     if (!req_t.amounts.empty())
