@@ -63,6 +63,7 @@ namespace cryptonote::rpc {
     struct tx_output_indices
     {
       std::vector<uint64_t> indices; // Array of unsigned int.
+                                     
 
       KV_MAP_SERIALIZABLE
     };
@@ -70,6 +71,7 @@ namespace cryptonote::rpc {
     struct block_output_indices
     {
       std::vector<tx_output_indices> indices; // Array of TX output indices:
+                                             
 
       KV_MAP_SERIALIZABLE
     };
@@ -86,6 +88,9 @@ namespace cryptonote::rpc {
       KV_MAP_SERIALIZABLE
     };
   };
+
+  void to_json(nlohmann::json& j, const GET_BLOCKS_BIN::tx_output_indices& toi);
+  void to_json(nlohmann::json& j, const GET_BLOCKS_BIN::block_output_indices& boi);
 
   OXEN_RPC_DOC_INTROSPECT
   // Get blocks by height. Binary request.

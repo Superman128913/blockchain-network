@@ -1095,6 +1095,7 @@ namespace cryptonote
 
     return buf;
   }
+  //---------------------------------------------------------------
   std::unordered_set<std::string> tx_verification_failure_codes(const tx_verification_context& tvc) {
       std::unordered_set<std::string> reasons;
 
