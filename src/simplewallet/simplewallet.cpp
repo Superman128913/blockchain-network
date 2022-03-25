@@ -6775,10 +6775,10 @@ bool simple_wallet::ons_update_mapping(std::vector<std::string> args)
     }
 
     if(backup_owner.size()) {
-      std::cout << boost::format(tr("Old Backup Owner: %s")) % response[0]["backup_owner"] << std::endl;
+      std::cout << boost::format(tr("Old Backup Owner: %s")) % response[0].value("backup_owner", "") << std::endl;
       std::cout << boost::format(tr("New Backup Owner: %s")) % backup_owner << std::endl;
     } else {
-      std::cout << boost::format(tr("Backup Owner:     %s (unchanged)")) % response[0]["backup_owner"] << std::endl;
+      std::cout << boost::format(tr("Backup Owner:     %s (unchanged)")) % response[0].value("backup_owner", "") << std::endl;
     }
     if (!confirm_and_send_tx(dsts, ptx_vector, false /*blink*/))
       return false;
@@ -7017,7 +7017,7 @@ bool simple_wallet::ons_lookup(std::vector<std::string> args)
     {
       static_cast<ons::mapping_type>(mapping["type"]),
       name,
-      req_params[0]["name_hash"]};
+      req_params["entries"][0]["name_hash"]};
     m_wallet->set_ons_cache_record(detail);
   }
   for (size_t i = last_index + 1; i < args.size(); i++)
@@ -7077,13 +7077,14 @@ bool simple_wallet::ons_by_owner(const std::vector<std::string>& args)
   {
     std::string_view name;
     std::string value;
+    ons::mapping_type ons_type = static_cast<ons::mapping_type>(entry["type"].get<uint16_t>());
     if (auto got = cache.find(entry["name_hash"]); got != cache.end())
     {
       name = got->second.name;
       ons::mapping_value mv;
-      if (ons::mapping_value::validate_encrypted(static_cast<ons::mapping_type>(entry["type"].get<uint16_t>()), oxenmq::from_hex(entry["encrypted_value"].get<std::string>()), &mv)
-          && mv.decrypt(name, static_cast<ons::mapping_type>(entry["type"].get<uint16_t>())))
-        value = mv.to_readable_value(nettype, static_cast<ons::mapping_type>(entry["type"].get<uint16_t>()));
+      if (ons::mapping_value::validate_encrypted(ons_type, oxenmq::from_hex(entry["encrypted_value"].get<std::string>()), &mv)
+          && mv.decrypt(name, ons_type))
+        value = mv.to_readable_value(nettype, ons_type);
     }
 
     auto writer = tools::msg_writer();
@@ -7092,7 +7093,7 @@ bool simple_wallet::ons_by_owner(const std::vector<std::string>& args)
     if (!name.empty()) writer
       << "\n    Name: " << name;
     writer
-      << "\n    Type: " << entry["type"];
+      << "\n    Type: " << ons_type;
     if (!value.empty()) writer
       << "\n    Value: " << value;
     writer
