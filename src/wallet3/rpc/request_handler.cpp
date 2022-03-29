@@ -3,8 +3,9 @@
 #include "commands.h"
 #include "command_parser.h"
 #include <wallet3/wallet.hpp>
-
 #include <wallet3/db_schema.hpp>
+
+#include <cryptonote_core/cryptonote_tx_utils.h>
 
 #include <unordered_map>
 #include <memory>
@@ -14,6 +15,7 @@ namespace wallet::rpc {
 
 using cryptonote::rpc::rpc_context;
 using cryptonote::rpc::rpc_request;
+using cryptonote::rpc::rpc_error;
 
   namespace {
 
@@ -83,14 +85,41 @@ void RequestHandler::invoke(SET_ACCOUNT_TAG_DESCRIPTION& command, rpc_context co
 }
 
 void RequestHandler::invoke(GET_HEIGHT& command, rpc_context context) {
-  auto height = wallet.db->scan_target_height();
-  command.response["height"] = height;
+  if (auto w = wallet.lock())
+  {
+    auto height = w->db->scan_target_height();
+    command.response["height"] = height;
 
-  //TODO: this
-  command.response["immutable_height"] = height;
+    //TODO: this
+    command.response["immutable_height"] = height;
+  }
 }
 
 void RequestHandler::invoke(TRANSFER& command, rpc_context context) {
+  if (auto w = wallet.lock())
+  {
+    // TODO: arg checking
+    // TODO: actually use all args
+
+    std::vector<cryptonote::tx_destination_entry> recipients;
+    for (const auto& [dest, amount] : command.request.destinations)
+    {
+      auto& entry = recipients.emplace_back();
+      cryptonote::address_parse_info addr_info;
+
+      if (not cryptonote::get_account_address_from_str(addr_info, w->nettype, dest))
+        //TODO: is 500 the "correct" error code?
+        throw rpc_error(500, std::string("Invalid destination: ") + dest);
+
+      entry.original = dest;
+      entry.amount = amount;
+      entry.addr = addr_info.address;
+      entry.is_subaddress = addr_info.is_subaddress;
+      entry.is_integrated = addr_info.has_payment_id;
+    }
+
+    auto ptx = w->tx_constructor->create_transaction(recipients);
+  }
 }
 
 void RequestHandler::invoke(TRANSFER_SPLIT& command, rpc_context context) {

@@ -10,6 +10,8 @@
 #include <string>
 #include <unordered_map>
 
+#include <memory>
+
 namespace wallet {
   class Wallet;
 }
@@ -36,11 +38,11 @@ extern const std::unordered_map<std::string, std::shared_ptr<const rpc_command>>
 
 class RequestHandler {
 
-  wallet::Wallet& wallet;
+  std::weak_ptr<wallet::Wallet> wallet;
 
 public:
 
-  RequestHandler(wallet::Wallet& wallet) : wallet(wallet) {};
+  RequestHandler(std::weak_ptr<wallet::Wallet> wallet) : wallet(wallet) {};
 
   void invoke(GET_BALANCE& command, rpc_context context);
   void invoke(GET_ADDRESS& command, rpc_context context);

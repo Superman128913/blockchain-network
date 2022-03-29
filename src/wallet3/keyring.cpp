@@ -271,12 +271,20 @@ namespace wallet
       i++;
     }
 
+    /*
     // Sort the inputs by their key image
     std::sort(ptx.tx.vin.begin(), ptx.tx.vin.end(), [&](const auto& a, const auto& b) {
       const cryptonote::txin_to_key &tk0 = var::get<cryptonote::txin_to_key>(a);
       const cryptonote::txin_to_key &tk1 = var::get<cryptonote::txin_to_key>(b);
       return memcmp(&tk0.k_image, &tk1.k_image, sizeof(tk0.k_image)) > 0;
     });
+    */
+
+    // TODO: apply the above sorting
+
+    auto txkey_pub = secret_tx_key_to_public_tx_key(tx_key);
+    cryptonote::remove_field_from_tx_extra<cryptonote::tx_extra_pub_key>(ptx.tx.extra);
+    cryptonote::add_tx_extra<cryptonote::tx_extra_pub_key>(ptx.tx, txkey_pub);
 
     std::vector<rct::key> amount_keys;
     amount_keys.clear();
@@ -294,9 +302,12 @@ namespace wallet
       dest_keys.push_back(rct::pk2rct(out_eph_public_key));
       outamounts.push_back(recipient.amount);
       amount_out += recipient.amount;
+      ptx.tx.vout.push_back(out);
       // TODO sean the output should be shuffled
       i++;
     }
+
+    // TODO: extra pub keys as needed (will come into play with subaddresses)
 
     // Generate one time destination key for change address (Output Ephemeral Key)
     crypto::public_key change_out_eph_public_key = generate_change_address_ephemeral_keys(tx_key, ptx.change, i, amount_keys);
@@ -307,8 +318,14 @@ namespace wallet
     change_out.target = change_tk;
     dest_keys.push_back(rct::pk2rct(change_out_eph_public_key));
     outamounts.push_back(ptx.change.amount);
+    ptx.tx.vout.push_back(change_out);
     amount_out += ptx.change.amount;
 
+    // Zero amounts in tx.vin and tx.vout before ringct step
+    for (auto& i : ptx.tx.vin)
+      var::get<cryptonote::txin_to_key>(i).amount = 0;
+    for (auto& o : ptx.tx.vout)
+      o.amount = 0;
 
     crypto::hash tx_prefix_hash = get_transaction_prefix_hash(ptx.tx);
 

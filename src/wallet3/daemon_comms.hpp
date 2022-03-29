@@ -29,14 +29,14 @@ namespace wallet
      * if the wallet is already registered.
      *
      * A wallet should call this:
-     *   On creation, to inform the daemon comms that it exists and wishes to sync.
+     *   On creation, to inform the daemon comms that it exists and wishes to sync.  Pass new_wallet=true.
      *   If the wallet recieves blocks from daemon comms which are in the future for
      *   it.  In this case, it is telling the daemon comms to start syncing from
      *   earlier in the chain.  Pass check_sync_height=true.
      *   When the wallet finishes processing a batch of blocks.  Pass check_sync_height=false.
      */
     virtual void
-    register_wallet(Wallet& wallet, int64_t height, bool check_sync_height = false) = 0;
+    register_wallet(Wallet& wallet, int64_t height, bool check_sync_height = false, bool new_wallet = false) = 0;
 
     virtual void
     deregister_wallet(Wallet& wallet, std::promise<void>& p) = 0;

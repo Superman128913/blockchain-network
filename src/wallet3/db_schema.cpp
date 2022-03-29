@@ -6,8 +6,14 @@
 #include <common/hex.h>
 #include <cryptonote_basic/cryptonote_basic.h>
 
+#include <iostream>
+
 namespace wallet
 {
+  WalletDB::~WalletDB()
+  {
+  }
+
   // FIXME: BLOB or TEXT for binary data below?
   void
   WalletDB::create_schema()
@@ -21,12 +27,34 @@ namespace wallet
     // TODO: table for balance "per account"
     db.exec(
         R"(
+          -- CHECK (id = 0) restricts this table to a single row
+          CREATE TABLE metadata (
+            id INTEGER NOT NULL PRIMARY KEY CHECK (id = 0),
+            db_version INTEGER NOT NULL DEFAULT 0,
+            balance INTEGER NOT NULL DEFAULT 0,
+            unlocked_balance INTEGER NOT NULL DEFAULT 0,
+            last_scan_height INTEGER NOT NULL DEFAULT -1,
+            scan_target_hash TEXT NOT NULL,
+            scan_target_height INTEGER NOT NULL DEFAULT 0,
+            output_count INTEGER NOT NULL DEFAULT 0
+          );
+
+          -- insert metadata row as default
+          INSERT INTO metadata VALUES (0,0,0,0,-1,"",0,0);
+
           CREATE TABLE blocks (
             height INTEGER NOT NULL PRIMARY KEY,
             transaction_count INTEGER NOT NULL,
             hash TEXT NOT NULL,
             timestamp INTEGER NOT NULL
           );
+
+          -- update scan height when new block added
+          CREATE TRIGGER block_added AFTER INSERT ON blocks
+          FOR EACH ROW
+          BEGIN
+            UPDATE metadata SET last_scan_height = NEW.height WHERE id = 0;
+          END;
 
           CREATE TABLE transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,19 +74,6 @@ namespace wallet
 
           -- default "main" subaddress
           INSERT INTO subaddresses VALUES (0,0,TRUE);
-
-          -- CHECK (id = 0) restricts this table to a single row
-          CREATE TABLE metadata (
-            id INTEGER NOT NULL PRIMARY KEY CHECK (id = 0),
-            db_version INTEGER NOT NULL DEFAULT 0,
-            balance INTEGER NOT NULL DEFAULT 0,
-            unlocked_balance INTEGER NOT NULL DEFAULT 0,
-            last_scan_height INTEGER NOT NULL DEFAULT -1,
-            scan_target_hash TEXT NOT NULL,
-            scan_target_height INTEGER NOT NULL DEFAULT 0
-          );
-          -- insert metadata row as default
-          INSERT INTO metadata VALUES (0,0,0,0,-1,"",0);
 
           CREATE TABLE key_images (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -144,8 +159,23 @@ namespace wallet
   }
 
   void
+  WalletDB::update_output_count(const int64_t count)
+  {
+    prepared_exec(
+        "UPDATE metadata SET output_count = output_count + ? WHERE id = 0;",
+        count);
+  }
+
+  void
   WalletDB::store_block(const Block& block)
   {
+    int64_t output_count = 0;
+    for (const auto& tx : block.transactions)
+    {
+      output_count += tx.tx.vout.size();
+    }
+    update_output_count(output_count);
+
     prepared_exec(
         "INSERT INTO blocks(height,transaction_count,hash,timestamp) VALUES(?,?,?,?)",
         block.height,
@@ -297,8 +327,7 @@ namespace wallet
   int64_t
   WalletDB::chain_output_count()
   {
-    //TODO: this
-    return 0;
+    return prepared_get<int64_t>("SELECT output_count FROM metadata WHERE id=0;");
   }
 
 }  // namespace wallet

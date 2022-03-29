@@ -104,6 +104,8 @@ namespace wallet
     wallet::rpc::RequestHandler request_handler;
     wallet::rpc::OmqServer omq_server;
     bool running = true;
+
+    cryptonote::network_type nettype = cryptonote::TESTNET;
   };
 
 }  // namespace wallet

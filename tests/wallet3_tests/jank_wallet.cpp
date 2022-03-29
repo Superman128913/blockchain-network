@@ -30,19 +30,39 @@ int main(void)
   auto comms = std::make_shared<wallet::DefaultDaemonComms>(oxenmq);
   cryptonote::address_parse_info senders_address{};
   cryptonote::get_account_address_from_str(senders_address, cryptonote::TESTNET, "T6Td9RNPPsMMApoxc59GLiVDS9a82FL2cNEwdMUCGWDLYTLv7e7rvi99aWdF4M2V1zN7q1Vdf1mage87SJ9gcgSu1wJZu3rFs");
-  auto ctor = std::make_shared<wallet::TransactionConstructor>(nullptr, comms, senders_address);
-  auto wallet = wallet::Wallet::create(oxenmq, keyring, ctor, comms, ":memory:", "");
+  auto wallet = wallet::Wallet::create(oxenmq, keyring, nullptr, comms, "test.sqlite", "");
 
   std::this_thread::sleep_for(2s);
   auto chain_height = comms->get_height();
 
   std::cout << "chain height: " << chain_height << "\n";
 
-  while (true)
+  int64_t old_height = -1;
+  int64_t scan_height = 0;
+
+  std::atomic<bool> done = false;
+
+  std::thread exit_thread([&](){
+      std::string foo;
+      std::cin >> foo;
+      done = true;
+      });
+
+  while (old_height != scan_height)
   {
     using namespace std::chrono_literals;
 
-    std::this_thread::sleep_for(1s);
-    std::cout << "after block " << wallet->last_scan_height << ", balance is: " << wallet->get_balance() << "\n";
+    old_height = scan_height;
+    scan_height = wallet->last_scan_height;
+    std::this_thread::sleep_for(5s);
+    std::cout << "after block " << scan_height << ", balance is: " << wallet->get_balance() << "\n";
+    if (done)
+      break;
   }
+
+  exit_thread.join();
+
+  std::cout << "scanning appears finished, scan height = " << wallet->last_scan_height << ", daemon comms height = " << comms->get_height() << "\n";
+
+  wallet->deregister();
 }

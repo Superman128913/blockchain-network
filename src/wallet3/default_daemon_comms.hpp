@@ -39,7 +39,7 @@ namespace wallet
     get_height() { return top_block_height; }
 
     void
-    register_wallet(wallet::Wallet& wallet, int64_t height, bool check_sync_height);
+    register_wallet(wallet::Wallet& wallet, int64_t height, bool check_sync_height, bool new_wallet);
 
     void
     deregister_wallet(Wallet& wallet, std::promise<void>& p);

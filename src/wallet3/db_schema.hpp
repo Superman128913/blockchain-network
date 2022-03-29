@@ -23,6 +23,8 @@ namespace wallet
   public:
     using db::Database::Database;
 
+    ~WalletDB();
+
     // Get a DB transaction.  This will revert any changes done to the db
     // while it exists when it is destroyed unless commit() is called on it.
     SQLite::Transaction db_transaction()
@@ -34,6 +36,10 @@ namespace wallet
     // Migration code will live elsewhere.
     void
     create_schema();
+
+    // update the total output count, for decoy selection
+    void
+    update_output_count(const int64_t count);
 
     void
     store_block(const Block& block);

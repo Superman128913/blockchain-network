@@ -14,6 +14,8 @@
 
 #include <filesystem>
 #include <future>
+#include <chrono>
+#include <thread>
 
 #include <iostream>
 
@@ -32,7 +34,7 @@ namespace wallet
       , tx_scanner{keys, db}
       , tx_constructor{tx_constructor}
       , daemon_comms{daemon_comms}
-      , request_handler{*this}
+      , request_handler{weak_from_this()}
       , omq_server{request_handler}
   {
     if (not omq)
@@ -56,12 +58,13 @@ namespace wallet
   {
     omq->start();
     daemon_comms->set_remote("ipc://./oxend.sock");
-    daemon_comms->register_wallet(*this, last_scan_height + 1 /*next needed block*/, true);
+    daemon_comms->register_wallet(*this, last_scan_height + 1 /*next needed block*/,
+        true /* update sync height */,
+        true /* new wallet */);
   }
 
   Wallet::~Wallet()
   {
-    std::cout << "Wallet::~Wallet()\n";
   }
 
   uint64_t
@@ -133,13 +136,19 @@ namespace wallet
   void
   Wallet::deregister()
   {
-    auto self = weak_from_this();
     running = false;
+    auto self = weak_from_this();
     std::promise<void> p;
     auto f = p.get_future();
     daemon_comms->deregister_wallet(*this, p);
     f.wait();
-  }
 
+    /*
+    // At this point, only the true "owner" should have a reference
+    using namespace std::chrono_literals;
+    while (self.use_count() > 1)
+      std::this_thread::sleep_for(50ms);
+    */
+  }
 
 }  // namespace wallet

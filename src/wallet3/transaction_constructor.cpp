@@ -76,9 +76,9 @@ namespace wallet
     for (const auto& output : ptx.chosen_outputs)
     {
       indexes = (*decoy_selector)(output);
-      auto decoy_promise = daemon->fetch_decoys(indexes);
-      decoy_promise.wait();
-      ptx.decoys.emplace_back(decoy_promise.get());
+      auto decoy_future = daemon->fetch_decoys(indexes);
+      decoy_future.wait();
+      ptx.decoys.emplace_back(decoy_future.get());
     }
   }
 

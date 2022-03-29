@@ -23,7 +23,6 @@ namespace wallet
       //TODO: error handling
       return;
     }
-    std::cout << "on_get_blocks_response() got " << response.size() - 1 << " blocks.\n";
 
     const auto& status = response[0];
     if (status != "OK" and status != "END")
@@ -117,7 +116,6 @@ namespace wallet
 
     int64_t start_height = blocks.front().height;
     int64_t end_height = blocks.back().height;
-    std::cout << "on_get_blocks_response() got blocks [" << start_height << " to " << end_height << "]\n";
 
     if (status == "END")
     {
@@ -417,12 +415,21 @@ namespace wallet
   }
 
   void
-  DefaultDaemonComms::register_wallet(wallet::Wallet& wallet, int64_t height, bool check_sync_height)
+  DefaultDaemonComms::register_wallet(wallet::Wallet& wallet, int64_t height, bool check_sync_height, bool new_wallet)
   {
-    omq->job([this,w=wallet.shared_from_this(),height,check_sync_height](){
-        wallets.insert_or_assign(w, height);
+    omq->job([this,w=wallet.shared_from_this(),height,check_sync_height,new_wallet](){
+        if (wallets.count(w))
+          wallets[w] = height;
+        else if (new_wallet)
+          wallets.emplace(w, height);
+
         if (check_sync_height)
-          sync_from_height = std::min(sync_from_height, height);
+        {
+          if (wallets.size() == 1) // if it's the only wallet
+            sync_from_height = height;
+          else
+            sync_from_height = std::min(sync_from_height, height);
+        }
         start_syncing();
         }, sync_thread);
   }
@@ -436,13 +443,27 @@ namespace wallet
   void
   DefaultDaemonComms::deregister_wallet(wallet::Wallet& wallet, std::promise<void>& p)
   {
-    omq->job([this,w=wallet.shared_from_this(),&p]() mutable {
+    auto dereg_finish = [this,&p]() mutable {
+      p.set_value();
+    };
+
+    omq->job([this, w=wallet.shared_from_this(), &p, dereg_finish]() mutable {
           wallets.erase(w);
           w.reset();
-          p.set_value();
+
+          // this fulfills the promise after any functions waiting on this thread
+          // have completed, so all references to wallet from here should be gone.
+          omq->job(dereg_finish, sync_thread);
           auto itr = std::min_element(wallets.begin(), wallets.end(),
               [](const auto& l, const auto& r){ return l.second < r.second; });
-          sync_from_height = itr->second;
+          if (itr != wallets.end())
+            sync_from_height = itr->second;
+          else
+          {
+            sync_from_height = 0;
+            syncing = false;
+          }
+
           std::cout << "deregister_wallet() setting sync_from_height to " << sync_from_height << "\n";
           if (sync_from_height != 0 and sync_from_height == top_block_height)
             syncing = false;

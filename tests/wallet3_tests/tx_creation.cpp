@@ -3,6 +3,7 @@
 
 #include <wallet3/wallet.hpp>
 #include <wallet3/db_schema.hpp>
+#include <wallet3/transaction_scanner.hpp>
 
 #include <sqlitedb/database.hpp>
 
@@ -244,6 +245,23 @@ TEST_CASE("Transaction Signing", "[wallet,tx]")
     {
       REQUIRE(decoys.size() == 10);
     }
+
+    wallet::TransactionScanner scanner{keys, wallet_with_valid_inputs.get_db()};
+
+    wallet::BlockTX btx;
+    btx.tx = signedtx;
+    btx.global_indices.resize(signedtx.vout.size());
+
+    auto recv = scanner.scan_received(btx, 123, 456);
+
+    REQUIRE(recv.size() == 1);
+    if (recv.size() == 1)
+      REQUIRE(recv[0].amount == 949969108610);
+
+    std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - scanner recv size: " << recv.size() << "\n";
+    std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - expected change amount: " << ptx.change.amount << "\n";
+    if (recv.size() == 1)
+      std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - scanner recv amount: " << recv[0].amount << "\n";
 
     std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - transaction hash: " << cryptonote::obj_to_json_str(ptx.tx.hash) << "\n";
     for (size_t n = 0; n < ptx.tx.vin.size(); ++n)
