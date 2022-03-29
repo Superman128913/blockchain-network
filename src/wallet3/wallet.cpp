@@ -35,14 +35,15 @@ namespace wallet
       , tx_constructor{tx_constructor}
       , daemon_comms{daemon_comms}
       , omq_server{request_handler}
+      , config()
   {
     if (not omq)
     {
       this->omq = std::make_shared<oxenmq::OxenMQ>();
-      this->daemon_comms = std::make_shared<DefaultDaemonComms>(omq);
+      this->daemon_comms = std::make_shared<DefaultDaemonComms>(omq, config.daemon);
     }
     if (not daemon_comms)
-      this->daemon_comms = std::make_shared<DefaultDaemonComms>(omq);
+      this->daemon_comms = std::make_shared<DefaultDaemonComms>(omq, config.daemon);
     if (not tx_constructor)
       this->tx_constructor = std::make_shared<TransactionConstructor>(db, daemon_comms); // TODO sean fix the input that is blank
 
@@ -66,6 +67,12 @@ namespace wallet
 
   Wallet::~Wallet()
   {
+  }
+
+  void
+  Wallet::propogate_config()
+  {
+    daemon_comms->propogate_config();
   }
 
   uint64_t
