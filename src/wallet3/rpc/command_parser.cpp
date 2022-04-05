@@ -54,6 +54,7 @@ void parse_request(GET_HEIGHT& req, rpc_input in) {
 }
 
 void parse_request(TRANSFER& req, rpc_input in) {
+std::cout << "parse_request(TRANSFER)\n";
 
   auto& r = req.request;
 
@@ -102,6 +103,7 @@ void parse_request(TRANSFER& req, rpc_input in) {
       "subaddr_indices", r.subaddr_indices,
       "unlock_time", r.unlock_time
       );
+std::cout << "end parse_request(TRANSFER)\n";
 }
 
 void parse_request(TRANSFER_SPLIT& req, rpc_input in) {

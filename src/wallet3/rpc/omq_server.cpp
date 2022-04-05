@@ -36,7 +36,8 @@ OmqServer::set_omq(std::shared_ptr<oxenmq::OxenMQ> omq_in)
   omq->listen_plain("ipc://./rpc.sock");
 
   omq->add_category("rpc", AuthLevel::none, 0 /*no reserved threads*/, 100 /*max queued requests*/);
-  omq->add_category("restricted", AuthLevel::basic, 0 /*no reserved threads*/, 100 /*max queued requests*/);
+  // TODO: actually make restricted category require auth
+  omq->add_category("restricted", AuthLevel::none, 0 /*no reserved threads*/, 100 /*max queued requests*/);
   //TODO: admin commands for wallet RPC?
   //omq->add_category("admin", oxenmq::AuthLevel::admin, 1 /* one reserved admin command thread */);
   for (auto& cmd : rpc_commands) {

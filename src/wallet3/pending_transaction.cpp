@@ -7,6 +7,7 @@ namespace wallet
   PendingTransaction::PendingTransaction(const std::vector<cryptonote::tx_destination_entry>& new_recipients)
       : recipients(new_recipients)
   {
+    tx = cryptonote::transaction{};
     int64_t sum_recipient_amounts = 0;
     for (const auto& recipient : new_recipients)
     {
@@ -114,11 +115,13 @@ namespace wallet
   bool
   PendingTransaction::finalise()
   {
-    tx = cryptonote::transaction{};
-    if (sum_inputs() - sum_outputs() - fee - change.amount == 0)
-      return true;
-    else
+    if ((sum_inputs() - sum_outputs() - fee - change.amount) != 0)
       return false;
+    for (size_t i=0; i < recipients.size(); i++)
+      tx.output_unlock_times.push_back(unlock_time);
+    tx.output_unlock_times.push_back(change_unlock_time);
+
+    return true;
   }
 
 }  // namespace wallet

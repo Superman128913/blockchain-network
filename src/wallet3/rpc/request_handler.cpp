@@ -17,7 +17,7 @@ using cryptonote::rpc::rpc_context;
 using cryptonote::rpc::rpc_request;
 using cryptonote::rpc::rpc_error;
 
-  namespace {
+namespace {
 
   template <typename RPC>
   void register_rpc_command(std::unordered_map<std::string, std::shared_ptr<const rpc_command>>& regs)
@@ -44,7 +44,12 @@ using cryptonote::rpc::rpc_error;
     return regs;
   }
 
-  } // anonymous namespace
+} // anonymous namespace
+
+void RequestHandler::set_wallet(std::weak_ptr<wallet::Wallet> ptr)
+{
+  wallet = ptr;
+}
 
 const std::unordered_map<std::string, std::shared_ptr<const rpc_command>> rpc_commands = register_rpc_commands(wallet_rpc_types{});
 
@@ -96,6 +101,7 @@ void RequestHandler::invoke(GET_HEIGHT& command, rpc_context context) {
 }
 
 void RequestHandler::invoke(TRANSFER& command, rpc_context context) {
+std::cout << "rpc handler, handling TRANSFER\n";
   if (auto w = wallet.lock())
   {
     // TODO: arg checking
@@ -104,6 +110,8 @@ void RequestHandler::invoke(TRANSFER& command, rpc_context context) {
     std::vector<cryptonote::tx_destination_entry> recipients;
     for (const auto& [dest, amount] : command.request.destinations)
     {
+std::cout << "transfer dest: " << dest << "\n";
+std::cout << "transfer amount: " << amount << "\n";
       auto& entry = recipients.emplace_back();
       cryptonote::address_parse_info addr_info;
 
@@ -119,6 +127,20 @@ void RequestHandler::invoke(TRANSFER& command, rpc_context context) {
     }
 
     auto ptx = w->tx_constructor->create_transaction(recipients);
+
+    w->keys->sign_transaction(ptx);
+
+std::cout << "rpc, transaction vout.size() = " << ptx.tx.vout.size() << "\n";
+std::cout << "rpc, transaction output_unlock_times.size() = " << ptx.tx.output_unlock_times.size() << "\n";
+std::cout << "rpc, ptx recipients.size() = " << ptx.recipients.size() << "\n";
+
+    auto submit_future = w->daemon_comms->submit_transaction(ptx.tx, false);
+
+    if (submit_future.wait_for(5s) != std::future_status::ready)
+      throw rpc_error(500, "request to daemon timed out");
+
+    command.response["status"] = "200";
+    command.response["result"] = submit_future.get();
   }
 }
 

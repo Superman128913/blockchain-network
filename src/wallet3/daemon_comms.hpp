@@ -48,7 +48,7 @@ namespace wallet
     // used by the daemon to uniquely identify outputs. In our distribution we find the earliest and latest indexes that are
     // available and simply pick numbers between the indexes according to our distribution function.
     virtual std::future<std::vector<Decoy>>
-    fetch_decoys(const std::vector<int64_t>& indexes) = 0;
+    fetch_decoys(const std::vector<int64_t>& indexes, bool with_txid = false) = 0;
 
     virtual std::future<std::string>
     submit_transaction(const cryptonote::transaction& tx, bool blink) = 0;

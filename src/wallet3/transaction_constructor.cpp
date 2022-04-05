@@ -13,10 +13,18 @@ namespace wallet
       const std::vector<cryptonote::tx_destination_entry>& recipients)
   {
     PendingTransaction new_tx(recipients);
+    cryptonote::oxen_construct_tx_params tx_params{}; // TODO: params; defaults are fine for now
+                                          //
+    new_tx.tx.version = cryptonote::transaction::get_max_version_for_hf(tx_params.hf_version);
+    new_tx.tx.type = tx_params.tx_type;
+std::cout << "create_transaction, transaction version = " << cryptonote::transaction_prefix::version_to_string(new_tx.tx.version) << "\n";
+std::cout << "create_transaction, transaction type = " << cryptonote::transaction_prefix::type_to_string(new_tx.tx.type) << "\n";
     new_tx.fee_per_byte = fee_per_byte;
     new_tx.fee_per_output = fee_per_output;
     new_tx.change = cryptonote::tx_destination_entry(0, senders_address.address, senders_address.is_subaddress);
     select_inputs_and_finalise(new_tx);
+std::cout << "create_transaction returning, transaction version = " << cryptonote::transaction_prefix::version_to_string(new_tx.tx.version) << "\n";
+std::cout << "create_transaction returning, transaction type = " << cryptonote::transaction_prefix::type_to_string(new_tx.tx.type) << "\n";
     return new_tx;
   }
 
@@ -75,7 +83,7 @@ namespace wallet
     std::vector<int64_t> indexes;
     for (const auto& output : ptx.chosen_outputs)
     {
-      indexes = (*decoy_selector)(output);
+      indexes = decoy_selection(output);
       auto decoy_future = daemon->fetch_decoys(indexes);
       decoy_future.wait();
       ptx.decoys.emplace_back(decoy_future.get());

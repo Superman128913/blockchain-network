@@ -34,19 +34,19 @@ namespace wallet
       , tx_scanner{keys, db}
       , tx_constructor{tx_constructor}
       , daemon_comms{daemon_comms}
-      , request_handler{weak_from_this()}
       , omq_server{request_handler}
   {
     if (not omq)
     {
-      omq = std::make_shared<oxenmq::OxenMQ>();
-      daemon_comms = std::make_shared<DefaultDaemonComms>(omq);
-      omq_server.set_omq(omq);
+      this->omq = std::make_shared<oxenmq::OxenMQ>();
+      this->daemon_comms = std::make_shared<DefaultDaemonComms>(omq);
     }
     if (not daemon_comms)
-      daemon_comms = std::make_shared<DefaultDaemonComms>(omq);
+      this->daemon_comms = std::make_shared<DefaultDaemonComms>(omq);
     if (not tx_constructor)
-      tx_constructor = std::make_shared<TransactionConstructor>(db, daemon_comms); // TODO sean fix the input that is blank
+      this->tx_constructor = std::make_shared<TransactionConstructor>(db, daemon_comms); // TODO sean fix the input that is blank
+
+    omq_server.set_omq(this->omq);
 
     db->create_schema();
     last_scan_height = db->last_scan_height();
@@ -56,6 +56,7 @@ namespace wallet
   void
   Wallet::init()
   {
+    request_handler.set_wallet(weak_from_this());
     omq->start();
     daemon_comms->set_remote("ipc://./oxend.sock");
     daemon_comms->register_wallet(*this, last_scan_height + 1 /*next needed block*/,

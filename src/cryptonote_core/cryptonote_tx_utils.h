@@ -206,7 +206,7 @@ namespace cryptonote
 
   struct oxen_construct_tx_params
   {
-    uint8_t hf_version = cryptonote::network_version_7;
+    uint8_t hf_version = cryptonote::network_version_17;
     txtype tx_type     = txtype::standard;
 
     // Can be set to non-zero values to have the tx be constructed specifying required burn amounts

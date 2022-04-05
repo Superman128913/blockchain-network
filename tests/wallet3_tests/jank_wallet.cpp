@@ -14,6 +14,8 @@
 
 int main(void)
 {
+  // after block 719259, balance is: 16109908470850
+
   crypto::secret_key spend_priv;
   tools::hex_to_type<crypto::secret_key>("d6a2eac72d1432fb816793aa7e8e86947116ac1423cbad5804ca49893e03b00c", spend_priv);
   crypto::public_key spend_pub;
@@ -24,15 +26,17 @@ int main(void)
   crypto::public_key view_pub;
   tools::hex_to_type<crypto::public_key>("5c1e8d44b4d7cb1269e69180dbf7aaf9c1fed4089b2bd4117dd1a70e90f19600", view_pub);
 
+  std::string wallet_addr = "T6Td9RNPPsMMApoxc59GLiVDS9a82FL2cNEwdMUCGWDLYTLv7e7rvi99aWdF4M2V1zN7q1Vdf1mage87SJ9gcgSu1wJZu3rFs";
+
   auto keyring = std::make_shared<wallet::Keyring>(spend_priv, spend_pub, view_priv, view_pub);
 
   auto oxenmq = std::make_shared<oxenmq::OxenMQ>();
   auto comms = std::make_shared<wallet::DefaultDaemonComms>(oxenmq);
   cryptonote::address_parse_info senders_address{};
-  cryptonote::get_account_address_from_str(senders_address, cryptonote::TESTNET, "T6Td9RNPPsMMApoxc59GLiVDS9a82FL2cNEwdMUCGWDLYTLv7e7rvi99aWdF4M2V1zN7q1Vdf1mage87SJ9gcgSu1wJZu3rFs");
+  cryptonote::get_account_address_from_str(senders_address, cryptonote::TESTNET, wallet_addr);
   auto wallet = wallet::Wallet::create(oxenmq, keyring, nullptr, comms, "test.sqlite", "");
 
-  std::this_thread::sleep_for(2s);
+  std::this_thread::sleep_for(1s);
   auto chain_height = comms->get_height();
 
   std::cout << "chain height: " << chain_height << "\n";
@@ -54,12 +58,41 @@ int main(void)
 
     old_height = scan_height;
     scan_height = wallet->last_scan_height;
-    std::this_thread::sleep_for(5s);
+    std::this_thread::sleep_for(2s);
     std::cout << "after block " << scan_height << ", balance is: " << wallet->get_balance() << "\n";
     if (done)
       break;
   }
 
+  oxenmq::address remote{"ipc://rpc.sock"};
+  oxenmq::ConnectionID conn;
+  conn = oxenmq->connect_remote(remote, [](auto){}, [](auto,auto){});
+
+  oxenmq::bt_dict req;
+  oxenmq::bt_list dests;
+  oxenmq::bt_dict d;
+  d["address"] = wallet_addr;
+  d["amount"] = 4206980085;
+  dests.push_back(std::move(d));
+  req["destinations"] = std::move(dests);
+
+  std::promise<bool> p;
+  auto f = p.get_future();
+  auto req_cb = [&p](bool ok, std::vector<std::string> response) mutable
+      {
+        std::cout << "transfer response, bool ok = " << std::boolalpha << ok << "\n";
+        size_t n = 0;
+        for (const auto& s : response)
+        {
+          std::cout << "response string " << n++ << ": " << s << "\n";
+        }
+        p.set_value(ok);
+      };
+
+  //oxenmq->request(conn, "rpc.get_height", req_cb, "de");
+  oxenmq->request(conn, "restricted.transfer", req_cb, oxenmq::bt_serialize(req));
+
+  f.wait();
   exit_thread.join();
 
   std::cout << "scanning appears finished, scan height = " << wallet->last_scan_height << ", daemon comms height = " << comms->get_height() << "\n";

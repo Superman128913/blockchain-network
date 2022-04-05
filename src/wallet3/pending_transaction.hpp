@@ -11,13 +11,8 @@
 
 namespace wallet
 {
-  struct version
-  {};  // XXX: placeholder type
-
   struct PendingTransaction
   {
-    version tx_version;
-
     std::vector<cryptonote::tx_destination_entry> recipients;  // does not include change
 
     cryptonote::tx_destination_entry change;
@@ -31,6 +26,10 @@ namespace wallet
     std::vector<std::vector<Decoy>> decoys;
 
     bool blink = true;
+
+    //TODO: parametrize unlock times
+    uint64_t unlock_time = 0;
+    uint64_t change_unlock_time = 0;
 
     int64_t fee = 0;
     uint64_t fee_per_byte = FEE_PER_BYTE_V13;

@@ -117,21 +117,26 @@ namespace wallet
     int64_t start_height = blocks.front().height;
     int64_t end_height = blocks.back().height;
 
-    if (status == "END")
-    {
-      std::cout << "Finished syncing wallets, height: " << end_height << "\n";
-      omq->job([this](){ syncing = false; }, sync_thread);
-    }
-    else
-    {
-      omq->job([this,start_height,end_height](){got_blocks(start_height, end_height);}, sync_thread);
-    }
-
     omq->job([blocks=std::move(blocks),this](){
         for_each_wallet([&](std::shared_ptr<Wallet> wallet){
             wallet->add_blocks(blocks);
             });
         }, sync_thread);
+
+    if (status == "END")
+    {
+      omq->job([this, old = this->sync_from_height, start_height, end_height](){
+          // if a new wallet hasn't been added requesting to sync from lower,
+          // we should be done syncing all wallets
+          if (old <= this->sync_from_height)
+            syncing = false;
+          got_blocks(start_height, end_height);
+          }, sync_thread);
+    }
+    else
+    {
+      omq->job([this,start_height,end_height](){got_blocks(start_height, end_height);}, sync_thread);
+    }
 
   }
 
@@ -174,6 +179,11 @@ namespace wallet
 
           // RPC response is chain length, not top height
           top_block_height = new_height - 1;
+          omq->job([this](){
+              for_each_wallet([this](auto wallet){
+                wallet->update_top_block_info(top_block_height, top_block_hash);
+                });
+              }, sync_thread);
         }, "de");
 
     omq->request(conn, "rpc.get_fee_estimate",
@@ -261,11 +271,11 @@ namespace wallet
   }
 
   std::future<std::vector<Decoy>>
-  DefaultDaemonComms::fetch_decoys(const std::vector<int64_t>& indexes)
+  DefaultDaemonComms::fetch_decoys(const std::vector<int64_t>& indexes, bool with_txid)
   {
     auto p = std::make_shared<std::promise<std::vector<Decoy> > >();
     auto fut = p->get_future();
-    auto req_cb = [p=std::move(p)](bool ok, std::vector<std::string> response)
+    auto req_cb = [p=std::move(p), with_txid, indexes=indexes](bool ok, std::vector<std::string> response)
     {
       if (not ok or response.size() == 0)
       {
@@ -279,12 +289,11 @@ namespace wallet
         //TODO: error handling
         return;
       }
-      std::cout << "on_get_outputs_response() got " << response.size() - 1 << " outputs.\n";
 
-      const auto& status = response[0];
-      if (status != "OK" and status != "END")
+      // if not OK
+      if (response[0] != "200")
       {
-        std::cout << "get_outputs response: " << response[0] << "\n";
+        std::cout << "get_outputs response not ok: " << response[0] << "\n";
         //TODO: error handling
         return;
       }
@@ -298,16 +307,23 @@ namespace wallet
       }
 
       std::vector<Decoy> outputs;
+      size_t i=0;
       try
       {
-        auto itr = response.cbegin();
-        itr++;
-        while( itr != response.cend())
+        auto outer_dict = oxenmq::bt_dict_consumer(response[1]);
+
+        if (outer_dict.key() != "outs")
+          return;
+
+        auto outputs_list = outer_dict.consume_list_consumer();
+
+        while (not outputs_list.is_finished())
         {
-          const auto& output_str = *itr;
-          auto output_dict = oxenmq::bt_dict_consumer{output_str};
+          auto output_dict = outputs_list.consume_dict_consumer();
 
           Decoy& o = outputs.emplace_back();
+
+          o.global_index = indexes[i++];
 
           if (output_dict.key() != "height")
             return;
@@ -321,9 +337,12 @@ namespace wallet
             return;
           o.mask = tools::make_from_guts<rct::key>(output_dict.consume_string_view());
 
-          if (output_dict.key() != "txid")
-            return;
-          o.txid = output_dict.consume_string_view();
+          if (with_txid)
+          {
+            if (output_dict.key() != "txid")
+              return;
+            o.txid = output_dict.consume_string_view();
+          }
 
           if (output_dict.key() != "unlocked")
             return;
@@ -332,7 +351,7 @@ namespace wallet
           if (not output_dict.is_finished())
             return;
 
-          itr++;
+std::cout << "fetched decoy, height = " << o.height << "\n";
         }
       }
       catch (const std::exception& e)
@@ -347,17 +366,17 @@ namespace wallet
         return;
       }
 
+      p->set_value(std::move(outputs));
     }; // req_cb
 
     oxenmq::bt_dict req_params_dict;
     oxenmq::bt_list decoy_list_bt;
     for (auto index : indexes)
     {
-      oxenmq::bt_dict decoy_bt;
-      decoy_bt["amounts"] = 0;
-      decoy_bt["index"] = index;
-      decoy_list_bt.push_back(std::move(decoy_bt));
+std::cout << "fetching decoy index " << index << "\n";
+      decoy_list_bt.push_back(index);
     }
+    req_params_dict["get_txid"] = with_txid;
     req_params_dict["outputs"] = std::move(decoy_list_bt);
     omq->request(conn, "rpc.get_outs", req_cb, oxenmq::bt_serialize(req_params_dict));
 
@@ -374,6 +393,9 @@ namespace wallet
       // TODO: handle various error cases.
       if (not ok or response.size() != 2 or response[0] != "200")
       {
+std::cout << "bad daemon response to submit tx. response.size = " << response.size() << "\n";
+std::cout << "bad daemon response to submit tx. response[0] = " << response[0] << "\n";
+std::cout << "bad daemon response to submit tx. response[1] = " << response[1] << "\n";
         p->set_value("Unknown Error");
         return;
       }
@@ -402,12 +424,15 @@ namespace wallet
       }
     };
 
-    auto tx_str = tx_to_blob(tx);
-
+std::cout << "daemon comms submit tx, vin/vout len = " << tx.vin.size() << "/" << tx.vout.size() << "\n";
+    std::string tx_str;
+    bool ser_success = cryptonote::tx_to_blob(tx, tx_str);
+std::cout << "daemon comms submit tx, tx str len = " << tx_str.size() << "\n";
+std::cout << "daemon comms submit tx, tx_to_blob returned " << std::boolalpha << ser_success << "\n";
     oxenmq::bt_dict req_params_dict;
 
-    req_params_dict["tx"] = tx_str;
     req_params_dict["blink"] = blink;
+    req_params_dict["tx"] = tx_str;
 
     omq->request(conn, "rpc.submit_transaction", req_cb, oxenmq::bt_serialize(req_params_dict));
 
@@ -482,14 +507,13 @@ namespace wallet
   void
   DefaultDaemonComms::got_blocks(int64_t start_height, int64_t end_height)
   {
+    if (start_height == sync_from_height)
+      sync_from_height = end_height + 1;
+
     // if we get caught up, or all wallets are removed, no need to request more blocks
     if (not syncing)
       return;
 
-    if (start_height == sync_from_height)
-    {
-      sync_from_height = end_height + 1;
-    }
     get_blocks();
   }
 

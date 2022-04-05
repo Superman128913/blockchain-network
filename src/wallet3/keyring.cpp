@@ -16,9 +16,8 @@ namespace wallet
   {
     // TODO sean make sure this is zero
     crypto::secret_key tx_key{};
-    // TODO sean this should base itself on the hf version
-    //return key_device.open_tx(tx_key, transaction::get_max_version_for_hf(hf_version), txtype::standard);
-    if (!key_device.open_tx(tx_key, cryptonote::txversion::v4_tx_types, cryptonote::txtype::standard))
+
+    if (!key_device.open_tx(tx_key, cryptonote::transaction::get_max_version_for_hf(hf_version), cryptonote::txtype::standard))
       throw std::runtime_error("Could not generate transaction secret key");
 
     return tx_key;
@@ -263,8 +262,9 @@ namespace wallet
         decoypk.dest = rct::pk2rct(decoy.key);
         decoypk.mask = decoy.mask;
       }
-      input_to_key.key_offsets.push_back(src_entr.global_index);
-      index.push_back(src_entr.global_index);
+      //TODO: once the decoy set is shuffled when requesting decoys from the daemon,
+      //      this will need to know which index is actually the real one.
+      index.push_back(0);
 
       input_to_key.key_offsets = cryptonote::absolute_output_offsets_to_relative(input_to_key.key_offsets);
       ptx.tx.vin.push_back(input_to_key);
@@ -349,6 +349,9 @@ namespace wallet
         outSk, // rct::ctkeyV& outSk -> Return Parameter
         rct_config, // rct::RCTConfig& rct_config
         key_device); // hw::device& hwdev
+
+    if (not rct::verRctNonSemanticsSimple(ptx.tx.rct_signatures))
+      throw std::runtime_error("RCT signing went wrong");
   }
 
 }  // namespace wallet

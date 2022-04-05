@@ -42,7 +42,7 @@ class RequestHandler {
 
 public:
 
-  RequestHandler(std::weak_ptr<wallet::Wallet> wallet) : wallet(wallet) {};
+  void set_wallet(std::weak_ptr<wallet::Wallet> wallet);
 
   void invoke(GET_BALANCE& command, rpc_context context);
   void invoke(GET_ADDRESS& command, rpc_context context);
