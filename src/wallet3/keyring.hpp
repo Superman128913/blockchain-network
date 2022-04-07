@@ -104,6 +104,9 @@ namespace wallet
         PendingTransaction& ptx
     );
 
+    virtual cryptonote::account_keys
+    export_keys();
+
    private:
     crypto::secret_key spend_private_key;
     crypto::public_key spend_public_key;
