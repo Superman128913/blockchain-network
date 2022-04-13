@@ -1078,14 +1078,13 @@ std::vector<std::pair<std::string, uint64_t>>* WalletImpl::listCurrentStakes() c
     std::vector<std::pair<std::string, uint64_t>>* stakes = new std::vector<std::pair<std::string, uint64_t>>;
 
     auto response = wallet()->list_current_stakes();
+    auto main_addr = mainAddress();
 
-    for (rpc::GET_SERVICE_NODES::response::entry const &node_info : response)
-    {
+    for (const auto& node_info : response)
         for (const auto& contributor : node_info.contributors)
-        {
-            stakes->push_back(std::make_pair(node_info.service_node_pubkey, contributor.amount));
-        }
-    }
+            if (contributor.address == main_addr)
+                stakes->push_back(std::make_pair(node_info.service_node_pubkey, contributor.amount));
+
     return stakes;
 }
 
