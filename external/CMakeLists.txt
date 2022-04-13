@@ -156,6 +156,21 @@ target_include_directories(cpr PUBLIC cpr/include)
 target_compile_definitions(cpr PUBLIC CPR_CURL_NOSIGNAL)
 add_library(cpr::cpr ALIAS cpr)
 
+file(READ cpr/CMakeLists.txt cpr_cmake_head LIMIT 1000)
+if(cpr_cmake_head MATCHES "project\\(cpr VERSION ([0-9]+)\.([0-9]+)\.([0-9]+) LANGUAGES CXX\\)")
+    set(cpr_VERSION_MAJOR ${CMAKE_MATCH_1})
+    set(cpr_VERSION_MINOR ${CMAKE_MATCH_2})
+    set(cpr_VERSION_PATCH ${CMAKE_MATCH_3})
+    set(cpr_VERSION "${cpr_VERSION_MAJOR}.${cpr_VERSION_MINOR}.${cpr_VERSION_PATCH}")
+    set(cpr_VERSION_NUM "(${cpr_VERSION_MAJOR} * 0x10000 + ${cpr_VERSION_MINOR} * 0x100 + ${cpr_VERSION_PATCH})")
+
+    configure_file(cpr/cmake/cprver.h.in "${CMAKE_CURRENT_BINARY_DIR}/cpr_generated_includes/cpr/cprver.h")
+    target_include_directories(cpr PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/cpr_generated_includes")
+else()
+    message(FATAL_ERROR "Could not identify cpr submodule version!")
+endif()
+
+
 # Hack around SQLiteCpp's attempts to locate sqlite3 because we *don't* want to link against the
 # system one, but don't download and build the embedded one until build time.  Thankfully it
 # actually links against the SQLite::SQLite3 cmake target if it already exists, so all we have to do
