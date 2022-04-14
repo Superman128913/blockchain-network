@@ -558,6 +558,8 @@ else()
   set(hidapi_links "libusb_vendor;libudev")
   if(WIN32)
     list(APPEND hidapi_links setupapi)
+  elseif(APPLE)
+    list(APPEND hidapi_links "-framework AppKit")
   endif()
   set_target_properties(hidapi_libusb PROPERTIES
       INTERFACE_LINK_LIBRARIES "${hidapi_links}"
