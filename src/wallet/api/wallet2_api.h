@@ -1210,9 +1210,6 @@ struct WalletManagerBase
 
     //! returns current block target
     virtual uint64_t blockTarget() = 0;
-
-    //! resolves an OpenAlias address to a monero address
-    virtual std::string resolveOpenAlias(const std::string &address, bool &dnssec_valid) const = 0;
 };
 
 struct WalletManagerFactory

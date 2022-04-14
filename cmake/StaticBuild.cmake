@@ -5,26 +5,6 @@
 
 set(LOCAL_MIRROR "" CACHE STRING "local mirror path/URL for lib downloads")
 
-set(OPENSSL_VERSION 3.0.2 CACHE STRING "openssl version")
-set(OPENSSL_MIRROR ${LOCAL_MIRROR} https://www.openssl.org/source CACHE STRING "openssl download mirror(s)")
-set(OPENSSL_SOURCE openssl-${OPENSSL_VERSION}.tar.gz)
-set(OPENSSL_HASH SHA256=98e91ccead4d4756ae3c9cde5e09191a8e586d9f4d50838e7ec09d6411dfdb63
-    CACHE STRING "openssl source hash")
-
-set(EXPAT_VERSION 2.4.4 CACHE STRING "expat version")
-string(REPLACE "." "_" EXPAT_TAG "R_${EXPAT_VERSION}")
-set(EXPAT_MIRROR ${LOCAL_MIRROR} https://github.com/libexpat/libexpat/releases/download/${EXPAT_TAG}
-    CACHE STRING "expat download mirror(s)")
-set(EXPAT_SOURCE expat-${EXPAT_VERSION}.tar.xz)
-set(EXPAT_HASH SHA512=c88a82f4732e27340eb9480c082bcc909b0284e16b368ee9feeb4e2dd058e8f7c42fd48feacd5272cc76cb78bd183df33eb5d0b135fdd1d3c493cb156572ab76
-    CACHE STRING "expat source hash")
-
-set(UNBOUND_VERSION 1.15.0 CACHE STRING "unbound version")
-set(UNBOUND_MIRROR ${LOCAL_MIRROR} https://nlnetlabs.nl/downloads/unbound CACHE STRING "unbound download mirror(s)")
-set(UNBOUND_SOURCE unbound-${UNBOUND_VERSION}.tar.gz)
-set(UNBOUND_HASH SHA256=a480dc6c8937447b98d161fe911ffc76cfaffa2da18788781314e81339f1126f
-    CACHE STRING "unbound source hash")
-
 set(BOOST_VERSION 1.79.0 CACHE STRING "boost version")
 set(BOOST_MIRROR ${LOCAL_MIRROR} https://boostorg.jfrog.io/artifactory/main/release/${BOOST_VERSION}/source
     CACHE STRING "boost download mirror(s)")
@@ -141,16 +121,12 @@ if (ANDROID)
   endif()
   if(CMAKE_ANDROID_ARCH_ABI MATCHES x86_64)
     set(android_clang x86_64-linux-android${ANDROID_PLATFORM_LEVEL}-clang)
-    set(openssl_machine android-x86_64)
   elseif(CMAKE_ANDROID_ARCH_ABI MATCHES x86)
     set(android_clang i686-linux-android${ANDROID_PLATFORM_LEVEL}-clang)
-    set(openssl_machine android-x86)
   elseif(CMAKE_ANDROID_ARCH_ABI MATCHES armeabi-v7a)
     set(android_clang armv7a-linux-androideabi${ANDROID_PLATFORM_LEVEL}-clang)
-    set(openssl_machine android-arm)
   elseif(CMAKE_ANDROID_ARCH_ABI MATCHES arm64-v8a)
     set(android_clang aarch64-linux-android${ANDROID_PLATFORM_LEVEL}-clang)
-    set(openssl_machine android-arm64)
   else()
     message(FATAL_ERROR "Don't know how to build for android arch abi ${CMAKE_ANDROID_ARCH_ABI}")
   endif()
@@ -273,81 +249,6 @@ build_external(zlib
     ${DEPS_DESTDIR}/include/zlib.h
 )
 add_static_target(zlib zlib_external libz.a)
-
-
-
-set(openssl_configure_extra)
-set(openssl_system_env "")
-set(openssl_cc "${deps_cc}")
-if(CMAKE_CROSSCOMPILING)
-  if(ARCH_TRIPLET STREQUAL x86_64-w64-mingw32)
-    set(openssl_configure_extra mingw64)
-    set(openssl_system_env RC=${CMAKE_RC_COMPILER})
-  elseif(ARCH_TRIPLET STREQUAL i686-w64-mingw32)
-    set(openssl_configure_extra mingw)
-    set(openssl_system_env RC=${CMAKE_RC_COMPILER})
-  elseif(ANDROID)
-    set(openssl_configure_extra ${openssl_machine} -D__ANDROID_API__=21)
-    set(openssl_system_env ${cross_extra})
-    list(APPEND openssl_system_env "ANDROID_NDK_ROOT=${ANDROID_NDK}")
-    list(APPEND openssl_system_env "PATH=${ANDROID_TOOLCHAIN_ROOT}/bin:${ANDROID_NDK}/toolchains/${ANDROID_TOOLCHAIN_NAME}/prebuilt/linux-x86_64/bin:$ENV{PATH}")
-    set(openssl_extra_opts no-asm)
-  elseif(IOS)
-    get_filename_component(apple_toolchain "${CMAKE_C_COMPILER}" DIRECTORY)
-    get_filename_component(apple_sdk "${CMAKE_OSX_SYSROOT}" NAME)
-    if(NOT ${apple_toolchain} MATCHES Xcode OR NOT ${apple_sdk} MATCHES "iPhone(OS|Simulator)")
-      message(FATAL_ERROR "didn't find your toolchain and sdk correctly from ${CMAKE_C_COMPILER}/${CMAKE_OSX_SYSROOT}: found toolchain=${apple_toolchain}, sdk=${apple_sdk}")
-    endif()
-    set(openssl_system_env CROSS_COMPILE=${apple_toolchain}/ CROSS_TOP=${CMAKE_DEVELOPER_ROOT} CROSS_SDK=${apple_sdk})
-    set(openssl_configure ./Configure iphoneos-cross)
-    set(openssl_cc "clang")
-  endif()
-endif()
-build_external(openssl
-  CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=${openssl_cc} "CFLAGS=${deps_CFLAGS}" ${openssl_system_env}
-    ./Configure ${openssl_configure_extra} --prefix=${DEPS_DESTDIR} --libdir=lib ${openssl_extra_opts}
-    no-shared no-capieng no-dso no-dtls1 no-ec_nistp_64_gcc_128 no-gost
-    no-md2 no-rc5 no-rdrand no-rfc3779 no-sctp no-ssl-trace no-ssl3
-    no-static-engine no-tests no-weak-ssl-ciphers no-zlib-dynamic
-  BUILD_COMMAND ${CMAKE_COMMAND} -E env CC=${openssl_cc} ${openssl_system_env} make
-  INSTALL_COMMAND make install_sw
-  BUILD_BYPRODUCTS
-    ${DEPS_DESTDIR}/lib/libssl.a ${DEPS_DESTDIR}/lib/libcrypto.a
-    ${DEPS_DESTDIR}/include/openssl/ssl.h ${DEPS_DESTDIR}/include/openssl/crypto.h
-)
-add_static_target(OpenSSL::SSL openssl_external libssl.a)
-add_static_target(OpenSSL::Crypto openssl_external libcrypto.a)
-set(OPENSSL_INCLUDE_DIR ${DEPS_DESTDIR}/include)
-
-
-
-build_external(expat
-  CONFIGURE_COMMAND ./configure ${cross_host} --prefix=${DEPS_DESTDIR} --enable-static
-  --disable-shared --with-pic --without-examples --without-tests --without-docbook --without-xmlwf
-  "CC=${deps_cc}" "CFLAGS=${deps_CFLAGS}"
-)
-add_static_target(expat expat_external libexpat.a)
-
-
-set(unbound_extra)
-if(APPLE AND IOS)
-  # I have no idea why this is necessary: without this it runs `clang -E` which should work, but
-  # doesn't because... hurray ios is wonderful?
-  set(unbound_extra CPP=cpp)
-endif()
-build_external(unbound
-  DEPENDS openssl_external expat_external
-  CONFIGURE_COMMAND ./configure ${cross_host} ${cross_extra} --prefix=${DEPS_DESTDIR} --disable-shared
-  --enable-static --with-libunbound-only --with-pic --disable-gost
-  --$<IF:$<BOOL:${USE_LTO}>,enable,disable>-flto --with-ssl=${DEPS_DESTDIR}
-  --with-libexpat=${DEPS_DESTDIR}
-  "CC=${deps_cc}" "CFLAGS=${deps_CFLAGS}" ${unbound_extra}
-)
-add_static_target(libunbound unbound_external libunbound.a)
-target_link_libraries(libunbound INTERFACE OpenSSL::SSL OpenSSL::Crypto)
-if(WIN32)
-  target_link_libraries(libunbound INTERFACE ws2_32 crypt32 iphlpapi)
-endif()
 
 
 
@@ -631,16 +532,12 @@ set_target_properties(libzmq PROPERTIES
 
 
 set(curl_extra)
-if(WIN32)
-  set(curl_ssl_opts --without-ssl --with-schannel)
-elseif(APPLE)
-  set(curl_ssl_opts --without-ssl --with-secure-transport)
+if(APPLE)
   if(IOS)
     # This CPP crap shouldn't be necessary but is because Apple's toolchain is trash
     set(curl_extra "LDFLAGS=-L${DEPS_DESTDIR}/lib -isysroot ${CMAKE_OSX_SYSROOT}" CPP=cpp)
   endif()
 else()
-  set(curl_ssl_opts --with-ssl=${DEPS_DESTDIR})
   set(curl_extra "LIBS=-pthread")
 endif()
 
@@ -672,7 +569,7 @@ foreach(curl_arch ${curl_arches})
 
   build_external(curl
     TARGET_SUFFIX ${curl_target_suffix}
-    DEPENDS openssl_external zlib_external
+    DEPENDS zlib_external
     CONFIGURE_COMMAND ./configure ${cross_host} ${cross_extra} --prefix=${curl_prefix} --disable-shared
     --enable-static --disable-ares --disable-ftp --disable-ldap --disable-laps --disable-rtsp
     --disable-dict --disable-telnet --disable-tftp --disable-pop3 --disable-imap --disable-smb
@@ -680,7 +577,8 @@ foreach(curl_arch ${curl_arches})
     --enable-ipv6 --disable-threaded-resolver --disable-pthreads --disable-verbose --disable-sspi
     --enable-crypto-auth --disable-ntlm-wb --disable-tls-srp --disable-unix-sockets --disable-cookies
     --enable-http-auth --enable-doh --disable-mime --enable-dateparse --disable-netrc --without-libidn2
-    --disable-progress-meter --without-brotli --with-zlib=${DEPS_DESTDIR} ${curl_ssl_opts}
+    --disable-progress-meter --without-brotli --with-zlib=${DEPS_DESTDIR}
+    --without-ssl --without-schannel --without-secure-transport
     --without-librtmp --disable-versioned-symbols --enable-hidden-symbols
     --without-zsh-functions-dir --without-fish-functions-dir
     "CC=${deps_cc}" "CFLAGS=${deps_noarch_CFLAGS}${cflags_extra}" ${curl_extra}
@@ -710,9 +608,9 @@ endif()
 add_static_target(CURL::libcurl curl_external libcurl.a)
 set(libcurl_link_libs zlib)
 if(CMAKE_CROSSCOMPILING AND ARCH_TRIPLET MATCHES mingw)
-  list(APPEND libcurl_link_libs crypt32)
+  list(APPEND libcurl_link_libs ws2_32)
 elseif(APPLE)
-  list(APPEND libcurl_link_libs "-framework Security")
+  list(APPEND libcurl_link_libs "-framework SystemConfiguration")
 endif()
 set_target_properties(CURL::libcurl PROPERTIES
   INTERFACE_LINK_LIBRARIES "${libcurl_link_libs}"

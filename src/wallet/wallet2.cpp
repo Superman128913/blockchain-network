@@ -35,8 +35,6 @@
 #include <optional>
 #include <mutex>
 #include <boost/format.hpp>
-#include <openssl/evp.h>
-#include <openssl/pem.h>
 #include <type_traits>
 #include <cpr/parameters.h>
 #include <oxenc/base64.h>
@@ -76,7 +74,6 @@
 #include "epee/memwipe.h"
 #include "common/base58.h"
 #include "common/combinator.h"
-#include "common/dns_utils.h"
 #include "common/notify.h"
 #include "common/perf_timer.h"
 #include "common/hex.h"
@@ -1085,8 +1082,7 @@ wallet2::wallet2(network_type nettype, uint64_t kdf_rounds, bool unattended):
   m_devices_registered(false),
   m_device_last_key_image_sync(0),
   m_offline(false),
-  m_rpc_version(0),
-  m_export_format(ExportFormat::Binary)
+  m_rpc_version(0)
 {
 }
 
@@ -3869,7 +3865,7 @@ bool wallet2::store_keys(const fs::path& keys_file_name, const epee::wipeable_st
   bool r = false;
   try {
     buf = serialization::dump_binary(*keys_file_data);
-    r = save_to_file(tmp_file_name, buf);
+    r = tools::dump_file(tmp_file_name, buf);
   } catch (...) {}
   CHECK_AND_ASSERT_MES(r, false, "failed to generate wallet keys file " << tmp_file_name);
 
@@ -4047,9 +4043,6 @@ std::optional<wallet2::keys_file_data> wallet2::get_keys_file_data(const epee::w
   value2.SetInt(m_original_keys_available ? 1 : 0);
   json.AddMember("original_keys_available", value2, json.GetAllocator());
 
-  value2.SetInt(m_export_format);
-  json.AddMember("export_format", value2, json.GetAllocator());
-
   value2.SetUint(1);
   json.AddMember("encrypted_secret_keys", value2, json.GetAllocator());
 
@@ -4123,7 +4116,7 @@ void wallet2::change_password(const fs::path& filename, const epee::wipeable_str
 bool wallet2::load_keys(const fs::path& keys_file_name, const epee::wipeable_string& password)
 {
   std::string keys_file_buf;
-  bool r = load_from_file(keys_file_name, keys_file_buf);
+  bool r = tools::slurp_file(keys_file_name, keys_file_buf);
   THROW_WALLET_EXCEPTION_IF(!r, error::file_read_error, keys_file_name);
 
   // Load keys from buffer
@@ -4206,7 +4199,6 @@ bool wallet2::load_keys_buf(const std::string& keys_buf, const epee::wipeable_st
     m_subaddress_lookahead_major = SUBADDRESS_LOOKAHEAD_MAJOR;
     m_subaddress_lookahead_minor = SUBADDRESS_LOOKAHEAD_MINOR;
     m_original_keys_available = false;
-    m_export_format = ExportFormat::Binary;
     m_device_name = "";
     m_device_derivation_path = "";
     m_key_device_type = hw::device::type::SOFTWARE;
@@ -4372,9 +4364,6 @@ bool wallet2::load_keys_buf(const std::string& keys_buf, const epee::wipeable_st
     GET_FIELD_FROM_JSON_RETURN_ON_ERROR(json, encrypted_secret_keys, uint32_t, Uint, false, false);
     encrypted_secret_keys = field_encrypted_secret_keys;
 
-    GET_FIELD_FROM_JSON_RETURN_ON_ERROR(json, export_format, ExportFormat, Int, false, Binary);
-    m_export_format = field_export_format;
-
     GET_FIELD_FROM_JSON_RETURN_ON_ERROR(json, device_name, std::string, String, false, std::string());
     if (m_device_name.empty())
     {
@@ -4513,7 +4502,7 @@ bool wallet2::verify_password(const fs::path& keys_file_name, const epee::wipeab
   wallet2::keys_file_data keys_file_data;
   std::string buf;
   bool encrypted_secret_keys = false;
-  bool r = load_from_file(keys_file_name, buf);
+  bool r = tools::slurp_file(keys_file_name, buf);
   THROW_WALLET_EXCEPTION_IF(!r, error::file_read_error, keys_file_name);
 
   // Decrypt the contents
@@ -4610,7 +4599,7 @@ void wallet2::create_keys_file(const fs::path &wallet_, bool watch_only, const e
     {
       auto addrfile = m_wallet_file;
       addrfile += ".address.txt";
-      r = save_to_file(addrfile, m_account.get_public_address_str(m_nettype), true);
+      r = tools::dump_file(addrfile, m_account.get_public_address_str(m_nettype));
       if(!r) MERROR("String with address text not saved");
     }
   }
@@ -4632,7 +4621,7 @@ bool wallet2::query_device(hw::device::type& device_type, const fs::path& keys_f
   rapidjson::Document json;
   wallet2::keys_file_data keys_file_data;
   std::string buf;
-  bool r = load_from_file(keys_file_name, buf);
+  bool r = tools::slurp_file(keys_file_name, buf);
   THROW_WALLET_EXCEPTION_IF(!r, error::file_read_error, keys_file_name);
 
   // Decrypt the contents
@@ -4958,7 +4947,7 @@ void wallet2::restore_from_device(const fs::path& wallet_, const epee::wipeable_
   if (hwdev_label) {
     fs::path hwdev_txt = m_wallet_file;
     hwdev_txt += ".hwdev.txt";
-    if (!save_to_file(hwdev_txt, *hwdev_label, true))
+    if (!tools::dump_file(hwdev_txt, *hwdev_label))
       MERROR("failed to write .hwdev.txt comment file");
   }
   if (progress_callback)
@@ -5209,7 +5198,7 @@ std::string wallet2::exchange_multisig_keys(const epee::wipeable_string &passwor
       addrfile += ".address.txt";
       if (fs::exists(addrfile))
       {
-        r = save_to_file(addrfile, m_account.get_public_address_str(m_nettype), true);
+        r = tools::dump_file(addrfile, m_account.get_public_address_str(m_nettype));
         if(!r) MERROR("String with address text not saved");
       }
     }
@@ -5685,7 +5674,7 @@ void wallet2::load(const fs::path& wallet_, const epee::wipeable_string& passwor
     bool r = true;
     if (use_fs)
     {
-      load_from_file(m_wallet_file, cache_file_buf);
+      r = tools::slurp_file(m_wallet_file, cache_file_buf);
       THROW_WALLET_EXCEPTION_IF(!r, error::file_read_error, m_wallet_file);
     }
 
@@ -5910,7 +5899,7 @@ void wallet2::store_to(const fs::path &path, const epee::wipeable_string &passwo
       // save address to the new file
       fs::path address_file = path;
       address_file += ".address.txt";
-      r = save_to_file(address_file, m_account.get_public_address_str(m_nettype), true);
+      r = tools::dump_file(address_file, m_account.get_public_address_str(m_nettype));
       THROW_WALLET_EXCEPTION_IF(!r, error::file_save_error, m_wallet_file);
       // remove old address file
       if (!fs::remove(old_address_file, ec))
@@ -7044,7 +7033,7 @@ bool wallet2::save_tx(const std::vector<pending_tx>& ptx_vector, const fs::path&
   std::string ciphertext = dump_tx_to_str(ptx_vector);
   if (ciphertext.empty())
     return false;
-  return save_to_file(filename, ciphertext);
+  return tools::dump_file(filename, ciphertext);
 }
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::dump_tx_to_str(const std::vector<pending_tx> &ptx_vector) const
@@ -7085,7 +7074,7 @@ bool wallet2::load_unsigned_tx(const fs::path& unsigned_filename, unsigned_tx_se
   }
 
   std::string s;
-  if (!load_from_file(unsigned_filename, s))
+  if (!tools::slurp_file(unsigned_filename, s))
   {
     LOG_PRINT_L0("Failed to load from " << unsigned_filename);
     return false;
@@ -7309,7 +7298,7 @@ bool wallet2::sign_tx(unsigned_tx_set& exported_txs, const fs::path& signed_file
     return false;
   }
 
-  if (!save_to_file(signed_filename, ciphertext))
+  if (!tools::dump_file(signed_filename, ciphertext))
   {
     LOG_PRINT_L0("Failed to save file to " << signed_filename);
     return false;
@@ -7323,7 +7312,7 @@ bool wallet2::sign_tx(unsigned_tx_set& exported_txs, const fs::path& signed_file
       fs::path raw_filename = signed_filename;
       raw_filename += "_raw";
       if (signed_txes.ptx.size() > 1) raw_filename += "_" + std::to_string(i);
-      if (!save_to_file(raw_filename, tx_as_hex))
+      if (!tools::dump_file(raw_filename, tx_as_hex))
       {
         LOG_PRINT_L0("Failed to save file to " << raw_filename);
         return false;
@@ -7368,7 +7357,7 @@ bool wallet2::load_tx(const fs::path& signed_filename, std::vector<tools::wallet
   }
 
   std::string s;
-  if (!load_from_file(signed_filename, s))
+  if (!tools::slurp_file(signed_filename, s))
   {
     LOG_PRINT_L0("Failed to load from " << signed_filename);
     return false;
@@ -7497,7 +7486,7 @@ bool wallet2::save_multisig_tx(const multisig_tx_set& txs, const fs::path& filen
   std::string ciphertext = save_multisig_tx(txs);
   if (ciphertext.empty())
     return false;
-  return save_to_file(filename, ciphertext);
+  return tools::dump_file(filename, ciphertext);
 }
 //----------------------------------------------------------------------------------------------------
 wallet2::multisig_tx_set wallet2::make_multisig_tx_set(const std::vector<pending_tx>& ptx_vector) const
@@ -7525,7 +7514,7 @@ bool wallet2::save_multisig_tx(const std::vector<pending_tx>& ptx_vector, const 
   std::string ciphertext = save_multisig_tx(ptx_vector);
   if (ciphertext.empty())
     return false;
-  return save_to_file(filename, ciphertext);
+  return tools::dump_file(filename, ciphertext);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::parse_multisig_tx_from_str(std::string_view multisig_tx_st, multisig_tx_set &exported_txs) const
@@ -7614,7 +7603,7 @@ bool wallet2::load_multisig_tx_from_file(const fs::path& filename, multisig_tx_s
   }
 
   std::string s;
-  if (!load_from_file(filename, s))
+  if (!tools::slurp_file(filename, s))
   {
     LOG_PRINT_L0("Failed to load from " << filename);
     return false;
@@ -13334,7 +13323,7 @@ bool wallet2::export_key_images_to_file(const fs::path& filename, bool requested
   PERF_TIMER(export_key_images_encrypt);
   std::string ciphertext{KEY_IMAGE_EXPORT_FILE_MAGIC};
   ciphertext += encrypt_with_view_secret_key(data);
-  return save_to_file(filename, ciphertext);
+  return tools::dump_file(filename, ciphertext);
 }
 
 //----------------------------------------------------------------------------------------------------
@@ -13397,7 +13386,7 @@ uint64_t wallet2::import_key_images_from_file(const fs::path& filename, uint64_t
 {
   PERF_TIMER(__FUNCTION__);
   std::string data;
-  bool r = load_from_file(filename, data);
+  bool r = tools::slurp_file(filename, data);
 
   THROW_WALLET_EXCEPTION_IF(!r, error::wallet_internal_error, std::string(tr("failed to read file ")) + filename.u8string());
 
@@ -14746,71 +14735,6 @@ std::string wallet2::get_rpc_status(const std::string &s) const
   if (m_trusted_daemon)
     return s;
   return "<error>";
-}
-//----------------------------------------------------------------------------------------------------
-
-bool wallet2::save_to_file(const fs::path& path_to_file, std::string_view binary, bool is_printable) const
-{
-  if (is_printable || m_export_format == ExportFormat::Binary)
-  {
-    return tools::dump_file(path_to_file, binary);
-  }
-
-#ifdef _WIN32
-  FILE *fp = _wfopen(path_to_file.c_str(), L"w+");
-#else
-  FILE *fp = fopen(path_to_file.c_str(), "w+");
-#endif
-  if (!fp)
-  {
-    MERROR("Failed to open wallet file for writing: " << path_to_file << ": " << strerror(errno));
-    return false;
-  }
-
-  // Save the result b/c we need to close the fp before returning success/failure.
-  int write_result = PEM_write(fp, ASCII_OUTPUT_MAGIC.c_str(), "", reinterpret_cast<const unsigned char *>(binary.data()), binary.length());
-  fclose(fp);
-
-  return write_result != 0;
-}
-//----------------------------------------------------------------------------------------------------
-
-bool wallet2::load_from_file(const fs::path& path_to_file, std::string& target_str)
-{
-  std::string data;
-  if (!tools::slurp_file(path_to_file, data))
-    return false;
-
-  if (data.find(ASCII_OUTPUT_MAGIC) == std::string::npos)
-  {
-    // It's NOT our ascii dump.
-    target_str = std::move(data);
-    return true;
-  }
-
-  // Creating a BIO and calling PEM_read_bio instead of simpler PEM_read
-  // to avoid reading the file from disk twice.
-  BIO* b = BIO_new_mem_buf((const void*) data.data(), data.length());
-
-  char *name = nullptr;
-  char *header = nullptr;
-  unsigned char *openssl_data = nullptr;
-  long len = 0;
-
-  // Save the result b/c we need to free the data before returning success/failure.
-  bool success = PEM_read_bio(b, &name, &header, &openssl_data, &len);
-  if (success)
-  {
-    target_str.clear();
-    target_str.append((const char*) openssl_data, len);
-  }
-
-  OPENSSL_free((void *) name);
-  OPENSSL_free((void *) header);
-  OPENSSL_free((void *) openssl_data);
-  BIO_free(b);
-
-  return success;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::hash_m_transfer(const transfer_details & transfer, crypto::hash &hash) const
