@@ -587,7 +587,8 @@ namespace nodetool
     {
       full_addrs.insert("116.203.196.12:22022");  // Hetzner seed node
       full_addrs.insert("149.56.165.115:22022");  // Jason's seed node
-      full_addrs.insert("192.250.236.196:22022"); // Rangeproof Test VPSC Box
+      full_addrs.insert("199.127.60.6:22022");    // Oxen Foundation server "holstein"
+      full_addrs.insert("23.88.6.250:22022");     // Official Session open group server
       full_addrs.insert("144.217.243.15:22022");  // OVH(1)
       full_addrs.insert("51.38.133.145:22022");   // OVH(2)
     }
