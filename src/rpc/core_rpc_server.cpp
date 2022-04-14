@@ -65,6 +65,8 @@
 #include "p2p/net_node.h"
 #include "version.h"
 
+#include <fmt/core.h>
+
 #undef OXEN_DEFAULT_LOG_CATEGORY
 #define OXEN_DEFAULT_LOG_CATEGORY "daemon.rpc"
 
@@ -3209,36 +3211,40 @@ namespace cryptonote { namespace rpc {
   }
 
   namespace {
-    struct version_printer { const std::array<uint16_t, 3> &v; };
-    std::ostream &operator<<(std::ostream &o, const version_printer &vp) { return o << vp.v[0] << '.' << vp.v[1] << '.' << vp.v[2]; }
-
     // Handles a ping.  Returns true if the ping was significant (i.e. first ping after startup, or
     // after the ping had expired).  `Success` is a callback that is invoked with a single boolean
     // argument: true if this ping should trigger an immediate proof send (i.e. first ping after
     // startup or after a ping expiry), false for an ordinary ping.
-    template <typename RPC, typename Success>
+    template <typename RPC, typename SuccessCallback>
     auto handle_ping(
+            core& core,
             std::array<uint16_t, 3> cur_version,
             std::array<uint16_t, 3> required,
+            std::string_view ed25519_pubkey,
             std::string_view name,
             std::atomic<std::time_t>& update,
             std::chrono::seconds lifetime,
-            Success success)
+            SuccessCallback success)
     {
+      std::string our_ed25519_pubkey = tools::type_to_hex(core.get_service_keys().pub_ed25519);
       typename RPC::response res{};
       if (cur_version < required) {
-        std::ostringstream status;
-        status << "Outdated " << name << ". Current: " << version_printer{cur_version} << " Required: " << version_printer{required};
-        res.status = status.str();
+        res.status = fmt::format("Outdated {}. Current: {}.{}.{}, Required: {}.{}.{}",
+            name, cur_version[0], cur_version[1], cur_version[2], required[0], required[1], required[2]);
+        MERROR(res.status);
+      } else if (!ed25519_pubkey.empty() // TODO: once lokinet & ss are always sending this we can remove this empty bypass
+          && ed25519_pubkey != our_ed25519_pubkey) {
+        res.status = fmt::format("Invalid {} pubkey: expected {}, received {}", name, our_ed25519_pubkey, ed25519_pubkey);
         MERROR(res.status);
       } else {
         auto now = std::time(nullptr);
         auto old = update.exchange(now);
         bool significant = std::chrono::seconds{now - old} > lifetime; // Print loudly for the first ping after startup/expiry
+        auto msg = fmt::format("Received ping from {} {}.{}.{}", name, cur_version[0], cur_version[1], cur_version[2]);
         if (significant)
-          MGINFO_GREEN("Received ping from " << name << " " << version_printer{cur_version});
+          MGINFO_GREEN(msg);
         else
-          MDEBUG("Accepted ping from " << name << " " << version_printer{cur_version});
+          MDEBUG(msg);
         success(significant);
         res.status = STATUS_OK;
       }
@@ -3250,8 +3256,9 @@ namespace cryptonote { namespace rpc {
   STORAGE_SERVER_PING::response core_rpc_server::invoke(STORAGE_SERVER_PING::request&& req, rpc_context context)
   {
     m_core.ss_version = req.version;
-    return handle_ping<STORAGE_SERVER_PING>(
+    return handle_ping<STORAGE_SERVER_PING>(m_core,
       req.version, service_nodes::MIN_STORAGE_SERVER_VERSION,
+      req.ed25519_pubkey,
       "Storage Server", m_core.m_last_storage_server_ping, m_core.get_net_config().UPTIME_PROOF_FREQUENCY,
       [this, &req](bool significant) {
         m_core.m_storage_https_port = req.https_port;
@@ -3264,8 +3271,9 @@ namespace cryptonote { namespace rpc {
   LOKINET_PING::response core_rpc_server::invoke(LOKINET_PING::request&& req, rpc_context context)
   {
     m_core.lokinet_version = req.version;
-    return handle_ping<LOKINET_PING>(
+    return handle_ping<LOKINET_PING>(m_core,
         req.version, service_nodes::MIN_LOKINET_VERSION,
+        req.ed25519_pubkey,
         "Lokinet", m_core.m_last_lokinet_ping, m_core.get_net_config().UPTIME_PROOF_FREQUENCY,
         [this](bool significant) { if (significant) m_core.reset_proof_interval(); });
   }
