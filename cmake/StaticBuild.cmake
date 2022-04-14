@@ -289,6 +289,8 @@ if(CMAKE_CROSSCOMPILING)
   elseif(ANDROID)
     set(openssl_configure_extra ${openssl_machine} -D__ANDROID_API__=21)
     set(openssl_system_env ${cross_extra})
+    list(APPEND openssl_system_env "ANDROID_NDK_ROOT=${ANDROID_NDK}")
+    list(APPEND openssl_system_env "PATH=${ANDROID_TOOLCHAIN_ROOT}/bin:${ANDROID_NDK}/toolchains/${ANDROID_TOOLCHAIN_NAME}/prebuilt/linux-x86_64/bin:$ENV{PATH}")
     set(openssl_extra_opts no-asm)
   elseif(IOS)
     get_filename_component(apple_toolchain "${CMAKE_C_COMPILER}" DIRECTORY)
@@ -302,11 +304,12 @@ if(CMAKE_CROSSCOMPILING)
   endif()
 endif()
 build_external(openssl
-  CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=${openssl_cc} ${openssl_system_env} ./Configure ${openssl_configure_extra}
-    --prefix=${DEPS_DESTDIR} --libdir=lib ${openssl_extra_opts}
+  CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env CC=${openssl_cc} "CFLAGS=${deps_CFLAGS}" ${openssl_system_env}
+    ./Configure ${openssl_configure_extra} --prefix=${DEPS_DESTDIR} --libdir=lib ${openssl_extra_opts}
     no-shared no-capieng no-dso no-dtls1 no-ec_nistp_64_gcc_128 no-gost
     no-md2 no-rc5 no-rdrand no-rfc3779 no-sctp no-ssl-trace no-ssl3
-    no-static-engine no-tests no-weak-ssl-ciphers no-zlib-dynamic "CFLAGS=${deps_CFLAGS}"
+    no-static-engine no-tests no-weak-ssl-ciphers no-zlib-dynamic
+  BUILD_COMMAND ${CMAKE_COMMAND} -E env CC=${openssl_cc} ${openssl_system_env} make
   INSTALL_COMMAND make install_sw
   BUILD_BYPRODUCTS
     ${DEPS_DESTDIR}/lib/libssl.a ${DEPS_DESTDIR}/lib/libcrypto.a
