@@ -70,11 +70,11 @@ set(EUDEV_SOURCE v${EUDEV_VERSION}.tar.gz)
 set(EUDEV_HASH SHA512=17b328365913af3e434abe667dd0498c3702a41c6cb66f3793ca2c195b05ac06397b0a401077f81df7dd25193e4eeea13657a221ca6cb3d237c4d91e31e30b33
     CACHE STRING "eudev source hash")
 
-set(LIBUSB_VERSION 1.0.25 CACHE STRING "libusb version")
+set(LIBUSB_VERSION 1.0.26 CACHE STRING "libusb version")
 set(LIBUSB_MIRROR ${LOCAL_MIRROR} https://github.com/libusb/libusb/releases/download/v${LIBUSB_VERSION}
     CACHE STRING "libusb download mirror(s)")
 set(LIBUSB_SOURCE libusb-${LIBUSB_VERSION}.tar.bz2)
-set(LIBUSB_HASH SHA512=f1e6e5577d4bd1ff136927dc66c615014a06ac332ddd797b1d1ad5f7b68e2405e66068dcb210e2f0ae3e31681603ef72efbd88bf7fbe0eb41ce700fdc3f92f9d
+set(LIBUSB_HASH SHA512=fcdb85c98f21639668693c2fd522814d440972d65883984c4ae53d0555bdbdb7e8c7a32199cd4b01113556a1eb5be7841b750cc73c9f6bda79bfe1af80914e71
     CACHE STRING "libusb source hash")
 
 set(HIDAPI_VERSION 0.11.2 CACHE STRING "hidapi version")
@@ -530,13 +530,21 @@ else()
     set(hidapi_libusb_lib libhidapi.a)
     set(hidapi_lib_byproducts ${DEPS_DESTDIR}/lib/libhidapi.a)
   endif()
+  set(hidapi_cmake_toolchain)
+  if(CMAKE_TOOLCHAIN_FILE)
+    set(hidapi_cmake_toolchain "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}")
+  endif()
   build_external(hidapi
     DEPENDS ${maybe_eudev} libusb_external
-    CONFIGURE_COMMAND autoreconf -ivf && ./configure ${cross_host} --prefix=${DEPS_DESTDIR} --disable-shared --enable-static --with-pic
-      "CC=${deps_cc}" "CXX=${deps_cxx}" "CFLAGS=${deps_CFLAGS}" "CXXFLAGS=${deps_CXXFLAGS}"
-      ${cross_extra}
-      "libudev_CFLAGS=-I${DEPS_DESTDIR}/include" "libudev_LIBS=-L${DEPS_DESTDIR}/lib -ludev"
-      "libusb_CFLAGS=-I${DEPS_DESTDIR}/include/libusb-1.0" "libusb_LIBS=-L${DEPS_DESTDIR}/lib -lusb-1.0"
+    CONFIGURE_COMMAND mkdir -p build && cd build && cmake .. "-DCMAKE_GENERATOR=Unix Makefiles"
+    "-DCMAKE_PREFIX_PATH=${DEPS_DESTDIR}" "-DCMAKE_INSTALL_PREFIX=${DEPS_DESTDIR}"
+    "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
+    "-DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}"
+    "-DCMAKE_C_FLAGS=${deps_CFLAGS}"
+    ${hidapi_cmake_toolchain}
+    -DBUILD_SHARED_LIBS=OFF
+    BUILD_COMMAND cd build && make
+    INSTALL_COMMAND cd build && make install
     BUILD_BYPRODUCTS
       ${hidapi_lib_byproducts}
       ${DEPS_DESTDIR}/include/hidapi
@@ -608,7 +616,7 @@ add_static_target(libzmq zmq_external libzmq.a)
 
 set(libzmq_link_libs "sodium")
 if(CMAKE_CROSSCOMPILING AND ARCH_TRIPLET MATCHES mingw)
-  list(APPEND libzmq_link_libs iphlpapi)
+  list(APPEND libzmq_link_libs iphlpapi ws2_32)
 endif()
 
 set_target_properties(libzmq PROPERTIES
