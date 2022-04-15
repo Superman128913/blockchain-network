@@ -1032,37 +1032,31 @@ namespace cryptonote
     cn_fast_hash(blob.data(), blob.size(), res);
   }
   //---------------------------------------------------------------
-  std::string get_unit(unsigned int decimal_point)
+  std::string print_money(uint64_t amount, bool strip_zeros)
   {
-    if (decimal_point == (unsigned int)-1)
-      decimal_point = CRYPTONOTE_DISPLAY_DECIMAL_POINT;
-    switch (decimal_point)
-    {
-      case 9:
-        return "oxen";
-      case 6:
-        return "megarok";
-      case 3:
-        return "kilorok";
-      case 0:
-        return "rok";
-      default:
-        ASSERT_MES_AND_THROW("Invalid decimal point specification: " << decimal_point);
-    }
-  }
-  //---------------------------------------------------------------
-  std::string print_money(uint64_t amount, unsigned int decimal_point)
-  {
-    if (decimal_point == (unsigned int)-1)
-      decimal_point = CRYPTONOTE_DISPLAY_DECIMAL_POINT;
+    constexpr unsigned int decimal_point = CRYPTONOTE_DISPLAY_DECIMAL_POINT;
     std::string s = std::to_string(amount);
     if(s.size() < decimal_point+1)
     {
       s.insert(0, decimal_point+1 - s.size(), '0');
     }
-    if (decimal_point > 0)
-      s.insert(s.size() - decimal_point, ".");
+    s.insert(s.size() - decimal_point, ".");
+    if (strip_zeros)
+    {
+      while (s.back() == '0')
+        s.pop_back();
+      if (s.back() == '.')
+        s.pop_back();
+    }
     return s;
+  }
+  //---------------------------------------------------------------
+  std::string format_money(uint64_t amount, bool strip_zeros)
+  {
+    auto value = print_money(amount, strip_zeros);
+    value += ' ';
+    value += get_unit();
+    return value;
   }
   //---------------------------------------------------------------
   std::string print_tx_verification_context(tx_verification_context const &tvc, transaction const *tx)

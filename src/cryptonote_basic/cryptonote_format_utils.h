@@ -213,8 +213,12 @@ namespace cryptonote
   uint64_t get_block_height(const block& b);
   std::vector<uint64_t> relative_output_offsets_to_absolute(const std::vector<uint64_t>& off);
   std::vector<uint64_t> absolute_output_offsets_to_relative(const std::vector<uint64_t>& off);
-  std::string get_unit(unsigned int decimal_point = -1);
-  std::string print_money(uint64_t amount, unsigned int decimal_point = -1);
+  constexpr std::string_view get_unit() { return "OXEN"sv; }
+  // Returns a monetary value with a decimal point; optionally strips insignificant trailing 0s.
+  std::string print_money(uint64_t amount, bool strip_zeros = false);
+  // Returns a formatted monetary value including the unit, e.g. "1.234567 OXEN"; strips
+  // insignificant trailing 0s by default (unlike the above) but can be overridden to not do that.
+  std::string format_money(uint64_t amount, bool strip_zeros = true);
 
   std::string print_tx_verification_context  (tx_verification_context const &tvc, transaction const *tx = nullptr);
   std::string print_vote_verification_context(vote_verification_context const &vvc, service_nodes::quorum_vote_t const *vote = nullptr);
