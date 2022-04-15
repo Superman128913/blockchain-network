@@ -41,6 +41,7 @@
 
 #include "common/string_util.h"
 #include "common/varint.h"
+#include "common/median.h"
 #include "epee/console_handler.h"
 #include "common/rules.h"
 
@@ -983,7 +984,7 @@ bool oxen_chain_generator::block_begin(oxen_blockchain_entry &entry, oxen_create
   while (true)
   {
     if (!construct_miner_tx(height,
-                            epee::misc_utils::median(params.block_weights),
+                            tools::median(params.block_weights.begin(), params.block_weights.end()),
                             params.prev.already_generated_coins,
                             target_block_weight,
                             total_fee,
@@ -1034,7 +1035,7 @@ bool oxen_chain_generator::block_begin(oxen_blockchain_entry &entry, oxen_create
 
   entry.txs = tx_list;
   uint64_t block_reward, block_reward_unpenalized;
-  cryptonote::get_base_block_reward(epee::misc_utils::median(params.block_weights), entry.block_weight, params.prev.already_generated_coins, block_reward, block_reward_unpenalized, params.hf_version, height);
+  cryptonote::get_base_block_reward(tools::median(params.block_weights.begin(), params.block_weights.end()), entry.block_weight, params.prev.already_generated_coins, block_reward, block_reward_unpenalized, params.hf_version, height);
   entry.already_generated_coins = block_reward + params.prev.already_generated_coins;
 
   // NOTE: This relies on the block hash, so must be done after
@@ -1209,7 +1210,7 @@ void test_generator::add_block(const cryptonote::block& blk, size_t txs_weight, 
 {
   const size_t block_weight = txs_weight + get_transaction_weight(blk.miner_tx);
   uint64_t block_reward, block_reward_unpenalized;
-  cryptonote::get_base_block_reward(epee::misc_utils::median(block_weights), block_weight, already_generated_coins, block_reward, block_reward_unpenalized, m_hf_version, 0);
+  cryptonote::get_base_block_reward(tools::median(block_weights.begin(), block_weights.end()), block_weight, already_generated_coins, block_reward, block_reward_unpenalized, m_hf_version, 0);
   m_blocks_info.insert({get_block_hash(blk), block_info(blk.prev_id, already_generated_coins + block_reward, block_weight, blk)});
 }
 
@@ -1298,7 +1299,7 @@ bool test_generator::construct_block(cryptonote::block &blk,
   while (true)
   {
     if (!construct_miner_tx(height,
-                            epee::misc_utils::median(block_weights),
+                            tools::median(block_weights.begin(), block_weights.end()),
                             already_generated_coins,
                             target_block_weight,
                             total_fee,
@@ -1416,7 +1417,7 @@ bool test_generator::construct_block_manually(
     manual_calc_batched_governance(*this, prev_id, miner_tx_context, m_hf_version, height);
 
     size_t current_block_weight = txs_weight + get_transaction_weight(blk.miner_tx);
-    if (!construct_miner_tx(height, epee::misc_utils::median(block_weights), already_generated_coins, current_block_weight, miner_fee, blk.miner_tx, cryptonote::oxen_miner_tx_context::miner_block(cryptonote::FAKECHAIN, miner_acc.get_keys().m_account_address), cryptonote::blobdata(), m_hf_version))
+    if (!construct_miner_tx(height, tools::median(block_weights.begin(), block_weights.end()), already_generated_coins, current_block_weight, miner_fee, blk.miner_tx, cryptonote::oxen_miner_tx_context::miner_block(cryptonote::FAKECHAIN, miner_acc.get_keys().m_account_address), cryptonote::blobdata(), m_hf_version))
       return false;
   }
 

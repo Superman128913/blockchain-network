@@ -258,11 +258,6 @@ private:
       AskPasswordToDecrypt = 2,
     };
 
-    enum ExportFormat {
-      Binary = 0,
-      Ascii,
-    };
-
     static const char* tr(const char* str);
     static const char *ERR_MSG_NETWORK_VERSION_QUERY_FAILED;
     static const char *ERR_MSG_NETWORK_HEIGHT_QUERY_FAILED;
@@ -1043,8 +1038,6 @@ private:
     void device_address(std::string device_address) { m_device_address = std::move(device_address); }
     const std::string & device_derivation_path() const { return m_device_derivation_path; }
     void device_derivation_path(const std::string &device_derivation_path) { m_device_derivation_path = device_derivation_path; }
-    const ExportFormat & export_format() const { return m_export_format; }
-    void set_export_format(const ExportFormat& export_format) { m_export_format = export_format; }
 
     bool get_tx_key_cached(const crypto::hash &txid, crypto::secret_key &tx_key, std::vector<crypto::secret_key> &additional_tx_keys) const;
     void set_tx_key(const crypto::hash &txid, const crypto::secret_key &tx_key, const std::vector<crypto::secret_key> &additional_tx_keys);
@@ -1448,9 +1441,6 @@ private:
     bool frozen(const crypto::key_image &ki) const;
     bool frozen(const transfer_details &td) const;
 
-    bool save_to_file(const fs::path& path_to_file, std::string_view binary, bool is_printable = false) const;
-    static bool load_from_file(const fs::path& path_to_file, std::string& target_str);
-
     uint64_t get_bytes_sent() const;
     uint64_t get_bytes_received() const;
 
@@ -1737,8 +1727,6 @@ private:
 
     std::shared_ptr<tools::Notify> m_tx_notify;
     std::unique_ptr<wallet_device_callback> m_device_callback;
-
-    ExportFormat m_export_format;
 
     inline static std::mutex default_daemon_address_mutex;
     inline static std::string default_daemon_address;

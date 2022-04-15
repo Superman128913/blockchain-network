@@ -40,7 +40,7 @@
 #include "common/random.h"
 
 #include <oxenmq/oxenmq.h>
-#include <oxenmq/hex.h>
+#include <oxenc/hex.h>
 #include <shared_mutex>
 #include <iterator>
 #include <time.h>
@@ -53,9 +53,12 @@ namespace quorumnet {
 namespace {
 
 using namespace service_nodes;
-using namespace oxenmq;
+using namespace oxenc;
 
-using blink_tx = cryptonote::blink_tx;
+namespace send_option = oxenmq::send_option;
+using oxenmq::Message;
+
+using cryptonote::blink_tx;
 
 constexpr auto NUM_BLINK_QUORUMS = tools::enum_count<blink_tx::subquorum>;
 static_assert(std::is_same<const uint8_t, decltype(NUM_BLINK_QUORUMS)>(), "unexpected underlying blink quorum count type");
@@ -72,7 +75,7 @@ using pending_signature_set = std::unordered_set<pending_signature, pending_sign
 
 struct QnetState {
     cryptonote::core &core;
-    OxenMQ &omq{core.get_omq()};
+    oxenmq::OxenMQ &omq{core.get_omq()};
 
     // Track submitted blink txes here; unlike the blinks stored in the mempool we store these ones
     // more liberally to track submitted blinks, even if unsigned/unacceptable, while the mempool
@@ -82,7 +85,7 @@ struct QnetState {
     struct blink_metadata {
         std::shared_ptr<blink_tx> btxptr;
         pending_signature_set pending_sigs;
-        ConnectionID reply_conn;
+        oxenmq::ConnectionID reply_conn;
         uint64_t reply_tag = 0;
     };
     // { height => { txhash => {blink_tx,conn,reply}, ... }, ... }
@@ -320,7 +323,7 @@ public:
     }
 
 private:
-    OxenMQ &omq;
+    oxenmq::OxenMQ &omq;
 
     /// Looks up a pubkey in known remotes and adds it to `peers`.  If strong, it is added with an
     /// address, otherwise it is added with an empty address.  If the element already exists, it
@@ -650,7 +653,7 @@ std::string debug_known_signatures(blink_tx &btx, quorum_array &blink_quorums) {
 /// tx; otherwise signatures are stored until we learn about the tx and then processed.
 void process_blink_signatures(QnetState &qnet, const std::shared_ptr<blink_tx> &btxptr, quorum_array &blink_quorums, uint64_t quorum_checksum, std::list<pending_signature> &&signatures,
         uint64_t reply_tag, // > 0 if we are expected to send a status update if it becomes accepted/rejected
-        ConnectionID reply_conn, // who we are supposed to send the status update to
+        oxenmq::ConnectionID reply_conn, // who we are supposed to send the status update to
         const std::string &received_from = ""s /* x25519 of the peer that sent this, if available (to avoid trying to pointlessly relay back to them) */) {
 
     auto &btx = *btxptr;
@@ -828,7 +831,7 @@ void process_blink_signatures(QnetState &qnet, const std::shared_ptr<blink_tx> &
 ///     "#" - precomputed tx hash.  This much match the actual hash of the transaction (the blink
 ///           submission will fail immediately if it does not).
 ///
-void handle_blink(oxenmq::Message& m, QnetState& qnet) {
+void handle_blink(Message& m, QnetState& qnet) {
     // TODO: if someone sends an invalid tx (i.e. one that doesn't get to the distribution stage)
     // then put a timeout on that IP during which new submissions from them are dropped for a short
     // time.
@@ -1193,7 +1196,7 @@ void handle_blink_signature(Message& m, QnetState& qnet) {
     auto blink_quorums = get_blink_quorums(blink_height, qnet.core.get_service_node_list(), &checksum); // throws if bad quorum or checksum mismatch
 
     uint64_t reply_tag = 0;
-    ConnectionID reply_conn;
+    oxenmq::ConnectionID reply_conn;
     std::shared_ptr<blink_tx> btxptr;
     auto find_blink = [&]() {
         auto height_it = qnet.blinks.find(blink_height);
@@ -1703,6 +1706,8 @@ void init_core_callbacks() {
 
 namespace {
 void setup_endpoints(cryptonote::core& core, void* obj) {
+    using namespace oxenmq;
+
     auto& omq = core.get_omq();
 
     if (core.service_node()) {

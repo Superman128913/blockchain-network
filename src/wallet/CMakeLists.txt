@@ -62,8 +62,6 @@ target_link_libraries(wallet
     filesystem
     Boost::thread
   PRIVATE
-    OpenSSL::SSL
-    OpenSSL::Crypto
     extra)
 
 oxen_add_executable(wallet_rpc_server "oxen-wallet-rpc"

@@ -375,7 +375,7 @@ void simple_wallet::mms_signer(const std::vector<std::string> &args)
   if (args.size() == 4)
   {
     cryptonote::address_parse_info info;
-    bool ok = cryptonote::get_account_address_from_str_or_url(info, m_wallet->nettype(), args[3], oa_prompter);
+    bool ok = cryptonote::get_account_address_from_str(info, m_wallet->nettype(), args[3]);
     if (!ok)
     {
       fail_msg_writer() << tr("Invalid Oxen address");

@@ -40,6 +40,7 @@
 #include "common/file.h"
 #include "common/pruning.h"
 #include "common/hex.h"
+#include "common/median.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "crypto/crypto.h"
 #include "epee/profile_tools.h"
@@ -5813,8 +5814,9 @@ void BlockchainLMDB::migrate_3_4()
       uint64_t long_term_block_weight;
       if (past_long_term_weight)
       {
-        std::vector<uint64_t> weights(long_term_block_weights.begin(), long_term_block_weights.end());
-        uint64_t long_term_effective_block_median_weight = std::max<uint64_t>(CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V5, epee::misc_utils::median(weights));
+        uint64_t long_term_effective_block_median_weight = std::max<uint64_t>(
+                CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V5,
+                tools::median(std::vector<uint64_t>{long_term_block_weights.begin(), long_term_block_weights.end()}));
         long_term_block_weight = std::min<uint64_t>(bi.bi_weight, long_term_effective_block_median_weight + long_term_effective_block_median_weight * 2 / 5);
       }
       else

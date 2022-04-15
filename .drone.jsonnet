@@ -6,7 +6,6 @@ local default_deps_nocxx = [
   'libevent-dev',
   'libgtest-dev',
   'libhidapi-dev',
-  'libminiupnpc-dev',
   'libreadline-dev',
   'libsodium-dev',
   'libsqlite3-dev',
@@ -35,6 +34,7 @@ local submodules = {
 
 local apt_get_quiet = 'apt-get -o=Dpkg::Use-Pty=0 -q';
 
+local cmake_options(opts) = std.join(' ', [' -D' + o + '=' + (if opts[o] then 'ON' else 'OFF') for o in std.objectFields(opts)]) + ' ';
 
 // Regular build on a debian-like system:
 local debian_pipeline(name,
@@ -74,10 +74,9 @@ local debian_pipeline(name,
         'mkdir build',
         'cd build',
         'cmake .. -G Ninja -DCMAKE_CXX_FLAGS=-fdiagnostics-color=always -DCMAKE_BUILD_TYPE=' + build_type + ' ' +
-        '-DLOCAL_MIRROR=https://builds.lokinet.dev/deps -DUSE_LTO=' + (if lto then 'ON ' else 'OFF ') +
-        (if werror then '-DWARNINGS_AS_ERRORS=ON ' else '') +
-        (if build_tests || run_tests then '-DBUILD_TESTS=ON ' else '') +
-        cmake_extra,
+        '-DLOCAL_MIRROR=https://builds.lokinet.dev/deps '
+        + cmake_options({ USE_LTO: lto, WARNINGS_AS_ERRORS: werror, BUILD_TESTS: build_tests || run_tests })
+        + cmake_extra,
       ] + (
         if arch == 'arm64' && jobs > 1 then
           // The wallet code is too bloated to be compiled at -j2 with only 4GB ram, so do
@@ -135,10 +134,9 @@ local mac_builder(name,
         'mkdir build',
         'cd build',
         'cmake .. -G Ninja -DCMAKE_CXX_FLAGS=-fcolor-diagnostics -DCMAKE_BUILD_TYPE=' + build_type + ' ' +
-        '-DLOCAL_MIRROR=https://builds.lokinet.dev/deps -DUSE_LTO=' + (if lto then 'ON ' else 'OFF ') +
-        (if werror then '-DWARNINGS_AS_ERRORS=ON ' else '') +
-        (if build_tests || run_tests then '-DBUILD_TESTS=ON ' else '') +
-        cmake_extra,
+        '-DLOCAL_MIRROR=https://builds.lokinet.dev/deps '
+        + cmake_options({ USE_LTO: lto, WARNINGS_AS_ERRORS: werror, BUILD_TESTS: build_tests || run_tests })
+        + cmake_extra,
         'ninja -j' + jobs + ' -v',
       ] + (
         if run_tests then [
@@ -178,7 +176,7 @@ local android_build_steps(android_abi, android_platform=21, jobs=6, cmake_extra=
   '-DCMAKE_BUILD_TYPE=Release ' +
   '-DCMAKE_TOOLCHAIN_FILE=/usr/lib/android-sdk/ndk-bundle/build/cmake/android.toolchain.cmake ' +
   '-DANDROID_PLATFORM=' + android_platform + ' -DANDROID_ABI=' + android_abi + ' ' +
-  '-DMONERO_SLOW_HASH=ON ' +
+  cmake_options({ MONERO_SLOW_HASH: true, WARNINGS_AS_ERRORS: false, BUILD_TESTS: false }) +
   '-DLOCAL_MIRROR=https://builds.lokinet.dev/deps ' +
   '-DBUILD_STATIC_DEPS=ON -DSTATIC=ON -G Ninja ' + cmake_extra,
   'ninja -j' + jobs + ' -v wallet_merged',
