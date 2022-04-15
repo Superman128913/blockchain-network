@@ -63,9 +63,9 @@ namespace {
 
   std::string input_line(std::string const &prompt)
   {
+    rdln::suspend_readline pause_readline;
     std::cout << prompt << std::flush;
     std::string result;
-    rdln::suspend_readline pause_readline;
     std::cin >> result;
 
     return result;
