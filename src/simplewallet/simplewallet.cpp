@@ -6645,7 +6645,7 @@ bool simple_wallet::ons_update_mapping(std::vector<std::string> args)
     }
 
     auto& enc_hex = response[0].encrypted_value;
-    if (!oxenc::is_hex(enc_hex) || enc_hex.size() % 2 != 0 || enc_hex.size() > 2*ons::mapping_value::BUFFER_SIZE)
+    if (!oxenc::is_hex(enc_hex) || enc_hex.size() > 2*ons::mapping_value::BUFFER_SIZE)
     {
       LOG_ERROR("invalid ONS data returned from oxend");
       fail_msg_writer() << tr("invalid ONS data returned from oxend");
@@ -6887,7 +6887,7 @@ bool simple_wallet::ons_lookup(std::vector<std::string> args)
   for (auto const &mapping : response)
   {
     auto& enc_hex = mapping.encrypted_value;
-    if (mapping.entry_index >= args.size() || !oxenc::is_hex(enc_hex) || enc_hex.size() % 2 != 0 || enc_hex.size() > 2*ons::mapping_value::BUFFER_SIZE)
+    if (mapping.entry_index >= args.size() || !oxenc::is_hex(enc_hex) || enc_hex.size() > 2*ons::mapping_value::BUFFER_SIZE)
     {
       fail_msg_writer() << "Received invalid ONS mapping data from oxend";
       return false;
