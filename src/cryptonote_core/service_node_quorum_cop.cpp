@@ -460,7 +460,7 @@ namespace service_nodes
             m_last_checkpointed_height = std::max(start_checkpointing_height, m_last_checkpointed_height);
 
             for (;
-                 m_last_checkpointed_height <= height;
+                 m_last_checkpointed_height < height;
                  m_last_checkpointed_height += CHECKPOINT_INTERVAL)
             {
               uint8_t checkpointed_height_hf_version = get_network_version(m_core.get_nettype(), m_last_checkpointed_height);
@@ -604,11 +604,10 @@ namespace service_nodes
 
     std::unique_lock<cryptonote::Blockchain> lock{blockchain};
 
-    bool update_checkpoint;
+    bool update_checkpoint = false;
     if (blockchain.get_checkpoint(vote.block_height, checkpoint) &&
         checkpoint.block_hash == vote.checkpoint.block_hash)
     {
-      update_checkpoint = false;
       if (checkpoint.signatures.size() != service_nodes::CHECKPOINT_QUORUM_SIZE)
       {
         checkpoint.signatures.reserve(service_nodes::CHECKPOINT_QUORUM_SIZE);
@@ -636,7 +635,7 @@ namespace service_nodes
         }
       }
     }
-    else
+    else if (vote.block_height < core.get_current_blockchain_height())  // Don't accept checkpoints for blocks we don't have yet
     {
       update_checkpoint = true;
       checkpoint = make_empty_service_node_checkpoint(vote.checkpoint.block_hash, vote.block_height);
