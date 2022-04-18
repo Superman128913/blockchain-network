@@ -177,6 +177,7 @@ struct TransactionInfo
     virtual ~TransactionInfo() = 0;
     virtual bool isServiceNodeReward() const = 0;
     virtual bool isMinerReward() const = 0;
+    virtual bool isStake() const = 0;
     virtual int  direction() const = 0;
     virtual bool isPending() const = 0;
     virtual bool isFailed() const = 0;
