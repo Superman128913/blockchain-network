@@ -48,6 +48,7 @@ TransactionInfoImpl::TransactionInfoImpl()
       , m_pending(false)
       , m_failed(false)
       , m_reward_type(reward_type::unspecified)
+      , m_is_stake(false)
       , m_amount(0)
       , m_fee(0)
       , m_blockheight(0)
@@ -81,6 +82,12 @@ EXPORT
 bool TransactionInfoImpl::isMinerReward() const
 {
     return m_reward_type == reward_type::miner;
+}
+
+EXPORT
+bool TransactionInfoImpl::isStake() const
+{
+    return m_is_stake;
 }
 
 EXPORT

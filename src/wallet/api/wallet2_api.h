@@ -118,6 +118,8 @@ struct StakeUnlockResult
   virtual bool success() = 0;
   virtual std::string msg() = 0;
   virtual PendingTransaction* ptx() = 0;
+
+  virtual ~StakeUnlockResult() = default;
 };
 
 /**
@@ -177,6 +179,7 @@ struct TransactionInfo
     virtual ~TransactionInfo() = 0;
     virtual bool isServiceNodeReward() const = 0;
     virtual bool isMinerReward() const = 0;
+    virtual bool isStake() const = 0;
     virtual int  direction() const = 0;
     virtual bool isPending() const = 0;
     virtual bool isFailed() const = 0;
