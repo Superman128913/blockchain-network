@@ -118,6 +118,8 @@ struct StakeUnlockResult
   virtual bool success() = 0;
   virtual std::string msg() = 0;
   virtual PendingTransaction* ptx() = 0;
+
+  virtual ~StakeUnlockResult() = default;
 };
 
 /**
