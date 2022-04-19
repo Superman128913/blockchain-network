@@ -14457,7 +14457,9 @@ bool wallet2::parse_uri(std::string_view uri, std::string &address, std::string 
     if (key == "tx_amount"sv)
     {
       amount = 0;
-      if (!cryptonote::parse_amount(amount, value))
+      if (auto a = cryptonote::parse_amount(value))
+        amount = *a;
+      else
       {
         error = "URI has invalid amount: " + value;
         return false;

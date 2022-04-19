@@ -2302,8 +2302,8 @@ bool simple_wallet::set_min_output_count(const std::vector<std::string> &args/* 
 
 bool simple_wallet::set_min_output_value(const std::vector<std::string> &args/* = std::vector<std::string>()*/)
 {
-  uint64_t value;
-  if (!cryptonote::parse_amount(value, args[1]))
+  auto value = cryptonote::parse_amount(args[1]);
+  if (!value)
   {
     fail_msg_writer() << tr("invalid value");
     return true;
@@ -2312,7 +2312,7 @@ bool simple_wallet::set_min_output_value(const std::vector<std::string> &args/* 
   const auto pwd_container = get_and_verify_password();
   if (pwd_container)
   {
-    m_wallet->set_min_output_value(value);
+    m_wallet->set_min_output_value(*value);
     m_wallet->rewrite(m_wallet_file, pwd_container->password());
   }
   return true;
@@ -2424,15 +2424,15 @@ bool simple_wallet::set_ignore_outputs_above(const std::vector<std::string> &arg
   const auto pwd_container = get_and_verify_password();
   if (pwd_container)
   {
-    uint64_t amount;
-    if (!cryptonote::parse_amount(amount, args[1]))
+    auto amount = cryptonote::parse_amount(args[1]);
+    if (!amount)
     {
       fail_msg_writer() << tr("Invalid amount");
       return true;
     }
-    if (amount == 0)
+    if (*amount == 0)
       amount = MONEY_SUPPLY;
-    m_wallet->ignore_outputs_above(amount);
+    m_wallet->ignore_outputs_above(*amount);
     m_wallet->rewrite(m_wallet_file, pwd_container->password());
   }
   return true;
@@ -2443,13 +2443,13 @@ bool simple_wallet::set_ignore_outputs_below(const std::vector<std::string> &arg
   const auto pwd_container = get_and_verify_password();
   if (pwd_container)
   {
-    uint64_t amount;
-    if (!cryptonote::parse_amount(amount, args[1]))
+    auto amount = cryptonote::parse_amount(args[1]);
+    if (!amount)
     {
       fail_msg_writer() << tr("Invalid amount");
       return true;
     }
-    m_wallet->ignore_outputs_below(amount);
+    m_wallet->ignore_outputs_below(*amount);
     m_wallet->rewrite(m_wallet_file, pwd_container->password());
   }
   return true;
@@ -5806,9 +5806,13 @@ bool simple_wallet::transfer_main(Transfer transfer_type, const std::vector<std:
   static constexpr auto BURN_PREFIX = "burn="sv;
   uint64_t burn_amount = 0;
   std::string burn_amount_str = eat_named_argument(local_args, BURN_PREFIX);
-  if (!burn_amount_str.empty() && !cryptonote::parse_amount(burn_amount, burn_amount_str)) {
-    fail_msg_writer() << tr("Invalid amount");
-    return true;
+  if (!burn_amount_str.empty()) {
+    if (auto b = cryptonote::parse_amount(burn_amount_str))
+      burn_amount = *b;
+    else {
+      fail_msg_writer() << tr("Invalid amount");
+      return true;
+    }
   }
 
   uint32_t priority = 0;
@@ -5885,8 +5889,9 @@ bool simple_wallet::transfer_main(Transfer transfer_type, const std::vector<std:
         return false;
       }
 
-      bool ok = cryptonote::parse_amount(de.amount, local_args[i + 1]);
-      if(!ok || 0 == de.amount)
+      if (auto a = cryptonote::parse_amount(local_args[i + 1]); a && *a > 0)
+        de.amount = *a;
+      else
       {
         fail_msg_writer() << tr("amount is wrong: ") << local_args[i] << ' ' << local_args[i + 1] <<
           ", " << tr("expected number from 0 to ") << print_money(std::numeric_limits<uint64_t>::max());
@@ -6112,7 +6117,9 @@ bool simple_wallet::stake(const std::vector<std::string> &args_)
     }
     else
     {
-      if (!cryptonote::parse_amount(amount, local_args[1]) || amount == 0)
+      if (auto a = cryptonote::parse_amount(local_args[1]); a && *a > 0)
+        amount = *a;
+      else
       {
         fail_msg_writer() << tr("amount is wrong: ") << local_args[1] <<
           ", " << tr("expected number from ") << print_money(1) << " to " << print_money(std::numeric_limits<uint64_t>::max());
@@ -7557,18 +7564,18 @@ bool simple_wallet::sweep_account(const std::vector<std::string> &args_)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::sweep_below(const std::vector<std::string> &args_)
 {
-  uint64_t below = 0;
   if (args_.size() < 1)
   {
     fail_msg_writer() << tr("missing threshold amount");
     return true;
   }
-  if (!cryptonote::parse_amount(below, args_[0]))
+  auto below = cryptonote::parse_amount(args_[0]);
+  if (!below)
   {
     fail_msg_writer() << tr("invalid amount threshold");
     return true;
   }
-  return sweep_main(m_current_subaddress_account, below, Transfer::Normal, std::vector<std::string>(++args_.begin(), args_.end()));
+  return sweep_main(m_current_subaddress_account, *below, Transfer::Normal, std::vector<std::string>(++args_.begin(), args_.end()));
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::accept_loaded_tx(const std::function<size_t()> get_num_txes, const std::function<const wallet::tx_construction_data&(size_t)> &get_tx, const std::string &extra_message)
@@ -8250,7 +8257,9 @@ bool simple_wallet::get_reserve_proof(const std::vector<std::string> &args)
   {
     account_minreserve = std::pair<uint32_t, uint64_t>();
     account_minreserve->first = m_current_subaddress_account;
-    if (!cryptonote::parse_amount(account_minreserve->second, args[0]))
+    if (auto r = cryptonote::parse_amount(args[0]))
+      account_minreserve->second = *r;
+    else
     {
       fail_msg_writer() << tr("amount is wrong: ") << args[0];
       return true;
@@ -8587,7 +8596,9 @@ bool simple_wallet::unspent_outputs(const std::vector<std::string> &args_)
   uint64_t max_amount = std::numeric_limits<uint64_t>::max();
   if (local_args.size() > 0)
   {
-    if (!cryptonote::parse_amount(min_amount, local_args[0]))
+    if (auto a = cryptonote::parse_amount(local_args[0]))
+      min_amount = *a;
+    else
     {
       fail_msg_writer() << tr("amount is wrong: ") << local_args[0];
       return true;
@@ -8595,7 +8606,9 @@ bool simple_wallet::unspent_outputs(const std::vector<std::string> &args_)
     local_args.erase(local_args.begin());
     if (local_args.size() > 0)
     {
-      if (!cryptonote::parse_amount(max_amount, local_args[0]))
+      if (auto a = cryptonote::parse_amount(local_args[0]))
+        max_amount = *a;
+      else
       {
         fail_msg_writer() << tr("amount is wrong: ") << local_args[0];
         return true;

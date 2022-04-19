@@ -38,21 +38,20 @@ namespace
 {
   void do_pos_test(uint64_t expected, const std::string& str)
   {
-    uint64_t val;
     std::string number_str = str;
     std::replace(number_str.begin(), number_str.end(), '_', '.');
     number_str.erase(std::remove(number_str.begin(), number_str.end(), '~'), number_str.end());
-    ASSERT_TRUE(parse_amount(val, number_str));
-    ASSERT_EQ(expected, val);
+    auto val = parse_amount(number_str);
+    ASSERT_TRUE(val);
+    ASSERT_EQ(expected, *val);
   }
 
   void do_neg_test(const std::string& str)
   {
-    uint64_t val;
     std::string number_str = str;
     std::replace(number_str.begin(), number_str.end(), '_', '.');
     number_str.erase(std::remove(number_str.begin(), number_str.end(), '~'), number_str.end());
-    ASSERT_FALSE(parse_amount(val, number_str));
+    ASSERT_FALSE(parse_amount(number_str));
   }
 }
 

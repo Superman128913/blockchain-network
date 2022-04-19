@@ -61,21 +61,20 @@ namespace daemonize {
 namespace {
   enum class input_line_result { yes, no, cancel, back, };
 
-  std::string input_line(std::string const &prompt)
+  template <typename... Args>
+  std::string input_line(Args&&... prompt)
   {
-    std::cout << prompt << std::flush;
-    std::string result;
     rdln::suspend_readline pause_readline;
+    (std::cout << ... << prompt) << std::flush;
+    std::string result;
     std::cin >> result;
 
     return result;
   }
 
-  input_line_result input_line_yes_no_back_cancel(char const *msg)
+  input_line_result input_line_ask(std::string_view msg)
   {
-    std::string prompt = std::string(msg);
-    prompt += " (Y/Yes/N/No/B/Back/C/Cancel): ";
-    std::string input = input_line(prompt);
+    auto input = input_line(msg, " (Y/Yes/N/No/B/Back/C/Cancel): ");
 
     if (command_line::is_yes(input))  return input_line_result::yes;
     if (command_line::is_no(input))   return input_line_result::no;
@@ -83,27 +82,20 @@ namespace {
     return input_line_result::cancel;
   }
 
-  input_line_result input_line_yes_no_cancel(char const *msg)
+  std::pair<input_line_result, std::string> input_line_value(std::string_view msg, bool back = true)
   {
-    std::string prompt = msg;
-    prompt += " (Y/Yes/N/No/C/Cancel): ";
-    std::string input = input_line(prompt);
+    std::string_view end = ""sv;
+    if (msg.back() == '\n') {
+      end = "\n"sv;
+      msg.remove_suffix(1);
+    }
+    auto input = input_line(msg, back ? " (B/Back/C/Cancel): " : " (C/Cancel): ", end);
 
-    if (command_line::is_yes(input)) return input_line_result::yes;
-    if (command_line::is_no(input))  return input_line_result::no;
-    return input_line_result::cancel;
-  }
-
-
-  input_line_result input_line_back_cancel_get_input(char const *msg, std::string &input)
-  {
-    std::string prompt = msg;
-    prompt += " (B/Back/C/Cancel): ";
-    input   = input_line(prompt);
-
-    if (command_line::is_back(input))   return input_line_result::back;
-    if (command_line::is_cancel(input)) return input_line_result::cancel;
-    return input_line_result::yes;
+    return {
+      back && command_line::is_back(input) ? input_line_result::back :
+        command_line::is_cancel(input) ? input_line_result::cancel :
+        input_line_result::yes,
+      input};
   }
 
   void print_peer(std::string const & prefix, GET_PEER_LIST::peer const & peer, bool pruned_only, bool publicrpc_only)
@@ -186,15 +178,11 @@ namespace {
 
   std::string get_time_hms(time_t t)
   {
-    unsigned int hours, minutes, seconds;
-    char buffer[24];
-    hours = t / 3600;
+    unsigned int hours = t / 3600;
     t %= 3600;
-    minutes = t / 60;
-    t %= 60;
-    seconds = t;
-    snprintf(buffer, sizeof(buffer), "%02u:%02u:%02u", hours, minutes, seconds);
-    return std::string(buffer);
+    unsigned int minutes = t / 60;
+    unsigned int seconds = t % 60;
+    return fmt::format("{:02}:{:02}:{:02}", hours, minutes, seconds);
   }
 }
 
@@ -605,7 +593,7 @@ bool rpc_command_executor::mining_status() {
   if (!mining_busy && mres.active && mres.speed > 0 && mres.block_target > 0 && mres.difficulty > 0)
   {
     uint64_t daily = 86400 / (double)mres.difficulty * mres.speed * mres.block_reward;
-    tools::msg_writer() << "Expected: " << cryptonote::print_money(daily) << " OXEN daily, " << cryptonote::print_money(7*daily) << " weekly";
+    tools::msg_writer() << "Expected: " << cryptonote::format_money(daily) << " daily, " << cryptonote::format_money(7*daily) << " weekly";
   }
 
   return true;
@@ -1899,24 +1887,27 @@ bool rpc_command_executor::print_sn_key()
   return true;
 }
 
-// Returns lowest x such that (STAKING_PORTIONS * x/amount) >= portions
-static uint64_t get_amount_to_make_portions(uint64_t amount, uint64_t portions)
-{
-  uint64_t lo, hi, resulthi, resultlo;
-  lo = mul128(amount, portions, &hi);
-  if (lo > UINT64_MAX - (STAKING_PORTIONS - 1))
-    hi++;
-  lo += STAKING_PORTIONS-1;
-  div128_64(hi, lo, STAKING_PORTIONS, &resulthi, &resultlo);
-  return resultlo;
-}
-
 static uint64_t get_actual_amount(uint64_t amount, uint64_t portions)
 {
   uint64_t lo, hi, resulthi, resultlo;
   lo = mul128(amount, portions, &hi);
   div128_64(hi, lo, STAKING_PORTIONS, &resulthi, &resultlo);
   return resultlo;
+}
+
+// Returns an error message on invalid, nullopt if good
+static std::optional<std::string_view> is_invalid_staking_address(
+    std::string_view addr,
+    const cryptonote::network_type nettype) {
+  cryptonote::address_parse_info info;
+  bool valid = get_account_address_from_str(info, nettype, addr);
+  if (!valid)
+    return "Invalid OXEN address"sv;
+  if (info.is_subaddress)
+    return "Staking from subaddresses is not supported"sv;
+  if (info.has_payment_id)
+    return "Staking with a payment id/integrated address is not supported"sv;
+  return std::nullopt;
 }
 
 bool rpc_command_executor::prepare_registration(bool force_registration)
@@ -2003,31 +1994,32 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
     std::max(service_nodes::get_staking_requirement(nettype, block_height),
              service_nodes::get_staking_requirement(nettype, block_height + 30 * 24)); // allow 1 day
 
+  auto highlight_money = [](uint64_t amount) {
+    return fmt::format("\x1b[36;1m{}\x1b[0m", cryptonote::format_money(amount));
+  };
+
   // anything less than DUST will be added to operator stake
   const uint64_t DUST = MAX_NUMBER_OF_CONTRIBUTORS;
-  std::cout << "Current staking requirement: " << cryptonote::print_money(staking_requirement) << " " << cryptonote::get_unit() << std::endl;
+  std::cout << "Current staking requirement: " << highlight_money(staking_requirement) << std::endl;
 
   enum struct register_step
   {
-    ask_is_solo_stake = 0,
-    is_solo_stake__operator_address_to_reserve,
+    ask_address,
+    ask_is_solo_stake,
 
-    is_open_stake__get_operator_fee,
-    is_open_stake__do_you_want_to_reserve_other_contributors,
-    is_open_stake__how_many_more_contributors,
-    is_open_stake__operator_amount_to_reserve,
-    is_open_stake__operator_address_to_reserve,
-    is_open_stake__contributor_address_to_reserve,
-    is_open_stake__contributor_amount_to_reserve,
-    is_open_stake__summary_info,
+    get_operator_fee,
+    do_you_want_to_reserve_other_contributors,
+    how_many_more_contributors,
+    staker_amount_to_reserve,
+    summary_info,
+
     final_summary,
     cancelled_by_user,
   };
 
   struct prepare_registration_state
   {
-    register_step            prev_step                    = register_step::ask_is_solo_stake;
-    bool                     is_solo_stake;
+    register_step            prev_step                    = register_step::ask_address;
     size_t                   num_participants             = 1;
     uint64_t                 operator_fee_portions        = STAKING_PORTIONS;
     uint64_t                 portions_remaining           = STAKING_PORTIONS;
@@ -2036,329 +2028,236 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
     std::vector<uint64_t>    contributions;
   };
 
+  std::string operator_address;
+
   prepare_registration_state state = {};
   std::stack<prepare_registration_state> state_stack;
   state_stack.push(state);
 
+
+
   bool finished = false;
-  register_step step = register_step::ask_is_solo_stake;
-  for (input_line_result last_input_result = input_line_result::yes; !finished;)
+  bool go_back = false;
+  auto step = register_step::ask_address;
+
+  auto next_step = [&](register_step next)
   {
-    if (last_input_result == input_line_result::back)
+    state.prev_step = step;
+    step = next;
+    state_stack.push(state);
+    std::cout << std::endl;
+  };
+  auto check_cancel_back = [&](input_line_result result) -> bool {
+    switch (result) {
+      case input_line_result::cancel:
+        step = register_step::cancelled_by_user;
+        return true;
+      case input_line_result::back:
+        go_back = true;
+        return true;
+      default:
+        return false;
+    }
+  };
+
+  while (!finished)
+  {
+    if (go_back)
     {
       step = state.prev_step;
       state_stack.pop();
       state = state_stack.top();
+      go_back = false;
       std::cout << std::endl;
     }
 
     switch(step)
     {
+      case register_step::ask_address:
+      {
+        bool is_operator = state.addresses.empty();
+        auto [result, address_str] = input_line_value(fmt::format(
+              "Enter the OXEN address of {}\n",
+              is_operator ? "the Service Node operator" : fmt::format("contributor {}", state.contributions.size())),
+            /*back=*/ !is_operator);
+
+        if (check_cancel_back(result))
+          break;
+
+        if (auto bad = is_invalid_staking_address(address_str, nettype))
+        {
+          tools::fail_msg_writer() << *bad << std::endl;
+          break;
+        }
+        if (std::find(state.addresses.begin(), state.addresses.end(), address_str) != state.addresses.end())
+        {
+          tools::fail_msg_writer() << "Invalid OXEN address: you cannot provide the same address twice" << std::endl;
+          break;
+        }
+        state.addresses.push_back(std::move(address_str));
+        next_step(is_operator
+            ? register_step::ask_is_solo_stake
+            : register_step::staker_amount_to_reserve);
+        break;
+      }
+
       case register_step::ask_is_solo_stake:
       {
-        last_input_result = input_line_yes_no_cancel("Will the operator contribute the entire stake?");
-        if(last_input_result == input_line_result::cancel)
-        {
-          step = register_step::cancelled_by_user;
-          continue;
-        }
+        auto result = input_line_ask("Will the operator contribute the entire stake?");
+        if (check_cancel_back(result))
+          break;
 
-        state.is_solo_stake = (last_input_result == input_line_result::yes);
-        if (state.is_solo_stake)
+        if (result == input_line_result::yes)
         {
           std::cout << std::endl;
-          step = register_step::is_solo_stake__operator_address_to_reserve;
+          state.contributions.push_back(STAKING_PORTIONS);
+          state.portions_remaining = 0;
+          state.total_reserved_contributions += staking_requirement;
+
+          next_step(register_step::final_summary);
         }
         else
-        {
-          step = register_step::is_open_stake__get_operator_fee;
-        }
-
-        state_stack.push(state);
-        continue;
+          next_step(register_step::staker_amount_to_reserve);
+        break;
       }
 
-      case register_step::is_solo_stake__operator_address_to_reserve:
+      case register_step::get_operator_fee:
       {
-        std::string address_str;
-        last_input_result = input_line_back_cancel_get_input("Enter the oxen address for the solo staker", address_str);
-        if (last_input_result == input_line_result::back)
-          continue;
+        auto [result, operator_fee_str] = input_line_value(
+            "Enter operator fee as a percentage of earned rewards [0-100]%");
 
-        if (last_input_result == input_line_result::cancel)
-        {
-          step = register_step::cancelled_by_user;
-          continue;
-        }
-
-        state.addresses.push_back(address_str); // the addresses will be validated later down the line
-        state.contributions.push_back(STAKING_PORTIONS);
-        state.portions_remaining = 0;
-        state.total_reserved_contributions += staking_requirement;
-        state.prev_step = step;
-        step            = register_step::final_summary;
-        state_stack.push(state);
-        continue;
-      }
-
-      case register_step::is_open_stake__get_operator_fee:
-      {
-        std::string operator_fee_str;
-        last_input_result = input_line_back_cancel_get_input("Enter operator fee as a percentage of the total staking reward [0-100]%", operator_fee_str);
-
-        if (last_input_result == input_line_result::back)
-          continue;
-
-        if (last_input_result == input_line_result::cancel)
-        {
-          step = register_step::cancelled_by_user;
-          continue;
-        }
+        if (check_cancel_back(result))
+          break;
 
         if (!service_nodes::get_portions_from_percent_str(operator_fee_str, state.operator_fee_portions))
         {
-          std::cout << "Invalid value: " << operator_fee_str << ". Should be between [0-100]" << std::endl;
-          continue;
+          tools::fail_msg_writer() << "Invalid value: " << operator_fee_str << ". Should be between [0-100]" << std::endl;
+          break;
         }
 
-        step = register_step::is_open_stake__do_you_want_to_reserve_other_contributors;
-        state_stack.push(state);
-        continue;
+        next_step(register_step::do_you_want_to_reserve_other_contributors);
+        break;
       }
 
-      case register_step::is_open_stake__do_you_want_to_reserve_other_contributors:
+      case register_step::do_you_want_to_reserve_other_contributors:
       {
-        last_input_result = input_line_yes_no_back_cancel("Do you want to reserve portions of the stake for other specific contributors?");
-        if (last_input_result == input_line_result::back)
-          continue;
+        auto result = input_line_ask("Do you want to reserve stakes for specific contributors?");
+        if (check_cancel_back(result))
+          break;
 
-        if (last_input_result == input_line_result::cancel)
-        {
-          step = register_step::cancelled_by_user;
-          continue;
-        }
-
-        state.prev_step = step;
-        if(last_input_result == input_line_result::yes)
-        {
-          step = register_step::is_open_stake__how_many_more_contributors;
-        }
-        else
-        {
-          std::cout << std::endl;
-          step = register_step::is_open_stake__operator_address_to_reserve;
-        }
-
-        state_stack.push(state);
-        continue;
+        next_step(result == input_line_result::yes
+          ? register_step::how_many_more_contributors
+          : register_step::summary_info);
+        break;
       }
 
-      case register_step::is_open_stake__how_many_more_contributors:
+      case register_step::how_many_more_contributors:
       {
-        std::string prompt = "Number of additional contributors [1-" + std::to_string(MAX_NUMBER_OF_CONTRIBUTORS - 1) + "]";
-        std::string input;
-        last_input_result = input_line_back_cancel_get_input(prompt.c_str(), input);
+        auto [result, input] = input_line_value(
+            "Number of additional contributors [1-" + std::to_string(MAX_NUMBER_OF_CONTRIBUTORS - 1) + "]");
 
-        if (last_input_result == input_line_result::back)
-          continue;
+        if (check_cancel_back(result))
+          break;
 
-        if (last_input_result == input_line_result::cancel)
+        size_t additional_contributors;
+        if (!tools::parse_int(input, additional_contributors) ||
+            additional_contributors < 1 || additional_contributors > (MAX_NUMBER_OF_CONTRIBUTORS - 1))
         {
-          step = register_step::cancelled_by_user;
-          continue;
+          tools::fail_msg_writer() << "Invalid value; must be between 1 and " << (MAX_NUMBER_OF_CONTRIBUTORS - 1) << "." << std::endl;
+          break;
         }
 
-        long additional_contributors = strtol(input.c_str(), NULL, 10 /*base 10*/);
-        if(additional_contributors < 1 || additional_contributors > (MAX_NUMBER_OF_CONTRIBUTORS - 1))
-        {
-          std::cout << "Invalid value. Should be between [1-" << (MAX_NUMBER_OF_CONTRIBUTORS - 1) << "]" << std::endl;
-          continue;
-        }
-
-        std::cout << std::endl;
-        state.num_participants += static_cast<size_t>(additional_contributors);
-        state.prev_step = step;
-        step            = register_step::is_open_stake__operator_address_to_reserve;
-        state_stack.push(state);
-        continue;
+        state.num_participants += additional_contributors;
+        next_step(register_step::ask_address);
+        break;
       }
 
-      case register_step::is_open_stake__operator_address_to_reserve:
+      case register_step::staker_amount_to_reserve:
       {
-        std::string address_str;
-        last_input_result = input_line_back_cancel_get_input("Enter the oxen address for the operator", address_str);
-        if (last_input_result == input_line_result::back)
-          continue;
+        bool is_operator = state.total_reserved_contributions == 0;
+        uint64_t amount_left = staking_requirement - state.total_reserved_contributions;
+        uint64_t min_contribution_portions = service_nodes::get_min_node_contribution_in_portions(
+            hf_version, staking_requirement, state.total_reserved_contributions, state.contributions.size());
+        uint64_t min_contribution = service_nodes::portions_to_amount(staking_requirement, min_contribution_portions);
 
-        if (last_input_result == input_line_result::cancel)
-        {
-          step = register_step::cancelled_by_user;
-          continue;
-        }
+        auto [result, contribution_str] = input_line_value(fmt::format(
+            "The {} contribution must be between {} and {} to meet the staking requirements.\n\n"
+            "How much OXEN does {} want to stake?",
+            is_operator ? "operator" : "next",
+            highlight_money(min_contribution),
+            highlight_money(amount_left),
+            is_operator ? "the operator" : fmt::format("contributor {}", state.contributions.size())));
 
-        state.addresses.push_back(address_str); // the addresses will be validated later down the line
-        state.prev_step = step;
-        step            = register_step::is_open_stake__operator_amount_to_reserve;
-        state_stack.push(state);
-        continue;
-      }
-
-      case register_step::is_open_stake__operator_amount_to_reserve:
-      {
-        uint64_t min_contribution_portions = service_nodes::get_min_node_contribution_in_portions(hf_version, staking_requirement, 0, 0);
-        const uint64_t min_contribution    = get_amount_to_make_portions(staking_requirement, min_contribution_portions);
-        std::cout << "Minimum amount that can be reserved: " << cryptonote::print_money(min_contribution) << " " << cryptonote::get_unit() << std::endl;
-
-        std::string contribution_str;
-        last_input_result = input_line_back_cancel_get_input("How much oxen does the operator want to reserve in the stake?", contribution_str);
-        if (last_input_result == input_line_result::back)
-          continue;
-
-        if (last_input_result == input_line_result::cancel)
-        {
-          step = register_step::cancelled_by_user;
-          continue;
-        }
+        if (check_cancel_back(result))
+          break;
 
         uint64_t contribution;
-        if(!cryptonote::parse_amount(contribution, contribution_str))
-        {
-          std::cout << "Invalid amount." << std::endl;
-          continue;
-        }
-
-        uint64_t portions = service_nodes::get_portions_to_make_amount(staking_requirement, contribution);
-        if(portions < min_contribution_portions)
-        {
-          std::cout << "The operator needs to contribute at least 25% of the stake requirement (" << cryptonote::print_money(min_contribution) << " " << cryptonote::get_unit() << "). Aborted." << std::endl;
-          continue;
-        }
-
-        if(portions > state.portions_remaining)
-        {
-          std::cout << "The operator contribution is higher than the staking requirement. Any excess contribution will be locked for the staking duration, but won't yield any additional reward." << std::endl;
-          portions = state.portions_remaining;
-        }
-
-        state.contributions.push_back(portions);
-        state.portions_remaining -= portions;
-        state.total_reserved_contributions += get_actual_amount(staking_requirement, portions);
-        state.prev_step = step;
-
-        if (state.num_participants > 1)
-        {
-          step = register_step::is_open_stake__contributor_address_to_reserve;
-        }
+        if (auto c = cryptonote::parse_amount(contribution_str))
+          contribution = *c;
         else
         {
-          step = register_step::is_open_stake__summary_info;
+          tools::fail_msg_writer() << "Invalid amount." << std::endl;
+          break;
         }
 
-        std::cout << std::endl;
-        state_stack.push(state);
-        continue;
-      }
-
-      case register_step::is_open_stake__contributor_address_to_reserve:
-      {
-        std::string const prompt = "Enter the oxen address for contributor " + std::to_string(state.contributions.size() + 1);
-        std::string address_str;
-        last_input_result = input_line_back_cancel_get_input(prompt.c_str(), address_str);
-        if (last_input_result == input_line_result::back)
-          continue;
-
-        if (last_input_result == input_line_result::cancel)
+        if (contribution > amount_left)
         {
-          step = register_step::cancelled_by_user;
-          continue;
-        }
-
-        // the addresses will be validated later down the line
-        state.addresses.push_back(address_str);
-        state.prev_step = step;
-        step            = register_step::is_open_stake__contributor_amount_to_reserve;
-        state_stack.push(state);
-        continue;
-      }
-
-      case register_step::is_open_stake__contributor_amount_to_reserve:
-      {
-        const uint64_t amount_left         = staking_requirement - state.total_reserved_contributions;
-        uint64_t min_contribution_portions = service_nodes::get_min_node_contribution_in_portions(hf_version, staking_requirement, state.total_reserved_contributions, state.contributions.size());
-        const uint64_t min_contribution    = service_nodes::portions_to_amount(staking_requirement, min_contribution_portions);
-
-        std::cout << "The minimum amount possible to contribute is " << cryptonote::print_money(min_contribution) << " " << cryptonote::get_unit() << std::endl;
-        std::cout << "There is " << cryptonote::print_money(amount_left) << " " << cryptonote::get_unit() << " left to meet the staking requirement." << std::endl;
-
-        std::string contribution_str;
-        std::string const prompt = "How much oxen does contributor " + std::to_string(state.contributions.size() + 1) + " want to reserve in the stake?";
-        last_input_result        = input_line_back_cancel_get_input(prompt.c_str(), contribution_str);
-        if (last_input_result == input_line_result::back)
-          continue;
-
-        if (last_input_result == input_line_result::cancel)
-        {
-          step = register_step::cancelled_by_user;
-          continue;
-        }
-
-        uint64_t contribution;
-        if (!cryptonote::parse_amount(contribution, contribution_str))
-        {
-          std::cout << "Invalid amount." << std::endl;
-          continue;
+          tools::fail_msg_writer() << fmt::format(
+              "Invalid amount: The contribution exceeds the remaining staking requirement ({}).\n",
+              highlight_money(amount_left));
+          break;
         }
 
         uint64_t portions = service_nodes::get_portions_to_make_amount(staking_requirement, contribution);
         if (portions < min_contribution_portions)
         {
-          std::cout << "The amount is too small." << std::endl;
-          continue;
+          tools::fail_msg_writer() << "Invalid amount\n";
+          break;
         }
-
-        if (portions > state.portions_remaining)
-          portions = state.portions_remaining;
 
         state.contributions.push_back(portions);
         state.portions_remaining -= portions;
         state.total_reserved_contributions += get_actual_amount(staking_requirement, portions);
-        state.prev_step = step;
 
-        if (state.contributions.size() == state.num_participants)
-          step = register_step::is_open_stake__summary_info;
-        else
-          step = register_step::is_open_stake__contributor_address_to_reserve;
-
-        std::cout << std::endl;
-        state_stack.push(state);
-        continue;
+        next_step(
+            is_operator ? register_step::get_operator_fee :
+            state.num_participants > state.contributions.size()
+            ? register_step::ask_address
+            : register_step::summary_info);
+        break;
       }
 
-      case register_step::is_open_stake__summary_info:
+      case register_step::summary_info:
       {
+        uint64_t open_spots = MAX_NUMBER_OF_CONTRIBUTORS - state.contributions.size();
         const uint64_t amount_left = staking_requirement - state.total_reserved_contributions;
-        std::cout << "Total staking contributions reserved: " << cryptonote::print_money(state.total_reserved_contributions) << " " << cryptonote::get_unit() << std::endl;
+        fmt::print("Total reserved contributions: {}\n", highlight_money(state.total_reserved_contributions));
         if (amount_left > DUST)
         {
-          std::cout << "Your total reservations do not equal the staking requirement." << std::endl;
-          std::cout << "You will leave the remaining portion of " << cryptonote::print_money(amount_left) << " " << cryptonote::get_unit() << " open to contributions from anyone, and the Service Node will not activate until the full staking requirement is filled." << std::endl;
+          fmt::print(
+              "\nThe total reserved amount ({}) is less than the required full stake ({}).\n"
+              "The remaining stake ({}) will be open to contribution from {}.\n"
+              "The Service Node will not activate until the full contribution has been filled.\n\n",
+              highlight_money(state.total_reserved_contributions),
+              highlight_money(staking_requirement),
+              highlight_money(amount_left),
+              open_spots > 1 ? fmt::format("1-{} public contributors", open_spots) : "1 public contributor"
+          );
 
-          last_input_result = input_line_yes_no_back_cancel("Is this ok?\n");
-          if(last_input_result == input_line_result::no || last_input_result == input_line_result::cancel)
-          {
-            step = register_step::cancelled_by_user;
-            continue;
-          }
+          auto result = input_line_ask("Is this acceptable?");
+          if (result == input_line_result::no)
+            result = input_line_result::cancel;
+          if (check_cancel_back(result))
+            break;
 
-          if(last_input_result == input_line_result::back)
-            continue;
-
-          state_stack.push(state);
-          state.prev_step = step;
+          next_step(register_step::final_summary);
+          break;
         }
 
+        // Not calling next_step here because we have no state change to push
         step = register_step::final_summary;
-        continue;
+        std::cout << std::endl;
+        break;
       }
 
       case register_step::final_summary:
@@ -2366,51 +2265,65 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
         assert(state.addresses.size() == state.contributions.size());
         const uint64_t amount_left = staking_requirement - state.total_reserved_contributions;
 
-        std::cout << "Summary:" << std::endl;
-        std::cout << "Operating costs as % of reward: " << (state.operator_fee_portions * 100.0 / static_cast<double>(STAKING_PORTIONS)) << "%" << std::endl;
-        printf("%-16s%-9s%-19s%-s\n", "Contributor", "Address", "Contribution", "Contribution(%)");
-        printf("%-16s%-9s%-19s%-s\n", "___________", "_______", "____________", "_______________");
+        std::cout << "\nRegistration Summary:\n" << std::endl;
+
+        if (amount_left > 0 || state.addresses.size() > 1)
+          fmt::print("Operator fee (as % of Service Node rewards): \x1b[33;1m{}%\x1b[0m\n\n",
+              state.operator_fee_portions * 100.0 / static_cast<double>(STAKING_PORTIONS));
+
+        constexpr auto row = "{:^14}  {:^13}  {:>17}  {:>8}\n"sv;
+        fmt::print(row, "Contributor", "Address", "Contribution", "Contr. %");
+        fmt::print(row, "_____________", "_____________", "_________________", "________");
+        fmt::print("\n");
 
         for (size_t i = 0; i < state.num_participants; ++i)
         {
-          const std::string participant_name = (i==0) ? "Operator" : "Contributor " + std::to_string(i);
           uint64_t amount = get_actual_amount(staking_requirement, state.contributions[i]);
           if (amount_left <= DUST && i == 0)
             amount += amount_left; // add dust to the operator.
-          printf("%-16s%-9s%-19s%-.9f\n", participant_name.c_str(), state.addresses[i].substr(0,6).c_str(), cryptonote::print_money(amount).c_str(), (double)state.contributions[i] * 100 / (double)STAKING_PORTIONS);
+          const auto& addr = state.addresses[i];
+          fmt::print(row,
+              (i==0) ? "Operator" : "Contributor " + std::to_string(i),
+              addr.substr(0, 9) + ".." + addr.substr(addr.size() - 2),
+              cryptonote::print_money(amount),
+              fmt::format("{:.2f}%", state.contributions[i] * 100.0 / STAKING_PORTIONS));
         }
 
         if (amount_left > DUST)
         {
-          printf("%-16s%-9s%-19s%-.2f\n", "(open)", "", cryptonote::print_money(amount_left).c_str(), amount_left * 100.0 / staking_requirement);
+          size_t open_spots = MAX_NUMBER_OF_CONTRIBUTORS - state.contributions.size();
+          for (size_t i = 0; i < open_spots; i++) {
+            fmt::print(row,
+                "(open)",
+                "(any)",
+                i == 0 && open_spots == 1 ? cryptonote::print_money(amount_left) :
+                i == 0 ? ">=" + cryptonote::print_money((amount_left + open_spots - 1) / open_spots) :
+                "",
+                i == 0 && open_spots == 1 ? fmt::format("{:.2f}%", amount_left * 100.0 / staking_requirement) :
+                i == 0 ? fmt::format(">={:.2f}%", amount_left * 100.0 / staking_requirement / open_spots) :
+                "");
+          }
         }
         else if (amount_left > 0)
         {
-          std::cout << "\nActual amounts may differ slightly from specification. This is due to\n" << std::endl;
-          std::cout << "limitations on the way fractions are represented internally.\n" << std::endl;
+          std::cout <<
+            "\nActual amounts may differ slightly from specification because of limitations on"
+            "\nthe way fractions are represented on the blockchain\n\n";
         }
 
-        std::cout << "\nBecause the actual requirement will depend on the time that you register, the\n";
-        std::cout << "amounts shown here are used as a guide only, and the percentages will remain\n";
-        std::cout << "the same." << std::endl << std::endl;
-
-        last_input_result = input_line_yes_no_back_cancel("Do you confirm the information above is correct?");
-        if(last_input_result == input_line_result::no || last_input_result == input_line_result::cancel)
-        {
-          step = register_step::cancelled_by_user;
-          continue;
-        }
-
-        if(last_input_result == input_line_result::back)
-          continue;
+        auto result = input_line_ask("\nIs the staking information above correct?");
+        if (result == input_line_result::no)
+          result = input_line_result::cancel;
+        if (check_cancel_back(result))
+          break;
 
         finished = true;
-        continue;
+        break;
       }
 
       case register_step::cancelled_by_user:
       {
-        std::cout << "Cancel requested in prepare registration. Aborting." << std::endl;
+        tools::fail_msg_writer() << "Registration preparation cancelled." << std::endl;
         return true;
       }
     }
@@ -2425,18 +2338,6 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
     args.push_back(std::to_string(state.contributions[i]));
   }
 
-  for (size_t i = 0; i < state.addresses.size(); i++)
-  {
-    for (size_t j = 0; j < i; j++)
-    {
-      if (state.addresses[i] == state.addresses[j])
-      {
-        std::cout << "Must not provide the same address twice" << std::endl;
-        return true;
-      }
-    }
-  }
-
   scoped_log_cats.reset();
 
   {
@@ -2447,8 +2348,9 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
     req.make_friendly = true;
     req.staking_requirement = staking_requirement;
 
-    if (!invoke<GET_SERVICE_NODE_REGISTRATION_CMD_RAW>(std::move(req), res, "Failed to validate registration arguments; "
-          "check the addresses and registration parameters and that the Daemon is running with the '--service-node' flag"))
+    if (!invoke<GET_SERVICE_NODE_REGISTRATION_CMD_RAW>(std::move(req), res,
+          "Failed to validate registration arguments; check the addresses and registration parameters "
+          "and make sure oxend is running as a service node."))
       return false;
 
     tools::success_msg_writer() << res.registration_cmd;

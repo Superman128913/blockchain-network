@@ -316,9 +316,7 @@ std::string Wallet::displayAmount(uint64_t amount)
 EXPORT
 uint64_t Wallet::amountFromString(const std::string &amount)
 {
-    uint64_t result = 0;
-    cryptonote::parse_amount(result, amount);
-    return result;
+    return cryptonote::parse_amount(amount).value_or(0);
 }
 
 EXPORT
