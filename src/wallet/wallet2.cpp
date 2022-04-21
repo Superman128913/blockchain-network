@@ -13008,8 +13008,8 @@ std::vector<rpc::GET_SERVICE_NODES::response::entry> wallet2::list_current_stake
     return service_node_states;
   }
 
-  cryptonote::account_public_address const primary_address = this->get_address();
-  for (rpc::GET_SERVICE_NODES::response::entry const &node_info : all_nodes)
+  const auto primary_address = this->get_address();
+  for (auto& node_info : all_nodes)
   {
     for (const auto& contributor : node_info.contributors)
     {
@@ -13022,7 +13022,8 @@ std::vector<rpc::GET_SERVICE_NODES::response::entry> wallet2::list_current_stake
       if (primary_address != address_info.address)
         continue;
 
-      service_node_states.push_back(node_info);
+      service_node_states.push_back(std::move(node_info));
+      break;
     }
   }
 
