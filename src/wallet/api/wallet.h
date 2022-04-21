@@ -118,7 +118,7 @@ public:
     bool trustedDaemon() const override;
     uint64_t balance(uint32_t accountIndex = 0) const override;
     uint64_t unlockedBalance(uint32_t accountIndex = 0) const override;
-    std::vector<std::pair<std::string, uint64_t>>* listCurrentStakes() const override;
+    std::vector<Wallet::stake_info>* listCurrentStakes() const override;
     uint64_t blockChainHeight() const override;
     uint64_t approximateBlockChainHeight() const override;
     uint64_t estimateBlockChainHeight() const override;

@@ -1064,17 +1064,24 @@ uint64_t WalletImpl::unlockedBalance(uint32_t accountIndex) const
 }
 
 EXPORT
-std::vector<std::pair<std::string, uint64_t>>* WalletImpl::listCurrentStakes() const
+std::vector<Wallet::stake_info>* WalletImpl::listCurrentStakes() const
 {
-    std::vector<std::pair<std::string, uint64_t>>* stakes = new std::vector<std::pair<std::string, uint64_t>>;
+    auto* stakes = new std::vector<Wallet::stake_info>;
 
     auto response = wallet()->list_current_stakes();
     auto main_addr = mainAddress();
 
     for (const auto& node_info : response)
         for (const auto& contributor : node_info.contributors)
-            if (contributor.address == main_addr)
-                stakes->push_back(std::make_pair(node_info.service_node_pubkey, contributor.amount));
+            if (contributor.address == main_addr) {
+                auto& info = stakes->emplace_back();
+                info.sn_pubkey = node_info.service_node_pubkey;
+                info.stake = contributor.amount;
+                if (node_info.requested_unlock_height != 0)
+                    info.unlock_height = node_info.requested_unlock_height;
+                info.awaiting = !node_info.funded;
+                info.decommissioned = node_info.funded && !node_info.active;
+            }
 
     return stakes;
 }
