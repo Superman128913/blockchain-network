@@ -2215,6 +2215,9 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
           break;
         }
 
+        if (portions > state.portions_remaining)
+          portions = state.portions_remaining;
+
         state.contributions.push_back(portions);
         state.portions_remaining -= portions;
         state.total_reserved_contributions += get_actual_amount(staking_requirement, portions);
