@@ -52,6 +52,7 @@
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "cryptonote_basic/miner.h"
+#include "cryptonote_basic/tx_extra.h"
 #include "cryptonote_core/uptime_proof.h"
 #include "oxen_economy.h"
 #include "ringct/rctSigs.h"
@@ -433,6 +434,13 @@ cryptonote::transaction oxen_chain_generator::create_and_add_staking_tx(const cr
   return result;
 }
 
+cryptonote::transaction oxen_chain_generator::create_and_add_unlock_stake_tx(const crypto::public_key& pub_key, const cryptonote::account_base& src, const cryptonote::transaction& staking_tx, bool kept_by_block)
+{
+  cryptonote::transaction result = create_unlock_stake_tx(pub_key, staking_tx, src);
+  add_tx(result, true /*can_be_added_to_blockchain*/, "" /*fail_msg*/, kept_by_block);
+  return result;
+}
+
 oxen_blockchain_entry &oxen_chain_generator::create_and_add_next_block(const std::vector<cryptonote::transaction>& txs, cryptonote::checkpoint_t const *checkpoint, bool can_be_added_to_blockchain, std::string const &fail_msg)
 {
   oxen_blockchain_entry entry   = create_next_block(txs, checkpoint);
@@ -529,6 +537,49 @@ cryptonote::transaction oxen_chain_generator::create_staking_tx(const crypto::pu
       .with_unlock_time(unlock_time)
       .with_extra(extra)
       .build();
+  return result;
+}
+
+cryptonote::transaction oxen_chain_generator::create_unlock_stake_tx(const crypto::public_key& pub_key, const cryptonote::transaction& staking_tx, const cryptonote::account_base& src) const
+{
+  cryptonote::transaction result = {};
+  cryptonote::tx_extra_tx_key_image_unlock unlock = {};
+  unlock.nonce = cryptonote::tx_extra_tx_key_image_unlock::FAKE_NONCE;
+
+  crypto::secret_key tx_secret_key{};
+  crypto::public_key tx_public_key{};
+  cryptonote::tx_extra_tx_key_image_proofs key_image_proofs;
+  if (!cryptonote::get_field_from_tx_extra(staking_tx.extra, key_image_proofs))
+    throw("TX: Didn't have key image proofs in the tx_extra, rejected for tx");
+
+  if (!cryptonote::get_tx_secret_key_from_tx_extra(staking_tx.extra, tx_secret_key))
+    throw("TX: Failed to get tx secret key from contribution");
+  crypto::secret_key_to_public_key(tx_secret_key, tx_public_key);
+
+  crypto::key_derivation recv_derivation{};
+  crypto::generate_key_derivation(tx_public_key, src.get_keys().m_view_secret_key, recv_derivation);
+  crypto::secret_key output_secret_key{};
+  crypto::public_key output_public_key{};
+  for (size_t i = 0; i <= 1; i++)
+  {
+    crypto::derive_secret_key(recv_derivation, i, src.get_keys().m_spend_secret_key, output_secret_key);
+    crypto::secret_key_to_public_key(output_secret_key, output_public_key);
+
+    crypto::generate_signature(cryptonote::tx_extra_tx_key_image_unlock::HASH, output_public_key, output_secret_key, unlock.signature);
+    crypto::generate_key_image(output_public_key, output_secret_key, unlock.key_image);
+
+    if (unlock.key_image == key_image_proofs.proofs[0].key_image)
+    {
+      cryptonote::add_service_node_pubkey_to_tx_extra(result.extra, pub_key);
+      cryptonote::add_tx_key_image_unlock_to_tx_extra(result.extra, unlock);
+    }
+  }
+
+  uint64_t new_height    = get_block_height(top().block) + 1;
+  const auto new_hf_version = get_hf_version_at(new_height);
+
+  result.type    = cryptonote::txtype::key_image_unlock;
+  result.version = cryptonote::transaction::get_max_version_for_hf(new_hf_version);
   return result;
 }
 

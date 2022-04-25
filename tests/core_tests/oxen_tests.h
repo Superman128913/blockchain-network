@@ -79,6 +79,8 @@ struct oxen_service_nodes_gen_nodes                                             
 struct oxen_service_nodes_insufficient_contribution                                  : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_service_nodes_insufficient_contribution_HF18                             : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_service_nodes_sufficient_contribution_HF19                               : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
+struct oxen_service_nodes_small_contribution_early_withdrawal                        : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
+struct oxen_service_nodes_large_contribution_early_withdrawal                        : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_service_nodes_insufficient_operator_contribution_HF19                    : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_service_nodes_test_rollback                                              : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_service_nodes_test_swarms_basic                                          : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };

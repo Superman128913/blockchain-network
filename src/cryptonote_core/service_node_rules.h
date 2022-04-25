@@ -249,6 +249,10 @@ namespace service_nodes {
   // staking portion doesn't fall below the required threshold.
   inline constexpr uint64_t PORTION_FUZZ = 20;
 
+  // Small Stake prevented from unlocking stake until a certain number of blocks have passed
+  constexpr uint64_t SMALL_CONTRIBUTOR_UNLOCK_TIMER = cryptonote::BLOCKS_PER_DAY * 30;
+  constexpr uint64_t SMALL_CONTRIBUTOR_THRESHOLD = 3749;
+
 static_assert(cryptonote::old::STAKING_PORTIONS != UINT64_MAX, "UINT64_MAX is used as the invalid value for failing to calculate the min_node_contribution");
 // return: UINT64_MAX if (num_contributions > the max number of contributions), otherwise the amount in oxen atomic units
 uint64_t get_min_node_contribution            (cryptonote::hf version, uint64_t staking_requirement, uint64_t total_reserved, size_t num_contributions);

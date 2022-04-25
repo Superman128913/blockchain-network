@@ -1344,6 +1344,7 @@ public:
     cryptonote::tx_destination_entry change_addr{ change_amount, m_from.get_keys().m_account_address, false /*is_subaddr*/ };
     bool result = cryptonote::construct_tx(
       m_from.get_keys(), sources, destinations, change_addr, m_extra, m_tx, m_unlock_time, m_tx_params);
+
     return result;
   }
 };
@@ -1463,6 +1464,7 @@ struct oxen_chain_generator
   cryptonote::transaction                              create_and_add_state_change_tx(service_nodes::new_state state, const crypto::public_key& pub_key, uint16_t reasons_all, uint16_t reasons_any, uint64_t height = -1, const std::vector<uint64_t>& voters = {}, uint64_t fee = 0, bool kept_by_block = false);
   cryptonote::transaction                              create_and_add_registration_tx(const cryptonote::account_base& src, const cryptonote::keypair& sn_keys = cryptonote::keypair{hw::get_device("default")}, bool kept_by_block = false);
   cryptonote::transaction                              create_and_add_staking_tx     (const crypto::public_key &pub_key, const cryptonote::account_base &src, uint64_t amount, bool kept_by_block = false);
+  cryptonote::transaction                              create_and_add_unlock_stake_tx     (const crypto::public_key& pub_key, const cryptonote::account_base& src, const cryptonote::transaction& staking_tx, bool kept_by_block = false);
   oxen_blockchain_entry                               &create_and_add_next_block     (const std::vector<cryptonote::transaction>& txs = {}, cryptonote::checkpoint_t const *checkpoint = nullptr, bool can_be_added_to_blockchain = true, std::string const &fail_msg = {});
   // Same as create_and_add_tx, but also adds 95kB of junk into tx_extra to bloat up the tx size.
   cryptonote::transaction create_and_add_big_tx(const cryptonote::account_base& src, const cryptonote::account_public_address& dest, uint64_t amount, uint64_t junk_size = 95000, uint64_t fee = TESTS_DEFAULT_FEE, bool kept_by_block = false);
@@ -1476,6 +1478,7 @@ struct oxen_chain_generator
                                                                               std::array<oxen_service_node_contribution, 3> const &contributors = {},
                                                                               int num_contributors = 0) const;
   cryptonote::transaction                              create_staking_tx     (const crypto::public_key& pub_key, const cryptonote::account_base &src, uint64_t amount) const;
+  cryptonote::transaction                              create_unlock_stake_tx     (const crypto::public_key& pub_key, const cryptonote::transaction& staking_tx, const cryptonote::account_base &src) const;
   cryptonote::transaction                              create_state_change_tx(service_nodes::new_state state, const crypto::public_key& pub_key, uint16_t reasons_all, uint16_t reasons_any, uint64_t height = -1, const std::vector<uint64_t>& voters = {}, uint64_t fee = 0) const;
   cryptonote::checkpoint_t                             create_service_node_checkpoint(uint64_t block_height, size_t num_votes) const;
 

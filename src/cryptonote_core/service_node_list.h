@@ -723,7 +723,7 @@ namespace service_nodes
           const cryptonote::block &block,
           const cryptonote::transaction& tx,
           const service_node_keys *my_keys);
-      bool process_key_image_unlock_tx(cryptonote::network_type nettype, uint64_t block_height, const cryptonote::transaction &tx);
+      bool process_key_image_unlock_tx(cryptonote::network_type nettype, cryptonote::hf hf_version, uint64_t block_height, const cryptonote::transaction &tx);
       payout get_block_leader() const;
       payout get_block_producer(uint8_t pulse_round) const;
     };
