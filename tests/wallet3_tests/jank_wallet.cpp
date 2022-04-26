@@ -26,7 +26,7 @@ int main(void)
   crypto::public_key view_pub;
   tools::hex_to_type<crypto::public_key>("5c1e8d44b4d7cb1269e69180dbf7aaf9c1fed4089b2bd4117dd1a70e90f19600", view_pub);
 
-  std::string wallet_addr = "T6Td9RNPPsMMApoxc59GLiVDS9a82FL2cNEwdMUCGWDLYTLv7e7rvi99aWdF4M2V1zN7q1Vdf1mage87SJ9gcgSu1wJZu3rFs";
+  std::string wallet_addr = "T6SYSC9FVpn15BGNpYYx3dHiATyjXoyqbSGBqgu5QbqEUmETnGSFqjtay42DBs6yZpVbgJcyhsbDUcUL3msN4GyW2HhR7aTmh";
 
   auto keyring = std::make_shared<wallet::Keyring>(spend_priv, spend_pub, view_priv, view_pub);
 
