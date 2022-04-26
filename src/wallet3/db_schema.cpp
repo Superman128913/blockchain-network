@@ -56,6 +56,13 @@ namespace wallet
             UPDATE metadata SET last_scan_height = NEW.height WHERE id = 0;
           END;
 
+          -- update scan height when new block removed
+          CREATE TRIGGER block_removed AFTER DELETE ON blocks
+          FOR EACH ROW
+          BEGIN
+            UPDATE metadata SET last_scan_height = OLD.height - 1 WHERE id = 0;
+          END;
+
           CREATE TABLE transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             block INTEGER NOT NULL REFERENCES blocks(height) ON DELETE CASCADE,
@@ -182,6 +189,12 @@ namespace wallet
         static_cast<int64_t>(block.transactions.size()),
         tools::type_to_hex(block.hash),
         block.timestamp);
+  }
+
+  void
+  WalletDB::pop_block()
+  {
+    prepared_exec("DELETE FROM blocks WHERE height = (SELECT MAX(height) FROM blocks)");
   }
 
   void

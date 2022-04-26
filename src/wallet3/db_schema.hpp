@@ -45,6 +45,9 @@ namespace wallet
     store_block(const Block& block);
 
     void
+    pop_block();
+
+    void
     store_transaction(const crypto::hash& tx_hash,
         const int64_t height,
         const std::vector<Output>& outputs);
