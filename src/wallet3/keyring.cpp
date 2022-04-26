@@ -96,10 +96,7 @@ namespace wallet
       throw std::invalid_argument("Subaddresses not yet supported in wallet3");
     }
 
-    crypto::secret_key output_private_key;
-
-    // computes Hs(a*R || idx) + b
-    key_device.derive_secret_key(derivation, output_index, spend_private_key, output_private_key);
+    auto output_private_key = derive_transaction_secret_key(derivation, output_index);
 
     crypto::public_key output_pubkey_computed;
     key_device.secret_key_to_public_key(output_private_key, output_pubkey_computed);
@@ -189,6 +186,8 @@ namespace wallet
 
   // This is called over a transaction input to produce the secret key that can spend an outputs funds.
   // The key derivation is usually produced from calling generate_key_derivation().
+  // computes Hs(a*R || idx) + b
+  // TODO: subaddress support
   crypto::secret_key
   Keyring::derive_transaction_secret_key(const crypto::key_derivation& key_derivation, const size_t output_index)
   {
@@ -248,6 +247,11 @@ namespace wallet
       // the actual transaction secret key which we can use to spend the output.
       crypto::secret_key output_secret_key = derive_transaction_secret_key(src_entr.derivation, src_entr.output_index);
 
+      crypto::public_key computed_output_pubkey{};
+      if (!key_device.secret_key_to_public_key(output_secret_key, computed_output_pubkey)
+          or (computed_output_pubkey != src_entr.key))
+        throw std::runtime_error("computed output secret key wrong, pubkey mismatch");
+
       // There is a input secret keys structure (inSk) that gets passed to the ringct library/module and it is
       // essentially an array of our output secret keys. It also needs to know the mask which is
       // another random number used to hide the amounts in our pederson commitments.
@@ -264,8 +268,11 @@ namespace wallet
       // shows the key images and a now redundant amount field which always says zero. We generated the key images
       // when first scanning the outputs so we can just copy it straight from the database
       cryptonote::txin_to_key input_to_key;
-      input_to_key.amount = 0;
+      input_to_key.amount = src_entr.amount;
       input_to_key.k_image = key_image(src_entr.derivation, src_entr.key, src_entr.output_index, src_entr.subaddress_index);
+      if (input_to_key.k_image != src_entr.key_image)
+        throw std::runtime_error("computed key_image wrong");
+
       // The outputs array in the VIN structure lists all the global indexs of the ring decoys,
       // it uses offsets relative to the first output to save space on chain, so they need 
       // to be converted from absolute to relative afterwards using the utility function.
