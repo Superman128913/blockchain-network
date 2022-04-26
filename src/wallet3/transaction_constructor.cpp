@@ -87,6 +87,20 @@ std::cout << "create_transaction returning, transaction type = " << cryptonote::
       auto decoy_future = daemon->fetch_decoys(indexes);
       decoy_future.wait();
       ptx.decoys.emplace_back(decoy_future.get());
+
+      //TODO: for the below check, check against the actual position of the real
+      //      input once the positions are correctly randomized.
+      if (not (output.key == ptx.decoys.back()[0].key))
+        throw std::runtime_error{"Key from daemon for real output does not match our stored key."};
+
+      //TODO: for the below check, check against the actual position of the real
+      //      input once the positions are correctly randomized.
+      //TODO: Also, is this check correct?  Confirm that mask from daemon when
+      //      fetching decoys should match mask computed from scanning.
+      if (not (output.rct_mask == ptx.decoys.back()[0].mask))
+      {
+        throw std::runtime_error{"Mask from daemon for real output does not match our stored mask."};
+      }
     }
   }
 
