@@ -8,6 +8,8 @@
 #include <cryptonote_basic/txtypes.h>
 #include <cryptonote_basic/account.h>
 #include <device/device.hpp>
+#include <common/apply_permutation.h>
+#include <common/hex.h>
 
 namespace wallet
 {
@@ -215,7 +217,23 @@ namespace wallet
     uint64_t amount_in = 0, amount_out = 0;
     std::vector<uint64_t> inamounts, outamounts;
     std::vector<unsigned int> index;
-    inSk.reserve(ptx.chosen_outputs.size() + 1);
+    inSk.reserve(ptx.chosen_outputs.size());
+
+    // Sort the inputs by their key image
+    // TODO: is this *required*?
+    std::vector<size_t> ins_order(ptx.chosen_outputs.size());
+    for (size_t n = 0; n < ptx.chosen_outputs.size(); ++n)
+      ins_order[n] = n;
+
+    std::sort(ins_order.begin(), ins_order.end(), [&](const size_t i0, const size_t i1) {
+      const crypto::key_image& img0 = ptx.chosen_outputs[i0].key_image;
+      const crypto::key_image& img1 = ptx.chosen_outputs[i1].key_image;
+      return memcmp(&img0, &img1, sizeof(img0)) > 0;
+    });
+    tools::apply_permutation(ins_order, [&] (size_t i0, size_t i1) {
+      std::swap(ptx.chosen_outputs[i0], ptx.chosen_outputs[i1]);
+      std::swap(ptx.decoys[i0], ptx.decoys[i1]);
+    });
 
     // Loop over inputs for the transaction to build the VIN array (Amount = 0, keyimage, array of offsets for ring)
     // and collect all the transaction private keys so we can spend our outputs in this transaction.
@@ -271,17 +289,6 @@ namespace wallet
       ptx.tx.vin.push_back(input_to_key);
       i++;
     }
-
-    /*
-    // Sort the inputs by their key image
-    std::sort(ptx.tx.vin.begin(), ptx.tx.vin.end(), [&](const auto& a, const auto& b) {
-      const cryptonote::txin_to_key &tk0 = var::get<cryptonote::txin_to_key>(a);
-      const cryptonote::txin_to_key &tk1 = var::get<cryptonote::txin_to_key>(b);
-      return memcmp(&tk0.k_image, &tk1.k_image, sizeof(tk0.k_image)) > 0;
-    });
-    */
-
-    // TODO: apply the above sorting
 
     auto txkey_pub = secret_tx_key_to_public_tx_key(tx_key);
     cryptonote::remove_field_from_tx_extra<cryptonote::tx_extra_pub_key>(ptx.tx.extra);
