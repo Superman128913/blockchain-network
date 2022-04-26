@@ -114,14 +114,15 @@ namespace wallet
   }
 
   // TODO: replace later when removing wallet2½ layer
-  uint64_t
-  Keyring::output_amount(
+  std::pair<uint64_t, rct::key>
+  Keyring::output_amount_and_mask(
       const rct::rctSig& rv,
       const crypto::key_derivation& derivation,
-      unsigned int i,
-      rct::key& mask)
+      unsigned int i)
   {
-    return wallet25::output_amount(rv, derivation, i, mask, key_device);
+    rct::key mask{};
+    auto amount = wallet25::output_amount(rv, derivation, i, mask, key_device);
+    return {amount, std::move(mask)};
   }
 
   // This gets called for every output in the transaction, there is some complication for how the 

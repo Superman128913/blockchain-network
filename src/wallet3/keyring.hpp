@@ -68,12 +68,11 @@ namespace wallet
         uint64_t output_index,
         const cryptonote::subaddress_index& sub_index);
 
-    virtual uint64_t
-    output_amount(
+    virtual std::pair<uint64_t, rct::key>
+    output_amount_and_mask(
         const rct::rctSig& rv,
         const crypto::key_derivation& derivation,
-        unsigned int i,
-        rct::key& mask);
+        unsigned int i);
 
     virtual crypto::public_key
     generate_output_ephemeral_keys(

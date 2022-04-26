@@ -66,10 +66,9 @@ namespace wallet
         Output o;
 
         // TODO: ringct mask returned by reference.  ugh.
-        auto amount = wallet_keys->output_amount(
-            tx.tx.rct_signatures, derivations[derivation_index], output_index, o.rct_mask);
+        std::tie(o.amount, o.rct_mask) = wallet_keys->output_amount_and_mask(
+            tx.tx.rct_signatures, derivations[derivation_index], output_index);
 
-        o.amount = amount;
         o.key_image = key_image;
         o.subaddress_index = *sub_index;
         o.output_index = output_index;
