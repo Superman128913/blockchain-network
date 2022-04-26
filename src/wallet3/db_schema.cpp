@@ -315,8 +315,8 @@ namespace wallet
     std::vector<Output> outs;
 
     std::string query = "SELECT amount, output_index, global_index, "
-        "unlock_time, block_height, output_key, derivation, key_image, "
-        "spent_height, spending FROM outputs WHERE spent_height = 0 AND spending = FALSE ";
+        "unlock_time, block_height, output_key, derivation, rct_mask, key_images.key_image, "
+        "spent_height, spending FROM outputs JOIN key_images ON outputs.key_image = key_images.id WHERE spent_height = 0 AND spending = FALSE ";
 
     if (min_amount)
     {
@@ -334,7 +334,7 @@ namespace wallet
     {
       auto& out = outs.emplace_back();
       auto from_db = db::get<int64_t, int64_t, int64_t, int64_t, int64_t, std::string,
-           std::string, std::string, int64_t, int64_t>(st);
+           std::string, std::string, std::string, int64_t, int64_t>(st);
       out.amount = std::get<0>(from_db);
       out.output_index = std::get<1>(from_db);
       out.global_index = std::get<2>(from_db);
@@ -342,9 +342,10 @@ namespace wallet
       out.block_height = std::get<4>(from_db);
       tools::hex_to_type(std::get<5>(from_db), out.key);
       tools::hex_to_type(std::get<6>(from_db), out.derivation);
-      tools::hex_to_type(std::get<7>(from_db), out.key_image);
-      out.spent_height = std::get<8>(from_db);
-      out.spending = std::get<9>(from_db);
+      tools::hex_to_type(std::get<7>(from_db), out.rct_mask);
+      tools::hex_to_type(std::get<8>(from_db), out.key_image);
+      out.spent_height = std::get<9>(from_db);
+      out.spending = std::get<10>(from_db);
     }
 
     return outs;
