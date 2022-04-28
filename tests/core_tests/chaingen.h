@@ -1134,15 +1134,20 @@ inline bool do_replay_file(const std::string& filename)
 
 #define MAKE_MINER_TX_MANUALLY(TX, BLK)                                                                                \
   transaction TX;                                                                                                      \
-  if (!construct_miner_tx(get_block_height(BLK) + 1,                                                                   \
+  std::optional<std::vector<cryptonote::batch_sn_payment>> sn_rwds;                                                       \
+  uint64_t block_rewards = 0;                                                                                          \
+  bool r;                                                                                                              \
+  std::tie(r, block_rewards) = construct_miner_tx(get_block_height(BLK) + 1,                                           \
                           0,                                                                                           \
                           generator.get_already_generated_coins(BLK),                                                  \
                           0,                                                                                           \
                           0,                                                                                           \
                           TX,                                                                                          \
                           cryptonote::oxen_miner_tx_context::miner_block(cryptonote::FAKECHAIN, miner_account.get_keys().m_account_address), \
-                          {},                                                                                          \
-                          7))                                                                                          \
+                          sn_rwds,                                                                                     \
+                          {}                                                                                           \
+                          );                                                                                           \
+  if (!r)                                                                                                              \
     return false;
 
 #define MAKE_TX_LIST_START_RCT(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, NMIX, HEAD) \
@@ -1380,6 +1385,7 @@ struct oxen_blockchain_entry
   cryptonote::checkpoint_t                   checkpoint;
 };
 
+
 struct oxen_chain_generator_db : public cryptonote::BaseTestDB
 {
   std::vector<oxen_blockchain_entry>                        blocks;
@@ -1431,13 +1437,17 @@ struct oxen_chain_generator
   service_nodes::service_node_list::state_set                        state_history_;
   uint64_t                                                           last_cull_height_ = 0;
   std::shared_ptr<ons::name_system_db>                               ons_db_ = std::make_shared<ons::name_system_db>();
+  std::unique_ptr<cryptonote::BlockchainSQLiteTest>                  sqlite_db_;
   oxen_chain_generator_db                                            db_;
   uint8_t                                                            hf_version_ = cryptonote::network_version_7;
   std::vector<test_event_entry>&                                     events_;
   const std::vector<cryptonote::hard_fork>                           hard_forks_;
   cryptonote::account_base                                           first_miner_;
 
-  oxen_chain_generator(std::vector<test_event_entry> &events, const std::vector<cryptonote::hard_fork>& hard_forks);
+  oxen_chain_generator(std::vector<test_event_entry>& events, const std::vector<cryptonote::hard_fork>& hard_forks, std::string first_miner_seed = "");
+  oxen_chain_generator(const oxen_chain_generator &other)
+    :tx_table_(other.tx_table_), service_node_keys_(other.service_node_keys_), state_history_(other.state_history_), last_cull_height_(other.last_cull_height_), sqlite_db_(std::make_unique<cryptonote::BlockchainSQLiteTest>(*other.sqlite_db_)),
+  ons_db_(other.ons_db_ ), db_(other.db_), hf_version_(other.hf_version_), events_(other.events_), hard_forks_(other.hard_forks_), first_miner_(other.first_miner_) {};
 
   uint64_t                                             height()       const { return cryptonote::get_block_height(db_.blocks.back().block); }
   uint64_t                                             chain_height() const { return height() + 1; }
@@ -1505,8 +1515,15 @@ struct oxen_chain_generator
   bool                                                 block_begin(oxen_blockchain_entry &entry, oxen_create_block_params &params, const std::vector<cryptonote::transaction> &tx_list) const;
   void                                                 block_fill_pulse_data(oxen_blockchain_entry &entry, oxen_create_block_params const &params, uint8_t round) const;
   void                                                 block_end(oxen_blockchain_entry &entry, oxen_create_block_params const &params) const;
+  bool                                                 process_registration_tx(cryptonote::transaction& tx, uint64_t block_height, uint8_t hf_version);
 
   uint8_t                                              get_hf_version_at(uint64_t height) const;
   std::vector<uint64_t>                                last_n_block_weights(uint64_t height, uint64_t num) const;
   const cryptonote::account_base&                      first_miner() const { return first_miner_; }
+
+  oxen_chain_generator& operator=(const oxen_chain_generator& other)
+  {
+    new(this) oxen_chain_generator(other);
+    return *this;
+  }
 };

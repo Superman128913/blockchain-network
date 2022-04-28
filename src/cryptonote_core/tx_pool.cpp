@@ -260,7 +260,7 @@ namespace cryptonote
       return false;
     }
 
-    if(!check_inputs_types_supported(tx))
+    if (!check_inputs_types_supported(tx))
     {
       tvc.m_verifivation_failed = true;
       tvc.m_invalid_input = true;
@@ -279,11 +279,14 @@ namespace cryptonote
       return false;
     }
 
-    if (!opts.kept_by_block && tx.is_transfer() && !m_blockchain.check_fee(tx_weight, tx.vout.size(), fee, burned, opts))
+    if (hf_version < cryptonote::network_version_19)
     {
-      tvc.m_verifivation_failed = true;
-      tvc.m_fee_too_low = true;
-      return false;
+      if (!opts.kept_by_block && tx.is_transfer() && !m_blockchain.check_fee(tx_weight, tx.vout.size(), fee, burned, opts))
+      {
+        tvc.m_verifivation_failed = true;
+        tvc.m_fee_too_low = true;
+        return false;
+      }
     }
 
     size_t tx_weight_limit = get_transaction_weight_limit(hf_version);

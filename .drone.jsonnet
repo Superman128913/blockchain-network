@@ -134,9 +134,10 @@ local mac_builder(name,
         'mkdir build',
         'cd build',
         'cmake .. -G Ninja -DCMAKE_CXX_FLAGS=-fcolor-diagnostics -DCMAKE_BUILD_TYPE=' + build_type + ' ' +
-        '-DLOCAL_MIRROR=https://builds.lokinet.dev/deps '
-        + cmake_options({ USE_LTO: lto, WARNINGS_AS_ERRORS: werror, BUILD_TESTS: build_tests || run_tests })
-        + cmake_extra,
+        '-DLOCAL_MIRROR=https://builds.lokinet.dev/deps -DUSE_LTO=' + (if lto then 'ON ' else 'OFF ') +
+        (if werror then '-DWARNINGS_AS_ERRORS=ON ' else '') +
+        (if build_tests || run_tests then '-DBUILD_TESTS=ON ' else '') +
+        cmake_extra,
         'ninja -j' + jobs + ' -v',
       ] + (
         if run_tests then [
