@@ -64,6 +64,7 @@ extern "C" {
 #include "checkpoints/checkpoints.h"
 #include "ringct/rctTypes.h"
 #include "blockchain_db/blockchain_db.h"
+#include "blockchain_db/sqlite/db_sqlite.h"
 #include "ringct/rctSigs.h"
 #include "common/notify.h"
 #include "version.h"
@@ -608,6 +609,12 @@ namespace cryptonote
     if(fs::exists(folder / "lns.db"))
       ons_db_file_path = folder / "lns.db";
 
+    auto sqlite_db_file_path = folder / "sqlite.db";
+    if (m_nettype == FAKECHAIN)
+    {
+      sqlite_db_file_path = ":memory:";
+    }
+    auto sqliteDB = std::make_shared<cryptonote::BlockchainSQLite>(m_nettype, sqlite_db_file_path);
 
     folder /= db->get_db_name();
     MGINFO("Loading blockchain from folder " << folder << " ...");
@@ -779,10 +786,11 @@ namespace cryptonote
     sqlite3 *ons_db = ons::init_oxen_name_system(ons_db_file_path, db->is_read_only());
     if (!ons_db) return false;
 
+
     init_oxenmq(vm);
 
     const difficulty_type fixed_difficulty = command_line::get_arg(vm, arg_fixed_difficulty);
-    r = m_blockchain_storage.init(db.release(), ons_db, m_nettype, m_offline, regtest ? &regtest_test_options : test_options, fixed_difficulty, get_checkpoints);
+    r = m_blockchain_storage.init(db.release(), ons_db, std::move(sqliteDB), m_nettype, m_offline, regtest ? &regtest_test_options : test_options, fixed_difficulty, get_checkpoints);
     CHECK_AND_ASSERT_MES(r, false, "Failed to initialize blockchain storage");
 
     r = m_mempool.init(max_txpool_weight);
@@ -1253,11 +1261,11 @@ namespace cryptonote
     }
   }
   //-----------------------------------------------------------------------------------------------
-  std::vector<core::tx_verification_batch_info> core::parse_incoming_txs(const std::vector<blobdata>& tx_blobs, const tx_pool_options &opts)
+  std::vector<cryptonote::tx_verification_batch_info> core::parse_incoming_txs(const std::vector<blobdata>& tx_blobs, const tx_pool_options &opts)
   {
     // Caller needs to do this around both this *and* handle_parsed_txs
     //auto lock = incoming_tx_lock();
-    std::vector<tx_verification_batch_info> tx_info(tx_blobs.size());
+    std::vector<cryptonote::tx_verification_batch_info> tx_info(tx_blobs.size());
 
     tools::threadpool& tpool = tools::threadpool::getInstance();
     tools::threadpool::waiter waiter;
@@ -1347,7 +1355,7 @@ namespace cryptonote
     return ok;
   }
   //-----------------------------------------------------------------------------------------------
-  std::vector<core::tx_verification_batch_info> core::handle_incoming_txs(const std::vector<blobdata>& tx_blobs, const tx_pool_options &opts)
+  std::vector<cryptonote::tx_verification_batch_info> core::handle_incoming_txs(const std::vector<blobdata>& tx_blobs, const tx_pool_options &opts)
   {
     auto lock = incoming_tx_lock();
     auto parsed = parse_incoming_txs(tx_blobs, opts);
@@ -2062,6 +2070,7 @@ namespace cryptonote
         MERROR("Block found, but failed to prepare to add");
         return false;
       }
+      // add_new_block will verify block and set bvc.m_verification_failed accordingly
       add_new_block(b, bvc, nullptr /*checkpoint*/);
       cleanup_handle_incoming_blocks(true);
       m_miner.on_block_chain_update();
@@ -2250,8 +2259,10 @@ namespace cryptonote
   {
     std::vector<service_nodes::service_node_pubkey_info> const states = get_service_node_list_state({ m_service_keys.pub });
 
-    // wait one block before starting uptime proofs.
-    if (!states.empty() && (states[0].info->registration_height + 1) < get_current_blockchain_height())
+    // wait one block before starting uptime proofs (but not on testnet/devnet, where we sometimes
+    // have mass registrations/deregistrations where the waiting causes problems).
+    uint64_t delay_blocks = m_nettype == MAINNET ? 1 : 0;
+    if (!states.empty() && (states[0].info->registration_height + delay_blocks) < get_current_blockchain_height())
     {
       m_check_uptime_proof_interval.do_call([this]() {
         // This timer is not perfectly precise and can leak seconds slightly, so send the uptime

@@ -291,7 +291,9 @@ bool BlockchainDB::get_pruned_tx(const crypto::hash& h, cryptonote::transaction 
   if (!get_pruned_tx_blob(h, bd))
     return false;
   if (!parse_and_validate_tx_base_from_blob(bd, tx))
+  {
     throw DB_ERROR("Failed to parse transaction base from blob retrieved from the db");
+  }
 
   return true;
 }

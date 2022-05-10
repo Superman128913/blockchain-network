@@ -133,6 +133,10 @@ namespace service_nodes
     return sort_and_filter(service_nodes_infos, [](const service_node_info &info) { return info.is_decommissioned() && info.is_fully_funded(); }, /*reserve=*/ false);
   }
 
+  std::vector<pubkey_and_sninfo> service_node_list::state_t::payable_service_nodes_infos(uint64_t height, cryptonote::network_type nettype) const {
+    return sort_and_filter(service_nodes_infos, [height, nettype](const service_node_info &info) { return info.is_payable(height, nettype); }, /*reserve=*/ true);
+  }
+
   std::shared_ptr<const quorum> service_node_list::get_quorum(quorum_type type, uint64_t height, bool include_old, std::vector<std::shared_ptr<const quorum>> *alt_quorums) const
   {
     height = offset_testing_quorum_height(type, height);
@@ -1284,6 +1288,7 @@ namespace service_nodes
 
     if (miner_block)
     {
+
       if (cryptonote::block_has_pulse_components(block))
       {
         if (log_errors) MGINFO("Pulse " << block_type << "received but only miner blocks are permitted\n" << dump_pulse_block_data(block, pulse_quorum.get()));
@@ -1622,6 +1627,15 @@ namespace service_nodes
       }
     }
     return result;
+  }
+
+  bool service_node_list::process_batching_rewards(const cryptonote::block& block)
+  {
+    return m_blockchain.sqlite_db()->add_block(block, m_state);
+  }
+  bool service_node_list::pop_batching_rewards_block(const cryptonote::block& block)
+  {
+    return m_blockchain.sqlite_db()->pop_block(block, m_state);
   }
 
   static std::mt19937_64 quorum_rng(uint8_t hf_version, crypto::hash const &hash, quorum_type type)
@@ -2368,7 +2382,7 @@ namespace service_nodes
     return true;
   }
 
-  bool service_node_list::validate_miner_tx(cryptonote::block const &block, cryptonote::block_reward_parts const &reward_parts) const
+  bool service_node_list::validate_miner_tx(cryptonote::block const &block, cryptonote::block_reward_parts const &reward_parts, std::optional<std::vector<cryptonote::batch_sn_payment>> const &batched_sn_payments) const
   {
     uint8_t const hf_version = block.major_version;
     if (hf_version < cryptonote::network_version_9_service_nodes)
@@ -2398,6 +2412,7 @@ namespace service_nodes
       miner,
       pulse_block_leader_is_producer,
       pulse_different_block_producer,
+      batched_sn_rewards,
     };
 
     verify_mode mode                      = verify_mode::miner;
@@ -2443,7 +2458,8 @@ namespace service_nodes
     //
 
     std::shared_ptr<const service_node_info> block_producer = nullptr;
-    size_t expected_vouts_size                        = 0;
+    size_t expected_vouts_size = 0;
+
     if (mode == verify_mode::pulse_block_leader_is_producer || mode == verify_mode::pulse_different_block_producer)
     {
       auto info_it = m_state.service_nodes_infos.find(block_producer_key);
@@ -2454,17 +2470,39 @@ namespace service_nodes
       }
 
       block_producer = info_it->second;
-      if (mode == verify_mode::pulse_different_block_producer && reward_parts.miner_fee > 0)
+      if (mode == verify_mode::pulse_different_block_producer && reward_parts.miner_fee > 0 && block.major_version < cryptonote::network_version_19)
+      {
         expected_vouts_size += block_producer->contributors.size();
-    }
-    else
-    {
-      if ((reward_parts.base_miner + reward_parts.miner_fee) > 0) // (HF >= 16) this can be zero, no miner coinbase.
-        expected_vouts_size += 1; /*miner*/
+      }
     }
 
-    expected_vouts_size += block_leader.payouts.size();
-    expected_vouts_size += static_cast<size_t>(cryptonote::height_has_governance_output(m_blockchain.nettype(), hf_version, height));
+    if (block.major_version >= cryptonote::network_version_19)
+    {
+      mode = verify_mode::batched_sn_rewards;
+      MDEBUG("Batched miner reward");
+    }
+
+
+    if (mode == verify_mode::miner)
+    {
+      if ((reward_parts.base_miner + reward_parts.miner_fee) > 0) // (HF >= 16) this can be zero, no miner coinbase.
+      {
+        expected_vouts_size += 1; /*miner*/
+      }
+    }
+
+    if (mode == verify_mode::batched_sn_rewards)
+    {
+      if (batched_sn_payments.has_value())
+        expected_vouts_size += batched_sn_payments->size();
+    } else {
+      expected_vouts_size += block_leader.payouts.size();
+      bool has_governance_output = cryptonote::height_has_governance_output(m_blockchain.nettype(), hf_version, height);
+      if (has_governance_output) {
+        expected_vouts_size++;
+      }
+    }
+
 
     if (miner_tx.vout.size() != expected_vouts_size)
     {
@@ -2561,6 +2599,48 @@ namespace service_nodes
               return false;
             vout_index++;
           }
+        }
+      }
+      break;
+
+      case verify_mode::batched_sn_rewards:
+      {
+        size_t vout_index = 0;
+        uint64_t total_payout_in_our_db = std::accumulate(batched_sn_payments->begin(),batched_sn_payments->end(), uint64_t{0}, [](auto const a, auto const b){return a + b.amount;});
+        uint64_t total_payout_in_vouts = 0;
+        cryptonote::keypair const deterministic_keypair = cryptonote::get_deterministic_keypair_from_height(height);
+        for (auto & vout : block.miner_tx.vout)
+        {
+          if (!std::holds_alternative<cryptonote::txout_to_key>(vout.target))
+          {
+            MGINFO_RED("Service node output target type should be txout_to_key");
+            return false;
+          }
+
+          if (vout.amount != (*batched_sn_payments)[vout_index].amount)
+          {
+            MERROR("Service node reward amount incorrect. Should be " << cryptonote::print_money((*batched_sn_payments)[vout_index].amount) << ", is: " << cryptonote::print_money(vout.amount));
+            return false;
+          }
+          crypto::public_key out_eph_public_key{};
+          if (!cryptonote::get_deterministic_output_key((*batched_sn_payments)[vout_index].address_info.address, deterministic_keypair, vout_index, out_eph_public_key))
+          {
+            MERROR("Failed to generate output one-time public key");
+            return false;
+          }
+          const auto& out_to_key = var::get<cryptonote::txout_to_key>(vout.target);
+          if (tools::view_guts(out_to_key) != tools::view_guts(out_eph_public_key))
+          {
+            MERROR("Output Ephermeral Public Key does not match");
+            return false;
+          }
+          total_payout_in_vouts += vout.amount;
+          vout_index++;
+        }
+        if (total_payout_in_vouts != total_payout_in_our_db)
+        {
+          MERROR("Total service node reward amount incorrect. Should be " << cryptonote::print_money(total_payout_in_our_db) << ", is: " << cryptonote::print_money(total_payout_in_vouts));
+          return false;
         }
       }
       break;
@@ -3013,7 +3093,7 @@ namespace service_nodes
       REJECT_PROOF("timestamp is too far from now");
 
     for (auto const &min : MIN_UPTIME_PROOF_VERSIONS) {
-      if (vers >= min.hardfork_revision) {
+      if (vers >= min.hardfork_revision && m_blockchain.nettype() != cryptonote::DEVNET) {
         if (proof->version < min.oxend)
           REJECT_PROOF("v" << tools::join(".", min.oxend) << "+ oxend version is required for v" << +vers.first << "." << +vers.second << "+ network proofs");
         if (proof->lokinet_version < min.lokinet)

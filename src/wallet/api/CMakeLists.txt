@@ -126,6 +126,7 @@ if (STATIC AND BUILD_STATIC_DEPS)
             Boost::program_options Boost::serialization Boost::system Boost::thread
             zlib
             SQLite::SQLite3
+            SQLiteCpp
             ${merged_protobuf}
             sodium
             libzmq
@@ -136,6 +137,7 @@ if (STATIC AND BUILD_STATIC_DEPS)
             randomx
             uSockets
             cpr
+            fmt
             )
 
     if(IOS)

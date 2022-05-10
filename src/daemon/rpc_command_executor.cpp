@@ -1929,34 +1929,38 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
       !invoke<GET_SERVICE_KEYS>({}, kres, "Failed to retrieve service node keys"))
     return false;
 
-  if (!res.service_node)
-  {
-    tools::fail_msg_writer() << "Unable to prepare registration: this daemon is not running in --service-node mode";
-    return false;
-  }
-  else if (auto last_lokinet_ping = static_cast<std::time_t>(res.last_lokinet_ping.value_or(0));
-      last_lokinet_ping < (time(nullptr) - 60) && !force_registration)
-  {
-    tools::fail_msg_writer() << "Unable to prepare registration: this daemon has not received a ping from lokinet "
-                             << (res.last_lokinet_ping == 0 ? "yet" : "since " + get_human_time_ago(last_lokinet_ping, std::time(nullptr)));
-    return false;
-  }
-  else if (auto last_storage_server_ping = static_cast<std::time_t>(res.last_storage_server_ping.value_or(0));
-      last_storage_server_ping < (time(nullptr) - 60) && !force_registration)
-  {
-    tools::fail_msg_writer() << "Unable to prepare registration: this daemon has not received a ping from the storage server "
-                             << (res.last_storage_server_ping == 0 ? "yet" : "since " + get_human_time_ago(last_storage_server_ping, std::time(nullptr)));
-    return false;
-  }
-
-  uint64_t block_height = std::max(res.height, res.target_height);
-  uint8_t hf_version = hf_res.version;
   cryptonote::network_type const nettype =
     res.mainnet  ? cryptonote::MAINNET :
     res.devnet ? cryptonote::DEVNET :
     res.testnet  ? cryptonote::TESTNET :
     res.nettype == "fakechain" ? cryptonote::FAKECHAIN :
     cryptonote::UNDEFINED;
+
+  if (!res.service_node)
+  {
+    tools::fail_msg_writer() << "Unable to prepare registration: this daemon is not running in --service-node mode";
+    return false;
+  }
+  if (nettype != cryptonote::DEVNET)
+  {
+    if (auto last_lokinet_ping = static_cast<std::time_t>(res.last_lokinet_ping.value_or(0));
+        last_lokinet_ping < (time(nullptr) - 60) && !force_registration && nettype != cryptonote::DEVNET)
+    {
+      tools::fail_msg_writer() << "Unable to prepare registration: this daemon has not received a ping from lokinet "
+                               << (res.last_lokinet_ping == 0 ? "yet" : "since " + get_human_time_ago(last_lokinet_ping, std::time(nullptr)));
+      return false;
+    }
+    if (auto last_storage_server_ping = static_cast<std::time_t>(res.last_storage_server_ping.value_or(0));
+        last_storage_server_ping < (time(nullptr) - 60) && !force_registration)
+    {
+      tools::fail_msg_writer() << "Unable to prepare registration: this daemon has not received a ping from the storage server "
+        << (res.last_storage_server_ping == 0 ? "yet" : "since " + get_human_time_ago(last_storage_server_ping, std::time(nullptr)));
+      return false;
+    }
+  }
+
+  uint64_t block_height = std::max(res.height, res.target_height);
+  uint8_t hf_version = hf_res.version;
 
   // Query the latest block we've synced and check that the timestamp is sensible, issue a warning if not
   {

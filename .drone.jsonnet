@@ -134,9 +134,10 @@ local mac_builder(name,
         'mkdir build',
         'cd build',
         'cmake .. -G Ninja -DCMAKE_CXX_FLAGS=-fcolor-diagnostics -DCMAKE_BUILD_TYPE=' + build_type + ' ' +
-        '-DLOCAL_MIRROR=https://builds.lokinet.dev/deps '
-        + cmake_options({ USE_LTO: lto, WARNINGS_AS_ERRORS: werror, BUILD_TESTS: build_tests || run_tests })
-        + cmake_extra,
+        '-DLOCAL_MIRROR=https://builds.lokinet.dev/deps -DUSE_LTO=' + (if lto then 'ON ' else 'OFF ') +
+        (if werror then '-DWARNINGS_AS_ERRORS=ON ' else '') +
+        (if build_tests || run_tests then '-DBUILD_TESTS=ON ' else '') +
+        cmake_extra,
         'ninja -j' + jobs + ' -v',
       ] + (
         if run_tests then [
@@ -325,13 +326,13 @@ local gui_wallet_step_darwin = {
         'mkdir -p build/{arm64,sim64}',
         'cd build/arm64',
         'cmake ../.. -G Ninja ' +
-        '-DCMAKE_TOOLCHAIN_FILE=../../cmake/ios.toolchain.cmake -DPLATFORM=OS -DDEPLOYMENT_TARGET=11 -DENABLE_VISIBILITY=ON -DENABLE_BITCODE=OFF ' +
+        '-DCMAKE_TOOLCHAIN_FILE=../../cmake/ios.toolchain.cmake -DPLATFORM=OS -DDEPLOYMENT_TARGET=13 -DENABLE_VISIBILITY=ON -DENABLE_BITCODE=OFF ' +
         '-DSTATIC=ON -DBUILD_STATIC_DEPS=ON -DUSE_LTO=OFF -DCMAKE_BUILD_TYPE=Release ' +
         '-DRANDOMX_ENABLE_JIT=OFF -DCMAKE_CXX_FLAGS=-fcolor-diagnostics',
         'ninja -j6 -v wallet_merged',
         'cd ../sim64',
         'cmake ../.. -G Ninja ' +
-        '-DCMAKE_TOOLCHAIN_FILE=../../cmake/ios.toolchain.cmake -DPLATFORM=SIMULATOR64 -DDEPLOYMENT_TARGET=11 -DENABLE_VISIBILITY=ON -DENABLE_BITCODE=OFF ' +
+        '-DCMAKE_TOOLCHAIN_FILE=../../cmake/ios.toolchain.cmake -DPLATFORM=SIMULATOR64 -DDEPLOYMENT_TARGET=13 -DENABLE_VISIBILITY=ON -DENABLE_BITCODE=OFF ' +
         '-DSTATIC=ON -DBUILD_STATIC_DEPS=ON -DUSE_LTO=OFF -DCMAKE_BUILD_TYPE=Release ' +
         '-DRANDOMX_ENABLE_JIT=OFF -DCMAKE_CXX_FLAGS=-fcolor-diagnostics',
         'ninja -j6 -v wallet_merged',

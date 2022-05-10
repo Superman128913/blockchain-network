@@ -26,9 +26,9 @@ namespace db
   template <size_t N>
   constexpr bool is_cstr<const char[N]> = true;
   template <>
-  constexpr bool is_cstr<char*> = true;
+  inline constexpr bool is_cstr<char*> = true;
   template <>
-  constexpr bool is_cstr<const char*> = true;
+  inline constexpr bool is_cstr<const char*> = true;
 
   // Simple wrapper class that can be used to bind a blob through the templated binding code below.
   // E.g. `exec_query(st, 100, 42, blob_binder{data})` binds the third parameter using no-copy blob
@@ -286,7 +286,7 @@ namespace db
     }
 
     explicit Database(const fs::path& db_path, const std::string_view db_password)
-        : db{db_path.u8path(), SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE | SQLite::OPEN_FULLMUTEX, 5000/*ms*/}
+        : db{db_path.u8string(), SQLite::OPEN_READWRITE | SQLite::OPEN_CREATE | SQLite::OPEN_FULLMUTEX, 5000/*ms*/}
     {
       // Don't fail on these because we can still work even if they fail
       if (int rc = db.tryExec("PRAGMA journal_mode = WAL"); rc != SQLITE_OK)

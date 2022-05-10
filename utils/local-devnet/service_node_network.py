@@ -79,6 +79,7 @@ class SNNetwork:
                 if i != k:
                     self.all_nodes[i].add_peer(self.all_nodes[k])
 
+
         vprint("Starting new oxend service nodes with RPC on {} ports".format(self.sns[0].listen_ip), end="")
         for sn in self.sns:
             vprint(" {}".format(sn.rpc_port), end="", flush=True, timestamp=False)
@@ -107,6 +108,10 @@ class SNNetwork:
         for w in self.wallets:
             w.wait_for_json_rpc("refresh")
 
+        configfile=self.datadir+'config.py'
+        with open(configfile, 'w') as filetowrite:
+            filetowrite.write('#!/usr/bin/python3\n# -*- coding: utf-8 -*-\nlisten_ip=\"{}\"\nlisten_port=\"{}\"\nwallet_listen_ip=\"{}\"\nwallet_listen_port=\"{}\"\nwallet_address=\"{}\"\nexternal_address=\"{}\"'.format(self.sns[0].listen_ip,self.sns[0].rpc_port,self.mike.listen_ip,self.mike.rpc_port,self.mike.address(),self.bob.address()))
+
         # Mine some blocks; we need 100 per SN registration, and we can nearly 600 on fakenet before
         # it hits HF16 and kills mining rewards.  This lets us submit the first 5 SN registrations a
         # SN (at height 40, which is the earliest we can submit them without getting an occasional
@@ -128,7 +133,8 @@ class SNNetwork:
             self.mine(6*len(self.sns))
 
             self.print_wallet_balances()
-
+            self.mike.transfer(self.alice, 150000000000)
+            self.mike.transfer(self.bob, 150000000000)
             vprint("Submitting more service node registrations: ", end="", flush=True)
             for sn in self.sns[5:-1]:
                 self.mike.register_sn(sn)
@@ -139,7 +145,7 @@ class SNNetwork:
         self.print_wallet_balances()
 
         vprint("Mining 40 blocks (registrations + blink quorum lag) and waiting for nodes to sync")
-        self.sync_nodes(self.mine(40))
+        self.sync_nodes(self.mine(40), timeout=120)
 
         self.print_wallet_balances()
 
@@ -155,10 +161,20 @@ class SNNetwork:
             wait_for(lambda: all_service_nodes_proofed(sn), timeout=120)
             vprint(".", end="", flush=True, timestamp=False)
         vprint(timestamp=False)
-        for sn in self.sns[-1:]:
-            self.mike.register_sn(sn)
-            vprint(".", end="", flush=True, timestamp=False)
-        self.sync_nodes(self.mine(1))
+        # This commented out code will register the last SN through Mikes wallet (Has done every other SN)
+        # for sn in self.sns[-1:]:
+            # self.mike.register_sn(sn)
+            # vprint(".", end="", flush=True, timestamp=False)
+
+        # This commented out code will register the last SN through Bobs wallet (Has not done any others)
+        # self.bob.register_sn(self.sns[-1])
+
+        # This commented out code will register the last SN through Bobs wallet (Has not done any others)
+        # and also get alice to contribute 50% of the node with a 10% operator fee
+        self.bob.register_sn_for_contributions(self.sns[-1])
+        self.sync_nodes(self.mine(5), timeout=120)
+        self.alice.contribute_to_sn(self.sns[-1])
+        self.sync_nodes(self.mine(2), timeout=120)
         time.sleep(10)
         for sn in self.sns:
             sn.send_uptime_proof()
@@ -166,12 +182,6 @@ class SNNetwork:
 
         vprint("Local Devnet SN network setup complete!")
         vprint("Communicate with daemon on ip: {} port: {}".format(self.sns[0].listen_ip,self.sns[0].rpc_port))
-        configfile=self.datadir+'config.py'
-        with open(configfile, 'w') as filetowrite:
-            filetowrite.write('#!/usr/bin/python3\n# -*- coding: utf-8 -*-\nlisten_ip=\"{}\"\nlisten_port=\"{}\"\nwallet_listen_ip=\"{}\"\nwallet_listen_port=\"{}\"\nwallet_address=\"{}\"\nexternal_address=\"{}\"'.format(self.sns[0].listen_ip,self.sns[0].rpc_port,self.mike.listen_ip,self.mike.rpc_port,self.mike.address(),self.bob.address()))
-
-
-
 
     def refresh_wallets(self, *, extra=[]):
         vprint("Refreshing wallets")

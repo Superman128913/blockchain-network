@@ -311,6 +311,10 @@ namespace service_nodes
     bool is_fully_funded() const { return total_contributed >= staking_requirement; }
     bool is_decommissioned() const { return active_since_height < 0; }
     bool is_active() const { return is_fully_funded() && !is_decommissioned(); }
+    bool is_payable(uint64_t at_height, cryptonote::network_type nettype) const { 
+      auto& netconf = get_config(nettype);
+      return is_active() && at_height >= active_since_height + netconf.SERVICE_NODE_PAYABLE_AFTER_BLOCKS;
+    }
 
     bool can_transition_to_state(uint8_t hf_version, uint64_t block_height, new_state proposed_state) const;
     bool can_be_voted_on        (uint64_t block_height) const;
@@ -454,9 +458,11 @@ namespace service_nodes
     service_node_list &operator=(const service_node_list &) = delete;
 
     bool block_added(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs, cryptonote::checkpoint_t const *checkpoint) override;
+    bool process_batching_rewards(const cryptonote::block& block);
+    bool pop_batching_rewards_block(const cryptonote::block& block);
     void blockchain_detached(uint64_t height, bool by_pop_blocks) override;
     void init() override;
-    bool validate_miner_tx(cryptonote::block const &block, cryptonote::block_reward_parts const &base_reward) const override;
+    bool validate_miner_tx(cryptonote::block const &block, cryptonote::block_reward_parts const &base_reward, std::optional<std::vector<cryptonote::batch_sn_payment>> const &batched_sn_payments) const override;
     bool alt_block_added(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs, cryptonote::checkpoint_t const *checkpoint) override;
     payout get_block_leader() const { std::lock_guard lock{m_sn_mutex}; return m_state.get_block_leader(); }
     bool is_service_node(const crypto::public_key& pubkey, bool require_active = true) const;
@@ -690,6 +696,8 @@ namespace service_nodes
 
       std::vector<pubkey_and_sninfo>  active_service_nodes_infos() const;
       std::vector<pubkey_and_sninfo>  decommissioned_service_nodes_infos() const; // return: All nodes that are fully funded *and* decommissioned.
+      std::vector<pubkey_and_sninfo>  payable_service_nodes_infos(uint64_t height, cryptonote::network_type nettype) const; // return: All nodes that are active and have been online for a period greater than SERVICE_NODE_PAYABLE_AFTER_BLOCKS
+
       std::vector<crypto::public_key> get_expired_nodes(cryptonote::BlockchainDB const &db, cryptonote::network_type nettype, uint8_t hf_version, uint64_t block_height) const;
       void update_from_block(
           cryptonote::BlockchainDB const &db,
@@ -792,7 +800,7 @@ namespace service_nodes
   };
 
   bool     is_registration_tx   (cryptonote::network_type nettype, uint8_t hf_version, const cryptonote::transaction& tx, uint64_t block_timestamp, uint64_t block_height, uint32_t index, crypto::public_key& key, service_node_info& info);
-  bool     reg_tx_extract_fields(const cryptonote::transaction& tx, contributor_args_t &contributor_args, uint64_t& expiration_timestamp, crypto::public_key& service_node_key, crypto::signature& signature, crypto::public_key& tx_pub_key);
+  bool     reg_tx_extract_fields(const cryptonote::transaction& tx, contributor_args_t &contributor_args, uint64_t& expiration_timestamp, crypto::public_key& service_node_key, crypto::signature& signature);
   uint64_t offset_testing_quorum_height(quorum_type type, uint64_t height);
 
   contributor_args_t convert_registration_args(cryptonote::network_type nettype,
