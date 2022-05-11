@@ -1148,7 +1148,7 @@ namespace service_nodes
       bool too_many_contributions = false;
       if (hf_version >= cryptonote::network_version_19)
         // As of HF19 we allow up to 10 stakes total
-        too_many_contributions = existing_contributions + stake.locked_contributions.size() > MAX_NUMBER_OF_CONTRIBUTORS_V2;
+        too_many_contributions = existing_contributions + other_reservations + 1 > MAX_NUMBER_OF_CONTRIBUTORS_V2;
       else if (hf_version >= cryptonote::network_version_16_pulse)
         // Before HF16 we didn't properly take into account unfilled reservation spots
         too_many_contributions = existing_contributions + other_reservations + 1 > MAX_NUMBER_OF_CONTRIBUTORS_V1;
