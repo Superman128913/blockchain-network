@@ -2274,7 +2274,9 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
         assert(state.addresses.size() == state.contributions.size());
         const uint64_t amount_left = staking_requirement - state.total_reserved_contributions;
 
-        std::cout << "\nRegistration Summary:\n" << std::endl;
+        std::cout << "\nRegistration Summary:\n\n";
+
+        std::cout << "Service Node Pubkey: \x1b[32;1m" << kres.service_node_pubkey << "\x1b[0m\n" << std::endl;
 
         if (amount_left > 0 || state.addresses.size() > 1)
           fmt::print("Operator fee (as % of Service Node rewards): \x1b[33;1m{}%\x1b[0m\n\n",
