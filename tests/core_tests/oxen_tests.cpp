@@ -3077,7 +3077,7 @@ bool oxen_service_nodes_sufficient_contribution_HF19::generate(std::vector<test_
   gen.add_tx(register_tx);
   gen.create_and_add_next_block({register_tx});
 
-  assert(single_contributed_amount == 0);
+  assert(single_contributed_amount != 0);
   cryptonote::transaction stake = gen.create_and_add_staking_tx(sn_keys.pub, alice, single_contributed_amount);
   gen.create_and_add_next_block({stake});
 

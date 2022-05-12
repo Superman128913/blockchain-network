@@ -2182,7 +2182,7 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
         uint64_t amount_left = staking_requirement - state.total_reserved_contributions;
         uint64_t min_contribution_portions = service_nodes::get_min_node_contribution_in_portions(
             hf_version, staking_requirement, state.total_reserved_contributions, state.contributions.size());
-        uint64_t min_contribution = is_operator ? service_nodes::get_min_node_operator_contribution(staking_requirement) : service_nodes::portions_to_amount(staking_requirement, min_contribution_portions);
+        uint64_t min_contribution = is_operator ? service_nodes::MINIMUM_OPERATOR_CONTRIBUTION : service_nodes::portions_to_amount(staking_requirement, min_contribution_portions);
 
         auto [result, contribution_str] = input_line_value(fmt::format(
             "The {} contribution must be between {} and {} to meet the staking requirements.\n\n"

@@ -99,7 +99,7 @@ bool check_service_node_portions(uint8_t hf_version, const std::vector<uint64_t>
   const size_t max_contributors = hf_version >= 19 ? MAX_NUMBER_OF_CONTRIBUTORS_V2 : MAX_NUMBER_OF_CONTRIBUTORS_V1;
   if (portions.size() > max_contributors) return false;
 
-  if (portions[0] < get_min_node_operator_contribution(STAKING_PORTIONS_V1))
+  if (portions[0] < MINIMUM_OPERATOR_PORTION)
   {
     LOG_PRINT_L1("Register TX rejected: TX does not have sufficient operator stake");
     return false;
@@ -167,11 +167,6 @@ uint64_t get_min_node_contribution_in_portions(uint8_t version, uint64_t staking
   uint64_t atomic_amount = get_min_node_contribution(version, staking_requirement, total_reserved, num_contributions);
   uint64_t result        = (atomic_amount == UINT64_MAX) ? UINT64_MAX : (get_portions_to_make_amount(staking_requirement, atomic_amount));
   return result;
-}
-
-uint64_t get_min_node_operator_contribution(uint64_t staking_requirement)
-{
-  return staking_requirement / MAX_NUMBER_OF_CONTRIBUTORS_V1;
 }
 
 uint64_t get_portions_to_make_amount(uint64_t staking_requirement, uint64_t amount, uint64_t max_portions)
