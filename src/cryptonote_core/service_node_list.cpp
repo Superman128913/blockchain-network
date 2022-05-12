@@ -3861,7 +3861,9 @@ namespace service_nodes
     std::stringstream stream;
     if (make_friendly)
     {
-      stream << tr("Run this command in the wallet that will fund this registration:\n\n");
+      stream << tr("Run this command in the operator wallet") << " (" <<
+        cryptonote::get_account_address_as_str(nettype, false, contributor_args.addresses[0])
+        << "):\n\n";
     }
 
     stream << "register_service_node";
