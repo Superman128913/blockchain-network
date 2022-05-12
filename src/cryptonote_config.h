@@ -211,6 +211,9 @@ namespace config
   // service node.
   using MAXIMUM_ACCEPTABLE_STAKE = std::ratio<101, 100>;
 
+  // Required operator contribution is 1/4 of the staking requirement
+  inline constexpr uint64_t MINIMUM_OPERATOR_DIVISOR = 4;
+
   // Used to estimate the blockchain height from a timestamp, with some grace time.  This can drift
   // slightly over time (because average block time is not typically *exactly*
   // DIFFICULTY_TARGET_V2).

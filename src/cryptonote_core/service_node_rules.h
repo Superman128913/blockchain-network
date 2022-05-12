@@ -241,8 +241,7 @@ namespace service_nodes {
   constexpr uint8_t MAXIMUM_EXTERNAL_OUT_OF_SYNC = 80;
 
   //The SN operator must contribute more than 25% of the nodes requirements
-  constexpr uint64_t MINIMUM_OPERATOR_PORTION = STAKING_PORTIONS_V1/4;
-  constexpr uint64_t MINIMUM_OPERATOR_CONTRIBUTION = 3750;
+  constexpr uint64_t MINIMUM_OPERATOR_PORTION = STAKING_PORTIONS_V1 / config::MINIMUM_OPERATOR_DIVISOR;
 
 
 static_assert(STAKING_PORTIONS_V1 != UINT64_MAX, "UINT64_MAX is used as the invalid value for failing to calculate the min_node_contribution");
