@@ -603,7 +603,7 @@ TEST(serialization, serializes_ringct)
 #if 0
 TEST(serialization, portability_wallet)
 {
-  const cryptonote::network_type nettype = cryptonote::TESTNET;
+  const cryptonote::network_type nettype = cryptonote::network_type::TESTNET;
   tools::wallet2 w(nettype);
   const fs::path wallet_file = unit_test::data_dir / "wallet_testnet";
   std::string password = "test";
@@ -740,7 +740,7 @@ TEST(serialization, portability_wallet)
 TEST(serialization, portability_outputs)
 {
   const bool restricted = false;
-  tools::wallet2 w(cryptonote::TESTNET, restricted);
+  tools::wallet2 w(cryptonote::network_type::TESTNET, restricted);
 
   const fs::path wallet_file = unit_test::data_dir / "wallet_testnet";
   const std::string password = "test";
@@ -887,7 +887,7 @@ TEST(serialization, portability_unsigned_tx)
 {
   // TODO(oxen): We updated testnet genesis, is broken
   const bool restricted = false;
-  tools::wallet2 w(cryptonote::TESTNET, restricted);
+  tools::wallet2 w(cryptonote::network_type::TESTNET, restricted);
 
   const fs::path filename    = unit_test::data_dir / "unsigned_oxen_tx";
   const fs::path wallet_file = unit_test::data_dir / "wallet_testnet";
@@ -895,7 +895,7 @@ TEST(serialization, portability_unsigned_tx)
   w.load(wallet_file.string(), password);
 
   std::string s;
-  const cryptonote::network_type nettype = cryptonote::TESTNET;
+  const cryptonote::network_type nettype = cryptonote::network_type::TESTNET;
   bool r = tools::slurp_file(filename.string(), s);
   ASSERT_TRUE(r);
   size_t const magiclen = strlen(UNSIGNED_TX_PREFIX);
@@ -1086,14 +1086,14 @@ TEST(serialization, portability_unsigned_tx)
 TEST(serialization, portability_signed_tx)
 {
   const bool restricted = false;
-  tools::wallet2 w(cryptonote::TESTNET, restricted);
+  tools::wallet2 w(cryptonote::network_type::TESTNET, restricted);
 
   const fs::path filename    = unit_test::data_dir / "signed_oxen_tx";
   const fs::path wallet_file = unit_test::data_dir / "wallet_testnet";
   const std::string password = "test";
   w.load(wallet_file.string(), password);
 
-  const cryptonote::network_type nettype = cryptonote::TESTNET;
+  const cryptonote::network_type nettype = cryptonote::network_type::TESTNET;
   std::string s;
   bool r = tools::slurp_file(filename.string(), s);
   ASSERT_TRUE(r);

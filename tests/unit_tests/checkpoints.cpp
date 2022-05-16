@@ -141,7 +141,7 @@ private:
 TEST(checkpoints_is_alternative_block_allowed, handles_empty_checkpoints)
 {
   std::unique_ptr<TestDB> test_db(new TestDB());
-  checkpoints cp = {}; cp.init(cryptonote::FAKECHAIN, test_db.get());
+  checkpoints cp = {}; cp.init(network_type::FAKECHAIN, test_db.get());
 
   ASSERT_FALSE(cp.is_alternative_block_allowed(0, 0));
   ASSERT_TRUE(cp.is_alternative_block_allowed(1, 1));
@@ -152,7 +152,7 @@ TEST(checkpoints_is_alternative_block_allowed, handles_empty_checkpoints)
 TEST(checkpoints_is_alternative_block_allowed, handles_one_checkpoint)
 {
   std::unique_ptr<TestDB> test_db(new TestDB());
-  checkpoints cp = {}; cp.init(cryptonote::FAKECHAIN, test_db.get());
+  checkpoints cp = {}; cp.init(network_type::FAKECHAIN, test_db.get());
 
   ASSERT_TRUE(cp.add_checkpoint(5, "0000000000000000000000000000000000000000000000000000000000000000"));
 
@@ -192,7 +192,7 @@ TEST(checkpoints_is_alternative_block_allowed, handles_one_checkpoint)
 TEST(checkpoints_is_alternative_block_allowed, handles_two_and_more_checkpoints)
 {
   std::unique_ptr<TestDB> test_db(new TestDB());
-  checkpoints cp = {}; cp.init(cryptonote::FAKECHAIN, test_db.get());
+  checkpoints cp = {}; cp.init(network_type::FAKECHAIN, test_db.get());
 
   ASSERT_TRUE(cp.add_checkpoint(5, "0000000000000000000000000000000000000000000000000000000000000000"));
   ASSERT_TRUE(cp.add_checkpoint(9, "0000000000000000000000000000000000000000000000000000000000000000"));
@@ -275,7 +275,7 @@ TEST(checkpoints_is_alternative_block_allowed, handles_two_and_more_checkpoints)
 TEST(checkpoints_is_alternative_block_allowed, override_1_sn_checkpoint)
 {
   std::unique_ptr<TestDB> test_db(new TestDB());
-  checkpoints cp = {}; cp.init(cryptonote::FAKECHAIN, test_db.get());
+  checkpoints cp = {}; cp.init(network_type::FAKECHAIN, test_db.get());
 
   checkpoint_t checkpoint = {};
   checkpoint.type         = checkpoint_type::service_node;
@@ -298,7 +298,7 @@ TEST(checkpoints_is_alternative_block_allowed, override_1_sn_checkpoint)
 TEST(checkpoints_is_alternative_block_allowed, cant_override_2nd_oldest_sn_checkpoint)
 {
   std::unique_ptr<TestDB> test_db(new TestDB());
-  checkpoints cp = {}; cp.init(cryptonote::FAKECHAIN, test_db.get());
+  checkpoints cp = {}; cp.init(network_type::FAKECHAIN, test_db.get());
 
   checkpoint_t checkpoint = {};
   checkpoint.type         = checkpoint_type::service_node;
@@ -329,7 +329,7 @@ TEST(checkpoints_is_alternative_block_allowed, cant_override_2nd_oldest_sn_check
 TEST(checkpoints_is_alternative_block_allowed, hardcoded_checkpoint_overrides_sn_checkpoint)
 {
   std::unique_ptr<TestDB> test_db(new TestDB());
-  checkpoints cp = {}; cp.init(cryptonote::FAKECHAIN, test_db.get());
+  checkpoints cp = {}; cp.init(network_type::FAKECHAIN, test_db.get());
 
   checkpoint_t checkpoint = {};
   checkpoint.type         = checkpoint_type::service_node;
@@ -354,7 +354,7 @@ TEST(checkpoints_is_alternative_block_allowed, hardcoded_checkpoint_overrides_sn
 TEST(checkpoints_blockchain_detached, detach_to_checkpoint_height)
 {
   std::unique_ptr<TestDB> test_db(new TestDB());
-  checkpoints cp = {}; cp.init(cryptonote::FAKECHAIN, test_db.get());
+  checkpoints cp = {}; cp.init(network_type::FAKECHAIN, test_db.get());
 
   uint64_t constexpr FIRST_HEIGHT  = service_nodes::CHECKPOINT_INTERVAL;
   uint64_t constexpr SECOND_HEIGHT = FIRST_HEIGHT + service_nodes::CHECKPOINT_INTERVAL;
@@ -376,7 +376,7 @@ TEST(checkpoints_blockchain_detached, detach_to_checkpoint_height)
 TEST(checkpoints_blockchain_detached, detach_to_1)
 {
   std::unique_ptr<TestDB> test_db(new TestDB());
-  checkpoints cp = {}; cp.init(cryptonote::FAKECHAIN, test_db.get());
+  checkpoints cp = {}; cp.init(network_type::FAKECHAIN, test_db.get());
 
   checkpoint_t checkpoint = {};
   checkpoint.type         = checkpoint_type::service_node;

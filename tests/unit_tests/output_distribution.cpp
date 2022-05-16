@@ -83,13 +83,13 @@ bool get_output_distribution(uint64_t amount, uint64_t from, uint64_t to, uint64
 {
   blockchain_objects_t bc = {};
   struct get_test_options {
-    const std::vector<cryptonote::hard_fork> hard_forks{{1,0,0,0}};
+    const std::vector<cryptonote::hard_fork> hard_forks{{cryptonote::hf::hf7,0,0,0}};
     const cryptonote::test_options test_options = {
       hard_forks
     };
   } opts;
   cryptonote::Blockchain *blockchain = &bc.m_blockchain;
-  bool r = blockchain->init(new TestDB(test_distribution_size), nullptr /*ons_db*/, nullptr /*sqlite_db*/, cryptonote::FAKECHAIN, true, &opts.test_options, 0, NULL);
+  bool r = blockchain->init(new TestDB(test_distribution_size), nullptr /*ons_db*/, nullptr /*sqlite_db*/, cryptonote::network_type::FAKECHAIN, true, &opts.test_options, 0, NULL);
   return r && blockchain->get_output_distribution(amount, from, to, start_height, distribution, base);
 }
 

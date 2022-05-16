@@ -75,10 +75,10 @@ namespace cryptonote
   {
     crypto::hash result = crypto::null_hash;
     *height = 0;
-    if (nettype != MAINNET && nettype != TESTNET)
+    if (nettype != network_type::MAINNET && nettype != network_type::TESTNET)
       return result;
 
-    if (nettype == MAINNET)
+    if (nettype == network_type::MAINNET)
     {
       uint64_t last_index         = oxen::array_count(HARDCODED_MAINNET_CHECKPOINTS) - 1;
       height_to_hash const &entry = HARDCODED_MAINNET_CHECKPOINTS[last_index];
@@ -170,7 +170,7 @@ namespace cryptonote
   bool checkpoints::block_added(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs, checkpoint_t const *checkpoint)
   {
     uint64_t const height = get_block_height(block);
-    if (height < service_nodes::CHECKPOINT_STORE_PERSISTENTLY_INTERVAL || block.major_version < network_version_12_checkpointing)
+    if (height < service_nodes::CHECKPOINT_STORE_PERSISTENTLY_INTERVAL || block.major_version < hf::hf12_checkpointing)
       return true;
 
     uint64_t end_cull_height = 0;
@@ -308,7 +308,7 @@ namespace cryptonote
     if (db->is_read_only())
       return true;
 
-    if (nettype == MAINNET)
+    if (nettype == network_type::MAINNET)
     {
       for (size_t i = 0; i < oxen::array_count(HARDCODED_MAINNET_CHECKPOINTS); ++i)
       {

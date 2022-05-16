@@ -1,36 +1,62 @@
 #pragma once
-#include <cstdint>
+#include "cryptonote_config.h"
 
-constexpr uint64_t COIN                       = (uint64_t)1000000000; // 1 LOKI = pow(10, 9)
-constexpr uint64_t MONEY_SUPPLY               = ((uint64_t)(-1)); // MONEY_SUPPLY - total number coins to be generated
-constexpr uint64_t EMISSION_LINEAR_BASE       = ((uint64_t)(1) << 58);
-constexpr uint64_t EMISSION_SUPPLY_MULTIPLIER = 19;
-constexpr uint64_t EMISSION_SUPPLY_DIVISOR    = 10;
-constexpr uint64_t EMISSION_DIVISOR           = 2000000;
+namespace oxen {
+
+inline constexpr uint64_t COIN                       = 1000000000; // 1 LOKI = pow(10, 9)
+inline constexpr size_t   DISPLAY_DECIMAL_POINT      = 9;
+
+// Pre-HF15 money supply parameters:
+inline constexpr uint64_t MONEY_SUPPLY               = ((uint64_t)(-1)); // MONEY_SUPPLY - total number coins to be generated
+inline constexpr uint64_t EMISSION_LINEAR_BASE       = ((uint64_t)(1) << 58);
+inline constexpr uint64_t EMISSION_SUPPLY_MULTIPLIER = 19;
+inline constexpr uint64_t EMISSION_SUPPLY_DIVISOR    = 10;
+inline constexpr uint64_t EMISSION_DIVISOR           = 2000000;
 
 // HF15 money supply parameters:
-constexpr uint64_t BLOCK_REWARD_HF15      = 25 * COIN;
-constexpr uint64_t MINER_REWARD_HF15      = BLOCK_REWARD_HF15 * 24 / 100; // Only until HF16
-constexpr uint64_t SN_REWARD_HF15         = BLOCK_REWARD_HF15 * 66 / 100;
-constexpr uint64_t FOUNDATION_REWARD_HF15 = BLOCK_REWARD_HF15 * 10 / 100;
+inline constexpr uint64_t BLOCK_REWARD_HF15      = 25 * COIN;
+inline constexpr uint64_t MINER_REWARD_HF15      = BLOCK_REWARD_HF15 * 24 / 100; // Only until HF16
+inline constexpr uint64_t SN_REWARD_HF15         = BLOCK_REWARD_HF15 * 66 / 100;
+inline constexpr uint64_t FOUNDATION_REWARD_HF15 = BLOCK_REWARD_HF15 * 10 / 100;
 
 // HF16+ money supply parameters: same as HF15 except the miner fee goes away and is redirected to
 // LF to be used exclusively for Loki Chainflip liquidity seeding and incentives.  See
 // https://github.com/oxen-project/oxen-improvement-proposals/issues/24 for more details.  This ends
 // after 6 months.
-constexpr uint64_t BLOCK_REWARD_HF16        = BLOCK_REWARD_HF15;
-constexpr uint64_t CHAINFLIP_LIQUIDITY_HF16 = BLOCK_REWARD_HF15 * 24 / 100;
+inline constexpr uint64_t BLOCK_REWARD_HF16        = BLOCK_REWARD_HF15;
+inline constexpr uint64_t CHAINFLIP_LIQUIDITY_HF16 = BLOCK_REWARD_HF15 * 24 / 100;
 
 // HF17: at most 6 months after HF16.  This is tentative and will likely be replaced before the
 // actual HF with a new reward schedule including Chainflip rewards, but as per the LRC linked
 // above, the liquidity funds end after 6 months.  That means that until HF17 is finalized, this is
 // the fallback if we hit the 6-months-after-HF16 point:
-constexpr uint64_t BLOCK_REWARD_HF17      = 18'333'333'333;
-constexpr uint64_t FOUNDATION_REWARD_HF17 =  1'833'333'333;
+inline constexpr uint64_t BLOCK_REWARD_HF17      = 18'333'333'333;
+inline constexpr uint64_t FOUNDATION_REWARD_HF17 =  1'833'333'333;
 
 static_assert(MINER_REWARD_HF15        + SN_REWARD_HF15 + FOUNDATION_REWARD_HF15 == BLOCK_REWARD_HF15);
 static_assert(CHAINFLIP_LIQUIDITY_HF16 + SN_REWARD_HF15 + FOUNDATION_REWARD_HF15 == BLOCK_REWARD_HF16);
 static_assert(                           SN_REWARD_HF15 + FOUNDATION_REWARD_HF17 == BLOCK_REWARD_HF17);
+
+
+// -------------------------------------------------------------------------------------------------
+//
+// Service Nodes
+//
+// -------------------------------------------------------------------------------------------------
+
+// Fixed staking requirement since HF16 (before that it was height dependent, see
+// service_node_rules.cpp):
+inline constexpr uint64_t STAKING_REQUIREMENT = 15'000 * COIN;
+// testnet/devnet/fakenet have always had a fixed 100 OXEN staking requirement:
+inline constexpr uint64_t STAKING_REQUIREMENT_TESTNET = 100 * COIN;
+// Max contributors since HF19:
+inline constexpr size_t MAX_CONTRIBUTORS_HF19 = 10;
+// Max contributors before HF19:
+inline constexpr size_t MAX_CONTRIBUTORS_V1 = 4;
+
+// Required operator contribution is 1/4 of the staking requirement
+inline constexpr uint64_t MINIMUM_OPERATOR_DIVISOR = 4;
+
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -47,6 +73,8 @@ constexpr uint64_t BLINK_BURN_TX_FEE_PERCENT_V18  = 200; // A percentage of the 
 static_assert(BLINK_MINER_TX_FEE_PERCENT >= 100, "blink miner fee cannot be smaller than the base tx fee");
 static_assert(BLINK_BURN_FIXED >= 0, "fixed blink burn amount cannot be negative");
 static_assert(BLINK_BURN_TX_FEE_PERCENT_V18 >= 0, "blink burn tx percent cannot be negative");
+
+}  // namespace oxen
 
 // -------------------------------------------------------------------------------------------------
 //
@@ -73,15 +101,15 @@ constexpr bool is_lokinet_type(mapping_type t) { return t >= mapping_type::lokin
 // days per registration "year" to allow for some blockchain time drift + leap years.
 constexpr uint64_t REGISTRATION_YEAR_DAYS = 368;
 
-constexpr uint64_t burn_needed(uint8_t hf_version, mapping_type type)
+constexpr uint64_t burn_needed(cryptonote::hf hf_version, mapping_type type)
 {
   uint64_t result = 0;
 
   // The base amount for session/wallet/lokinet-1year:
   const uint64_t basic_fee = (
-      hf_version >= 18 ? 7*COIN :  // cryptonote::network_version_18
-      hf_version >= 16 ? 15*COIN :  // cryptonote::network_version_16_pulse -- but don't want to add cryptonote_config.h include
-      20*COIN                       // cryptonote::network_version_15_ons
+      hf_version >= cryptonote::hf::hf18       ? 7*oxen::COIN :
+      hf_version >= cryptonote::hf::hf16_pulse ? 15*oxen::COIN :
+      20*oxen::COIN
   );
   switch (type)
   {

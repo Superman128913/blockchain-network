@@ -176,7 +176,7 @@ namespace cryptonote
   static const command_line::arg_descriptor<size_t> arg_max_txpool_weight  = {
     "max-txpool-weight"
   , "Set maximum txpool weight in bytes."
-  , DEFAULT_TXPOOL_MAX_WEIGHT
+  , DEFAULT_MEMPOOL_MAX_WEIGHT
   };
   static const command_line::arg_descriptor<bool> arg_service_node  = {
     "service-node"
@@ -277,7 +277,7 @@ namespace cryptonote
   , m_starter_message_showed(false)
   , m_target_blockchain_height(0)
   , m_last_json_checkpoints_update(0)
-  , m_nettype(UNDEFINED)
+  , m_nettype(network_type::UNDEFINED)
   , m_last_storage_server_ping(0)
   , m_last_lokinet_ping(0)
   , m_pad_transactions(false)
@@ -364,11 +364,11 @@ namespace cryptonote
   //-----------------------------------------------------------------------------------------------
   bool core::handle_command_line(const boost::program_options::variables_map& vm)
   {
-    if (m_nettype != FAKECHAIN)
+    if (m_nettype != network_type::FAKECHAIN)
     {
       const bool testnet = command_line::get_arg(vm, arg_testnet_on);
       const bool devnet = command_line::get_arg(vm, arg_devnet_on);
-      m_nettype = testnet ? TESTNET : devnet ? DEVNET : MAINNET;
+      m_nettype = testnet ? network_type::TESTNET : devnet ? network_type::DEVNET : network_type::MAINNET;
     }
     m_check_uptime_proof_interval.interval(get_net_config().UPTIME_PROOF_CHECK_INTERVAL);
 
@@ -562,7 +562,7 @@ namespace cryptonote
     const bool regtest = command_line::get_arg(vm, arg_regtest_on);
     if (test_options != NULL || regtest)
     {
-      m_nettype = FAKECHAIN;
+      m_nettype = network_type::FAKECHAIN;
     }
 
     bool r = handle_command_line(vm);
@@ -588,7 +588,7 @@ namespace cryptonote
     }
 
     auto folder = m_config_folder;
-    if (m_nettype == FAKECHAIN)
+    if (m_nettype == network_type::FAKECHAIN)
       folder /= "fake";
 
     // make sure the data directory exists, and try to lock it
@@ -610,7 +610,7 @@ namespace cryptonote
       ons_db_file_path = folder / "lns.db";
 
     auto sqlite_db_file_path = folder / "sqlite.db";
-    if (m_nettype == FAKECHAIN)
+    if (m_nettype == network_type::FAKECHAIN)
     {
       sqlite_db_file_path = ":memory:";
     }
@@ -624,7 +624,7 @@ namespace cryptonote
     bool sync_on_blocks = true;
     uint64_t sync_threshold = 1;
 
-    if (m_nettype == FAKECHAIN && !keep_fakechain)
+    if (m_nettype == network_type::FAKECHAIN && !keep_fakechain)
     {
       // reset the db by removing the database file before opening it
       if (!db->remove_data_file(folder))
@@ -1114,7 +1114,7 @@ namespace cryptonote
   //-----------------------------------------------------------------------------------------------
   void core::parse_incoming_tx_pre(tx_verification_batch_info &tx_info)
   {
-    if(tx_info.blob->size() > get_max_tx_size())
+    if(tx_info.blob->size() > MAX_TX_SIZE)
     {
       LOG_PRINT_L1("WRONG TRANSACTION BLOB, too big size " << tx_info.blob->size() << ", rejected");
       tx_info.tvc.m_verifivation_failed = true;
@@ -1162,7 +1162,7 @@ namespace cryptonote
     if (proofs.size() != 1)
       return false;
     const size_t sz = proofs[0].V.size();
-    if (sz == 0 || sz > BULLETPROOF_MAX_OUTPUTS)
+    if (sz == 0 || sz > TX_BULLETPROOF_MAX_OUTPUTS)
       return false;
     return true;
   }
@@ -1312,8 +1312,8 @@ namespace cryptonote
   {
     // Caller needs to do this around both this *and* parse_incoming_txs
     //auto lock = incoming_tx_lock();
-    uint8_t version      = m_blockchain_storage.get_network_version();
-    bool ok              = true;
+    auto version = m_blockchain_storage.get_network_version();
+    bool ok = true;
     if (blink_rollback_height)
       *blink_rollback_height = 0;
     tx_pool_options tx_opts;
@@ -1379,7 +1379,7 @@ namespace cryptonote
     auto &new_blinks = results.first;
     auto &missing_txs = results.second;
 
-    if (m_blockchain_storage.get_network_version() < HF_VERSION_BLINK)
+    if (m_blockchain_storage.get_network_version() < feature::BLINK)
       return results;
 
     std::vector<uint8_t> want(blinks.size(), false); // Really bools, but std::vector<bool> is broken.
@@ -1591,9 +1591,9 @@ namespace cryptonote
       }
     }
 
-    if(!keeped_by_block && get_transaction_weight(tx) >= m_blockchain_storage.get_current_cumulative_block_weight_limit() - CRYPTONOTE_COINBASE_BLOB_RESERVED_SIZE)
+    if(!keeped_by_block && get_transaction_weight(tx) >= m_blockchain_storage.get_current_cumulative_block_weight_limit() - COINBASE_BLOB_RESERVED_SIZE)
     {
-      MERROR_VER("tx is too large " << get_transaction_weight(tx) << ", expected not bigger than " << m_blockchain_storage.get_current_cumulative_block_weight_limit() - CRYPTONOTE_COINBASE_BLOB_RESERVED_SIZE);
+      MERROR_VER("tx is too large " << get_transaction_weight(tx) << ", expected not bigger than " << m_blockchain_storage.get_current_cumulative_block_weight_limit() - COINBASE_BLOB_RESERVED_SIZE);
       return false;
     }
 
@@ -1690,9 +1690,7 @@ namespace cryptonote
   //-----------------------------------------------------------------------------------------------
   size_t core::get_block_sync_size(uint64_t height) const
   {
-    if (block_sync_size > 0)
-      return block_sync_size;
-    return BLOCKS_SYNCHRONIZING_DEFAULT_COUNT;
+    return block_sync_size > 0 ? block_sync_size : BLOCKS_SYNCHRONIZING_DEFAULT_COUNT;
   }
   //-----------------------------------------------------------------------------------------------
   bool core::are_key_images_spent_in_pool(const std::vector<crypto::key_image>& key_im, std::vector<bool> &spent) const
@@ -1787,8 +1785,8 @@ namespace cryptonote
       uint64_t tx_fee_amount = 0;
       for(const auto& tx: txs)
       {
-        tx_fee_amount += get_tx_miner_fee(tx, b.major_version >= HF_VERSION_FEE_BURNING);
-        if(b.major_version >= HF_VERSION_FEE_BURNING)
+        tx_fee_amount += get_tx_miner_fee(tx, b.major_version >= feature::FEE_BURNING);
+        if(b.major_version >= feature::FEE_BURNING)
         {
           burnt_oxen += get_burned_amount_from_tx_extra(tx.extra);
         }
@@ -1834,16 +1832,13 @@ namespace cryptonote
   //-----------------------------------------------------------------------------------------------
   bool core::check_tx_inputs_ring_members_diff(const transaction& tx) const
   {
-    const uint8_t version = m_blockchain_storage.get_network_version();
-    if (version >= 6)
+    const auto version = m_blockchain_storage.get_network_version();
+    for(const auto& in: tx.vin)
     {
-      for(const auto& in: tx.vin)
-      {
-        CHECKED_GET_SPECIFIC_VARIANT(in, txin_to_key, tokey_in, false);
-        for (size_t n = 1; n < tokey_in.key_offsets.size(); ++n)
-          if (tokey_in.key_offsets[n] == 0)
-            return false;
-      }
+      CHECKED_GET_SPECIFIC_VARIANT(in, txin_to_key, tokey_in, false);
+      for (size_t n = 1; n < tokey_in.key_offsets.size(); ++n)
+        if (tokey_in.key_offsets[n] == 0)
+          return false;
     }
     return true;
   }
@@ -2261,7 +2256,7 @@ namespace cryptonote
 
     // wait one block before starting uptime proofs (but not on testnet/devnet, where we sometimes
     // have mass registrations/deregistrations where the waiting causes problems).
-    uint64_t delay_blocks = m_nettype == MAINNET ? 1 : 0;
+    uint64_t delay_blocks = m_nettype == network_type::MAINNET ? 1 : 0;
     if (!states.empty() && (states[0].info->registration_height + delay_blocks) < get_current_blockchain_height())
     {
       m_check_uptime_proof_interval.do_call([this]() {
@@ -2305,7 +2300,7 @@ namespace cryptonote
           });
         }
 
-        if (m_nettype != DEVNET)
+        if (m_nettype != network_type::DEVNET)
         {
           if (!check_external_ping(m_last_storage_server_ping, get_net_config().UPTIME_PROOF_FREQUENCY, "the storage server"))
           {
@@ -2422,7 +2417,7 @@ namespace cryptonote
   //-----------------------------------------------------------------------------------------------
   bool core::check_block_rate()
   {
-    if (m_offline || m_nettype == FAKECHAIN || m_target_blockchain_height > get_current_blockchain_height() || m_target_blockchain_height == 0)
+    if (m_offline || m_nettype == network_type::FAKECHAIN || m_target_blockchain_height > get_current_blockchain_height() || m_target_blockchain_height == 0)
     {
       MDEBUG("Not checking block rate, offline or syncing");
       return true;

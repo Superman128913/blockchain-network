@@ -65,38 +65,33 @@ namespace cryptonote {
     constexpr cryptonote::pulse_random_value empty_random_value = {};
     bool bitset        = blk_header.pulse.validator_bitset > 0;
     bool random_value  = !(blk_header.pulse.random_value == empty_random_value);
-    uint8_t hf_version = blk_header.major_version;
-    bool result        = hf_version >= cryptonote::network_version_16_pulse && (bitset || random_value);
+    auto hf_version    = blk_header.major_version;
+    bool result        = hf_version >= hf::hf16_pulse && (bitset || random_value);
     return result;
   }
   //-----------------------------------------------------------------------------------------------
   bool block_has_pulse_components(block const &blk)
   {
-    bool signatures    = blk.signatures.size();
-    uint8_t hf_version = blk.major_version;
+    bool signatures = blk.signatures.size();
+    auto hf_version = blk.major_version;
     bool result =
-        (hf_version >= cryptonote::network_version_16_pulse && signatures) || block_header_has_pulse_components(blk);
+        (hf_version >= hf::hf16_pulse && signatures) || block_header_has_pulse_components(blk);
     return result;
   }
   //-----------------------------------------------------------------------------------------------
-  size_t get_min_block_weight(uint8_t version)
+  size_t get_min_block_weight(hf version)
   {
-    return CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V5;
-  }
-  //-----------------------------------------------------------------------------------------------
-  size_t get_max_tx_size()
-  {
-    return CRYPTONOTE_MAX_TX_SIZE;
+    return BLOCK_GRANTED_FULL_REWARD_ZONE_V5;
   }
   //-----------------------------------------------------------------------------------------------
   // TODO(oxen): Move into oxen_economy, this will require access to oxen::exp2
   uint64_t block_reward_unpenalized_formula_v7(uint64_t already_generated_coins, uint64_t height)
   {
-    uint64_t emission_supply_component = (already_generated_coins * EMISSION_SUPPLY_MULTIPLIER) / EMISSION_SUPPLY_DIVISOR;
-    uint64_t result = (EMISSION_LINEAR_BASE - emission_supply_component) / EMISSION_DIVISOR;
+    uint64_t emission_supply_component = (already_generated_coins * oxen::EMISSION_SUPPLY_MULTIPLIER) / oxen::EMISSION_SUPPLY_DIVISOR;
+    uint64_t result = (oxen::EMISSION_LINEAR_BASE - emission_supply_component) / oxen::EMISSION_DIVISOR;
 
     // Check if we just overflowed
-    if (emission_supply_component > EMISSION_LINEAR_BASE)
+    if (emission_supply_component > oxen::EMISSION_LINEAR_BASE)
       result = 0;
     return result;
   }
@@ -108,21 +103,21 @@ namespace cryptonote {
     return result;
   }
 
-  bool get_base_block_reward(size_t median_weight, size_t current_block_weight, uint64_t already_generated_coins, uint64_t &reward, uint64_t &reward_unpenalized, uint8_t version, uint64_t height) {
+  bool get_base_block_reward(size_t median_weight, size_t current_block_weight, uint64_t already_generated_coins, uint64_t &reward, uint64_t &reward_unpenalized, hf version, uint64_t height) {
 
     //premine reward
     if (already_generated_coins == 0)
     {
-      reward = 22'500'000 * COIN;
+      reward = 22'500'000 * oxen::COIN;
       return true;
     }
 
     static_assert((TARGET_BLOCK_TIME % 1min) == 0s, "difficulty targets must be a multiple of a minute");
 
     uint64_t base_reward =
-      version >= network_version_17 ? BLOCK_REWARD_HF17 :
-      version >= network_version_15_ons ? BLOCK_REWARD_HF15 :
-      version >= network_version_8  ? block_reward_unpenalized_formula_v8(height) :
+      version >= hf::hf17 ? oxen::BLOCK_REWARD_HF17 :
+      version >= hf::hf15_ons ? oxen::BLOCK_REWARD_HF15 :
+      version >= hf::hf8  ? block_reward_unpenalized_formula_v8(height) :
         block_reward_unpenalized_formula_v7(already_generated_coins, height);
 
     uint64_t full_reward_zone = get_min_block_weight(version);
@@ -201,7 +196,8 @@ namespace cryptonote {
     , account_public_address const & adr
     )
   {
-    uint64_t address_prefix = subaddress ? get_config(nettype).CRYPTONOTE_PUBLIC_SUBADDRESS_BASE58_PREFIX : get_config(nettype).CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX;
+    auto& conf = get_config(nettype);
+    uint64_t address_prefix = subaddress ? conf.PUBLIC_SUBADDRESS_BASE58_PREFIX : conf.PUBLIC_ADDRESS_BASE58_PREFIX;
 
     return tools::base58::encode_addr(address_prefix, t_serializable_object_to_blob(adr));
   }
@@ -212,7 +208,7 @@ namespace cryptonote {
     , crypto::hash8 const & payment_id
     )
   {
-    uint64_t integrated_address_prefix = get_config(nettype).CRYPTONOTE_PUBLIC_INTEGRATED_ADDRESS_BASE58_PREFIX;
+    uint64_t integrated_address_prefix = get_config(nettype).PUBLIC_INTEGRATED_ADDRESS_BASE58_PREFIX;
 
     integrated_address iadr = {
       adr, payment_id
@@ -231,9 +227,10 @@ namespace cryptonote {
     , const std::string_view str
     )
   {
-    uint64_t address_prefix = get_config(nettype).CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX;
-    uint64_t integrated_address_prefix = get_config(nettype).CRYPTONOTE_PUBLIC_INTEGRATED_ADDRESS_BASE58_PREFIX;
-    uint64_t subaddress_prefix = get_config(nettype).CRYPTONOTE_PUBLIC_SUBADDRESS_BASE58_PREFIX;
+    auto& conf = get_config(nettype);
+    uint64_t address_prefix = conf.PUBLIC_ADDRESS_BASE58_PREFIX;
+    uint64_t integrated_address_prefix = conf.PUBLIC_INTEGRATED_ADDRESS_BASE58_PREFIX;
+    uint64_t subaddress_prefix = conf.PUBLIC_SUBADDRESS_BASE58_PREFIX;
 
     blobdata data;
     uint64_t prefix{0};

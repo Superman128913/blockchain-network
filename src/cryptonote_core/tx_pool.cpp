@@ -33,6 +33,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "common/util.h"
 #include "tx_pool.h"
 #include "cryptonote_tx_utils.h"
 #include "cryptonote_basic/cryptonote_boost_serialization.h"
@@ -79,23 +80,23 @@ namespace cryptonote
       return d;
     }
 
-    uint64_t get_transaction_weight_limit(uint8_t version)
+    uint64_t get_transaction_weight_limit(hf version)
     {
       // from v10, bulletproofs, limit a tx to 50% of the minimum block weight
-      if (version >= network_version_10_bulletproofs)
-        return get_min_block_weight(version) / 2 - CRYPTONOTE_COINBASE_BLOB_RESERVED_SIZE;
+      if (version >= hf::hf10_bulletproofs)
+        return get_min_block_weight(version) / 2 - COINBASE_BLOB_RESERVED_SIZE;
       else
-        return get_min_block_weight(version) - CRYPTONOTE_COINBASE_BLOB_RESERVED_SIZE;
+        return get_min_block_weight(version) - COINBASE_BLOB_RESERVED_SIZE;
     }
   }
   //---------------------------------------------------------------------------------
   // warning: bchs is passed here uninitialized, so don't do anything but store it
-  tx_memory_pool::tx_memory_pool(Blockchain& bchs): m_blockchain(bchs), m_txpool_max_weight(DEFAULT_TXPOOL_MAX_WEIGHT), m_txpool_weight(0), m_cookie(0)
+  tx_memory_pool::tx_memory_pool(Blockchain& bchs): m_blockchain(bchs), m_txpool_max_weight(DEFAULT_MEMPOOL_MAX_WEIGHT), m_txpool_weight(0), m_cookie(0)
   {
 
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::have_duplicated_non_standard_tx(transaction const &tx, uint8_t hard_fork_version) const
+  bool tx_memory_pool::have_duplicated_non_standard_tx(transaction const &tx, hf hard_fork_version) const
   {
     auto &service_node_list = m_blockchain.get_service_node_list();
     if (tx.type == txtype::state_change)
@@ -132,7 +133,7 @@ namespace cryptonote
           continue;
         }
 
-        if (hard_fork_version >= cryptonote::network_version_12_checkpointing)
+        if (hard_fork_version >= hf::hf12_checkpointing)
         {
           crypto::public_key service_node_to_change_in_the_pool;
           bool same_service_node = false;
@@ -235,7 +236,7 @@ namespace cryptonote
   // to set `do_not_relay` to false and starts relaying it (other quorum members do the same).
 
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::add_tx(transaction &tx, const crypto::hash &id, const cryptonote::blobdata &blob, size_t tx_weight, tx_verification_context& tvc, const tx_pool_options &opts, uint8_t hf_version,
+  bool tx_memory_pool::add_tx(transaction &tx, const crypto::hash &id, const cryptonote::blobdata &blob, size_t tx_weight, tx_verification_context& tvc, const tx_pool_options &opts, hf hf_version,
       uint64_t *blink_rollback_height)
   {
     // this should already be called with that lock, but let's make it explicit for clarity
@@ -269,7 +270,7 @@ namespace cryptonote
 
     uint64_t fee, burned;
 
-    if (!get_tx_miner_fee(tx, fee, hf_version >= HF_VERSION_FEE_BURNING, &burned))
+    if (!get_tx_miner_fee(tx, fee, hf_version >= feature::FEE_BURNING, &burned))
     {
       // This code is a bit convoluted: the above sets `fee`, and returns false for a pre-ringct tx
       // with a too-low fee, but for ringct (v2+) txes it just sets `fee` but doesn't check it and
@@ -279,7 +280,7 @@ namespace cryptonote
       return false;
     }
 
-    if (hf_version < cryptonote::network_version_19)
+    if (hf_version < hf::hf19)
     {
       if (!opts.kept_by_block && tx.is_transfer() && !m_blockchain.check_fee(tx_weight, tx.vout.size(), fee, burned, opts))
       {
@@ -290,7 +291,7 @@ namespace cryptonote
     }
 
     size_t tx_weight_limit = get_transaction_weight_limit(hf_version);
-    if ((!opts.kept_by_block || hf_version >= HF_VERSION_PER_BYTE_FEE) && tx_weight > tx_weight_limit)
+    if ((!opts.kept_by_block || hf_version >= feature::PER_BYTE_FEE) && tx_weight > tx_weight_limit)
     {
       LOG_PRINT_L1("transaction is too heavy: " << tx_weight << " bytes, maximum weight: " << tx_weight_limit);
       tvc.m_verifivation_failed = true;
@@ -473,7 +474,7 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::add_tx(transaction &tx, tx_verification_context& tvc, const tx_pool_options &opts, uint8_t version)
+  bool tx_memory_pool::add_tx(transaction &tx, tx_verification_context& tvc, const tx_pool_options &opts, hf version)
   {
     crypto::hash h = null_hash;
     size_t blob_size = 0;
@@ -798,7 +799,7 @@ namespace cryptonote
       }
     };
 
-    const auto unexpired = std::time(nullptr) - MEMPOOL_PRUNE_NON_STANDARD_TX_LIFETIME;
+    const auto unexpired = std::time(nullptr) - static_cast<time_t>(tools::to_seconds(MEMPOOL_PRUNE_NON_STANDARD_TX_LIFETIME));
     for (auto it = m_txs_by_fee_and_receive_time.begin(); it != m_txs_by_fee_and_receive_time.end(); )
     {
       const bool is_standard_tx = !std::get<0>(it->first);
@@ -960,8 +961,8 @@ namespace cryptonote
     m_blockchain.for_all_txpool_txes([this, &remove](const crypto::hash &txid, const txpool_tx_meta_t &meta, const cryptonote::blobdata*) {
       uint64_t tx_age = time(nullptr) - meta.receive_time;
 
-      if((tx_age > CRYPTONOTE_MEMPOOL_TX_LIVETIME && !meta.kept_by_block) ||
-         (tx_age > CRYPTONOTE_MEMPOOL_TX_FROM_ALT_BLOCK_LIVETIME && meta.kept_by_block) )
+      if((tx_age > tools::to_seconds(MEMPOOL_TX_LIVETIME) && !meta.kept_by_block) ||
+         (tx_age > tools::to_seconds(MEMPOOL_TX_FROM_ALT_BLOCK_LIVETIME) && meta.kept_by_block) )
       {
         LOG_PRINT_L1("Tx " << txid << " removed from tx pool due to outdated, age: " << tx_age );
         auto sorted_it = find_tx_in_sorted_container(txid);
@@ -1027,7 +1028,7 @@ namespace cryptonote
         // if the tx is older than half the max lifetime, we don't re-relay it, to avoid a problem
         // mentioned by smooth where nodes would flush txes at slightly different times, causing
         // flushed txes to be re-added when received from a node which was just about to flush it
-        uint64_t max_age = meta.kept_by_block ? CRYPTONOTE_MEMPOOL_TX_FROM_ALT_BLOCK_LIVETIME : CRYPTONOTE_MEMPOOL_TX_LIVETIME;
+        uint64_t max_age = tools::to_seconds(meta.kept_by_block ? MEMPOOL_TX_FROM_ALT_BLOCK_LIVETIME : MEMPOOL_TX_LIVETIME);
         if (now - meta.receive_time <= max_age / 2)
         {
           try
@@ -1763,7 +1764,7 @@ end:
   }
   //---------------------------------------------------------------------------------
   //TODO: investigate whether boolean return is appropriate
-  bool tx_memory_pool::fill_block_template(block &bl, size_t median_weight, uint64_t already_generated_coins, size_t &total_weight, uint64_t &raw_fee, uint64_t &expected_reward, uint8_t version, uint64_t height)
+  bool tx_memory_pool::fill_block_template(block &bl, size_t median_weight, uint64_t already_generated_coins, size_t &total_weight, uint64_t &raw_fee, uint64_t &expected_reward, hf version, uint64_t height)
   {
     auto locks = tools::unique_locks(m_transactions_lock, m_blockchain);
 
@@ -1782,10 +1783,10 @@ end:
         return false;
       }
 
-      best_reward = version >= cryptonote::network_version_16_pulse ? 0 /*Empty block, starts with 0 fee*/ : reward_parts.base_miner;
+      best_reward = version >= hf::hf16_pulse ? 0 /*Empty block, starts with 0 fee*/ : reward_parts.base_miner;
     }
 
-    size_t const max_total_weight = 2 * median_weight - CRYPTONOTE_COINBASE_BLOB_RESERVED_SIZE;
+    size_t const max_total_weight = 2 * median_weight - COINBASE_BLOB_RESERVED_SIZE;
     std::unordered_set<crypto::key_image> k_images;
 
     LOG_PRINT_L2("Filling block template, median weight " << median_weight << ", " << m_txs_by_fee_and_receive_time.size() << " txes in the pool");
@@ -1827,7 +1828,7 @@ end:
       // NOTE: Use the net fee for comparison (after penalty is applied).
       // After HF16, penalty is applied on the miner fee. Before, penalty is
       // applied on the base reward.
-      if (version >= cryptonote::network_version_16_pulse)
+      if (version >= hf::hf16_pulse)
       {
         next_reward = next_reward_parts.miner_fee;
       }
@@ -1901,7 +1902,7 @@ end:
     return true;
   }
   //---------------------------------------------------------------------------------
-  size_t tx_memory_pool::validate(uint8_t version)
+  size_t tx_memory_pool::validate(hf version)
   {
     auto locks = tools::unique_locks(m_transactions_lock, m_blockchain);
 
@@ -1969,7 +1970,7 @@ end:
   {
     auto locks = tools::unique_locks(m_transactions_lock, m_blockchain);
 
-    m_txpool_max_weight = max_txpool_weight ? max_txpool_weight : DEFAULT_TXPOOL_MAX_WEIGHT;
+    m_txpool_max_weight = max_txpool_weight ? max_txpool_weight : DEFAULT_MEMPOOL_MAX_WEIGHT;
     m_txs_by_fee_and_receive_time.clear();
     m_spent_key_images.clear();
     m_txpool_weight = 0;

@@ -65,7 +65,7 @@ TEST(SQLITE, AddSNRewards)
   EXPECT_TRUE(sqliteDB.batching_count() == 1);
 
   std::optional<std::vector<cryptonote::batch_sn_payment>> p1;
-  const auto expected_payout = wallet_address.address.next_payout_height(0, config::BATCHING_INTERVAL);
+  const auto expected_payout = wallet_address.address.next_payout_height(0, cryptonote::config::BATCHING_INTERVAL);
   p1 = sqliteDB.get_sn_payments(expected_payout - 1);
   EXPECT_TRUE(p1.has_value());
   EXPECT_TRUE((*p1).size() == 0);
@@ -126,7 +126,7 @@ TEST(SQLITE, CalculateRewards)
   EXPECT_TRUE(multiple_rewards[2].amount == 68);
 
   // Check that 3 contributors receives their portion of the block reward when the operator takes a 10% fee
-  multiple_contributors.portions_for_operator = STAKING_PORTIONS_V1/10;
+  multiple_contributors.portions_for_operator = cryptonote::old::STAKING_PORTIONS/10;
   multiple_contributors.operator_address = first_address.address;
   block.reward = 1000;
   auto multiple_rewards_with_fee = sqliteDB.calculate_rewards(block.major_version, block.reward, multiple_contributors);

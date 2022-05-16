@@ -74,9 +74,9 @@ namespace {
       auto dir = tools::get_default_data_dir();
       // remove .oxen, replace with .shared-ringdb
       dir.replace_filename(".shared-ringdb");
-      if (nettype == cryptonote::TESTNET)
+      if (nettype == cryptonote::network_type::TESTNET)
         dir /= "testnet";
-      else if (nettype == cryptonote::DEVNET)
+      else if (nettype == cryptonote::network_type::DEVNET)
         dir /= "devnet";
       return dir;
     }
@@ -323,7 +323,7 @@ EXPORT
 uint64_t Wallet::amountFromDouble(double amount)
 {
     std::stringstream ss;
-    ss << std::fixed << std::setprecision(CRYPTONOTE_DISPLAY_DECIMAL_POINT) << amount;
+    ss << std::fixed << std::setprecision(oxen::DISPLAY_DECIMAL_POINT) << amount;
     return amountFromString(ss.str());
 }
 
@@ -1625,7 +1625,7 @@ PendingTransaction *WalletImpl::createTransactionMultDest(const std::vector<std:
             break;
         }
         try {
-            std::optional<uint8_t> hf_version = w->get_hard_fork_version();
+            auto hf_version = w->get_hard_fork_version();
             if (!hf_version)
             {
               setStatusError(tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED);
@@ -1635,12 +1635,12 @@ PendingTransaction *WalletImpl::createTransactionMultDest(const std::vector<std:
             if (amount) {
                 oxen_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, txtype::standard, priority);
                 transaction->m_pending_tx = w->create_transactions_2(
-                        dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, 0 /* unlock_time */,
+                        dsts, cryptonote::TX_OUTPUT_DECOYS, 0 /* unlock_time */,
                         priority,
                         extra, subaddr_account, subaddr_indices, tx_params);
             } else {
                 transaction->m_pending_tx = w->create_transactions_all(
-                        0, info.address, info.is_subaddress, 1, CRYPTONOTE_DEFAULT_TX_MIXIN, 0 /* unlock_time */,
+                        0, info.address, info.is_subaddress, 1, cryptonote::TX_OUTPUT_DECOYS, 0 /* unlock_time */,
                         priority,
                         extra, subaddr_account, subaddr_indices);
             }
@@ -2467,13 +2467,16 @@ void WalletImpl::hardForkInfo(uint8_t &version, uint64_t &earliest_height) const
 EXPORT
 std::optional<uint8_t> WalletImpl::hardForkVersion() const
 {
-    return m_wallet_ptr->get_hard_fork_version();
+    auto v = m_wallet_ptr->get_hard_fork_version();
+    if (!v)
+      return std::nullopt;
+    return static_cast<uint8_t>(*v);
 }
 
 EXPORT
 bool WalletImpl::useForkRules(uint8_t version, int64_t early_blocks) const 
 {
-    return wallet()->use_fork_rules(version,early_blocks);
+    return wallet()->use_fork_rules(static_cast<hf>(version),early_blocks);
 }
 
 EXPORT

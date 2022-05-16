@@ -98,9 +98,9 @@ namespace tests
     bool prepare_handle_incoming_blocks(const std::vector<cryptonote::block_complete_entry>  &blocks_entry, std::vector<cryptonote::block> &blocks) { return true; }
     bool cleanup_handle_incoming_blocks(bool force_sync = false) { return true; }
     uint64_t get_target_blockchain_height() const { return 1; }
-    size_t get_block_sync_size(uint64_t height) const { return BLOCKS_SYNCHRONIZING_DEFAULT_COUNT; }
+    size_t get_block_sync_size(uint64_t height) const { return cryptonote::BLOCKS_SYNCHRONIZING_DEFAULT_COUNT; }
     virtual crypto::hash on_transaction_relayed(const cryptonote::blobdata& tx) { return crypto::null_hash; }
-    cryptonote::network_type get_nettype() const { return cryptonote::MAINNET; }
+    cryptonote::network_type get_nettype() const { return cryptonote::network_type::MAINNET; }
     bool get_blocks(uint64_t start_offset, size_t count, std::vector<std::pair<cryptonote::blobdata, cryptonote::block>>& blocks, std::vector<cryptonote::blobdata>& txs) const { return false; }
     bool get_transactions(const std::vector<crypto::hash>& txs_ids, std::vector<cryptonote::transaction>& txs, std::vector<crypto::hash>& missed_txs) const { return false; }
     bool get_block_by_hash(const crypto::hash &h, cryptonote::block &blk, bool *orphan = NULL) const { return false; }

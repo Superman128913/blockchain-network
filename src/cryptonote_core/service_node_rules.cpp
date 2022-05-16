@@ -8,20 +8,23 @@
 #include <boost/lexical_cast.hpp>
 #include <cfenv>
 
+#include "oxen_economy.h"
 #include "service_node_rules.h"
+
+using cryptonote::hf;
 
 namespace service_nodes {
 
 // TODO(oxen): Move to oxen_economy, this will also need access to oxen::exp2
 uint64_t get_staking_requirement(cryptonote::network_type nettype, uint64_t height)
 {
-  if (nettype == cryptonote::TESTNET || nettype == cryptonote::FAKECHAIN || nettype == cryptonote::DEVNET)
-      return COIN * 100;
+  if (nettype != cryptonote::network_type::MAINNET)
+      return oxen::STAKING_REQUIREMENT_TESTNET;
 
-  if (is_hard_fork_at_least(nettype, cryptonote::network_version_16_pulse, height))
-    return 15000'000000000;
+  if (is_hard_fork_at_least(nettype, hf::hf16_pulse, height))
+    return oxen::STAKING_REQUIREMENT;
 
-  if (is_hard_fork_at_least(nettype, cryptonote::network_version_13_enforce_checkpoints, height))
+  if (is_hard_fork_at_least(nettype, hf::hf13_enforce_checkpoints, height))
   {
     constexpr int64_t heights[] = {
         385824,
@@ -70,15 +73,15 @@ uint64_t get_staking_requirement(cryptonote::network_type nettype, uint64_t heig
   uint64_t height_adjusted = height - hardfork_height;
   uint64_t base = 0, variable = 0;
   std::fesetround(FE_TONEAREST);
-  if (is_hard_fork_at_least(nettype, cryptonote::network_version_11_infinite_staking, height))
+  if (is_hard_fork_at_least(nettype, hf::hf11_infinite_staking, height))
   {
-    base     = 15000 * COIN;
-    variable = (25007.0 * COIN) / oxen::exp2(height_adjusted/129600.0);
+    base     = 15000 * oxen::COIN;
+    variable = (25007.0 * oxen::COIN) / oxen::exp2(height_adjusted/129600.0);
   }
   else
   {
-    base      = 10000 * COIN;
-    variable  = (35000.0 * COIN) / oxen::exp2(height_adjusted/129600.0);
+    base      = 10000 * oxen::COIN;
+    variable  = (35000.0 * oxen::COIN) / oxen::exp2(height_adjusted/129600.0);
   }
 
   uint64_t result = base + variable;
@@ -89,19 +92,23 @@ uint64_t portions_to_amount(uint64_t portions, uint64_t staking_requirement)
 {
   uint64_t hi, lo, resulthi, resultlo;
   lo = mul128(staking_requirement, portions, &hi);
-  div128_64(hi, lo, STAKING_PORTIONS_V1, &resulthi, &resultlo);
+  div128_64(hi, lo, cryptonote::old::STAKING_PORTIONS, &resulthi, &resultlo);
   return resultlo;
 }
 
-bool check_service_node_portions(uint8_t hf_version, const std::vector<uint64_t>& portions)
+bool check_service_node_portions(hf hf_version, const std::vector<uint64_t>& portions)
 {
+  uint64_t portion_fuzz = hf_version >= hf::hf19 ? PORTION_FUZZ : 0;
 
-  const size_t max_contributors = hf_version >= 19 ? MAX_NUMBER_OF_CONTRIBUTORS_V2 : MAX_NUMBER_OF_CONTRIBUTORS_V1;
-  if (portions.size() > max_contributors) return false;
+  const size_t max_contributors = hf_version >= hf::hf19 ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1;
+  if (portions.size() > max_contributors) {
+    LOG_PRINT_L1("Registration tx rejected: too many contributors (" << portions.size() << " > " << max_contributors << ")");
+    return false;
+  }
 
-  if (portions[0] < MINIMUM_OPERATOR_PORTION)
+  if (portions[0] < MINIMUM_OPERATOR_PORTION - portion_fuzz)
   {
-    LOG_PRINT_L1("Register TX rejected: TX does not have sufficient operator stake");
+    LOG_PRINT_L1("Register TX rejected: TX does not have sufficient operator stake (" << portions[0] << " < " << MINIMUM_OPERATOR_PORTION << ")");
     return false;
   }
 
@@ -109,12 +116,23 @@ bool check_service_node_portions(uint8_t hf_version, const std::vector<uint64_t>
   for (auto i = 0u; i < portions.size(); ++i)
   {
 
-    const uint64_t min_portions = get_min_node_contribution(hf_version, STAKING_PORTIONS_V1, reserved, i);
-    if (portions[i] < min_portions) return false;
+    uint64_t min_portions = get_min_node_contribution(hf_version, cryptonote::old::STAKING_PORTIONS, reserved, i);
+
+    if (min_portions > portion_fuzz)
+      min_portions -= portion_fuzz;
+
+    if (portions[i] < min_portions) {
+      LOG_PRINT_L1("Registration tx rejected: portion " << i << " too small (" << portions[i] << " < " << min_portions << ")");
+      return false;
+    }
     reserved += portions[i];
   }
 
-  return reserved <= STAKING_PORTIONS_V1;
+  if (reserved > cryptonote::old::STAKING_PORTIONS) {
+    LOG_PRINT_L1("Registration tx rejected: total reserved amount too large");
+    return false;
+  }
+  return true;
 }
 
 crypto::hash generate_request_stake_unlock_hash(uint32_t nonce)
@@ -136,25 +154,25 @@ uint64_t get_locked_key_image_unlock_height(cryptonote::network_type nettype, ui
 
 static uint64_t get_min_node_contribution_pre_v11(uint64_t staking_requirement, uint64_t total_reserved)
 {
-  return std::min(staking_requirement - total_reserved, staking_requirement / MAX_NUMBER_OF_CONTRIBUTORS_V1);
+  return std::min(staking_requirement - total_reserved, staking_requirement / oxen::MAX_CONTRIBUTORS_V1);
 }
 
-uint64_t get_max_node_contribution(uint8_t version, uint64_t staking_requirement, uint64_t total_reserved)
+uint64_t get_max_node_contribution(hf version, uint64_t staking_requirement, uint64_t total_reserved)
 {
-  if (version >= cryptonote::network_version_16_pulse)
-    return (staking_requirement - total_reserved) * config::MAXIMUM_ACCEPTABLE_STAKE::num
-      / config::MAXIMUM_ACCEPTABLE_STAKE::den;
+  if (version >= hf::hf16_pulse)
+    return (staking_requirement - total_reserved) * cryptonote::MAXIMUM_ACCEPTABLE_STAKE::num
+      / cryptonote::MAXIMUM_ACCEPTABLE_STAKE::den;
   return std::numeric_limits<uint64_t>::max();
 }
 
-uint64_t get_min_node_contribution(uint8_t version, uint64_t staking_requirement, uint64_t total_reserved, size_t num_contributions)
+uint64_t get_min_node_contribution(hf version, uint64_t staking_requirement, uint64_t total_reserved, size_t num_contributions)
 {
-  if (version < cryptonote::network_version_11_infinite_staking)
+  if (version < hf::hf11_infinite_staking)
     return get_min_node_contribution_pre_v11(staking_requirement, total_reserved);
 
   const uint64_t needed = staking_requirement - total_reserved;
 
-  const size_t max_contributors = (version < cryptonote::network_version_19) ? MAX_NUMBER_OF_CONTRIBUTORS_V1: MAX_NUMBER_OF_CONTRIBUTORS_V2;
+  const size_t max_contributors = version >= hf::hf19 ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1;
   assert(max_contributors > num_contributions);
   if (max_contributors <= num_contributions) return UINT64_MAX;
 
@@ -162,7 +180,7 @@ uint64_t get_min_node_contribution(uint8_t version, uint64_t staking_requirement
   return needed / num_contributions_remaining_avail;
 }
 
-uint64_t get_min_node_contribution_in_portions(uint8_t version, uint64_t staking_requirement, uint64_t total_reserved, size_t num_contributions)
+uint64_t get_min_node_contribution_in_portions(hf version, uint64_t staking_requirement, uint64_t total_reserved, size_t num_contributions)
 {
   uint64_t atomic_amount = get_min_node_contribution(version, staking_requirement, total_reserved, num_contributions);
   uint64_t result        = (atomic_amount == UINT64_MAX) ? UINT64_MAX : (get_portions_to_make_amount(staking_requirement, atomic_amount));
@@ -186,11 +204,11 @@ static bool get_portions_from_percent(double cur_percent, uint64_t& portions) {
   // Fix for truncation issue when operator cut = 100 for a pool Service Node.
   if (cur_percent == 100.0)
   {
-    portions = STAKING_PORTIONS_V1;
+    portions = cryptonote::old::STAKING_PORTIONS;
   }
   else
   {
-    portions = (cur_percent / 100.0) * (double)STAKING_PORTIONS_V1;
+    portions = (cur_percent / 100.0) * (double)cryptonote::old::STAKING_PORTIONS;
   }
 
   return true;

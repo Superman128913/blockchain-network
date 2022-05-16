@@ -238,11 +238,11 @@ TYPED_TEST(BlockchainDBTest, OpenAndClose)
   this->set_prefix(dirPath);
 
   // make sure open does not throw
-  ASSERT_NO_THROW(this->m_db->open(dirPath, cryptonote::FAKECHAIN));
+  ASSERT_NO_THROW(this->m_db->open(dirPath, network_type::FAKECHAIN));
   this->get_filenames();
 
   // make sure open when already open DOES throw
-  ASSERT_THROW(this->m_db->open(dirPath, cryptonote::FAKECHAIN), DB_OPEN_FAILURE);
+  ASSERT_THROW(this->m_db->open(dirPath, network_type::FAKECHAIN), DB_OPEN_FAILURE);
 
   ASSERT_NO_THROW(this->m_db->close());
 }
@@ -256,7 +256,7 @@ TYPED_TEST(BlockchainDBTest, AddBlock)
   this->set_prefix(dirPath);
 
   // make sure open does not throw
-  ASSERT_NO_THROW(this->m_db->open(dirPath, cryptonote::FAKECHAIN));
+  ASSERT_NO_THROW(this->m_db->open(dirPath, network_type::FAKECHAIN));
   this->get_filenames();
 
   db_wtxn_guard guard(this->m_db);
@@ -303,7 +303,7 @@ TYPED_TEST(BlockchainDBTest, RetrieveBlockData)
   this->set_prefix(dirPath);
 
   // make sure open does not throw
-  ASSERT_NO_THROW(this->m_db->open(dirPath, cryptonote::FAKECHAIN));
+  ASSERT_NO_THROW(this->m_db->open(dirPath, network_type::FAKECHAIN));
   this->get_filenames();
 
   db_wtxn_guard guard(this->m_db);
