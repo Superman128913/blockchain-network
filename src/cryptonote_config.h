@@ -44,7 +44,6 @@ using namespace std::literals;
 #define CRYPTONOTE_MAX_BLOCK_NUMBER                     500000000
 #define CRYPTONOTE_MAX_TX_SIZE                          1000000
 #define CRYPTONOTE_MAX_TX_PER_BLOCK                     0x10000000
-#define CRYPTONOTE_PUBLIC_ADDRESS_TEXTBLOB_VER          0
 #define CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW            30
 #define CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT_V2           60*10
 #define CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE             10
@@ -54,7 +53,6 @@ using namespace std::literals;
 #define STAKING_PORTIONS_V1                             UINT64_C(0xfffffffffffffffc)
 #define MAX_NUMBER_OF_CONTRIBUTORS_V1                   4
 #define MAX_NUMBER_OF_CONTRIBUTORS_V2                   10
-#define MIN_PORTIONS_V2                                 (STAKING_PORTIONS_V1 / MAX_NUMBER_OF_CONTRIBUTORS_V2)
 
 static_assert(STAKING_PORTIONS_V1 % 12 == 0, "Use a multiple of 12, so that it divides evenly by two, three, or four contributors.");
 
@@ -165,8 +163,6 @@ constexpr uint64_t BLOCKS_EXPECTED_IN_YEARS(int years) { return BLOCKS_EXPECTED_
 #define P2P_NET_DATA_FILENAME                   "p2pstate.bin"
 #define MINER_CONFIG_FILE_NAME                  "miner_conf.json"
 
-#define THREAD_STACK_SIZE                       5 * 1024 * 1024
-
 #define HF_VERSION_PER_BYTE_FEE                 cryptonote::network_version_10_bulletproofs
 #define HF_VERSION_SMALLER_BP                   cryptonote::network_version_11_infinite_staking
 #define HF_VERSION_LONG_TERM_BLOCK_WEIGHT       cryptonote::network_version_11_infinite_staking
@@ -199,11 +195,7 @@ constexpr uint64_t BLOCKS_EXPECTED_IN_YEARS(int years) { return BLOCKS_EXPECTED_
 // New constants are intended to go here
 namespace config
 {
-  inline constexpr auto DNS_TIMEOUT = 20s;
-  inline constexpr uint64_t DEFAULT_FEE_ATOMIC_XMR_PER_KB = 500; // Just a placeholder!  Change me!
-  inline constexpr uint8_t FEE_CALCULATION_MAX_RETRIES = 10;
   inline constexpr uint64_t DEFAULT_DUST_THRESHOLD = 2000000000; // 2 * pow(10, 9)
-  inline constexpr uint64_t BASE_REWARD_CLAMP_THRESHOLD = 100000000; // pow(10, 8)
 
   // Maximum allowed stake contribution, as a fraction of the available contribution room.  This
   // should generally be slightly larger than 1.  This is used to disallow large overcontributions
