@@ -35,7 +35,7 @@
 
 if(NOT STATIC AND NOT BUILD_STATIC_DEPS)
   find_package(PkgConfig REQUIRED)
-  pkg_check_modules(OXENC liboxenc>=1.0.1 IMPORTED_TARGET)
+  pkg_check_modules(OXENC liboxenc>=1.0.3 IMPORTED_TARGET)
   pkg_check_modules(OXENMQ liboxenmq>=1.2.3 IMPORTED_TARGET)
 endif()
 
@@ -43,8 +43,12 @@ endif()
 if(NOT OXENC_FOUND)
   message(STATUS "Using in-tree oxen-encoding")
   add_subdirectory(oxen-encoding)
+  add_library(oxenc::oxenc ALIAS oxenc)
+elseif(NOT TARGET PkgConfig::OXENC AND CMAKE_VERSION VERSION_LESS "3.21")
+  # Work around cmake bug 22180 (PkgConfig::OXENC not set if no flags needed):
+  add_library(_empty_oxenc INTERFACE)
+  add_library(oxenc::oxenc ALIAS _empty_oxenc)
 else()
-  add_library(oxenc INTERFACE)
   target_link_libraries(oxenc INTERFACE PkgConfig::OXENC)
   add_library(oxenc::oxenc ALIAS oxenc)
   message(STATUS "Found liboxenc ${OXENC_VERSION}")
