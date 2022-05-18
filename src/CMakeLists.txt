@@ -70,6 +70,7 @@ add_subdirectory(p2p)
 add_subdirectory(daemonizer)
 add_subdirectory(daemon)
 add_subdirectory(simplewallet)
+add_subdirectory(sqlitedb)
 
 add_subdirectory(gen_multisig)
 add_subdirectory(blockchain_utilities)

@@ -110,6 +110,7 @@ if (STATIC AND BUILD_STATIC_DEPS)
             cryptonote_core
             cryptonote_basic
             cryptonote_protocol
+            sqlitedb
             mnemonics
             common
             cncrypto
