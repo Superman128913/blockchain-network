@@ -248,6 +248,7 @@ namespace cryptonote::rpc {
     PRUNE_BLOCKCHAIN::response                          invoke(PRUNE_BLOCKCHAIN::request&& req, rpc_context context);
     GET_OUTPUT_BLACKLIST::response                      invoke(GET_OUTPUT_BLACKLIST::request&& req, rpc_context context);
     GET_QUORUM_STATE::response                          invoke(GET_QUORUM_STATE::request&& req, rpc_context context);
+    GET_ACCRUED_BATCHED_EARNINGS::response              invoke(GET_ACCRUED_BATCHED_EARNINGS::request&& req, rpc_context context);
     GET_SERVICE_NODE_REGISTRATION_CMD_RAW::response     invoke(GET_SERVICE_NODE_REGISTRATION_CMD_RAW::request&& req, rpc_context context);
     GET_SERVICE_NODE_REGISTRATION_CMD::response         invoke(GET_SERVICE_NODE_REGISTRATION_CMD::request&& req, rpc_context context);
     GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES::response   invoke(GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES::request&& req, rpc_context context);
