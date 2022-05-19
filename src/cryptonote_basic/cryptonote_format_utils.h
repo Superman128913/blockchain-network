@@ -45,7 +45,10 @@ namespace epee
   class wipeable_string;
 }
 
-namespace service_nodes { struct quorum_vote_t; }
+namespace service_nodes {
+  struct quorum_vote_t;
+  struct registration_details;
+}
 
 namespace cryptonote
 {
@@ -133,7 +136,7 @@ namespace cryptonote
 
   bool get_service_node_pubkey_from_tx_extra(const std::vector<uint8_t>& tx_extra, crypto::public_key& pubkey);
   bool get_service_node_contributor_from_tx_extra(const std::vector<uint8_t>& tx_extra, cryptonote::account_public_address& address);
-  bool add_service_node_register_to_tx_extra(std::vector<uint8_t>& tx_extra, const std::vector<cryptonote::account_public_address>& addresses, uint64_t portions_for_operator, const std::vector<uint64_t>& portions, uint64_t expiration_timestamp, const crypto::signature& signature);
+  bool add_service_node_registration_to_tx_extra(std::vector<uint8_t>& tx_extra, const service_nodes::registration_details& registration);
 
   bool get_tx_secret_key_from_tx_extra(const std::vector<uint8_t>& tx_extra, crypto::secret_key& key);
   void add_tx_secret_key_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::secret_key& key);
@@ -178,8 +181,6 @@ namespace cryptonote
   void get_blob_hash(const std::string_view blob, crypto::hash& res);
   crypto::hash get_blob_hash(const std::string_view blob);
   std::string short_hash_str(const crypto::hash& h);
-
-  bool get_registration_hash(const std::vector<cryptonote::account_public_address>& addresses, uint64_t operator_portions, const std::vector<uint64_t>& portions, uint64_t expiration_timestamp, crypto::hash& hash);
 
   crypto::hash get_transaction_hash(const transaction& t);
   bool get_transaction_hash(const transaction& t, crypto::hash& res);

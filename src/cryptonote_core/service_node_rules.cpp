@@ -15,6 +15,14 @@ using cryptonote::hf;
 
 namespace service_nodes {
 
+uint64_t get_staking_requirement(cryptonote::network_type nettype, hf hardfork)
+{
+  assert(hardfork >= hf::hf16_pulse);
+  return nettype == cryptonote::network_type::MAINNET
+    ? oxen::STAKING_REQUIREMENT
+    : oxen::STAKING_REQUIREMENT_TESTNET;
+}
+
 // TODO(oxen): Move to oxen_economy, this will also need access to oxen::exp2
 uint64_t get_staking_requirement(cryptonote::network_type nettype, uint64_t height)
 {
@@ -96,42 +104,77 @@ uint64_t portions_to_amount(uint64_t portions, uint64_t staking_requirement)
   return resultlo;
 }
 
-bool check_service_node_portions(hf hf_version, const std::vector<uint64_t>& portions)
+bool check_service_node_portions(hf hf_version, const std::vector<std::pair<cryptonote::account_public_address, uint64_t>>& portions)
 {
-  uint64_t portion_fuzz = hf_version >= hf::hf19 ? PORTION_FUZZ : 0;
-
-  const size_t max_contributors = hf_version >= hf::hf19 ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1;
-  if (portions.size() > max_contributors) {
-    LOG_PRINT_L1("Registration tx rejected: too many contributors (" << portions.size() << " > " << max_contributors << ")");
+  // When checking portion we always use HF18 rules, even on HF19, because a registration actually
+  // generated under HF19+ won't get here.
+  if (hf_version == hf::hf19)
+    hf_version = hf::hf18;
+  else if (hf_version > hf::hf19)
+  {
+    LOG_PRINT_L1("Registration tx rejected: portions-based registrations not permitted after HF19");
     return false;
   }
-
-  if (portions[0] < MINIMUM_OPERATOR_PORTION - portion_fuzz)
-  {
-    LOG_PRINT_L1("Register TX rejected: TX does not have sufficient operator stake (" << portions[0] << " < " << MINIMUM_OPERATOR_PORTION << ")");
+  if (portions.size() > oxen::MAX_CONTRIBUTORS_V1) {
+    LOG_PRINT_L1("Registration tx rejected: too many contributors (" << portions.size() << " > " << oxen::MAX_CONTRIBUTORS_V1 << ")");
     return false;
   }
 
   uint64_t reserved = 0;
-  for (auto i = 0u; i < portions.size(); ++i)
+  uint64_t remaining = cryptonote::old::STAKING_PORTIONS;
+  for (size_t i = 0; i < portions.size(); ++i)
   {
 
-    uint64_t min_portions = get_min_node_contribution(hf_version, cryptonote::old::STAKING_PORTIONS, reserved, i);
-
-    if (min_portions > portion_fuzz)
-      min_portions -= portion_fuzz;
-
-    if (portions[i] < min_portions) {
-      LOG_PRINT_L1("Registration tx rejected: portion " << i << " too small (" << portions[i] << " < " << min_portions << ")");
+    const uint64_t min_portions = get_min_node_contribution(hf_version, cryptonote::old::STAKING_PORTIONS, reserved, i);
+    if (portions[i].second < min_portions) {
+      LOG_PRINT_L1("Registration tx rejected: portion " << i << " too small (" << portions[i].second << " < " << min_portions << ")");
       return false;
     }
-    reserved += portions[i];
+    if (portions[i].second > remaining) {
+      LOG_PRINT_L1("Registration tx rejected: portion " << i << " exceeds available portions");
+      return false;
+    }
+
+    reserved += portions[i].second;
+    remaining -= portions[i].second;
   }
 
-  if (reserved > cryptonote::old::STAKING_PORTIONS) {
-    LOG_PRINT_L1("Registration tx rejected: total reserved amount too large");
+  return true;
+}
+
+bool check_service_node_stakes(hf hf_version, cryptonote::network_type nettype, uint64_t staking_requirement, const std::vector<std::pair<cryptonote::account_public_address, uint64_t>>& stakes)
+{
+  if (hf_version < hf::hf19) {
+    LOG_PRINT_L1("Registration tx rejected: amount-based registrations not accepted before HF19");
+    return false; // OXEN-based registrations not accepted before HF19
+  }
+  if (stakes.size() > oxen::MAX_CONTRIBUTORS_HF19) {
+    LOG_PRINT_L1("Registration tx rejected: too many contributors (" << stakes.size() << " > " << oxen::MAX_CONTRIBUTORS_HF19 << ")");
     return false;
   }
+
+  const auto operator_requirement = nettype == cryptonote::network_type::MAINNET
+    ? oxen::MINIMUM_OPERATOR_CONTRIBUTION
+    : oxen::MINIMUM_OPERATOR_CONTRIBUTION_TESTNET;
+
+  uint64_t reserved = 0;
+  uint64_t remaining = staking_requirement;
+  for (size_t i = 0; i < stakes.size(); i++) {
+    const uint64_t min_stake = i == 0 ? operator_requirement : get_min_node_contribution(hf_version, staking_requirement, reserved, i);
+
+    if (stakes[i].second < min_stake) {
+      LOG_PRINT_L1("Registration tx rejected: stake " << i << " too small (" << stakes[i].second << " < " << min_stake << ")");
+      return false;
+    }
+    if (stakes[i].second > remaining) {
+      LOG_PRINT_L1("Registration tx rejected: stake " << i << " (" << stakes[i].second << ") exceeds available remaining stake (" << remaining << ")");
+      return false;
+    }
+
+    reserved += stakes[i].second;
+    remaining -= stakes[i].second;
+  }
+
   return true;
 }
 

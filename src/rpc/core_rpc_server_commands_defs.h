@@ -280,13 +280,15 @@ namespace rpc {
         struct contribution
         {
           std::string wallet; // Contributor wallet
-          uint32_t portion;   // Reserved portion, as the rounded nearest value out of 1'000'000 (i.e. 234567 == 23.4567%).
+          uint64_t amount;  // For HF19+ registrations, the atomic OXEN amount of the contribution.  Omitted for older registrations.
+          uint32_t portion; // Reserved portion, as the rounded nearest value out of 1'000'000 (i.e. 234567 == 23.4567%).
           KV_MAP_SERIALIZABLE
         };
 
         std::vector<contribution> contributors; // Operator contribution plus any reserved contributions
-        uint32_t fee;                           // Operator fee, as the rounded nearest value out of 1'000'000
-        uint64_t expiry;                        // unix timestamp at which the registration expires
+        uint32_t fee;                           // Operator fee, out of 1'000'000.  For HF19+ registrations this is exact, for earlier ones this is rounded to the nearest value.
+        hf hardfork;                            // For HF19+ registrations, this is the hard fork for which the registration is valid.  Omitted for earlier registrations.
+        uint64_t expiry;                        // For HF18 and earlier registrations, this is the unix timestamp at which the registration expires.  Omitted for HF19+ registrations.
         KV_MAP_SERIALIZABLE
       };
       struct state_change

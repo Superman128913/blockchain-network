@@ -43,6 +43,7 @@
 #include "common/hex.h"
 #include "common/varint.h"
 #include "common/median.h"
+#include "cryptonote_core/service_node_list.h"
 #include "epee/console_handler.h"
 #include "common/rules.h"
 
@@ -450,61 +451,79 @@ cryptonote::transaction oxen_chain_generator::create_tx(const cryptonote::accoun
   return t;
 }
 
+static uint64_t a_b_over_c(uint64_t a, uint64_t b, uint64_t c) {
+  uint64_t hi;
+  uint64_t lo = mul128(a, b, &hi);
+  uint64_t resulthi, resultlo;
+  div128_64(hi, lo, c, &resulthi, &resultlo);
+  assert(resulthi == 0);
+  return resultlo;
+}
+
 cryptonote::transaction
-oxen_chain_generator::create_registration_tx(const cryptonote::account_base &src,
-                                             const cryptonote::keypair &service_node_keys,
-                                             uint64_t src_portions,
-                                             uint64_t src_operator_cut,
-                                             std::array<oxen_service_node_contribution, 3> const &contributions,
-                                             int num_contributors) const
+oxen_chain_generator::create_registration_tx(const cryptonote::account_base& src,
+                                             const cryptonote::keypair& service_node_keys,
+                                             uint64_t operator_stake,
+                                             uint64_t fee,
+                                             const std::vector<service_nodes::contribution>& contributors
+                                             ) const
 {
-  cryptonote::transaction result = {};
-  {
-    std::vector<cryptonote::account_public_address> contributors;
-    std::vector<uint64_t> portions;
+  uint64_t new_height = get_block_height(top().block) + 1;
+  auto new_hf_version = get_hf_version_at(new_height);
 
-    contributors.reserve(1 + num_contributors);
-    portions.reserve    (1 + num_contributors);
+  service_nodes::registration_details reg{};
+  reg.fee = fee;
+  reg.reserved.reserve(1 + contributors.size());
+  reg.reserved.emplace_back(src.get_keys().m_account_address, operator_stake);
+  reg.reserved.insert(reg.reserved.end(), contributors.begin(), contributors.end());
 
-    contributors.push_back(src.get_keys().m_account_address);
-    portions.push_back(src_portions);
-    for (int i = 0; i < num_contributors; i++)
-    {
-      oxen_service_node_contribution const &entry = contributions[i];
-      contributors.push_back(entry.contributor);
-      portions.push_back    (entry.portions);
+  if (new_hf_version >= hf::hf19) {
+    assert(reg.reserved.size() <= oxen::MAX_CONTRIBUTORS_HF19);
+    reg.hf = static_cast<uint8_t>(new_hf_version);
+  } else {
+    assert(reg.reserved.size() <= oxen::MAX_CONTRIBUTORS_V1);
+    reg.uses_portions = true;
+    reg.hf = time(nullptr) + tools::to_seconds(cryptonote::old::STAKING_AUTHORIZATION_EXPIRATION_WINDOW);
+    assert(reg.fee <= cryptonote::STAKING_FEE_BASIS);
+    reg.fee = a_b_over_c(reg.fee, cryptonote::old::STAKING_PORTIONS, cryptonote::STAKING_FEE_BASIS);
+    uint64_t total = 0;
+    for (auto& [contrib, amount] : reg.reserved) {
+      assert(amount <= oxen::STAKING_REQUIREMENT_TESTNET);
+      amount = a_b_over_c(amount, cryptonote::old::STAKING_PORTIONS, oxen::STAKING_REQUIREMENT_TESTNET);
+      total += amount;
     }
 
-    uint64_t new_height    = get_block_height(top().block) + 1;
-    auto new_hf_version = get_hf_version_at(new_height);
-    const auto staking_requirement = service_nodes::get_staking_requirement(cryptonote::network_type::FAKECHAIN, new_height);
-    uint64_t amount                = service_nodes::portions_to_amount(portions[0], staking_requirement);
+    assert(total <= cryptonote::old::STAKING_PORTIONS);
 
-    uint64_t unlock_time = 0;
-    if (new_hf_version < hf::hf11_infinite_staking)
-      unlock_time = new_height + service_nodes::staking_num_lock_blocks(cryptonote::network_type::FAKECHAIN);
-
-    std::vector<uint8_t> extra;
-    cryptonote::add_service_node_pubkey_to_tx_extra(extra, service_node_keys.pub);
-    const uint64_t exp_timestamp = time(nullptr) + tools::to_seconds(cryptonote::old::STAKING_AUTHORIZATION_EXPIRATION_WINDOW);
-
-    crypto::hash hash;
-    if (!cryptonote::get_registration_hash(contributors, src_operator_cut, portions, exp_timestamp, hash))
-    {
-      MERROR("Could not make registration hash from addresses and portions");
-      return {};
-    }
-
-    crypto::signature signature;
-    crypto::generate_signature(hash, service_node_keys.pub, service_node_keys.sec, signature);
-    add_service_node_register_to_tx_extra(extra, contributors, src_operator_cut, portions, exp_timestamp, signature);
-    add_service_node_contributor_to_tx_extra(extra, contributors.at(0));
-    oxen_tx_builder(events_, result, top().block, src /*from*/, src.get_keys().m_account_address /*to*/, amount, new_hf_version)
-        .with_tx_type(cryptonote::txtype::stake)
-        .with_unlock_time(unlock_time)
-        .with_extra(extra)
-        .build();
+    uint64_t dust = cryptonote::old::STAKING_PORTIONS - total;
+    if (dust <= reg.reserved.size())
+      for (size_t i = 0; i < dust; i++)
+        reg.reserved[i].second++;
   }
+
+  uint64_t unlock_time = 0;
+  if (new_hf_version < hf::hf11_infinite_staking)
+    unlock_time = new_height + service_nodes::staking_num_lock_blocks(cryptonote::network_type::FAKECHAIN);
+
+  std::vector<uint8_t> extra;
+  cryptonote::add_service_node_pubkey_to_tx_extra(extra, service_node_keys.pub);
+
+  auto hash = service_nodes::get_registration_hash(reg);
+
+  auto block_ts = static_cast<uint64_t>(std::time(nullptr));
+  const auto staking_requirement = service_nodes::get_staking_requirement(cryptonote::network_type::FAKECHAIN, new_height);
+  reg.service_node_pubkey = service_node_keys.pub;
+  crypto::generate_signature(hash, service_node_keys.pub, service_node_keys.sec, reg.signature);
+
+  cryptonote::add_service_node_registration_to_tx_extra(extra, reg);
+  add_service_node_contributor_to_tx_extra(extra, reg.reserved[0].first);
+
+  cryptonote::transaction result{};
+  oxen_tx_builder(events_, result, top().block, src /*from*/, src.get_keys().m_account_address /*to*/, operator_stake, new_hf_version)
+      .with_tx_type(cryptonote::txtype::stake)
+      .with_unlock_time(unlock_time)
+      .with_extra(extra)
+      .build();
 
   service_node_keys_[service_node_keys.pub] = service_node_keys.sec; // NOTE: Save generated key for reuse later if we need to interact with the node again
   return result;
@@ -599,7 +618,9 @@ cryptonote::transaction oxen_chain_generator::create_state_change_tx(service_nod
 cryptonote::checkpoint_t oxen_chain_generator::create_service_node_checkpoint(uint64_t block_height, size_t num_votes) const
 {
   service_nodes::quorum const &quorum = *get_quorum(service_nodes::quorum_type::checkpointing, block_height);
-  assert(num_votes < quorum.validators.size());
+  if (num_votes >= quorum.validators.size())
+      throw std::logic_error{"cannot create checkpoint with " + std::to_string(num_votes) +
+          " votes with only " + std::to_string(quorum.validators.size()) + " validators"};
 
   oxen_blockchain_entry const &entry = db_.blocks[block_height];
   crypto::hash const block_hash      = cryptonote::get_block_hash(entry.block);
@@ -960,7 +981,7 @@ bool oxen_chain_generator::block_begin(oxen_blockchain_entry &entry, oxen_create
       crypto::public_key block_producer_key = pulse_quorum.workers[0];
       auto it = params.prev.service_node_state.service_nodes_infos.find(block_producer_key);
       assert(it != params.prev.service_node_state.service_nodes_infos.end());
-      block_producer = service_nodes::service_node_info_to_payout(block_producer_key, *(it->second));
+      block_producer = service_nodes::service_node_payout_portions(block_producer_key, *(it->second));
     }
 
     miner_tx_context = cryptonote::oxen_miner_tx_context::pulse_block(cryptonote::network_type::FAKECHAIN, block_producer, params.block_leader);
@@ -1095,17 +1116,7 @@ void oxen_chain_generator::block_end(oxen_blockchain_entry &entry, oxen_create_b
 
 bool oxen_chain_generator::process_registration_tx(cryptonote::transaction& tx, uint64_t block_height, hf hf_version)
 {
-  service_nodes::contributor_args_t contributor_args = {};
-  crypto::public_key service_node_key;
-  uint64_t expiration_timestamp{0};
-  crypto::signature signature;
-
-  if (!service_nodes::reg_tx_extract_fields(tx, contributor_args, expiration_timestamp, service_node_key, signature))
-    return false;
-
-  uint64_t staking_requirement = service_nodes::get_staking_requirement(cryptonote::network_type::FAKECHAIN, block_height);
-
-  return true;
+  return (bool) service_nodes::reg_tx_extract_fields(tx);
 }
 
 bool oxen_chain_generator::create_block(oxen_blockchain_entry &entry,
@@ -1499,6 +1510,12 @@ cryptonote::transaction make_registration_tx(std::vector<test_event_entry>& even
   const auto staking_requirement = service_nodes::get_staking_requirement(cryptonote::network_type::FAKECHAIN, new_height);
   uint64_t amount                = service_nodes::portions_to_amount(portions[0], staking_requirement);
 
+  service_nodes::registration_details reg{};
+  reg.uses_portions = true;
+  reg.fee = operator_cut;
+  reg.hf = time(nullptr) + tools::to_seconds(cryptonote::old::STAKING_AUTHORIZATION_EXPIRATION_WINDOW);
+  reg.service_node_pubkey = service_node_keys.pub;
+
   cryptonote::transaction tx;
   uint64_t unlock_time = 0;
   if (hf_version < hf::hf11_infinite_staking)
@@ -1506,18 +1523,10 @@ cryptonote::transaction make_registration_tx(std::vector<test_event_entry>& even
 
   std::vector<uint8_t> extra;
   cryptonote::add_service_node_pubkey_to_tx_extra(extra, service_node_keys.pub);
-  const uint64_t exp_timestamp = time(nullptr) + tools::to_seconds(cryptonote::old::STAKING_AUTHORIZATION_EXPIRATION_WINDOW);
 
-  crypto::hash hash;
-  if (!cryptonote::get_registration_hash(contributors, operator_cut, portions, exp_timestamp, hash))
-  {
-    MERROR("Could not make registration hash from addresses and portions");
-    return {};
-  }
-
-  crypto::signature signature;
-  crypto::generate_signature(hash, service_node_keys.pub, service_node_keys.sec, signature);
-  add_service_node_register_to_tx_extra(extra, contributors, operator_cut, portions, exp_timestamp, signature);
+  auto hash = service_nodes::get_registration_hash(reg);
+  crypto::generate_signature(hash, service_node_keys.pub, service_node_keys.sec, reg.signature);
+  cryptonote::add_service_node_registration_to_tx_extra(extra, reg);
   add_service_node_contributor_to_tx_extra(extra, contributors.at(0));
 
   cryptonote::txtype tx_type = cryptonote::txtype::standard;

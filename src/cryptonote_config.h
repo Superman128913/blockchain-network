@@ -111,6 +111,12 @@ namespace hashkey {
 // service node.
 using MAXIMUM_ACCEPTABLE_STAKE = std::ratio<101, 100>;
 
+// In HF19+ registrations the fee amount is a relative value out of this (for older registrations
+// the fee is a portion, i.e. value out of old::STAKING_PORTIONS).  For example a registration fee
+// value of 1000 corresponds to 1000/10000 = 10%.  This also implicitly defines the maximum
+// precision of HF19+ registrations (i.e. to a percentage with two decimal places of precision).
+inline constexpr uint64_t STAKING_FEE_BASIS = 10'000;
+
 
 // see src/cryptonote_protocol/levin_notify.cpp
 inline constexpr auto     NOISE_MIN_EPOCH   = 5min;
