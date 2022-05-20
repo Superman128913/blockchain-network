@@ -2271,7 +2271,6 @@ The Service Node will not activate until the entire stake has been contributed.
 
       case register_step::final_summary:
       {
-        assert(state.addresses.size() == state.contributions.size());
         const uint64_t amount_left = staking_requirement - state.total_reserved_contributions;
 
         std::cout << "\nRegistration Summary:\n\n";
@@ -2647,7 +2646,6 @@ The Service Node will not activate until the entire stake has been contributed.
 
       case register_step::final_summary:
       {
-        assert(state.addresses.size() == state.contributions.size());
         const uint64_t amount_left = staking_requirement - state.total_reserved_contributions;
 
         std::cout << "\nRegistration Summary:\n\n";

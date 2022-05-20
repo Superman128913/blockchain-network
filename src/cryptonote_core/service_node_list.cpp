@@ -409,12 +409,12 @@ namespace service_nodes
   crypto::hash get_registration_hash(const registration_details& registration)
   {
     std::string buffer;
-    buffer.reserve(
+    size_t size =
         sizeof(uint64_t) + // fee
         registration.reserved.size() * (
           sizeof(cryptonote::account_public_address) + sizeof(uint64_t)) + // addr+amount for each
-        sizeof(uint64_t) // expiration timestamp
-    );
+        sizeof(uint64_t); // expiration timestamp
+    buffer.reserve(size);
     buffer += tools::view_guts(oxenc::host_to_little(registration.fee));
     for (const auto& [addr, amount] : registration.reserved)
     {
