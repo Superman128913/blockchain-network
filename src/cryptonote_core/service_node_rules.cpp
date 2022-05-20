@@ -1,3 +1,4 @@
+#include "common/string_util.h"
 #include "cryptonote_config.h"
 #include "cryptonote_basic/hardfork.h"
 #include "common/oxen.h"
@@ -257,24 +258,30 @@ static bool get_portions_from_percent(double cur_percent, uint64_t& portions) {
   return true;
 }
 
+std::optional<double> parse_fee_percent(std::string_view fee)
+{
+  if (tools::ends_with(fee, "%"))
+    fee.remove_suffix(1);
+
+  double percent;
+  try {
+    percent = boost::lexical_cast<double>(fee);
+  } catch(...) {
+    return std::nullopt;
+  }
+
+  if (percent < 0 || percent > 100)
+    return std::nullopt;
+
+  return percent;
+}
+
 bool get_portions_from_percent_str(std::string cut_str, uint64_t& portions) {
 
-  if(!cut_str.empty() && cut_str.back() == '%')
-  {
-    cut_str.pop_back();
-  }
+  if (auto pct = parse_fee_percent(cut_str))
+    return get_portions_from_percent(*pct, portions);
 
-  double cut_percent;
-  try
-  {
-    cut_percent = boost::lexical_cast<double>(cut_str);
-  }
-  catch(...)
-  {
-    return false;
-  }
-
-  return get_portions_from_percent(cut_percent, portions);
+  return false;
 }
 
 } // namespace service_nodes

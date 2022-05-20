@@ -3924,9 +3924,11 @@ namespace service_nodes
           tr("Run this command in the operator's wallet"),
           cryptonote::get_account_address_as_str(nettype, false, reg.reserved[0].first));
 
-    cmd += "register_service_node";
-    cmd += tools::join(" ", args);
-    cmd += fmt::format(" {} {} {}", reg.hf, tools::type_to_hex(reg.service_node_pubkey), tools::type_to_hex(reg.signature));
+    cmd += fmt::format("register_service_node {} {} {} {}",
+            tools::join(" ", args),
+            reg.hf,
+            tools::type_to_hex(reg.service_node_pubkey),
+            tools::type_to_hex(reg.signature));
 
     if (make_friendly && reg.uses_portions)
     {

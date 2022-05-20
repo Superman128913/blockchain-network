@@ -290,6 +290,8 @@ uint64_t     get_locked_key_image_unlock_height(cryptonote::network_type nettype
 // Returns lowest x such that (staking_requirement * x/STAKING_PORTIONS) >= amount
 uint64_t get_portions_to_make_amount(uint64_t staking_requirement, uint64_t amount, uint64_t max_portions = cryptonote::old::STAKING_PORTIONS);
 
+std::optional<double> parse_fee_percent(std::string_view fee);
+
 bool get_portions_from_percent_str(std::string cut_str, uint64_t& portions);
 
 }

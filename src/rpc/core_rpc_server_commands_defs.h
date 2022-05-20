@@ -634,7 +634,7 @@ namespace rpc {
       bool mainnet;                         // States if the node is on the mainnet (`true`) or not (`false`).
       bool testnet;                         // States if the node is on the testnet (`true`) or not (`false`).
       bool devnet;                          // States if the node is on the devnet (`true`) or not (`false`).
-      std::string nettype;                  // Nettype value used.
+      std::string nettype;                  // Network type as a string ("mainnet", "testnet", "devnet", or "fakechain").
       std::string top_block_hash;           // Hash of the highest block in the chain.
       std::string immutable_block_hash;     // Hash of the highest block in the chain that can not be reorganized.
       uint64_t cumulative_difficulty;       // Cumulative difficulty of all blocks in the blockchain.
