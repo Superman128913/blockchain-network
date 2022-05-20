@@ -46,8 +46,6 @@ TEST(SQLITE, AddSNRewards)
 {
   cryptonote::BlockchainSQLiteTest sqliteDB(cryptonote::network_type::TESTNET, ":memory:");
 
-  std::cout << "in memory db opened" << std::endl;
-
   EXPECT_TRUE(sqliteDB.batching_count() == 0);
 
   std::vector<cryptonote::batch_sn_payment> t1;
