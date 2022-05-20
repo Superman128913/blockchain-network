@@ -209,6 +209,10 @@ constexpr auto hf_prev(hf x) {
     return static_cast<hf>(static_cast<uint8_t>(x) - 1);
 }
 
+// This is here to make sure the numeric value of the top hf enum value is correct (i.e. hf19 == 19
+// numerically); bump this when adding a new hf.
+static_assert(static_cast<uint8_t>(hf_max) == 19);
+
 // Constants for which hardfork activates various features:
 namespace feature {
   constexpr auto PER_BYTE_FEE                           = hf::hf10_bulletproofs;
