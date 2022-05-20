@@ -60,7 +60,6 @@
 #include "serialization/binary_utils.h"
 #include "serialization/string.h"
 #include "serialization/boost_std_variant.h"
-#include "cryptonote_basic/blobdatatype.h"
 #include "mnemonics/electrum-words.h"
 #include "common/i18n.h"
 #include "common/util.h"
@@ -841,7 +840,7 @@ void setup_shim(hw::wallet_shim * shim, tools::wallet2 * wallet)
 
 bool get_pruned_tx(const rpc::GET_TRANSACTIONS::entry &entry, cryptonote::transaction &tx, crypto::hash &tx_hash)
 {
-  cryptonote::blobdata bd;
+  std::string bd;
 
   // easy case if we have the whole tx
   if (entry.as_hex || (entry.prunable_as_hex && entry.pruned_as_hex))
@@ -2688,7 +2687,7 @@ void wallet2::get_short_chain_history(std::list<crypto::hash>& ids, uint64_t gra
     ids.push_back(m_blockchain.genesis());
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::parse_block_round(const cryptonote::blobdata &blob, cryptonote::block &bl, crypto::hash &bl_id, bool &error) const
+void wallet2::parse_block_round(const std::string &blob, cryptonote::block &bl, crypto::hash &bl_id, bool &error) const
 {
   error = !cryptonote::parse_and_validate_block_from_blob(blob, bl, bl_id);
 }
@@ -3258,7 +3257,7 @@ std::vector<wallet2::get_pool_state_tx> wallet2::get_pool_state(bool refreshed)
       if (tx_entry.in_pool)
       {
         cryptonote::transaction tx;
-        cryptonote::blobdata bd;
+        std::string bd;
         crypto::hash tx_hash;
 
         if (get_pruned_tx(tx_entry, tx, tx_hash))
@@ -7555,7 +7554,7 @@ bool wallet2::parse_multisig_tx_from_str(std::string_view multisig_tx_st, multis
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::load_multisig_tx(cryptonote::blobdata s, multisig_tx_set &exported_txs, std::function<bool(const multisig_tx_set&)> accept_func)
+bool wallet2::load_multisig_tx(std::string s, multisig_tx_set &exported_txs, std::function<bool(const multisig_tx_set&)> accept_func)
 {
   if(!parse_multisig_tx_from_str(s, exported_txs))
   {
@@ -14096,7 +14095,7 @@ crypto::key_image wallet2::get_multisig_composite_key_image(size_t n) const
   return ki;
 }
 //----------------------------------------------------------------------------------------------------
-cryptonote::blobdata wallet2::export_multisig()
+std::string wallet2::export_multisig()
 {
   std::vector<wallet::multisig_info> info;
 
@@ -14169,13 +14168,13 @@ void wallet2::update_multisig_rescan_info(const std::vector<std::vector<rct::key
   m_key_images[td.m_key_image] = n;
 }
 //----------------------------------------------------------------------------------------------------
-size_t wallet2::import_multisig(std::vector<cryptonote::blobdata> blobs)
+size_t wallet2::import_multisig(std::vector<std::string> blobs)
 {
   CHECK_AND_ASSERT_THROW_MES(m_multisig, "Wallet is not multisig");
 
   std::vector<std::vector<wallet::multisig_info>> info;
   std::unordered_set<crypto::public_key> seen;
-  for (cryptonote::blobdata &data: blobs)
+  for (std::string &data: blobs)
   {
     THROW_WALLET_EXCEPTION_IF(!tools::starts_with(data, MULTISIG_EXPORT_FILE_MAGIC),
         error::wallet_internal_error, "Bad multisig info file magic in ");

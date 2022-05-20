@@ -851,7 +851,7 @@ oxen_blockchain_entry oxen_chain_generator::create_genesis_block(const cryptonot
                                           blk.miner_tx,
                                           cryptonote::oxen_miner_tx_context::miner_block(cryptonote::network_type::FAKECHAIN, miner.get_keys().m_account_address),
                                           sn_rwds,
-                                          cryptonote::blobdata(),
+                                          std::string(),
                                           hf_version_);
     assert(constructed);
 
@@ -1015,7 +1015,7 @@ bool oxen_chain_generator::block_begin(oxen_blockchain_entry &entry, oxen_create
                                     blk.miner_tx,
                                     miner_tx_context,
                                     sn_rwds,
-                                    cryptonote::blobdata(),
+                                    std::string(),
                                     blk.major_version
                                     );
     if (!r)
@@ -1349,7 +1349,7 @@ bool test_generator::construct_block(cryptonote::block &blk,
                                   blk.miner_tx,
                                   miner_tx_context,
                                   sn_rwds,
-                                  cryptonote::blobdata(),
+                                  std::string(),
                                   m_hf_version);
     if (!r)
       return false;
@@ -1464,7 +1464,7 @@ bool test_generator::construct_block_manually(
 
     std::optional<std::vector<cryptonote::batch_sn_payment>> sn_rwds;
     size_t current_block_weight = txs_weight + get_transaction_weight(blk.miner_tx);
-    auto [r, block_rewards] = construct_miner_tx(height, tools::median(block_weights.begin(), block_weights.end()), already_generated_coins, current_block_weight, miner_fee, blk.miner_tx, cryptonote::oxen_miner_tx_context::miner_block(cryptonote::network_type::FAKECHAIN, miner_acc.get_keys().m_account_address), sn_rwds, cryptonote::blobdata(), m_hf_version);
+    auto [r, block_rewards] = construct_miner_tx(height, tools::median(block_weights.begin(), block_weights.end()), already_generated_coins, current_block_weight, miner_fee, blk.miner_tx, cryptonote::oxen_miner_tx_context::miner_block(cryptonote::network_type::FAKECHAIN, miner_acc.get_keys().m_account_address), sn_rwds, std::string(), m_hf_version);
     if (!r)
       return false;
   }

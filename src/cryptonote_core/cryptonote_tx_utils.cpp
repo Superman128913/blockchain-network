@@ -253,7 +253,7 @@ namespace cryptonote
       transaction& tx,
       const oxen_miner_tx_context &miner_tx_context,
       const std::optional<std::vector<cryptonote::batch_sn_payment>> sn_rwds,
-      const blobdata& extra_nonce,
+      const std::string& extra_nonce,
       hf hard_fork_version)
   {
     tx.vin.clear();
@@ -1098,7 +1098,7 @@ namespace cryptonote
     }
     else
     {
-      blobdata bd = get_block_hashing_blob(b);
+      std::string bd = get_block_hashing_blob(b);
       rx_slow_hash(randomx_context.current_blockchain_height, randomx_context.seed_height, randomx_context.seed_block_hash.data, bd.data(), bd.size(), result.data, 0, 1);
     }
 
