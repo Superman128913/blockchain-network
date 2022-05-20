@@ -65,8 +65,8 @@ static constexpr std::array testnet_hard_forks =
   hard_fork{hf::hf17,                     0,   447275, 1608276840 }, // 2020-12-18 05:34 UTC
   hard_fork{hf::hf18,                     0,   501750, 1616631051 }, // 2021-03-25 12:10 UTC
   hard_fork{hf::hf18,                     1,   578637, 1624040400 }, // 2021-06-18 18:20 UTC
-  hard_fork{hf::hf19,                     0,   732355, 1650402545 },
-  hard_fork{hf::hf19,                     1,   751553, 1652152424 },
+  hard_fork{hf::hf19_reward_batching,     0,   732355, 1650402545 },
+  hard_fork{hf::hf19_reward_batching,     1,   751553, 1652152424 },
 };
 
 static constexpr std::array devnet_hard_forks =
@@ -79,7 +79,8 @@ static constexpr std::array devnet_hard_forks =
   hard_fork{ hf::hf16_pulse,               0,   100,  1599848400 },
   hard_fork{ hf::hf17,                     0,   151,  1599848400 },
   hard_fork{ hf::hf18,                     0,   152,  1599848400 },
-  hard_fork{ hf::hf19,                     0,   153,  1599848400 },
+  hard_fork{ hf::hf19_reward_batching,     0,   153,  1599848400 },
+  hard_fork{ hf::hf19_reward_batching,     1,   154,  1599848400 },
 };
 
 
@@ -167,7 +168,7 @@ get_ideal_block_version(network_type nettype, uint64_t height)
       result.first = it->version;
       result.second = it->snode_revision;
     }
-    if (result.first < hf::hf19)
+    if (result.first < hf::hf19_reward_batching)
       result.second = static_cast<uint8_t>(it->version);
   }
   return result;

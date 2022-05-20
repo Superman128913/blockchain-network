@@ -473,7 +473,7 @@ bool oxen_core_block_reward_unpenalized_pre_pulse::generate(std::vector<test_eve
 
 bool oxen_core_block_reward_unpenalized_post_pulse::generate(std::vector<test_event_entry>& events)
 {
-  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::hf_prev(hf::hf19), 150 /*Proof Of Stake Delay*/);
+  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::hf_prev(hf::hf19_reward_batching), 150 /*Proof Of Stake Delay*/);
   oxen_chain_generator gen(events, hard_forks);
 
   const auto newest_hf = hard_forks.back().version;
@@ -3053,7 +3053,7 @@ bool oxen_service_nodes_insufficient_contribution_HF18::generate(std::vector<tes
 
 bool oxen_service_nodes_sufficient_contribution_HF19::generate(std::vector<test_event_entry> &events)
 {
-  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::hf::hf19);
+  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::hf::hf19_reward_batching);
   oxen_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().version);
@@ -3095,7 +3095,7 @@ bool oxen_service_nodes_sufficient_contribution_HF19::generate(std::vector<test_
 
 bool oxen_service_nodes_insufficient_operator_contribution_HF19::generate(std::vector<test_event_entry> &events)
 {
-  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::hf::hf19);
+  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::hf::hf19_reward_batching);
   oxen_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().version);

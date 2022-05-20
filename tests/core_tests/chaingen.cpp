@@ -477,7 +477,7 @@ oxen_chain_generator::create_registration_tx(const cryptonote::account_base& src
   reg.reserved.emplace_back(src.get_keys().m_account_address, operator_stake);
   reg.reserved.insert(reg.reserved.end(), contributors.begin(), contributors.end());
 
-  if (new_hf_version >= hf::hf19) {
+  if (new_hf_version >= hf::hf19_reward_batching) {
     assert(reg.reserved.size() <= oxen::MAX_CONTRIBUTORS_HF19);
     reg.hf = static_cast<uint8_t>(new_hf_version);
   } else {
@@ -1020,7 +1020,7 @@ bool oxen_chain_generator::block_begin(oxen_blockchain_entry &entry, oxen_create
 
   size_t target_block_weight = txs_weight + get_transaction_weight(blk.miner_tx);
   std::optional<std::vector<cryptonote::batch_sn_payment>> sn_rwds;
-  if (hf_version_ >= hf::hf19)
+  if (hf_version_ >= hf::hf19_reward_batching)
   {
     sn_rwds = sqlite_db_->get_sn_payments(height); //Rewards to pay out
   }

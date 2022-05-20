@@ -271,13 +271,13 @@ namespace cryptonote {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__ << " called on height: " << block_height);
 
     auto hf_version = block.major_version;
-    if (hf_version < hf::hf19) {
+    if (hf_version < hf::hf19_reward_batching) {
       update_height(block_height);
       print_database();
       return true;
     }
 
-    auto fork_height = cryptonote::get_hard_fork_heights(m_nettype, hf::hf19);
+    auto fork_height = cryptonote::get_hard_fork_heights(m_nettype, hf::hf19_reward_batching);
     if (block_height == fork_height.first.value_or(0)) {
       MDEBUG("Batching of Service Node Rewards Begins");
       reset_database();
@@ -379,7 +379,7 @@ namespace cryptonote {
 
     const auto& conf = get_config(m_nettype);
     auto hf_version = hf{block.major_version};
-    if (hf_version < hf::hf19) {
+    if (hf_version < hf::hf19_reward_batching) {
       decrement_height();
       return true;
     }

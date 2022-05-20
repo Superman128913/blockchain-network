@@ -8168,7 +8168,7 @@ wallet2::stake_result wallet2::check_stake_allowed(const crypto::public_key& sn_
   }
 
   const bool full = snode_info.contributors.size() >= (
-      *hf_version >= hf::hf19 ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1);
+      *hf_version >= hf::hf19_reward_batching ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1);
   if (full && !is_preexisting_contributor)
   {
     result.status = stake_result_status::service_node_contributors_maxed;

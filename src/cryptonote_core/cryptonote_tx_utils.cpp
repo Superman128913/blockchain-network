@@ -152,7 +152,7 @@ namespace cryptonote
     if (height == 0)
       return false;
 
-    if (hard_fork_version <= hf::hf9_service_nodes || hard_fork_version >= hf::hf19)
+    if (hard_fork_version <= hf::hf9_service_nodes || hard_fork_version >= hf::hf19_reward_batching)
       return true;
 
 
@@ -357,7 +357,7 @@ namespace cryptonote
         std::vector<uint64_t> split_rewards   = distribute_reward_by_portions(producer.payouts, reward_parts.miner_fee, true /*distribute_remainder*/);
 
         for (size_t i = 0; i < producer.payouts.size(); i++)
-          if (hard_fork_version < hf::hf19)
+          if (hard_fork_version < hf::hf19_reward_batching)
           {
             rewards.push_back({reward_type::snode, producer.payouts[i].address, split_rewards[i]});
           } else {
@@ -368,7 +368,7 @@ namespace cryptonote
       std::vector<uint64_t> split_rewards = distribute_reward_by_portions(leader.payouts, leader_reward, true /*distribute_remainder*/);
       for (size_t i = 0; i < leader.payouts.size(); i++)
       {
-        if (hard_fork_version < hf::hf19) {
+        if (hard_fork_version < hf::hf19_reward_batching) {
           rewards.push_back({reward_type::snode, leader.payouts[i].address, split_rewards[i]});
         } else {
           batched_rewards.emplace_back(leader.payouts[i].address, split_rewards[i], nettype);
@@ -384,7 +384,7 @@ namespace cryptonote
 
       if (uint64_t miner_amount = reward_parts.base_miner + reward_parts.miner_fee; miner_amount)
       {
-        if (hard_fork_version < hf::hf19) {
+        if (hard_fork_version < hf::hf19_reward_batching) {
           rewards.push_back({reward_type::miner, miner_tx_context.miner_block_producer, miner_amount});
         } else {
           batched_rewards.emplace_back(miner_tx_context.miner_block_producer, miner_amount, nettype);
@@ -398,7 +398,7 @@ namespace cryptonote
                                           hard_fork_version >= hf::hf16_pulse /*distribute_remainder*/);
         for (size_t i = 0; i < leader.payouts.size(); i++)
         {
-          if (hard_fork_version < hf::hf19) {
+          if (hard_fork_version < hf::hf19_reward_batching) {
             rewards.push_back({reward_type::snode, leader.payouts[i].address, split_rewards[i]});
           } else {
             batched_rewards.emplace_back(leader.payouts[i].address, split_rewards[i], nettype);
@@ -419,7 +419,7 @@ namespace cryptonote
         cryptonote::address_parse_info governance_wallet_address;
         cryptonote::get_account_address_from_str(governance_wallet_address, nettype, cryptonote::get_config(nettype).governance_wallet_address(hard_fork_version));
         // Governance reward paid out through SN rewards batching after HF19
-        if (hard_fork_version < hf::hf19) {
+        if (hard_fork_version < hf::hf19_reward_batching) {
           rewards.push_back({reward_type::governance, governance_wallet_address.address, reward_parts.governance_paid});
         }
       }
@@ -436,7 +436,7 @@ namespace cryptonote
       }
     }
 
-    if (hard_fork_version < hf::hf19)
+    if (hard_fork_version < hf::hf19_reward_batching)
     {
       CHECK_AND_ASSERT_MES(rewards.size() <= 9, std::make_pair(false, block_rewards), "More rewards specified than supported, number of rewards: " << rewards.size()  << ", capacity: " << rewards.size());
       CHECK_AND_ASSERT_MES(rewards.size() > 0, std::make_pair(false, block_rewards), "Zero rewards are to be payed out, there should be at least 1");
@@ -490,7 +490,7 @@ namespace cryptonote
     else
     {
       expected_amount = 0;
-      if (hard_fork_version < hf::hf19)
+      if (hard_fork_version < hf::hf19_reward_batching)
         expected_amount = expected_amount + reward_parts.base_miner + reward_parts.miner_fee + reward_parts.service_node_total + reward_parts.governance_paid;
       else
         expected_amount = expected_amount + total_sn_rewards;

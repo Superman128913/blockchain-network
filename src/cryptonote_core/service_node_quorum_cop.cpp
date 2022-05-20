@@ -127,7 +127,7 @@ namespace service_nodes
     }
 
     // TODO: perhaps come back and make this activate on some "soft fork" height before HF19?
-    if (!lokinet_reachable && hf_version >= hf::hf19)
+    if (!lokinet_reachable && hf_version >= hf::hf19_reward_batching)
     {
       LOG_PRINT_L1("Service Node lokinet is not reachable for node: " << pubkey);
       result.lokinet_reachable = false;

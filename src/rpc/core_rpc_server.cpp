@@ -745,7 +745,7 @@ namespace cryptonote { namespace rpc {
         for (size_t i = 0; i < x.amounts.size(); i++) {
           auto& [wallet, amount, portion] = reg.contributors.emplace_back();
           wallet = get_account_address_as_str(nettype, false, {x.public_spend_keys[i], x.public_view_keys[i]});
-          if (reg.hardfork >= hf::hf19) {
+          if (reg.hardfork >= hf::hf19_reward_batching) {
             amount = x.amounts[i];
             // We aren't given info on whether this is testnet/mainnet, but we can guess by looking
             // at the operator amount, which has to be <= 100 on testnet, but >= 3750 on mainnet.

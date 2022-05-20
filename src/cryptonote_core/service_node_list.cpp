@@ -352,18 +352,18 @@ namespace service_nodes
   {
     if (reg.uses_portions)
     {
-      if (hf_version > hf::hf19)
+      if (hf_version > hf::hf19_reward_batching)
         throw invalid_registration{"Portion-based registrations are not permitted after HF19"};
     }
     else
     {
       // If not using portions then the hf value must be >= 19 and equal to the current blockchain hf:
-      if (hf_version < hf::hf19 || reg.hf != static_cast<uint8_t>(hf_version))
+      if (hf_version < hf::hf19_reward_batching || reg.hf != static_cast<uint8_t>(hf_version))
         throw invalid_registration{"Wrong registration hardfork " +
           std::to_string(reg.hf) + ", != current " + std::to_string(static_cast<uint8_t>(hf_version))};
     }
 
-    const size_t max_contributors = (hf_version >= hf::hf19 && !reg.uses_portions)
+    const size_t max_contributors = (hf_version >= hf::hf19_reward_batching && !reg.uses_portions)
       ? oxen::MAX_CONTRIBUTORS_HF19
       : oxen::MAX_CONTRIBUTORS_V1;
 
@@ -1224,7 +1224,7 @@ namespace service_nodes
     // Check node contributor counts
     {
       bool too_many_contributions = false;
-      if (hf_version >= hf::hf19)
+      if (hf_version >= hf::hf19_reward_batching)
         // As of HF19 we allow up to 10 stakes total
         too_many_contributions = existing_contributions + other_reservations + 1 > oxen::MAX_CONTRIBUTORS_HF19;
       else if (hf_version >= hf::hf16_pulse)
@@ -1240,7 +1240,7 @@ namespace service_nodes
       if (too_many_contributions)
       {
         LOG_PRINT_L1("TX: Already hit the max number of contributions: "
-                     << (hf_version >= hf::hf19 ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1)
+                     << (hf_version >= hf::hf19_reward_batching ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1)
                      << " for contributor: " << cryptonote::get_account_address_as_str(nettype, false, stake.address)
                      << " on height: " << block_height << " for tx: " << cryptonote::get_transaction_hash(tx));
         return false;
@@ -2552,13 +2552,13 @@ namespace service_nodes
       }
 
       block_producer = info_it->second;
-      if (mode == verify_mode::pulse_different_block_producer && reward_parts.miner_fee > 0 && block.major_version < hf::hf19)
+      if (mode == verify_mode::pulse_different_block_producer && reward_parts.miner_fee > 0 && block.major_version < hf::hf19_reward_batching)
       {
         expected_vouts_size += block_producer->contributors.size();
       }
     }
 
-    if (block.major_version >= hf::hf19)
+    if (block.major_version >= hf::hf19_reward_batching)
     {
       mode = verify_mode::batched_sn_rewards;
       MDEBUG("Batched miner reward");
@@ -3841,11 +3841,11 @@ namespace service_nodes
     if (args.size() % 2 == 0 || args.size() < 3)
       throw invalid_registration{tr("Usage: <fee-basis-points> <address> <amount> [<address> <amount> [...]]]")};
 
-    const size_t max_contributors = hf_version >= hf::hf19 ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1;
+    const size_t max_contributors = hf_version >= hf::hf19_reward_batching ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1;
     if (args.size() > 1 + 2 * max_contributors)
       throw invalid_registration{tr("Exceeds the maximum number of contributors") + " ("s + std::to_string(max_contributors) + ")"};
 
-    const uint64_t max_fee = hf_version >= hf::hf19 ? cryptonote::STAKING_FEE_BASIS : cryptonote::old::STAKING_PORTIONS;
+    const uint64_t max_fee = hf_version >= hf::hf19_reward_batching ? cryptonote::STAKING_FEE_BASIS : cryptonote::old::STAKING_PORTIONS;
     if (!tools::parse_int(args[0], result.fee) || result.fee > max_fee)
       throw invalid_registration{tr("Invalid operator fee: ") + args[0] + tr(". Must be between 0 and ") + std::to_string(max_fee)};
 
@@ -3870,7 +3870,7 @@ namespace service_nodes
     }
 
     uint64_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    if (hf_version < hf::hf19)
+    if (hf_version < hf::hf19_reward_batching)
     {
       result.uses_portions = true;
       result.hf = now;

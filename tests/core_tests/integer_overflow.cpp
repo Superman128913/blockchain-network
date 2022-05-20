@@ -111,7 +111,7 @@ bool gen_uint_overflow_1::generate(std::vector<test_event_entry>& events) const
   // Problem 1. Miner tx outputs overflow
   {
     oxen_blockchain_entry entry       = gen.create_next_block();
-    if ( entry.block.major_version < cryptonote::hf::hf19)
+    if ( entry.block.major_version < cryptonote::hf::hf19_reward_batching)
     {
       cryptonote::transaction &miner_tx = entry.block.miner_tx;
       split_miner_tx_outs(miner_tx, oxen::MONEY_SUPPLY);
@@ -127,7 +127,7 @@ bool gen_uint_overflow_1::generate(std::vector<test_event_entry>& events) const
       txs.push_back(gen.create_and_add_tx(gen.first_miner_, alice.get_keys().m_account_address, MK_COINS(1), MK_COINS(100) /*fee*/, false /*kept_by_block*/));
 
       oxen_blockchain_entry entry       = gen.create_next_block(txs);
-      if ( entry.block.major_version < cryptonote::hf::hf19)
+      if ( entry.block.major_version < cryptonote::hf::hf19_reward_batching)
       {
         cryptonote::transaction &miner_tx = entry.block.miner_tx;
         miner_tx.vout[0].amount           = 0; // Take partial block reward, fee > block_reward so ordinarly it would overflow. This should be disallowed
@@ -141,7 +141,7 @@ bool gen_uint_overflow_1::generate(std::vector<test_event_entry>& events) const
       txs.push_back(gen.create_and_add_tx(gen.first_miner_, alice.get_keys().m_account_address, MK_COINS(1), MK_COINS(100) /*fee*/, true /*kept_by_block*/));
 
       oxen_blockchain_entry entry       = gen.create_next_block(txs);
-      if ( entry.block.major_version < cryptonote::hf::hf19)
+      if ( entry.block.major_version < cryptonote::hf::hf19_reward_batching)
       {
         cryptonote::transaction &miner_tx = entry.block.miner_tx;
         miner_tx.vout[0].amount           = 0; // Take partial block reward, fee > block_reward so ordinarly it would overflow. This should be disallowed

@@ -101,7 +101,7 @@ KV_SERIALIZE_MAP_CODE_END()
 KV_SERIALIZE_MAP_CODE_BEGIN(GET_TRANSACTIONS::extra_entry::sn_reg_info)
   KV_SERIALIZE(contributors)
   KV_SERIALIZE(fee)
-  if (this_ref.hardfork >= hf::hf19) { KV_SERIALIZE_ENUM(hardfork) }
+  if (this_ref.hardfork >= hf::hf19_reward_batching) { KV_SERIALIZE_ENUM(hardfork) }
   else { KV_SERIALIZE(expiry) }
 KV_SERIALIZE_MAP_CODE_END()
 KV_SERIALIZE_MAP_CODE_BEGIN(GET_TRANSACTIONS::extra_entry::state_change)

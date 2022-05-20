@@ -109,9 +109,9 @@ bool check_service_node_portions(hf hf_version, const std::vector<std::pair<cryp
 {
   // When checking portion we always use HF18 rules, even on HF19, because a registration actually
   // generated under HF19+ won't get here.
-  if (hf_version == hf::hf19)
+  if (hf_version == hf::hf19_reward_batching)
     hf_version = hf::hf18;
-  else if (hf_version > hf::hf19)
+  else if (hf_version > hf::hf19_reward_batching)
   {
     LOG_PRINT_L1("Registration tx rejected: portions-based registrations not permitted after HF19");
     return false;
@@ -145,7 +145,7 @@ bool check_service_node_portions(hf hf_version, const std::vector<std::pair<cryp
 
 bool check_service_node_stakes(hf hf_version, cryptonote::network_type nettype, uint64_t staking_requirement, const std::vector<std::pair<cryptonote::account_public_address, uint64_t>>& stakes)
 {
-  if (hf_version < hf::hf19) {
+  if (hf_version < hf::hf19_reward_batching) {
     LOG_PRINT_L1("Registration tx rejected: amount-based registrations not accepted before HF19");
     return false; // OXEN-based registrations not accepted before HF19
   }
@@ -216,7 +216,7 @@ uint64_t get_min_node_contribution(hf version, uint64_t staking_requirement, uin
 
   const uint64_t needed = staking_requirement - total_reserved;
 
-  const size_t max_contributors = version >= hf::hf19 ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1;
+  const size_t max_contributors = version >= hf::hf19_reward_batching ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1;
   assert(max_contributors > num_contributions);
   if (max_contributors <= num_contributions) return UINT64_MAX;
 

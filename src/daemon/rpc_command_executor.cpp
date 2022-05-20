@@ -2377,7 +2377,7 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
     return false;
 
   auto hf_version = hf_res.version;
-  if (hf_version < hf::hf19)
+  if (hf_version < hf::hf19_reward_batching)
     return prepare_registration_hf18(hf_version, force_registration);
 
   auto scoped_log_cats = std::make_unique<clear_log_categories>();
