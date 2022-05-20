@@ -51,7 +51,7 @@ message(STATUS "CMake version ${CMAKE_VERSION}")
 set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12 CACHE STRING "macOS deployment target (Apple clang only)")
 
 project(oxen
-    VERSION 9.2.0
+    VERSION 10.0.0
     LANGUAGES CXX C)
 set(OXEN_RELEASE_CODENAME "Audacious Aurochs")
 
