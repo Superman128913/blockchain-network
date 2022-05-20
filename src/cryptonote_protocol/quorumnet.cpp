@@ -860,7 +860,7 @@ void handle_blink(Message& m, QnetState& qnet) {
     auto local_height = qnet.core.get_current_blockchain_height();
 
     auto hf_version = get_network_version(qnet.core.get_nettype(), local_height);
-    if (hf_version < HF_VERSION_BLINK) {
+    if (hf_version < cryptonote::feature::BLINK) {
         MWARNING("Rejecting blink message: blink is not available for hardfork " << (int) hf_version);
         if (tag)
             m.send_back("bl.nostart", bt_serialize(bt_dict{{"!", tag}, {"e", "Invalid blink authorization height"sv}}));

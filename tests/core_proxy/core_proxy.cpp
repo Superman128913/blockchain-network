@@ -228,7 +228,7 @@ bool tests::proxy_core::handle_incoming_block(const cryptonote::blobdata& block_
     }
 
     crypto::hash h = get_block_hash(b);
-    crypto::hash lh = get_block_longhash_w_blockchain(cryptonote::FAKECHAIN, NULL, b, 0, 0);
+    crypto::hash lh = get_block_longhash_w_blockchain(network_type::FAKECHAIN, NULL, b, 0, 0);
     std::cout << "BLOCK\n\n";
     std::cout << h << '\n';
     std::cout << lh << '\n';
@@ -266,9 +266,9 @@ void tests::proxy_core::get_blockchain_top(uint64_t& height, crypto::hash& top_i
 }
 
 bool tests::proxy_core::init(const boost::program_options::variables_map& /*vm*/) {
-    generate_genesis_block(m_genesis, MAINNET);
+    generate_genesis_block(m_genesis, network_type::MAINNET);
     crypto::hash h = get_block_hash(m_genesis);
-    add_block(h, get_block_longhash(cryptonote::FAKECHAIN, randomx_longhash_context(NULL, m_genesis, 0), m_genesis, 0, 0), m_genesis, block_to_blob(m_genesis), nullptr /*checkpoint*/);
+    add_block(h, get_block_longhash(network_type::FAKECHAIN, randomx_longhash_context(NULL, m_genesis, 0), m_genesis, 0, 0), m_genesis, block_to_blob(m_genesis), nullptr /*checkpoint*/);
     return true;
 }
 

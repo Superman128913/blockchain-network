@@ -94,7 +94,7 @@ void mock_daemon::load_params(boost::program_options::variables_map const & vm)
   m_p2p_bind_port = command_line::get_arg(vm, nodetool::arg_p2p_bind_port);
   m_rpc_bind_port = command_line::get_arg(vm, cryptonote::core_rpc_server::arg_rpc_bind_port);
   m_zmq_bind_port = command_line::get_arg(vm, daemon_args::arg_zmq_rpc_bind_port);
-  m_network_type = command_line::get_arg(vm, cryptonote::arg_testnet_on) ? cryptonote::TESTNET : cryptonote::MAINNET;
+  m_network_type = command_line::get_arg(vm, cryptonote::arg_testnet_on) ? cryptonote::network_type::TESTNET : cryptonote::network_type::MAINNET;
 }
 
 mock_daemon::~mock_daemon()

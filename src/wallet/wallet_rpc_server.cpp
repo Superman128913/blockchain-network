@@ -1041,11 +1041,11 @@ namespace tools
 
     {
       uint32_t priority = convert_priority(req.priority);
-      std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
+      auto hf_version = m_wallet->get_hard_fork_version();
       if (!hf_version)
         throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
       cryptonote::oxen_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, cryptonote::txtype::standard, priority);
-      std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_2(dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, req.unlock_time, priority, extra, req.account_index, req.subaddr_indices, tx_params);
+      std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_2(dsts, cryptonote::TX_OUTPUT_DECOYS, req.unlock_time, priority, extra, req.account_index, req.subaddr_indices, tx_params);
 
       if (ptx_vector.empty())
         throw wallet_rpc_error{error_code::TX_NOT_POSSIBLE, "No transaction created"};
@@ -1075,13 +1075,13 @@ namespace tools
 
     {
       uint32_t priority = convert_priority(req.priority);
-      std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
+      auto hf_version = m_wallet->get_hard_fork_version();
       if (!hf_version)
         throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
 
       cryptonote::oxen_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, cryptonote::txtype::standard, priority);
       LOG_PRINT_L2("on_transfer_split calling create_transactions_2");
-      std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_2(dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, req.unlock_time, priority, extra, req.account_index, req.subaddr_indices, tx_params);
+      std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_2(dsts, cryptonote::TX_OUTPUT_DECOYS, req.unlock_time, priority, extra, req.account_index, req.subaddr_indices, tx_params);
       LOG_PRINT_L2("on_transfer_split called create_transactions_2");
 
       if (ptx_vector.empty())
@@ -1364,7 +1364,7 @@ namespace tools
 
     {
       uint32_t priority = convert_priority(req.priority);
-      std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_all(req.below_amount, dsts[0].addr, dsts[0].is_subaddress, req.outputs, CRYPTONOTE_DEFAULT_TX_MIXIN, req.unlock_time, priority, extra, req.account_index, subaddr_indices);
+      std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_all(req.below_amount, dsts[0].addr, dsts[0].is_subaddress, req.outputs, cryptonote::TX_OUTPUT_DECOYS, req.unlock_time, priority, extra, req.account_index, subaddr_indices);
 
       fill_response(ptx_vector, req.get_tx_keys, res.tx_key_list, res.amount_list, res.fee_list, res.multisig_txset, res.unsigned_txset, req.do_not_relay, priority == tx_priority_blink,
             res.tx_hash_list, req.get_tx_hex, res.tx_blob_list, req.get_tx_metadata, res.tx_metadata_list);
@@ -1396,7 +1396,7 @@ namespace tools
 
     {
       uint32_t priority = convert_priority(req.priority);
-      std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_single(ki, dsts[0].addr, dsts[0].is_subaddress, req.outputs, CRYPTONOTE_DEFAULT_TX_MIXIN, req.unlock_time, priority, extra);
+      std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_single(ki, dsts[0].addr, dsts[0].is_subaddress, req.outputs, cryptonote::TX_OUTPUT_DECOYS, req.unlock_time, priority, extra);
 
       if (ptx_vector.empty())
         throw wallet_rpc_error{error_code::UNKNOWN_ERROR, "No outputs found"};
@@ -2859,38 +2859,38 @@ namespace {
   {
     VALIDATE_ADDRESS::response res{};
     cryptonote::address_parse_info info;
-    const struct { cryptonote::network_type type; const char *stype; } net_types[] = {
-      { cryptonote::MAINNET, "mainnet" },
-      { cryptonote::TESTNET, "testnet" },
-      { cryptonote::DEVNET, "devnet" },
+    constexpr std::pair<cryptonote::network_type, std::string_view> net_types[] = {
+      { cryptonote::network_type::MAINNET, "mainnet" },
+      { cryptonote::network_type::TESTNET, "testnet" },
+      { cryptonote::network_type::DEVNET, "devnet" },
     };
     if (!req.any_net_type && !m_wallet)
       require_open();
 
-    for (const auto &net_type: net_types)
+    for (const auto& [type, type_str] : net_types)
     {
-      if (!req.any_net_type && (!m_wallet || net_type.type != m_wallet->nettype()))
+      if (!req.any_net_type && (!m_wallet || type != m_wallet->nettype()))
         continue;
       if (req.allow_openalias)
       {
         res.valid = false;
         try {
-          info = extract_account_addr(net_type.type, req.address);
+          info = extract_account_addr(type, req.address);
           res.valid = true;
         } catch (...) {}
 
         if (res.valid)
-          res.openalias_address = info.as_str(net_type.type);
+          res.openalias_address = info.as_str(type);
       }
       else
       {
-        res.valid = cryptonote::get_account_address_from_str(info, net_type.type, req.address);
+        res.valid = cryptonote::get_account_address_from_str(info, type, req.address);
       }
       if (res.valid)
       {
         res.integrated = info.has_payment_id;
         res.subaddress = info.is_subaddress;
-        res.nettype = net_type.stype;
+        res.nettype = type_str;
         return res;
       }
     }
@@ -2981,6 +2981,7 @@ namespace {
 
     // NOTE(oxen): Pre-emptively set subaddr_account to 0. We don't support onwards from Infinite Staking which is when this call was implemented.
     tools::wallet2::register_service_node_result register_result = m_wallet->create_register_service_node_tx(args, 0 /*subaddr_account*/);
+
     if (register_result.status != tools::wallet2::register_service_node_result_status::success)
       throw wallet_rpc_error{error_code::TX_NOT_POSSIBLE, register_result.msg};
 
@@ -3177,7 +3178,7 @@ namespace {
 
     std::string reason;
     ons::mapping_type type;
-    std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
+    auto hf_version = m_wallet->get_hard_fork_version();
     if (!hf_version) throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
     if (!ons::validate_mapping_type(req.type, *hf_version, ons::ons_tx_type::update, &type, &reason))
       throw wallet_rpc_error{error_code::WRONG_ONS_TYPE, "Wrong ons type given=" + reason};
@@ -3204,7 +3205,7 @@ namespace {
 
     std::string reason;
     ons::mapping_type type;
-    std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
+    auto hf_version = m_wallet->get_hard_fork_version();
     if (!hf_version) throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
     if (!ons::validate_mapping_type(req.type, *hf_version, ons::ons_tx_type::lookup, &type, &reason))
       throw wallet_rpc_error{error_code::WRONG_ONS_TYPE, "Wrong ons type given=" + reason};
@@ -3312,7 +3313,7 @@ namespace {
   {
     require_open();
 
-    std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
+    auto hf_version = m_wallet->get_hard_fork_version();
     if (!hf_version) throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
 
     std::string reason;
@@ -3359,15 +3360,15 @@ namespace {
     std::string reason;
     ons::mapping_type type = {};
 
-    std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
-    if (!hf_version) throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
-    {
-      if (!ons::validate_mapping_type(req.type, *hf_version, ons::ons_tx_type::lookup, &type, &reason))
-        throw wallet_rpc_error{error_code::WRONG_ONS_TYPE, "Invalid ONS type: " + reason};
+    auto hf_version = m_wallet->get_hard_fork_version();
+    if (!hf_version)
+      throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
 
-      if (!ons::validate_ons_name(type, req.name, &reason))
-        throw wallet_rpc_error{error_code::ONS_BAD_NAME, "Invalid ONS name '" + req.name + "': " + reason};
-    }
+    if (!ons::validate_mapping_type(req.type, *hf_version, ons::ons_tx_type::lookup, &type, &reason))
+      throw wallet_rpc_error{error_code::WRONG_ONS_TYPE, "Invalid ONS type: " + reason};
+
+    if (!ons::validate_ons_name(type, req.name, &reason))
+      throw wallet_rpc_error{error_code::ONS_BAD_NAME, "Invalid ONS name '" + req.name + "': " + reason};
 
     // ---------------------------------------------------------------------------------------------
     //
@@ -3394,7 +3395,7 @@ namespace {
       throw wallet_rpc_error{error_code::ONS_VALUE_TOO_LONG, "ONS value '" + req.value + "' is too long"};
 
     std::string reason;
-    std::optional<uint8_t> hf_version = m_wallet->get_hard_fork_version();
+    auto hf_version = m_wallet->get_hard_fork_version();
     if (!hf_version) throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
 
     ons::mapping_type type;
@@ -3408,7 +3409,7 @@ namespace {
     if (!ons::mapping_value::validate(m_wallet->nettype(), type, req.value, &value, &reason))
       throw wallet_rpc_error{error_code::ONS_BAD_VALUE, "Invalid ONS value '" + req.value + "': " + reason};
 
-    bool old_argon2 = type == ons::mapping_type::session && *hf_version < cryptonote::network_version_16_pulse;
+    bool old_argon2 = type == ons::mapping_type::session && hf_version < cryptonote::hf::hf16_pulse;
     if (!value.encrypt(req.name, nullptr, old_argon2))
       throw wallet_rpc_error{error_code::ONS_VALUE_ENCRYPT_FAILED, "Value encryption failure"};
 

@@ -4,6 +4,7 @@
 #include <vector>
 #include <algorithm>
 #include "common/hex.h"
+#include "cryptonote_config.h"
 #include "oxen_name_system.h"
 
 #include "common/oxen.h"
@@ -35,6 +36,8 @@ extern "C"
 
 #undef OXEN_DEFAULT_LOG_CATEGORY
 #define OXEN_DEFAULT_LOG_CATEGORY "ons"
+
+using cryptonote::hf;
 
 namespace ons
 {
@@ -609,14 +612,14 @@ sqlite3 *init_oxen_name_system(const fs::path& file_path, bool read_only)
   return result;
 }
 
-std::vector<mapping_type> all_mapping_types(uint8_t hf_version) {
+std::vector<mapping_type> all_mapping_types(hf hf_version) {
   std::vector<mapping_type> result;
   result.reserve(2);
-  if (hf_version >= cryptonote::network_version_15_ons)
+  if (hf_version >= hf::hf15_ons)
     result.push_back(mapping_type::session);
-  if (hf_version >= cryptonote::network_version_16_pulse)
+  if (hf_version >= hf::hf16_pulse)
     result.push_back(mapping_type::lokinet);
-  if (hf_version >= cryptonote::network_version_18)
+  if (hf_version >= hf::hf18)
     result.push_back(mapping_type::wallet);
   return result;
 }
@@ -628,18 +631,19 @@ std::optional<uint64_t> expiry_blocks(cryptonote::network_type nettype, mapping_
   {
     // For testnet we shorten 1-, 2-, and 5-year renewals to 1/2/5 days with 1-day renewal, but
     // leave 10 years alone to allow long-term registrations on testnet.
-    const bool testnet_short = nettype == cryptonote::TESTNET && type != mapping_type::lokinet_10years;
+    const bool testnet_short = nettype == cryptonote::network_type::TESTNET && type != mapping_type::lokinet_10years;
 
-    if (type == mapping_type::lokinet)              result = BLOCKS_EXPECTED_IN_DAYS(1 * REGISTRATION_YEAR_DAYS);
-    else if (type == mapping_type::lokinet_2years)  result = BLOCKS_EXPECTED_IN_DAYS(2 * REGISTRATION_YEAR_DAYS);
-    else if (type == mapping_type::lokinet_5years)  result = BLOCKS_EXPECTED_IN_DAYS(5 * REGISTRATION_YEAR_DAYS);
-    else if (type == mapping_type::lokinet_10years) result = BLOCKS_EXPECTED_IN_DAYS(10 * REGISTRATION_YEAR_DAYS);
-    assert(result);
+    result = cryptonote::BLOCKS_PER_DAY * REGISTRATION_YEAR_DAYS * (
+        type == mapping_type::lokinet         ? 1 :
+        type == mapping_type::lokinet_2years  ? 2 :
+        type == mapping_type::lokinet_5years  ? 5 :
+        type == mapping_type::lokinet_10years ? 10 : 0);
+    assert(result && *result);
 
     if (testnet_short)
       *result /= REGISTRATION_YEAR_DAYS;
-    else if (nettype == cryptonote::FAKECHAIN) // For fakenet testing we shorten 1/2/5/10 years to 2/4/10/20 blocks
-      *result /= (BLOCKS_EXPECTED_IN_DAYS(REGISTRATION_YEAR_DAYS) / 2);
+    else if (nettype == cryptonote::network_type::FAKECHAIN) // For fakenet testing we shorten 1/2/5/10 years to 2/4/10/20 blocks
+      *result /= (cryptonote::BLOCKS_PER_DAY * REGISTRATION_YEAR_DAYS / 2);
   }
 
   return result;
@@ -1182,7 +1186,7 @@ static bool validate_against_previous_mapping(ons::name_system_db &ons_db, uint6
 // Sanity check value to disallow the empty name hash
 static const crypto::hash null_name_hash = name_to_hash("");
 
-bool name_system_db::validate_ons_tx(uint8_t hf_version, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_oxen_name_system &ons_extra, std::string *reason)
+bool name_system_db::validate_ons_tx(hf hf_version, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_oxen_name_system &ons_extra, std::string *reason)
 {
   // -----------------------------------------------------------------------------------------------
   // Pull out ONS Extra from TX
@@ -1221,7 +1225,7 @@ bool name_system_db::validate_ons_tx(uint8_t hf_version, uint64_t blockchain_hei
     if (check_condition(ons_extra.version != 0, reason, tx, ", ", ons_extra_string(nettype, ons_extra), " unexpected version=", std::to_string(ons_extra.version), ", expected=0"))
       return false;
 
-    if (check_condition(!ons::mapping_type_allowed(hf_version, ons_extra.type), reason, tx, ", ", ons_extra_string(nettype, ons_extra), " specifying type=", ons_extra.type, " that is disallowed in hardfork ", hf_version))
+    if (check_condition(!ons::mapping_type_allowed(hf_version, ons_extra.type), reason, tx, ", ", ons_extra_string(nettype, ons_extra), " specifying type=", ons_extra.type, " is disallowed in HF", +static_cast<uint8_t>(hf_version)))
       return false;
 
     // -----------------------------------------------------------------------------------------------
@@ -1264,7 +1268,7 @@ bool name_system_db::validate_ons_tx(uint8_t hf_version, uint64_t blockchain_hei
   {
     uint64_t burn                = cryptonote::get_burned_amount_from_tx_extra(tx.extra);
     uint64_t const burn_required = (ons_extra.is_buying() || ons_extra.is_renewing()) ? burn_needed(hf_version, ons_extra.type) : 0;
-    if (hf_version == cryptonote::network_version_18 && burn > burn_required && blockchain_height < 524'000) {
+    if (hf_version == hf::hf18 && burn > burn_required && blockchain_height < 524'000) {
         // Testnet sync fix: PR #1433 merged that lowered fees for HF18 while testnet was already on
         // HF18, but broke syncing because earlier HF18 blocks have ONS txes at the higher fees, so
         // this allows them to pass by pretending the tx burned the right amount.
@@ -1282,13 +1286,13 @@ bool name_system_db::validate_ons_tx(uint8_t hf_version, uint64_t blockchain_hei
   return true;
 }
 
-bool validate_mapping_type(std::string_view mapping_type_str, uint8_t hf_version, ons_tx_type txtype, ons::mapping_type *mapping_type, std::string *reason)
+bool validate_mapping_type(std::string_view mapping_type_str, hf hf_version, ons_tx_type txtype, ons::mapping_type *mapping_type, std::string *reason)
 {
   std::string mapping = tools::lowercase_ascii_string(mapping_type_str);
   std::optional<ons::mapping_type> mapping_type_;
   if (txtype != ons_tx_type::renew && tools::string_iequal(mapping, "session"))
     mapping_type_ = ons::mapping_type::session;
-  else if (hf_version >= cryptonote::network_version_16_pulse)
+  else if (hf_version >= hf::hf16_pulse)
   {
     if (tools::string_iequal(mapping, "lokinet"))
       mapping_type_ = ons::mapping_type::lokinet;
@@ -1304,7 +1308,7 @@ bool validate_mapping_type(std::string_view mapping_type_str, uint8_t hf_version
         mapping_type_ = ons::mapping_type::lokinet_10years;
     }
   }
-  if (hf_version >= cryptonote::network_version_18)
+  if (hf_version >= hf::hf18)
   {
     if (tools::string_iequal(mapping, "wallet"))
       mapping_type_ = ons::mapping_type::wallet;
@@ -1875,8 +1879,8 @@ AND NOT EXISTS   (SELECT * FROM mappings WHERE owner.id = mappings.backup_owner_
   {
     if (!blockchain)
     {
-      assert(nettype == cryptonote::FAKECHAIN);
-      return nettype == cryptonote::FAKECHAIN;
+      assert(nettype == cryptonote::network_type::FAKECHAIN);
+      return nettype == cryptonote::network_type::FAKECHAIN;
     }
 
     uint64_t ons_height   = 0;
@@ -2108,7 +2112,7 @@ bool name_system_db::add_block(const cryptonote::block &block, const std::vector
    return false;
 
   bool ons_parsed_from_block = false;
-  if (block.major_version >= cryptonote::network_version_15_ons)
+  if (block.major_version >= hf::hf15_ons)
   {
     for (cryptonote::transaction const &tx : txs)
     {

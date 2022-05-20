@@ -74,7 +74,7 @@ static void make_wallet(unsigned int idx, tools::wallet2 &wallet)
     wallet.init("");
     wallet.set_subaddress_lookahead(1, 1);
     wallet.generate("", "", spendkey, true, false);
-    ASSERT_TRUE(test_addresses[idx].address == wallet.get_account().get_public_address_str(cryptonote::TESTNET));
+    ASSERT_TRUE(test_addresses[idx].address == wallet.get_account().get_public_address_str(cryptonote::network_type::TESTNET));
     wallet.decrypt_keys("");
     ASSERT_TRUE(test_addresses[idx].spendkey == tools::type_to_hex(wallet.get_account().get_keys().m_spend_secret_key));
     wallet.encrypt_keys("");
@@ -136,7 +136,7 @@ static void make_wallets(std::vector<tools::wallet2>& wallets, unsigned int M)
 
     if (i != 0) {
       // "equals" is transitive relation so we need only to compare first wallet's address to each others' addresses. no need to compare 0's address with itself.
-      ASSERT_TRUE(wallets[0].get_account().get_public_address_str(cryptonote::TESTNET) == wallets[i].get_account().get_public_address_str(cryptonote::TESTNET));
+      ASSERT_TRUE(wallets[0].get_account().get_public_address_str(cryptonote::network_type::TESTNET) == wallets[i].get_account().get_public_address_str(cryptonote::network_type::TESTNET));
     }
   }
 }

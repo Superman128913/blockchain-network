@@ -39,6 +39,7 @@
 
 #include <cassert>
 
+#include "cryptonote_config.h"
 #include "cryptonote_core/blockchain.h"
 
 #include "cryptonote_core/service_node_list.h"
@@ -224,7 +225,7 @@ namespace cryptonote {
     return payments;
   }
 
-  std::vector<cryptonote::batch_sn_payment> BlockchainSQLite::calculate_rewards(uint8_t hf_version, uint64_t distribution_amount, service_nodes::service_node_info sn_info) {
+  std::vector<cryptonote::batch_sn_payment> BlockchainSQLite::calculate_rewards(hf hf_version, uint64_t distribution_amount, service_nodes::service_node_info sn_info) {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
 
     // Find out how much is due for the operator
@@ -233,7 +234,7 @@ namespace cryptonote {
       // This calculates the operator fee using (operator_portion / max_operator_portion) * distribution_amount but using 128 bit integer math
       uint64_t hi, lo, resulthi, resultlo;
       lo = mul128(sn_info.portions_for_operator, distribution_amount, &hi);
-      div128_64(hi, lo, STAKING_PORTIONS, &resulthi, &resultlo);
+      div128_64(hi, lo, old::STAKING_PORTIONS, &resulthi, &resultlo);
       if (resulthi > 0)
         throw std::logic_error("overflow from calculating sn operator fee");
       operator_fee = resultlo;
@@ -270,13 +271,13 @@ namespace cryptonote {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__ << " called on height: " << block_height);
 
     auto hf_version = block.major_version;
-    if (hf_version < cryptonote::network_version_19) {
+    if (hf_version < hf::hf19) {
       update_height(block_height);
       print_database();
       return true;
     }
 
-    auto fork_height = cryptonote::get_hard_fork_heights(m_nettype, cryptonote::network_version_19);
+    auto fork_height = cryptonote::get_hard_fork_heights(m_nettype, hf::hf19);
     if (block_height == fork_height.first.value_or(0)) {
       MDEBUG("Batching of Service Node Rewards Begins");
       reset_database();
@@ -342,7 +343,7 @@ namespace cryptonote {
       }
 
       // Step 3: Add Governance reward to the list
-      if (m_nettype != cryptonote::FAKECHAIN) {
+      if (m_nettype != cryptonote::network_type::FAKECHAIN) {
         std::vector<cryptonote::batch_sn_payment> governance_rewards;
         cryptonote::address_parse_info governance_wallet_address;
         cryptonote::get_account_address_from_str(governance_wallet_address, m_nettype, cryptonote::get_config(m_nettype).governance_wallet_address(hf_version));
@@ -377,8 +378,8 @@ namespace cryptonote {
     }
 
     const auto& conf = get_config(m_nettype);
-    auto hf_version = block.major_version;
-    if (hf_version < cryptonote::network_version_19) {
+    auto hf_version = hf{block.major_version};
+    if (hf_version < hf::hf19) {
       decrement_height();
       return true;
     }
@@ -422,7 +423,7 @@ namespace cryptonote {
           return false;
       }
       // Step 3: Remove Governance reward
-      if (m_nettype != cryptonote::FAKECHAIN) {
+      if (m_nettype != cryptonote::network_type::FAKECHAIN) {
         std::vector<cryptonote::batch_sn_payment> governance_rewards;
         cryptonote::address_parse_info governance_wallet_address;
         cryptonote::get_account_address_from_str(governance_wallet_address, m_nettype, cryptonote::get_config(m_nettype).governance_wallet_address(hf_version));

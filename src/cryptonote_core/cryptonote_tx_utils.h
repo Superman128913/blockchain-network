@@ -43,14 +43,14 @@ namespace cryptonote
   bool     get_deterministic_output_key         (const account_public_address& address, const keypair& tx_key, size_t output_index, crypto::public_key& output_key);
   bool     validate_governance_reward_key       (uint64_t height, std::string_view governance_wallet_address_str, size_t output_index, const crypto::public_key& output_key, const cryptonote::network_type nettype);
 
-  uint64_t governance_reward_formula            (uint8_t hf_version, uint64_t base_reward = 0);
+  uint64_t governance_reward_formula            (hf hf_version, uint64_t base_reward = 0);
   bool     block_has_governance_output          (network_type nettype, cryptonote::block const &block);
-  bool     height_has_governance_output         (network_type nettype, uint8_t hard_fork_version, uint64_t height);
-  uint64_t derive_governance_from_block_reward  (network_type nettype, const cryptonote::block &block, uint8_t hf_version);
+  bool     height_has_governance_output         (network_type nettype, hf hard_fork_version, uint64_t height);
+  uint64_t derive_governance_from_block_reward  (network_type nettype, const cryptonote::block &block, hf hf_version);
 
   std::vector<uint64_t> distribute_reward_by_portions(const std::vector<service_nodes::payout_entry>& payout, uint64_t total_reward, bool distribute_remainder);
   uint64_t get_portion_of_reward                     (uint64_t portions, uint64_t total_service_node_reward);
-  uint64_t service_node_reward_formula               (uint64_t base_reward, uint8_t hard_fork_version);
+  uint64_t service_node_reward_formula               (uint64_t base_reward, hf hard_fork_version);
 
    /**
     * Returned type of parse_incoming_txs() that provides details about which transactions failed
@@ -93,7 +93,7 @@ namespace cryptonote
       return result;
     }
 
-    network_type           nettype = MAINNET;
+    network_type           nettype = network_type::MAINNET;
 
     bool                   pulse;                // If true, pulse_.* varables are set, otherwise miner_block_producer is set, determining who should get the coinbase reward.
     service_nodes::payout  pulse_block_producer; // Can be different from the leader in Pulse if the original leader fails to complete the round, the block producer changes.
@@ -130,8 +130,8 @@ namespace cryptonote
       transaction& tx,
       const oxen_miner_tx_context &miner_context,
       const std::optional<std::vector<cryptonote::batch_sn_payment>> sn_rwds,
-      const blobdata& extra_nonce = blobdata(),
-      uint8_t hard_fork_version = 1);
+      const blobdata& extra_nonce,
+      hf hard_fork_version);
 
   struct block_reward_parts
   {
@@ -164,7 +164,7 @@ namespace cryptonote
   // cryptonote_core since it would have a circular dependency on Blockchain
 
   // NOTE: Block reward function that should be called after hard fork v10
-  bool get_oxen_block_reward(size_t median_weight, size_t current_block_weight, uint64_t already_generated_coins, int hard_fork_version, block_reward_parts &result, const oxen_block_reward_context &oxen_context);
+  bool get_oxen_block_reward(size_t median_weight, size_t current_block_weight, uint64_t already_generated_coins, hf hard_fork_version, block_reward_parts &result, const oxen_block_reward_context &oxen_context);
 
 
   struct tx_source_entry
@@ -242,8 +242,8 @@ namespace cryptonote
 
   struct oxen_construct_tx_params
   {
-    uint8_t hf_version = cryptonote::network_version_7;
-    txtype tx_type     = txtype::standard;
+    hf hf_version = hf::hf7;
+    txtype tx_type = txtype::standard;
 
     // Can be set to non-zero values to have the tx be constructed specifying required burn amounts
     // Note that the percentage is relative to the minimal base tx fee, *not* the actual tx fee.

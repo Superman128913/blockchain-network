@@ -81,7 +81,7 @@ local debian_pipeline(name,
         if arch == 'arm64' && jobs > 1 then
           // The wallet code is too bloated to be compiled at -j2 with only 4GB ram, so do
           // the huge bloated jobs at -j1 and the rest at -j2
-          ['ninja -j1 rpc wallet -v', 'ninja -j2 daemon device_trezor -v', 'ninja -j1 wallet_rpc_server -v', 'ninja -j2 -v']
+          ['ninja -j1 rpc wallet -v', 'ninja -j2 daemon -v', 'ninja -j1 wallet_rpc_server -v', 'ninja -j2 -v']
         else
           ['ninja -j' + jobs + ' -v']
       ) + (

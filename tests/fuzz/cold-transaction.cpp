@@ -37,7 +37,7 @@
 class ColdTransactionFuzzer: public Fuzzer
 {
 public:
-  ColdTransactionFuzzer(): wallet(cryptonote::TESTNET) {}
+  ColdTransactionFuzzer(): wallet(cryptonote::network_type::TESTNET) {}
   virtual int init();
   virtual int run(const std::string &filename);
 

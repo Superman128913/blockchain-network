@@ -32,6 +32,7 @@
 #include <mutex>
 #include <shared_mutex>
 #include <string_view>
+#include "cryptonote_basic/hardfork.h"
 #include "serialization/serialization.h"
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 #include "cryptonote_core/service_node_rules.h"
@@ -304,7 +305,7 @@ namespace service_nodes
     cryptonote::account_public_address operator_address{};
     uint64_t                           last_ip_change_height = 0; // The height of the last quorum penalty for changing IPs
     version_t                          version = tools::enum_top<version_t>;
-    uint8_t                            registration_hf_version = 0;
+    cryptonote::hf                     registration_hf_version = cryptonote::hf::none;
     pulse_sort_key                     pulse_sorter;
 
     service_node_info() = default;
@@ -316,7 +317,7 @@ namespace service_nodes
       return is_active() && at_height >= active_since_height + netconf.SERVICE_NODE_PAYABLE_AFTER_BLOCKS;
     }
 
-    bool can_transition_to_state(uint8_t hf_version, uint64_t block_height, new_state proposed_state) const;
+    bool can_transition_to_state(cryptonote::hf hf_version, uint64_t block_height, new_state proposed_state) const;
     bool can_be_voted_on        (uint64_t block_height) const;
     size_t total_num_locked_contributions() const;
 
@@ -634,7 +635,7 @@ namespace service_nodes
     struct state_serialized
     {
       enum struct version_t : uint8_t { version_0, version_1_serialize_hash, count, };
-      static version_t get_version(uint8_t /*hf_version*/) { return version_t::version_1_serialize_hash; }
+      static version_t get_version(cryptonote::hf /*hf_version*/) { return version_t::version_1_serialize_hash; }
 
       version_t                              version;
       uint64_t                               height;
@@ -660,7 +661,7 @@ namespace service_nodes
     struct data_for_serialization
     {
       enum struct version_t : uint8_t { version_0, count, };
-      static version_t get_version(uint8_t /*hf_version*/) { return version_t::version_0; }
+      static version_t get_version(cryptonote::hf /*hf_version*/) { return version_t::version_0; }
 
       version_t version;
       std::vector<quorum_for_serialization> quorum_states;
@@ -698,7 +699,7 @@ namespace service_nodes
       std::vector<pubkey_and_sninfo>  decommissioned_service_nodes_infos() const; // return: All nodes that are fully funded *and* decommissioned.
       std::vector<pubkey_and_sninfo>  payable_service_nodes_infos(uint64_t height, cryptonote::network_type nettype) const; // return: All nodes that are active and have been online for a period greater than SERVICE_NODE_PAYABLE_AFTER_BLOCKS
 
-      std::vector<crypto::public_key> get_expired_nodes(cryptonote::BlockchainDB const &db, cryptonote::network_type nettype, uint8_t hf_version, uint64_t block_height) const;
+      std::vector<crypto::public_key> get_expired_nodes(cryptonote::BlockchainDB const &db, cryptonote::network_type nettype, cryptonote::hf hf_version, uint64_t block_height) const;
       void update_from_block(
           cryptonote::BlockchainDB const &db,
           cryptonote::network_type nettype,
@@ -788,7 +789,7 @@ namespace service_nodes
   };
   bool tx_get_staking_components            (cryptonote::transaction_prefix const &tx_prefix, staking_components *contribution, crypto::hash const &txid);
   bool tx_get_staking_components            (cryptonote::transaction const &tx, staking_components *contribution);
-  bool tx_get_staking_components_and_amounts(cryptonote::network_type nettype, uint8_t hf_version, cryptonote::transaction const &tx, uint64_t block_height, staking_components *contribution);
+  bool tx_get_staking_components_and_amounts(cryptonote::network_type nettype, cryptonote::hf hf_version, cryptonote::transaction const &tx, uint64_t block_height, staking_components *contribution);
 
   struct contributor_args_t
   {
@@ -799,22 +800,22 @@ namespace service_nodes
     std::string                                     err_msg; // if (success == false), this is set to the err msg otherwise empty
   };
 
-  bool     is_registration_tx   (cryptonote::network_type nettype, uint8_t hf_version, const cryptonote::transaction& tx, uint64_t block_timestamp, uint64_t block_height, uint32_t index, crypto::public_key& key, service_node_info& info);
+  bool     is_registration_tx   (cryptonote::network_type nettype, cryptonote::hf hf_version, const cryptonote::transaction& tx, uint64_t block_timestamp, uint64_t block_height, uint32_t index, crypto::public_key& key, service_node_info& info);
   bool     reg_tx_extract_fields(const cryptonote::transaction& tx, contributor_args_t &contributor_args, uint64_t& expiration_timestamp, crypto::public_key& service_node_key, crypto::signature& signature);
   uint64_t offset_testing_quorum_height(quorum_type type, uint64_t height);
 
   contributor_args_t convert_registration_args(cryptonote::network_type nettype,
                                                const std::vector<std::string> &args,
                                                uint64_t staking_requirement,
-                                               uint8_t hf_version);
+                                               cryptonote::hf hf_version);
 
   // validate_contributors_* functions throws invalid_contributions exception
   struct invalid_contributions : std::invalid_argument { using std::invalid_argument::invalid_argument; };
-  void validate_contributor_args(uint8_t hf_version, contributor_args_t const &contributor_args);
+  void validate_contributor_args(cryptonote::hf hf_version, contributor_args_t const &contributor_args);
   void validate_contributor_args_signature(contributor_args_t const &contributor_args, uint64_t const expiration_timestamp, crypto::public_key const &service_node_key, crypto::signature const &signature);
 
   bool make_registration_cmd(cryptonote::network_type nettype,
-      uint8_t hf_version,
+      cryptonote::hf hf_version,
       uint64_t staking_requirement,
       const std::vector<std::string>& args,
       const service_node_keys &keys,
@@ -823,7 +824,7 @@ namespace service_nodes
 
   service_nodes::quorum generate_pulse_quorum(cryptonote::network_type nettype,
                                               crypto::public_key const &leader,
-                                              uint8_t hf_version,
+                                              cryptonote::hf hf_version,
                                               std::vector<pubkey_and_sninfo> const &active_snode_list,
                                               std::vector<crypto::hash> const &pulse_entropy,
                                               uint8_t pulse_round);
@@ -837,6 +838,6 @@ namespace service_nodes
 
   payout service_node_info_to_payout(crypto::public_key const &key, service_node_info const &info);
 
-  const static payout_entry null_payout_entry = {cryptonote::null_address, STAKING_PORTIONS};
+  const static payout_entry null_payout_entry = {cryptonote::null_address, cryptonote::old::STAKING_PORTIONS};
   const static payout null_payout             = {crypto::null_pkey, {null_payout_entry}};
 }

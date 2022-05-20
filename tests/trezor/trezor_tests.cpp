@@ -135,7 +135,7 @@ int main(int argc, char* argv[])
 
     // Bootstrapping common chain & accounts
     const uint8_t initial_hf =  (uint8_t)get_env_long("TEST_MIN_HF", 12);
-    const uint8_t max_hf = (uint8_t)get_env_long("TEST_MAX_HF", HF_VERSION_CLSAG);
+    const uint8_t max_hf = (uint8_t)get_env_long("TEST_MAX_HF", cryptonote::feature::CLSAG);
     auto sync_test = get_env_long("TEST_KI_SYNC", 1);
     MINFO("Test versions " << LOKI_RELEASE_NAME << "' (v" << LOKI_VERSION_FULL << ")");
     MINFO("Testing hardforks [" << (int)initial_hf << ", " << (int)max_hf << "], sync-test: " << sync_test);
@@ -608,7 +608,7 @@ const std::string gen_trezor_base::m_alice_view_private = "a6ccd4ac344a295d1387f
 gen_trezor_base::gen_trezor_base(){
   m_rct_config = {rct::RangeProofType::PaddedBulletproof, 1};
   m_test_get_tx_key = true;
-  m_network_type = cryptonote::TESTNET;
+  m_network_type = cryptonote::network_type::TESTNET;
 }
 
 gen_trezor_base::gen_trezor_base(const gen_trezor_base &other):
@@ -682,6 +682,7 @@ void gen_trezor_base::add_shared_events(std::vector<test_event_entry>& events)
 void gen_trezor_base::init_fields()
 {
   m_miner_account.generate();
+# error FIXME: broken
   DEFAULT_HARDFORKS(m_hard_forks);
 
   crypto::secret_key master_seed{};
@@ -741,7 +742,7 @@ bool gen_trezor_base::generate(std::vector<test_event_entry>& events)
     const crypto::hash prev_id = get_block_hash(blk_gen);
     const uint64_t already_generated_coins = generator.get_already_generated_coins(prev_id);
     block_weights.clear();
-    generator.get_last_n_block_weights(block_weights, prev_id, CRYPTONOTE_REWARD_BLOCKS_WINDOW);
+    generator.get_last_n_block_weights(block_weights, prev_id, REWARD_BLOCKS_WINDOW);
     generator.construct_block(blk_0, 1, prev_id, m_miner_account, m_ts_start, already_generated_coins, block_weights, tx_list);
   }
 
@@ -769,6 +770,7 @@ bool gen_trezor_base::generate(std::vector<test_event_entry>& events)
   // Hard fork to bulletproofs version, v9.
   const uint8_t CUR_HF = 9;
   auto hardfork_height = num_blocks(events);  // next block is v9
+#error FIXME broken
   ADD_HARDFORK(m_hard_forks, CUR_HF, hardfork_height);
   add_hforks(events, m_hard_forks);
   MDEBUG("Hardfork height: " << hardfork_height << " at block: " << get_block_hash(blk_4r));
@@ -946,6 +948,7 @@ void gen_trezor_base::fix_hf(std::vector<test_event_entry>& events)
     auto const hf_to_add = current_hf + 1;
     auto hardfork_height = num_blocks(events);
 
+#error FIXME broken
     ADD_HARDFORK(m_hard_forks, hf_to_add, hardfork_height);
     add_top_hfork(events, m_hard_forks);
     MDEBUG("Hardfork added at height: " << hardfork_height << ", from " << (int)current_hf << " to " << (int)hf_to_add);
@@ -1232,7 +1235,7 @@ void gen_trezor_base::mine_and_test(std::vector<test_event_entry>& events)
   cryptonote::core * core = daemon()->core();
   const uint64_t height_before_mining = daemon()->get_height();
 
-  const auto miner_address = cryptonote::get_account_address_as_str(FAKECHAIN, false, get_address(m_miner_account));
+  const auto miner_address = cryptonote::get_account_address_as_str(network_type::FAKECHAIN, false, get_address(m_miner_account));
   daemon()->mine_blocks(1, miner_address);
 
   const uint64_t cur_height = daemon()->get_height();
@@ -1263,7 +1266,7 @@ void gen_trezor_base::set_hard_fork(uint8_t hf)
     rct_config({rct::RangeProofType::PaddedBulletproof, 1});
   } else if (hf == 12){
     rct_config({rct::RangeProofType::PaddedBulletproof, 2});
-  } else if (hf == HF_VERSION_CLSAG){
+  } else if (hf == cryptonote::feature::CLSAG){
     rct_config({rct::RangeProofType::PaddedBulletproof, 3});
   } else {
     throw std::runtime_error("Unsupported HF");
