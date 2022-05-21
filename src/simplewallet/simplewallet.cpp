@@ -1165,7 +1165,7 @@ bool simple_wallet::export_multisig_main(const std::vector<std::string> &args EN
 
   try
   {
-    cryptonote::blobdata ciphertext = m_wallet->export_multisig();
+    std::string ciphertext = m_wallet->export_multisig();
 
 #ifdef WALLET_ENABLE_MMS
     if (called_by_mms)
@@ -1225,7 +1225,7 @@ bool simple_wallet::import_multisig_main(const std::vector<std::string> &args EN
     return false;
   }
 
-  std::vector<cryptonote::blobdata> info;
+  std::vector<std::string> info;
   for (size_t n = 0; n < args.size(); ++n)
   {
 #ifdef WALLET_ENABLE_MMS
@@ -3785,7 +3785,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
       {
         std::vector<crypto::secret_key> multisig_secret_spendkeys(multisig_n);
         epee::wipeable_string spendkey_string;
-        cryptonote::blobdata spendkey_data;
+        std::string spendkey_data;
         // get N secret spend keys from user
         for(unsigned int i=0; i<multisig_n; ++i)
         {
@@ -10089,7 +10089,7 @@ void simple_wallet::commit_or_save(std::vector<tools::wallet2::pending_tx>& ptx_
     const crypto::hash txid = get_transaction_hash(ptx.tx);
     if (do_not_relay)
     {
-      cryptonote::blobdata blob;
+      std::string blob;
       tx_to_blob(ptx.tx, blob);
       const std::string blob_hex = oxenc::to_hex(blob);
       fs::path filename = fs::u8path("raw_oxen_tx");

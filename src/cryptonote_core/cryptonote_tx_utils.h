@@ -63,7 +63,7 @@ namespace cryptonote
      bool result = false; // Indicates that the transaction was parsed and passed some basic checks
      bool already_have = false; // Indicates that the tx was found to already exist (in mempool or blockchain)
      bool approved_blink = false; // Can be set between the parse and handle calls to make this a blink tx (that replaces conflicting non-blink txes)
-     const blobdata *blob = nullptr; // Will be set to a pointer to the incoming blobdata (i.e. string). caller must keep it alive!
+     const std::string *blob = nullptr; // Will be set to a pointer to the incoming std::string (i.e. string). caller must keep it alive!
      crypto::hash tx_hash; // The transaction hash (only set if `parsed`)
      transaction tx; // The parsed transaction (only set if `parsed`)
    };
@@ -130,7 +130,7 @@ namespace cryptonote
       transaction& tx,
       const oxen_miner_tx_context &miner_context,
       const std::optional<std::vector<cryptonote::batch_sn_payment>> sn_rwds,
-      const blobdata& extra_nonce,
+      const std::string& extra_nonce,
       hf hard_fork_version);
 
   struct block_reward_parts

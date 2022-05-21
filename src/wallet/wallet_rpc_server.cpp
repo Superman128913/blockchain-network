@@ -1513,7 +1513,7 @@ namespace tools
     require_open();
     GET_PAYMENTS::response res{};
     crypto::hash payment_id;
-    cryptonote::blobdata payment_id_blob;
+    std::string payment_id_blob;
     if (!tools::hex_to_type(req.payment_id, payment_id)) {
       if (crypto::hash8 payment_id8; tools::hex_to_type(req.payment_id, payment_id8)) {
         memcpy(payment_id.data, payment_id8.data, 8);
@@ -1572,7 +1572,7 @@ namespace tools
     {
       crypto::hash payment_id;
       crypto::hash8 payment_id8;
-      cryptonote::blobdata payment_id_blob;
+      std::string payment_id_blob;
 
       // TODO - should the whole thing fail because of one bad id?
       bool r;
@@ -2685,7 +2685,7 @@ namespace {
     if (!ready)
       throw wallet_rpc_error{error_code::NOT_MULTISIG, "This wallet is multisig, but not yet finalized"};
 
-    cryptonote::blobdata info;
+    std::string info;
     info = m_wallet->export_multisig();
 
     res.info = oxenc::to_hex(info);

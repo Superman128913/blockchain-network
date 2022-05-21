@@ -153,12 +153,12 @@ struct serialized_object
 {
   serialized_object() { }
 
-  serialized_object(const cryptonote::blobdata& a_data)
+  serialized_object(const std::string& a_data)
     : data(a_data)
   {
   }
 
-  cryptonote::blobdata data;
+  std::string data;
   BEGIN_SERIALIZE_OBJECT()
     FIELD(data)
     END_SERIALIZE()
@@ -654,7 +654,7 @@ public:
   bool operator()(const std::vector<cryptonote::transaction>& txs) const
   {
     log_event("cryptonote::transaction");
-    std::vector<cryptonote::blobdata> tx_blobs;
+    std::vector<std::string> tx_blobs;
     for (const auto &tx: txs)
       tx_blobs.push_back(t_serializable_object_to_blob(tx));
     size_t pool_size = m_c.get_pool().get_transactions_count();
@@ -675,7 +675,7 @@ public:
   {
     log_event("cryptonote::block");
     cryptonote::block_verification_context bvc{};
-    cryptonote::blobdata bd = t_serializable_object_to_blob(b);
+    std::string bd = t_serializable_object_to_blob(b);
     std::vector<cryptonote::block> pblocks;
     if (m_c.prepare_handle_incoming_blocks(std::vector<cryptonote::block_complete_entry>(1, {bd, {}, {}}), pblocks))
     {
@@ -786,7 +786,7 @@ public:
     cryptonote::checkpoint_t checkpoint_copy = entry.data.checkpoint;
 
     cryptonote::block_verification_context bvc = {};
-    cryptonote::blobdata bd                    = t_serializable_object_to_blob(block);
+    std::string bd                    = t_serializable_object_to_blob(block);
     std::vector<cryptonote::block> pblocks;
     if (m_c.prepare_handle_incoming_blocks(std::vector<cryptonote::block_complete_entry>(1, {bd, {}, {}}), pblocks))
     {
@@ -806,7 +806,7 @@ public:
     log_event("oxen_blockchain_addable<cryptonote::block>");
     cryptonote::block const &block             = entry.data;
     cryptonote::block_verification_context bvc = {};
-    cryptonote::blobdata bd                    = t_serializable_object_to_blob(block);
+    std::string bd                    = t_serializable_object_to_blob(block);
     std::vector<cryptonote::block> pblocks;
     if (m_c.prepare_handle_incoming_blocks(std::vector<cryptonote::block_complete_entry>(1, {bd, {}, {}}), pblocks))
     {

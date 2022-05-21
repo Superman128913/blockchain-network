@@ -232,7 +232,7 @@ namespace cryptonote {
     uint64_t integrated_address_prefix = conf.PUBLIC_INTEGRATED_ADDRESS_BASE58_PREFIX;
     uint64_t subaddress_prefix = conf.PUBLIC_SUBADDRESS_BASE58_PREFIX;
 
-    blobdata data;
+    std::string data;
     uint64_t prefix{0};
     if (!tools::base58::decode_addr(str, prefix, data))
     {
