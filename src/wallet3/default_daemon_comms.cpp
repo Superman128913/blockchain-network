@@ -283,17 +283,12 @@ namespace wallet
         return;
       }
 
-      if (not response.size())
-      {
-        std::cout << "on_get_outputs_response(): empty get_outputs response\n";
-        //TODO: error handling
-        return;
-      }
-
       // if not OK
       if (response[0] != "200")
       {
         std::cout << "get_outputs response not ok: " << response[0] << "\n";
+        if (response.size() == 2)
+          std::cout << " -- error: \"" << response[1] << "\"\n";
         //TODO: error handling
         return;
       }
@@ -351,7 +346,6 @@ namespace wallet
           if (not output_dict.is_finished())
             return;
 
-std::cout << "fetched decoy, height = " << o.height << "\n";
         }
       }
       catch (const std::exception& e)
@@ -373,7 +367,6 @@ std::cout << "fetched decoy, height = " << o.height << "\n";
     oxenmq::bt_list decoy_list_bt;
     for (auto index : indexes)
     {
-std::cout << "fetching decoy index " << index << "\n";
       decoy_list_bt.push_back(index);
     }
     req_params_dict["get_txid"] = with_txid;
@@ -393,9 +386,6 @@ std::cout << "fetching decoy index " << index << "\n";
       // TODO: handle various error cases.
       if (not ok or response.size() != 2 or response[0] != "200")
       {
-std::cout << "bad daemon response to submit tx. response.size = " << response.size() << "\n";
-std::cout << "bad daemon response to submit tx. response[0] = " << response[0] << "\n";
-std::cout << "bad daemon response to submit tx. response[1] = " << response[1] << "\n";
         p->set_value("Unknown Error");
         return;
       }
@@ -424,11 +414,10 @@ std::cout << "bad daemon response to submit tx. response[1] = " << response[1] <
       }
     };
 
-std::cout << "daemon comms submit tx, vin/vout len = " << tx.vin.size() << "/" << tx.vout.size() << "\n";
     std::string tx_str;
-    bool ser_success = cryptonote::tx_to_blob(tx, tx_str);
-std::cout << "daemon comms submit tx, tx str len = " << tx_str.size() << "\n";
-std::cout << "daemon comms submit tx, tx_to_blob returned " << std::boolalpha << ser_success << "\n";
+    if (not cryptonote::tx_to_blob(tx, tx_str))
+      throw std::runtime_error{"wallet daemon comms, failed to serialize transaction"};
+
     oxenmq::bt_dict req_params_dict;
 
     req_params_dict["blink"] = blink;
