@@ -37,10 +37,6 @@ namespace wallet
     void
     create_schema();
 
-    // update the total output count, for decoy selection
-    void
-    update_output_count(const int64_t count);
-
     void
     store_block(const Block& block);
 

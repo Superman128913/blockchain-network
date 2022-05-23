@@ -44,7 +44,7 @@ namespace wallet
 
           CREATE TABLE blocks (
             height INTEGER NOT NULL PRIMARY KEY,
-            transaction_count INTEGER NOT NULL,
+            output_count INTEGER NOT NULL,
             hash TEXT NOT NULL,
             timestamp INTEGER NOT NULL
           );
@@ -54,6 +54,7 @@ namespace wallet
           FOR EACH ROW
           BEGIN
             UPDATE metadata SET last_scan_height = NEW.height WHERE id = 0;
+            UPDATE metadata SET output_count = output_count + NEW.output_count WHERE id = 0;
           END;
 
           -- update scan height when new block removed
@@ -61,6 +62,7 @@ namespace wallet
           FOR EACH ROW
           BEGIN
             UPDATE metadata SET last_scan_height = OLD.height - 1 WHERE id = 0;
+            UPDATE metadata SET output_count = output_count - OLD.output_count WHERE id = 0;
           END;
 
           CREATE TABLE transactions (
@@ -166,14 +168,6 @@ namespace wallet
   }
 
   void
-  WalletDB::update_output_count(const int64_t count)
-  {
-    prepared_exec(
-        "UPDATE metadata SET output_count = output_count + ? WHERE id = 0;",
-        count);
-  }
-
-  void
   WalletDB::store_block(const Block& block)
   {
     int64_t output_count = 0;
@@ -181,12 +175,11 @@ namespace wallet
     {
       output_count += tx.tx.vout.size();
     }
-    update_output_count(output_count);
 
     prepared_exec(
-        "INSERT INTO blocks(height,transaction_count,hash,timestamp) VALUES(?,?,?,?)",
+        "INSERT INTO blocks(height,output_count,hash,timestamp) VALUES(?,?,?,?)",
         block.height,
-        static_cast<int64_t>(block.transactions.size()),
+        output_count,
         tools::type_to_hex(block.hash),
         block.timestamp);
   }
