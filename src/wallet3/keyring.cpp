@@ -237,7 +237,7 @@ namespace wallet
     // Loop over inputs for the transaction to build the VIN array (Amount = 0, keyimage, array of offsets for ring)
     // and collect all the transaction private keys so we can spend our outputs in this transaction.
     int i = 0;
-    for(const auto& src_entr: ptx.chosen_outputs)
+    for(auto& src_entr: ptx.chosen_outputs)
     {
       // This takes the source outputs public transaction and combines it with our secret view key 
       // to make a key derivation. This derivation can be used evaluate an output on the 
@@ -280,6 +280,24 @@ namespace wallet
       // At this point we also push the public keys of the decoys into our mixRing struct which will get
       // passed to the ringct module which it actually will use to generate a ring signature.
       mixRing[i].reserve(ptx.decoys[i].size());
+
+      // The decoys must be sorted by global output index in order for the relative indexing below
+      // to work.
+      std::sort(ptx.decoys[i].begin(), ptx.decoys[i].end(),
+          [](auto& a, auto& b){ return a.global_index < b.global_index;});
+
+      // Find where our real output ended up in the sorting
+      unsigned int ours = 0;
+      for (const auto& decoy : ptx.decoys[i])
+      {
+        if (decoy.key == src_entr.key)
+        {
+          index.push_back(ours);
+          break;
+        }
+        ours++;
+      }
+
       for(const auto& decoy: ptx.decoys[i])
       {
         input_to_key.key_offsets.push_back(decoy.global_index);
@@ -288,9 +306,6 @@ namespace wallet
         decoypk.dest = rct::pk2rct(decoy.key);
         decoypk.mask = decoy.mask;
       }
-      //TODO: once the decoy set is shuffled when requesting decoys from the daemon,
-      //      this will need to know which index is actually the real one.
-      index.push_back(0);
 
       input_to_key.key_offsets = cryptonote::absolute_output_offsets_to_relative(input_to_key.key_offsets);
       ptx.tx.vin.push_back(input_to_key);
@@ -366,7 +381,7 @@ namespace wallet
         key_device); // hw::device& hwdev
 
     if (not rct::verRctNonSemanticsSimple(ptx.tx.rct_signatures))
-      throw std::runtime_error("RCT signing went wrong");
+      throw std::runtime_error("RCT signing went wrong -- verRctNonSemanticsSimple returned false");
   }
 
 }  // namespace wallet
