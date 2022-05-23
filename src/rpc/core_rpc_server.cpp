@@ -483,7 +483,7 @@ namespace cryptonote::rpc {
     GET_OUTPUTS_BIN::response res_bin{};
     if (!m_core.get_outs(req_bin, res_bin))
     {
-      get_outputs.response["status"] = "Failed";
+      get_outputs.response["status"] = STATUS_FAILED;
       return;
     }
 
