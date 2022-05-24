@@ -498,6 +498,11 @@ namespace cryptonote {
         db::exec_query(update_paid, payment.address, static_cast<int64_t>(amount), static_cast<int64_t>(block_height));
         update_paid->reset();
       }
+      else {
+        MERROR("Invalid amounts passed in to save payments for address: " << payment.address << ": that address has no accrued rewards");
+        return false;
+      }
+
       select_sum->reset();
     }
     return true;
