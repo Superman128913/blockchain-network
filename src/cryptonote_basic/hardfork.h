@@ -92,8 +92,10 @@ namespace cryptonote
   }
 
   // Returns the "ideal" network version that we want to use on blocks we create, which is to use
-  // the required major version for major version and the maximum major version we know about as
-  // minor version.  If this seems a bit silly, it is, and will be changed in the future.
+  // the required major version and current minor version.  (Minor versions are sometimes used to
+  // change network features, but do not change the blockchain rules).
+  // Before HF19, the minor version must be >= the major version, and is set to the largest major
+  // version we know about.
   std::pair<hf, uint8_t> get_ideal_block_version(network_type nettype, uint64_t height);
 
 }  // namespace cryptonote

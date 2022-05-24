@@ -4159,8 +4159,9 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
     }
 
     // this is a cheap test
-    // HF19 TODO: remove the requirement that minor_version must be >= network version
-    if (auto v = get_network_version(blk_height); blk.major_version != v || blk.minor_version < static_cast<uint8_t>(v))
+    // HF19 TODO: after hardfork 19 occurs we can remove the second line of this test:
+    if (auto v = get_network_version(blk_height); blk.major_version != v ||
+            (v < hf::hf19 && blk.minor_version < static_cast<uint8_t>(v)))
     {
       LOG_PRINT_L1("Block with id: " << blk_hash << ", has invalid version " << static_cast<int>(blk.major_version) << "." << +blk.minor_version <<
               "; current: " << static_cast<int>(v) << "." << static_cast<int>(v) << " for height " << blk_height);
@@ -4193,8 +4194,9 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
       }
     }
 
-    // HF19 TODO: remove the requirement that minor_version must be >= network version
-    if (blk.major_version != required_major_version || blk.minor_version < static_cast<uint8_t>(required_major_version))
+    // HF19 TODO: after hardfork 19 occurs we can remove the second line of this test:
+    if (blk.major_version != required_major_version ||
+            (blk.major_version < hf::hf19 && blk.minor_version < static_cast<uint8_t>(required_major_version)))
     {
       MGINFO_RED("Block with id: " << blk_hash << ", has invalid version " << static_cast<int>(blk.major_version) << "." << +blk.minor_version <<
               "; current: " << static_cast<int>(required_major_version) << "." << static_cast<int>(required_major_version) << " for height " << blk_height);
