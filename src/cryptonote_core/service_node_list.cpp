@@ -932,18 +932,6 @@ namespace service_nodes
     return false;
   }
 
-  // Calculates a*b/c, using 128-bit precision to avoid overflow.  This assumes that the result is
-  // 64-bits, but only checks it (via assertion) in debug builds.  As such you should only call this
-  // when this is true: for instance, when c is known to be greater than either a or b.
-  static uint64_t a_b_over_c(uint64_t a, uint64_t b, uint64_t c) {
-    uint64_t hi;
-    uint64_t lo = mul128(a, b, &hi);
-    uint64_t resulthi, resultlo;
-    div128_64(hi, lo, c, &resulthi, &resultlo);
-    assert(resulthi == 0);
-    return resultlo;
-  }
-
   bool is_registration_tx(cryptonote::network_type nettype, hf hf_version, const cryptonote::transaction& tx, uint64_t block_timestamp, uint64_t block_height, uint32_t index, crypto::public_key& key, service_node_info& info)
   {
     auto maybe_reg = reg_tx_extract_fields(tx);
@@ -1032,7 +1020,7 @@ namespace service_nodes
     if (reg.uses_portions)
       info.portions_for_operator = reg.fee;
     else
-      info.portions_for_operator = a_b_over_c(reg.fee, cryptonote::old::STAKING_PORTIONS, cryptonote::STAKING_FEE_BASIS);
+      info.portions_for_operator = mul128_div64(reg.fee, cryptonote::old::STAKING_PORTIONS, cryptonote::STAKING_FEE_BASIS);
 
     info.registration_height           = block_height;
     info.registration_hf_version       = hf_version;
@@ -1056,7 +1044,7 @@ namespace service_nodes
 
       auto& contributor = info.contributors.emplace_back();
       if (reg.uses_portions)
-        contributor.reserved = a_b_over_c(amount, info.staking_requirement, cryptonote::old::STAKING_PORTIONS);
+        contributor.reserved = mul128_div64(amount, info.staking_requirement, cryptonote::old::STAKING_PORTIONS);
       else
         contributor.reserved = amount;
 
@@ -4023,7 +4011,7 @@ namespace service_nodes
     const uint64_t portions_after_fee = cryptonote::old::STAKING_PORTIONS - info.portions_for_operator;
     for (const auto& contributor : info.contributors)
     {
-      uint64_t portion = a_b_over_c(contributor.amount, portions_after_fee, info.staking_requirement);
+      uint64_t portion = mul128_div64(contributor.amount, portions_after_fee, info.staking_requirement);
 
       if (contributor.address == info.operator_address)
         portion += info.portions_for_operator;

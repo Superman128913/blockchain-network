@@ -208,10 +208,7 @@ namespace cryptonote
 
   uint64_t get_portion_of_reward(uint64_t portions, uint64_t total_service_node_reward)
   {
-    uint64_t hi, lo, rewardhi, rewardlo;
-    lo = mul128(total_service_node_reward, portions, &hi);
-    div128_64(hi, lo, old::STAKING_PORTIONS, &rewardhi, &rewardlo);
-    return rewardlo;
+    return mul128_div64(total_service_node_reward, portions, old::STAKING_PORTIONS);
   }
 
   std::vector<uint64_t> distribute_reward_by_portions(const std::vector<service_nodes::payout_entry>& payout, uint64_t total_reward, bool distribute_remainder)

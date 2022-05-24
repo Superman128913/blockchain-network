@@ -211,38 +211,26 @@ namespace cryptonote {
   std::vector<cryptonote::batch_sn_payment> BlockchainSQLite::calculate_rewards(hf hf_version, uint64_t distribution_amount, service_nodes::service_node_info sn_info) {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
 
-    // Find out how much is due for the operator
-    uint64_t operator_fee = 0;
-    {
-      // This calculates the operator fee using (operator_portion / max_operator_portion) * distribution_amount but using 128 bit integer math
-      uint64_t hi, lo, resulthi, resultlo;
-      lo = mul128(sn_info.portions_for_operator, distribution_amount, &hi);
-      div128_64(hi, lo, old::STAKING_PORTIONS, &resulthi, &resultlo);
-      if (resulthi > 0)
-        throw std::logic_error("overflow from calculating sn operator fee");
-      operator_fee = resultlo;
-    }
+    // Find out how much is due for the operator: fee_portions/PORTIONS * reward
+    assert(sn_info.portions_for_operator <= old::STAKING_PORTIONS);
+    uint64_t operator_fee = mul128_div64(sn_info.portions_for_operator, distribution_amount, old::STAKING_PORTIONS);
+
+    assert(operator_fee <= distribution_amount);
+
     std::vector<cryptonote::batch_sn_payment> payments;
     // Pay the operator fee to the operator
     if (operator_fee > 0)
       payments.emplace_back(sn_info.operator_address, operator_fee, m_nettype);
 
     // Pay the balance to all the contributors (including the operator again)
-    uint64_t total_contributed_to_sn = std::accumulate(sn_info.contributors.begin(), sn_info.contributors.end(), uint64_t(0), [](auto
-      const a, auto
-      const b) {
-      return a + b.amount;
-    });
+    uint64_t total_contributed_to_sn = std::accumulate(sn_info.contributors.begin(), sn_info.contributors.end(), uint64_t(0),
+            [](const auto a, const auto b) { return a + b.amount; });
 
     for (auto& contributor: sn_info.contributors) {
       // This calculates (contributor.amount / total_contributed_to_winner_sn) * (distribution_amount - operator_fee) but using 128 bit integer math
-      uint64_t hi, lo, resulthi, resultlo;
-      lo = mul128(contributor.amount, distribution_amount - operator_fee, &hi);
-      div128_64(hi, lo, total_contributed_to_sn, &resulthi, &resultlo);
-      if (resulthi > 0)
-        throw std::logic_error("overflow from calculating sn contributor reward");
-      if (resultlo > 0)
-        payments.emplace_back(contributor.address, resultlo, m_nettype);
+      uint64_t c_reward = mul128_div64(contributor.amount, distribution_amount - operator_fee, total_contributed_to_sn);
+      if (c_reward > 0)
+        payments.emplace_back(contributor.address, c_reward, m_nettype);
     }
 
     return payments;

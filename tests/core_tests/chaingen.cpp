@@ -451,15 +451,6 @@ cryptonote::transaction oxen_chain_generator::create_tx(const cryptonote::accoun
   return t;
 }
 
-static uint64_t a_b_over_c(uint64_t a, uint64_t b, uint64_t c) {
-  uint64_t hi;
-  uint64_t lo = mul128(a, b, &hi);
-  uint64_t resulthi, resultlo;
-  div128_64(hi, lo, c, &resulthi, &resultlo);
-  assert(resulthi == 0);
-  return resultlo;
-}
-
 cryptonote::transaction
 oxen_chain_generator::create_registration_tx(const cryptonote::account_base& src,
                                              const cryptonote::keypair& service_node_keys,
@@ -485,11 +476,11 @@ oxen_chain_generator::create_registration_tx(const cryptonote::account_base& src
     reg.uses_portions = true;
     reg.hf = time(nullptr) + tools::to_seconds(cryptonote::old::STAKING_AUTHORIZATION_EXPIRATION_WINDOW);
     assert(reg.fee <= cryptonote::STAKING_FEE_BASIS);
-    reg.fee = a_b_over_c(reg.fee, cryptonote::old::STAKING_PORTIONS, cryptonote::STAKING_FEE_BASIS);
+    reg.fee = mul128_div64(reg.fee, cryptonote::old::STAKING_PORTIONS, cryptonote::STAKING_FEE_BASIS);
     uint64_t total = 0;
     for (auto& [contrib, amount] : reg.reserved) {
       assert(amount <= oxen::STAKING_REQUIREMENT_TESTNET);
-      amount = a_b_over_c(amount, cryptonote::old::STAKING_PORTIONS, oxen::STAKING_REQUIREMENT_TESTNET);
+      amount = mul128_div64(amount, cryptonote::old::STAKING_PORTIONS, oxen::STAKING_REQUIREMENT_TESTNET);
       total += amount;
     }
 

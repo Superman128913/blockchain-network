@@ -99,10 +99,7 @@ uint64_t get_staking_requirement(cryptonote::network_type nettype, uint64_t heig
 
 uint64_t portions_to_amount(uint64_t portions, uint64_t staking_requirement)
 {
-  uint64_t hi, lo, resulthi, resultlo;
-  lo = mul128(staking_requirement, portions, &hi);
-  div128_64(hi, lo, cryptonote::old::STAKING_PORTIONS, &resulthi, &resultlo);
-  return resultlo;
+  return mul128_div64(staking_requirement, portions, cryptonote::old::STAKING_PORTIONS);
 }
 
 bool check_service_node_portions(hf hf_version, const std::vector<std::pair<cryptonote::account_public_address, uint64_t>>& portions)

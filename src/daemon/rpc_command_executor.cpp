@@ -1903,10 +1903,7 @@ namespace {
 
 uint64_t get_actual_amount(uint64_t amount, uint64_t portions)
 {
-  uint64_t lo, hi, resulthi, resultlo;
-  lo = mul128(amount, portions, &hi);
-  div128_64(hi, lo, cryptonote::old::STAKING_PORTIONS, &resulthi, &resultlo);
-  return resultlo;
+  return mul128_div64(amount, portions, cryptonote::old::STAKING_PORTIONS);
 }
 
 // Returns an error message on invalid, nullopt if good
