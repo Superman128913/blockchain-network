@@ -30,6 +30,8 @@
 
 #include "blockchain_db/sqlite/db_sqlite.h"
 
+#include "../blockchain_sqlite_test.h"
+
 TEST(SQLITE, AddressModulus)
 {
   cryptonote::address_parse_info wallet_address;
@@ -44,7 +46,7 @@ TEST(SQLITE, AddressModulus)
 
 TEST(SQLITE, AddSNRewards)
 {
-  cryptonote::BlockchainSQLiteTest sqliteDB(cryptonote::network_type::TESTNET, ":memory:");
+  test::BlockchainSQLiteTest sqliteDB(cryptonote::network_type::TESTNET, ":memory:");
 
   EXPECT_TRUE(sqliteDB.batching_count() == 0);
 
@@ -90,7 +92,7 @@ TEST(SQLITE, AddSNRewards)
 
 TEST(SQLITE, CalculateRewards)
 {
-  cryptonote::BlockchainSQLiteTest sqliteDB(cryptonote::network_type::TESTNET, ":memory:");
+  test::BlockchainSQLiteTest sqliteDB(cryptonote::network_type::TESTNET, ":memory:");
 
   cryptonote::block block;
   block.reward = 200;

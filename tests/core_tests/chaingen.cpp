@@ -169,7 +169,7 @@ std::vector<cryptonote::block> oxen_chain_generator_db::get_blocks_range(const u
 oxen_chain_generator::oxen_chain_generator(std::vector<test_event_entry>& events, const std::vector<cryptonote::hard_fork>& hard_forks, std::string first_miner_seed)
 : events_(events)
 , hard_forks_(hard_forks)
-, sqlite_db_(std::make_unique<cryptonote::BlockchainSQLiteTest>(cryptonote::network_type::FAKECHAIN, ":memory:"))
+, sqlite_db_(std::make_unique<test::BlockchainSQLiteTest>(cryptonote::network_type::FAKECHAIN, ":memory:"))
 {
   bool init = ons_db_->init(nullptr, cryptonote::network_type::FAKECHAIN, ons::init_oxen_name_system("", false /*read_only*/));
   assert(init);

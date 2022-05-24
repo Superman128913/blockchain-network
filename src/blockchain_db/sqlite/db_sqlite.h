@@ -96,15 +96,4 @@ protected:
 
 };
 
-class BlockchainSQLiteTest : public BlockchainSQLite
-{
-public:
-  BlockchainSQLiteTest(cryptonote::network_type nettype, fs::path db_path);
-  BlockchainSQLiteTest(BlockchainSQLiteTest &other);
-
-  // Helper functions, used in testing to assess the state of the database
-  uint64_t batching_count();
-  std::optional<uint64_t> retrieve_amount_by_address(const std::string& address);
-};
-
 }
