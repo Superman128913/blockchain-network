@@ -61,13 +61,7 @@ namespace cryptonote {
       create_schema();
     }
 
-    SQLite::Statement st {
-      db,
-      "SELECT height FROM batch_db_info"
-    };
-    while (st.executeStep()) {
-      height = st.getColumn(0).getInt64();
-    }
+    height = prepared_get<int64_t>("SELECT height FROM batch_db_info");
   }
 
   void BlockchainSQLite::create_schema() {
@@ -132,11 +126,9 @@ namespace cryptonote {
   void BlockchainSQLite::update_height(uint64_t new_height) {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__ << " Called with new height: " << new_height);
     height = new_height;
-    SQLite::Statement update_height {
-      db,
-      "UPDATE batch_db_info SET height = ?"
-    };
-    db::exec_query(update_height, static_cast<int64_t>(height));
+    prepared_exec(
+      "UPDATE batch_db_info SET height = ?",
+      static_cast<int64_t>(height));
   }
 
   void BlockchainSQLite::increment_height() {
@@ -151,28 +143,25 @@ namespace cryptonote {
 
   bool BlockchainSQLite::add_sn_payments(std::vector<cryptonote::batch_sn_payment>& payments) {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
-    SQLite::Statement insert_payment {
-      db,
-      "INSERT INTO batched_payments_accrued (address, amount) VALUES (?, ?) ON CONFLICT (address) DO UPDATE SET amount = amount + excluded.amount"
-    };
+    auto insert_payment = prepared_st(
+      "INSERT INTO batched_payments_accrued (address, amount) VALUES (?, ?)"
+      " ON CONFLICT (address) DO UPDATE SET amount = amount + excluded.amount");
 
     for (auto& payment: payments) {
       std::string address_str = cryptonote::get_account_address_as_str(m_nettype, 0, payment.address_info.address);
       MTRACE("Adding record for SN reward contributor " << address_str << "to database with amount " << static_cast<int64_t>(payment.amount));
 
       db::exec_query(insert_payment, address_str, static_cast<int64_t>(payment.amount * 1000));
-      insert_payment.reset();
-    };
+      insert_payment->reset();
+    }
 
     return true;
   }
 
   bool BlockchainSQLite::subtract_sn_payments(std::vector<cryptonote::batch_sn_payment>& payments) {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
-    SQLite::Statement update_payment {
-      db,
-      "UPDATE batched_payments_accrued SET amount = (amount - ?) WHERE address = ?"
-    };
+    auto update_payment = prepared_st(
+      "UPDATE batched_payments_accrued SET amount = (amount - ?) WHERE address = ?");
 
     for (auto& payment: payments) {
       std::string address_str = cryptonote::get_account_address_as_str(m_nettype, 0, payment.address_info.address);
@@ -181,8 +170,8 @@ namespace cryptonote {
         MERROR("tried to subtract payment from an address that doesnt exist: " << address_str);
         return false;
       }
-      update_payment.reset();
-    };
+      update_payment->reset();
+    }
 
     return true;
   }
@@ -195,20 +184,19 @@ namespace cryptonote {
 
     const auto& conf = get_config(m_nettype);
 
-    SQLite::Statement select_payments {
-      db,
-      "SELECT address, amount FROM batched_payments_accrued WHERE amount > ? ORDER BY address ASC"
-    };
+    auto select_payments = prepared_st(
+      "SELECT address, amount FROM batched_payments_accrued WHERE amount > ? ORDER BY address ASC");
 
-    select_payments.bind(1, static_cast<int64_t>(conf.MIN_BATCH_PAYMENT_AMOUNT * 1000));
+    select_payments->bind(1, static_cast<int64_t>(conf.MIN_BATCH_PAYMENT_AMOUNT * 1000));
 
     std::vector<cryptonote::batch_sn_payment> payments;
 
     std::string address;
     uint64_t amount;
-    while (select_payments.executeStep()) {
-      address = select_payments.getColumn(0).getString();
-      amount = static_cast<uint64_t>(select_payments.getColumn(1).getInt64() / 1000);
+    while (select_payments->executeStep()) {
+      auto [addr, amt] = db::get<std::string, int64_t>(select_payments);
+      address = std::move(addr);
+      amount = static_cast<uint64_t>(amt / 1000);
       if (cryptonote::is_valid_address(address, m_nettype)) {
         cryptonote::address_parse_info addr_info {};
         cryptonote::get_account_address_from_str(addr_info, m_nettype, address);
@@ -491,33 +479,29 @@ namespace cryptonote {
     return save_payments(block_height, finalised_payments);
   }
 
-  bool BlockchainSQLite::save_payments(uint64_t block_height, std::vector<batch_sn_payment>paid_amounts) {
+  bool BlockchainSQLite::save_payments(uint64_t block_height, const std::vector<batch_sn_payment>& paid_amounts) {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
 
-    SQLite::Statement select_sum {
-      db,
-      "SELECT amount from batched_payments_accrued WHERE address = ?;"
-    };
+    auto select_sum = prepared_st(
+      "SELECT amount from batched_payments_accrued WHERE address = ?");
 
-    SQLite::Statement update_paid {
-      db,
-      "INSERT INTO batched_payments_paid (address, amount, height_paid) VALUES (?,?,?);"
-    };
+    auto update_paid = prepared_st(
+      "INSERT INTO batched_payments_paid (address, amount, height_paid) VALUES (?,?,?)");
 
     for (const auto& payment: paid_amounts) {
-      select_sum.bind(1, payment.address);
-      while (select_sum.executeStep()) {
-        uint64_t amount = static_cast<uint64_t>(select_sum.getColumn(0).getInt64());
+      if (auto maybe_amount = db::exec_and_maybe_get<int64_t>(select_sum, payment.address))
+      {
+        auto amount = static_cast<uint64_t>(*maybe_amount);
         if (amount != payment.amount * 1000) {
           MERROR("Invalid amounts passed in to save payments for address: " << payment.address << " received " << payment.amount << " expected " << amount);
           return false;
         }
 
         db::exec_query(update_paid, payment.address, static_cast<int64_t>(amount), static_cast<int64_t>(block_height));
-        update_paid.reset();
+        update_paid->reset();
       }
-      select_sum.reset();
-    };
+      select_sum->reset();
+    }
     return true;
   }
 
@@ -525,24 +509,21 @@ namespace cryptonote {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__ << " Called with height: " << block_height);
 
     std::vector<cryptonote::batch_sn_payment> payments_at_height;
-    SQLite::Statement st {
-      db,
-      "SELECT address, amount FROM batched_payments_paid WHERE height_paid = ? ORDER BY address"
-    };
-    st.bind(1, static_cast<int64_t>(block_height));
-    while (st.executeStep()) {
-      payments_at_height.emplace_back(st.getColumn(0).getString(), st.getColumn(1).getInt64(), m_nettype);
+    auto st = prepared_st(
+      "SELECT address, amount FROM batched_payments_paid WHERE height_paid = ? ORDER BY address");
+    bind_oneshot(st, static_cast<int64_t>(block_height));
+    while (st->executeStep()) {
+      auto [addr, amt] = db::get<std::string, int64_t>(st);
+      payments_at_height.emplace_back(std::move(addr), static_cast<uint64_t>(amt), m_nettype);
     }
     return payments_at_height;
   }
 
   bool BlockchainSQLite::delete_block_payments(uint64_t block_height) {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__ << " Called with height: " << block_height);
-    SQLite::Statement delete_payments {
-      db,
-      "DELETE FROM batched_payments_paid WHERE height_paid >= ?"
-    };
-    db::exec_query(delete_payments, static_cast<int64_t>(block_height));
+    prepared_exec(
+        "DELETE FROM batched_payments_paid WHERE height_paid >= ?",
+        static_cast<int64_t>(block_height));
     return true;
   }
 
@@ -563,43 +544,29 @@ namespace cryptonote {
   BlockchainSQLiteTest::BlockchainSQLiteTest(cryptonote::network_type nettype, fs::path db_path): BlockchainSQLite(nettype, db_path) {};
 
   BlockchainSQLiteTest::BlockchainSQLiteTest(BlockchainSQLiteTest& other): BlockchainSQLiteTest(other.m_nettype, check_if_copy_filename(other.filename)) {
-    std::vector<std::tuple<std::string, int64_t>> all_payments_accrued;
-    SQLite::Statement st {
-      other.db, "SELECT address, amount FROM batched_payments_accrued"
-    };
-    while (st.executeStep())
-      all_payments_accrued.emplace_back(st.getColumn(0).getString(), st.getColumn(1).getInt64());
-    std::vector<std::tuple<std::string, int64_t, int64_t>> all_payments_paid;
-    SQLite::Statement st2 {
-      other.db, "SELECT address, amount, height_paid FROM batched_payments_raw"
-    };
-    while (st2.executeStep())
-      all_payments_paid.emplace_back(st2.getColumn(0).getString(), st2.getColumn(1).getInt64(), st2.getColumn(2).getInt64());
+    auto all_payments_accrued = db::get_all<std::string, int64_t>(prepared_st("SELECT address, amount FROM batched_payments_accrued"));
+    auto all_payments_paid = db::get_all<std::string, int64_t, int64_t>(prepared_st("SELECT address, amount, height_paid FROM batched_payments_raw"));
 
     SQLite::Transaction transaction {
       db,
       SQLite::TransactionBehavior::IMMEDIATE
     };
 
-    SQLite::Statement insert_payment_paid {
-      db,
-      "INSERT INTO batched_payments_raw (address, amount, height_paid) VALUES (?, ?, ?)"
-    };
+    auto insert_payment_paid = prepared_st(
+      "INSERT INTO batched_payments_raw (address, amount, height_paid) VALUES (?, ?, ?)");
 
     for (auto& [address, amount, height_paid]: all_payments_paid) {
       db::exec_query(insert_payment_paid, address, amount, height_paid);
-      insert_payment_paid.reset();
-    };
+      insert_payment_paid->reset();
+    }
 
-    SQLite::Statement insert_payment_accrued {
-      db,
-      "INSERT INTO batched_payments_accrued (address, amount) VALUES (?, ?)"
-    };
+    auto insert_payment_accrued = prepared_st(
+      "INSERT INTO batched_payments_accrued (address, amount) VALUES (?, ?)");
 
     for (auto& [address, amount]: all_payments_accrued) {
       db::exec_query(insert_payment_accrued, address, amount);
-      insert_payment_accrued.reset();
-    };
+      insert_payment_accrued->reset();
+    }
 
     transaction.commit();
 
@@ -608,30 +575,14 @@ namespace cryptonote {
 
   uint64_t BlockchainSQLiteTest::batching_count() {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
-    SQLite::Statement st {
-      db,
-      "SELECT count(*) FROM batched_payments_accrued"
-    };
-    uint64_t count = 0;
-    while (st.executeStep()) {
-      count = st.getColumn(0).getInt64();
-    }
-    return count;
+    return prepared_get<int64_t>("SELECT count(*) FROM batched_payments_accrued");
   }
 
   std::optional<uint64_t> BlockchainSQLiteTest::retrieve_amount_by_address(const std::string& address) {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
-    SQLite::Statement st {
-      db,
-      "SELECT amount FROM batched_payments_accrued WHERE address = ?"
-    };
-    st.bind(1, address);
-    std::optional<uint64_t> amount = std::nullopt;
-    while (st.executeStep()) {
-      assert(!amount);
-      amount.emplace(st.getColumn(0).getInt64());
-    }
-    return amount;
+    if (auto maybe = prepared_maybe_get<int64_t>("SELECT amount FROM batched_payments_accrued WHERE address = ?"))
+      return *maybe;
+    return std::nullopt;
   }
 
 } // namespace cryptonote

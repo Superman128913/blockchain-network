@@ -83,7 +83,7 @@ public:
   
   // these keep track of payments made to SN operators after then payment has been made. Allows for popping blocks back and knowing who got paid in those blocks.
   // passing in a list of people to be marked as paid in the paid_amounts vector. Block height will be added to the batched_payments_paid database as height_paid.
-  bool save_payments(uint64_t block_height, std::vector<batch_sn_payment> paid_amounts);
+  bool save_payments(uint64_t block_height, const std::vector<batch_sn_payment>& paid_amounts);
   std::vector<cryptonote::batch_sn_payment> get_block_payments(uint64_t block_height);
   bool delete_block_payments(uint64_t block_height);
 
