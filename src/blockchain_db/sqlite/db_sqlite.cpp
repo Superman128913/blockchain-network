@@ -261,7 +261,6 @@ namespace cryptonote {
     auto hf_version = block.major_version;
     if (hf_version < hf::hf19_reward_batching) {
       update_height(block_height);
-      print_database();
       return true;
     }
 
@@ -347,7 +346,6 @@ namespace cryptonote {
       MFATAL("Exception: " << e.what());
       return false;
     }
-    print_database();
     return true;
   }
 
@@ -525,16 +523,6 @@ namespace cryptonote {
         "DELETE FROM batched_payments_paid WHERE height_paid >= ?",
         static_cast<int64_t>(block_height));
     return true;
-  }
-
-  void BlockchainSQLite::print_database()
-  {
-    LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__ << " Called with height: " << height);
-    LOG_PRINT_L3("Print Database called with height: " << height);
-    SQLite::Statement st{db, "SELECT address, amount FROM batched_payments_accrued ORDER BY address ASC"};
-    while (st.executeStep()) {
-      LOG_PRINT_L3(" Address: " << st.getColumn(0).getString() << " has amount: " << st.getColumn(1).getString() << " in the database");
-    }
   }
 
   fs::path check_if_copy_filename(std::string_view db_path) {

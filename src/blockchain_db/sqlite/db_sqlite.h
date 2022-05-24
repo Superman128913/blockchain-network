@@ -87,9 +87,6 @@ public:
   std::vector<cryptonote::batch_sn_payment> get_block_payments(uint64_t block_height);
   bool delete_block_payments(uint64_t block_height);
 
-  // This is a debugging function. It prints the entire batching database to trace logs
-  void print_database();
-
   uint64_t height;
 
 protected:
