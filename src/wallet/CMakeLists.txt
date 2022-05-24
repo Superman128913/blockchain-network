@@ -54,7 +54,6 @@ target_link_libraries(wallet
     rpc_server_base
     cryptonote_core
     mnemonics
-    device_trezor
     net
     lmdb
     rpc_http_client
@@ -63,6 +62,10 @@ target_link_libraries(wallet
     Boost::thread
   PRIVATE
     extra)
+
+if(TARGET device_trezor)
+  target_link_libraries(wallet PUBLIC device_trezor)
+endif()
 
 oxen_add_executable(wallet_rpc_server "oxen-wallet-rpc"
   wallet_rpc_server.cpp

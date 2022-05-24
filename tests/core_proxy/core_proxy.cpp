@@ -148,7 +148,7 @@ int main(int argc, char* argv[])
 }
 
 /*
-string tx2str(const cryptonote::transaction& tx, const cryptonote::hash256& tx_hash, const cryptonote::hash256& tx_prefix_hash, const cryptonote::blobdata& blob) {
+string tx2str(const cryptonote::transaction& tx, const cryptonote::hash256& tx_hash, const cryptonote::hash256& tx_prefix_hash, const std::string& blob) {
     stringstream ss;
 
     ss << "{";
@@ -159,7 +159,7 @@ string tx2str(const cryptonote::transaction& tx, const cryptonote::hash256& tx_h
     return ss.str();
 }*/
 
-std::vector<cryptonote::tx_verification_batch_info> tests::proxy_core::parse_incoming_txs(const std::vector<cryptonote::blobdata>& tx_blobs, const tx_pool_options &opts) {
+std::vector<cryptonote::tx_verification_batch_info> tests::proxy_core::parse_incoming_txs(const std::vector<std::string>& tx_blobs, const tx_pool_options &opts) {
 
     std::vector<cryptonote::tx_verification_batch_info> tx_info(tx_blobs.size());
 
@@ -198,16 +198,16 @@ bool tests::proxy_core::handle_parsed_txs(std::vector<cryptonote::tx_verificatio
     return ok;
 }
 
-std::vector<tx_verification_batch_info> tests::proxy_core::handle_incoming_txs(const std::vector<blobdata>& tx_blobs, const tx_pool_options &opts)
+std::vector<tx_verification_batch_info> tests::proxy_core::handle_incoming_txs(const std::vector<std::string>& tx_blobs, const tx_pool_options &opts)
 {
     auto parsed = parse_incoming_txs(tx_blobs, opts);
     handle_parsed_txs(parsed, opts);
     return parsed;
 }
 
-bool tests::proxy_core::handle_incoming_tx(const blobdata& tx_blob, tx_verification_context& tvc, const tx_pool_options &opts)
+bool tests::proxy_core::handle_incoming_tx(const std::string& tx_blob, tx_verification_context& tvc, const tx_pool_options &opts)
 {
-    const std::vector<cryptonote::blobdata> tx_blobs{{tx_blob}};
+    const std::vector<std::string> tx_blobs{{tx_blob}};
     auto parsed = handle_incoming_txs(tx_blobs, opts);
     parsed[0].blob = &tx_blob; // Update pointer to the input rather than the copy in case the caller wants to use it for some reason
     tvc = parsed[0].tvc;
@@ -219,7 +219,7 @@ tests::proxy_core::parse_incoming_blinks(const std::vector<serializable_blink_me
     return {};
 }
 
-bool tests::proxy_core::handle_incoming_block(const cryptonote::blobdata& block_blob, const cryptonote::block *block_, cryptonote::block_verification_context& bvc, cryptonote::checkpoint_t *checkpoint, bool update_miner_blocktemplate) {
+bool tests::proxy_core::handle_incoming_block(const std::string& block_blob, const cryptonote::block *block_, cryptonote::block_verification_context& bvc, cryptonote::checkpoint_t *checkpoint, bool update_miner_blocktemplate) {
     block b{};
 
     if(!parse_and_validate_block_from_blob(block_blob, b)) {
@@ -228,7 +228,7 @@ bool tests::proxy_core::handle_incoming_block(const cryptonote::blobdata& block_
     }
 
     crypto::hash h = get_block_hash(b);
-    crypto::hash lh = get_block_longhash_w_blockchain(cryptonote::FAKECHAIN, NULL, b, 0, 0);
+    crypto::hash lh = get_block_longhash_w_blockchain(network_type::FAKECHAIN, NULL, b, 0, 0);
     std::cout << "BLOCK\n\n";
     std::cout << h << '\n';
     std::cout << lh << '\n';
@@ -266,9 +266,9 @@ void tests::proxy_core::get_blockchain_top(uint64_t& height, crypto::hash& top_i
 }
 
 bool tests::proxy_core::init(const boost::program_options::variables_map& /*vm*/) {
-    generate_genesis_block(m_genesis, MAINNET);
+    generate_genesis_block(m_genesis, network_type::MAINNET);
     crypto::hash h = get_block_hash(m_genesis);
-    add_block(h, get_block_longhash(cryptonote::FAKECHAIN, randomx_longhash_context(NULL, m_genesis, 0), m_genesis, 0, 0), m_genesis, block_to_blob(m_genesis), nullptr /*checkpoint*/);
+    add_block(h, get_block_longhash(network_type::FAKECHAIN, randomx_longhash_context(NULL, m_genesis, 0), m_genesis, 0, 0), m_genesis, block_to_blob(m_genesis), nullptr /*checkpoint*/);
     return true;
 }
 
@@ -293,7 +293,7 @@ void tests::proxy_core::build_short_history(std::list<crypto::hash> &m_history, 
     } while (m_hash2blkidx.end() != cit && get_block_hash(cit->second.blk) != cit->first);*/
 }
 
-bool tests::proxy_core::add_block(const crypto::hash &_id, const crypto::hash &_longhash, const cryptonote::block &_blk, const cryptonote::blobdata &_blob, cryptonote::checkpoint_t const *) {
+bool tests::proxy_core::add_block(const crypto::hash &_id, const crypto::hash &_longhash, const cryptonote::block &_blk, const std::string &_blob, cryptonote::checkpoint_t const *) {
     size_t height = 0;
 
     if (crypto::null_hash != _blk.prev_id) {

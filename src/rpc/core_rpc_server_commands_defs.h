@@ -749,8 +749,8 @@ namespace rpc {
       std::string prev_hash;       // Hash of the most recent block on which to mine the next block.
       std::string seed_hash;       // RandomX current seed hash
       std::string next_seed_hash;  // RandomX upcoming seed hash
-      blobdata blocktemplate_blob; // Blob on which to try to mine a new block.
-      blobdata blockhashing_blob;  // Blob on which to try to find a valid nonce.
+      std::string blocktemplate_blob; // Blob on which to try to mine a new block.
+      std::string blockhashing_blob;  // Blob on which to try to find a valid nonce.
       std::string status;          // General RPC error code. "OK" means everything looks good.
       bool untrusted;              // States if the result is obtained using the bootstrap mode, and is therefore not trusted (`true`), or when the daemon is fully synced (`false`).
 
@@ -1437,7 +1437,8 @@ namespace rpc {
 
     struct response
     {
-      uint8_t version;          // The major block version for the fork.
+      hf version;               // The major block version for the fork.
+      uint8_t revision;         // The network revision of this daemon (e.g. 1 for HF 19.1).
       bool enabled;             // Indicates whether hard fork is enforced (that is, at or above the requested hardfork)
       std::optional<uint64_t> earliest_height; // Block height at which hard fork will be enabled.
       std::optional<uint64_t> last_height; // The last block height at which this hard fork will be active; will be omitted if this oxend is not aware of any future hard fork.
@@ -2111,7 +2112,7 @@ namespace rpc {
       struct entry {
         std::string                           service_node_pubkey;           // The public key of the Service Node.
         uint64_t                              registration_height;           // The height at which the registration for the Service Node arrived on the blockchain.
-        uint16_t                              registration_hf_version;       // The hard fork at which the registration for the Service Node arrived on the blockchain.
+        hf                                    registration_hf_version;       // The hard fork at which the registration for the Service Node arrived on the blockchain.
         uint64_t                              requested_unlock_height;       // The height at which contributions will be released and the Service Node expires. 0 if not requested yet.
         uint64_t                              last_reward_block_height;      // The height that determines when this service node will next receive a reward.  This field is updated when receiving a reward, but is also updated when a SN is activated, recommissioned, or has an IP change position reset.
         uint32_t                              last_reward_transaction_index; // When multiple Service Nodes register (or become active/reactivated) at the same height (i.e. have the same last_reward_block_height), this field contains the activating transaction position in the block which is used to break ties in determining which SN is next in the reward list.

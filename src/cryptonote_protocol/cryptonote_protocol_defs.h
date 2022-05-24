@@ -34,7 +34,6 @@
 #include "epee/serialization/keyvalue_serialization.h"
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "epee/net/net_utils_base.h"
-#include "cryptonote_basic/blobdatatype.h"
 
 #include "common/oxen.h"
 
@@ -115,9 +114,9 @@ namespace cryptonote
   OXEN_RPC_DOC_INTROSPECT
   struct block_complete_entry
   {
-    blobdata block;
-    std::vector<blobdata> txs;
-    blobdata checkpoint;
+    std::string block;
+    std::vector<std::string> txs;
+    std::string checkpoint;
     std::vector<serializable_blink_metadata> blinks;
     KV_MAP_SERIALIZABLE
   };
@@ -131,7 +130,7 @@ namespace cryptonote
 
     struct request
     {
-      std::vector<blobdata> txs;
+      std::vector<std::string> txs;
       std::vector<serializable_blink_metadata> blinks;
       bool requested = false;
       std::string _; // padding
@@ -173,8 +172,8 @@ namespace cryptonote
   {
     uint64_t current_height;
     uint64_t cumulative_difficulty;
-    crypto::hash  top_id;
-    uint8_t top_version;
+    crypto::hash top_id;
+    hf top_version;
     uint32_t pruning_seed;
     std::vector<uint64_t> blink_blocks;
     std::vector<crypto::hash> blink_hash;

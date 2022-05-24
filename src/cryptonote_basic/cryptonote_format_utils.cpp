@@ -91,7 +91,7 @@ namespace cryptonote
       ++nlr;
     nlr += 6;
     const size_t bp_size = 32 * (9 + 2 * nlr);
-    CHECK_AND_ASSERT_THROW_MES_L1(n_outputs <= BULLETPROOF_MAX_OUTPUTS, "maximum number of outputs is " + std::to_string(BULLETPROOF_MAX_OUTPUTS) + " per transaction");
+    CHECK_AND_ASSERT_THROW_MES_L1(n_outputs <= TX_BULLETPROOF_MAX_OUTPUTS, "maximum number of outputs is " + std::to_string(TX_BULLETPROOF_MAX_OUTPUTS) + " per transaction");
     CHECK_AND_ASSERT_THROW_MES_L1(bp_base * n_padded_outputs >= bp_size, "Invalid bulletproof clawback: bp_base " + std::to_string(bp_base) + ", n_padded_outputs "
         + std::to_string(n_padded_outputs) + ", bp_size " + std::to_string(bp_size));
     const uint64_t bp_clawback = (bp_base * n_padded_outputs - bp_size) * 4 / 5;
@@ -380,9 +380,9 @@ namespace cryptonote
         return std::nullopt;
 
       // Scale up the number (e.g. 12 from "12.45") to atomic units.
-      if (amount > std::numeric_limits<uint64_t>::max() / COIN)
+      if (amount > std::numeric_limits<uint64_t>::max() / oxen::COIN)
         return std::nullopt; // would overflow
-      amount *= COIN;
+      amount *= oxen::COIN;
     }
 
     if (parts.size() == 1)
@@ -392,10 +392,10 @@ namespace cryptonote
       return std::nullopt; // fractional part contains non-digit
 
     // If too long, but with insignificant 0's, trim them off
-    while (parts[1].size() > CRYPTONOTE_DISPLAY_DECIMAL_POINT && parts[1].back() == '0')
+    while (parts[1].size() > oxen::DISPLAY_DECIMAL_POINT && parts[1].back() == '0')
       parts[1].remove_suffix(1);
 
-    if (parts[1].size() > CRYPTONOTE_DISPLAY_DECIMAL_POINT)
+    if (parts[1].size() > oxen::DISPLAY_DECIMAL_POINT)
       return std::nullopt; // fractional part has too many significant digits
 
     uint64_t fractional;
@@ -404,7 +404,7 @@ namespace cryptonote
 
     // Scale up the value if it wasn't a full fractional value, e.g. if we have "10.45" then we
     // need to convert the 45 we just parsed to 450'000'000.
-    for (size_t i = parts[1].size(); i < CRYPTONOTE_DISPLAY_DECIMAL_POINT; i++)
+    for (size_t i = parts[1].size(); i < oxen::DISPLAY_DECIMAL_POINT; i++)
       fractional *= 10;
 
     if (fractional > std::numeric_limits<uint64_t>::max() - amount)
@@ -612,7 +612,7 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------
-  bool add_extra_nonce_to_tx_extra(std::vector<uint8_t>& tx_extra, const blobdata& extra_nonce)
+  bool add_extra_nonce_to_tx_extra(std::vector<uint8_t>& tx_extra, const std::string& extra_nonce)
   {
     CHECK_AND_ASSERT_MES(extra_nonce.size() <= TX_EXTRA_NONCE_MAX_COUNT, false, "extra nonce could be 255 bytes max");
     tx_extra.reserve(tx_extra.size() + 2 + extra_nonce.size());
@@ -622,10 +622,10 @@ namespace cryptonote
     return true;
   }
 
-  bool add_service_node_state_change_to_tx_extra(std::vector<uint8_t>& tx_extra, const tx_extra_service_node_state_change& state_change, const uint8_t hf_version)
+  bool add_service_node_state_change_to_tx_extra(std::vector<uint8_t>& tx_extra, const tx_extra_service_node_state_change& state_change, const hf hf_version)
   {
     tx_extra_field field;
-    if (hf_version < network_version_12_checkpointing)
+    if (hf_version < hf::hf12_checkpointing)
     {
       CHECK_AND_ASSERT_MES(state_change.state == service_nodes::new_state::deregister, false, "internal error: cannot construct an old deregistration for a non-deregistration state change (before hardfork v12)");
       field = tx_extra_service_node_deregister_old{state_change};
@@ -741,9 +741,9 @@ namespace cryptonote
     add_tx_extra<tx_extra_service_node_winner>(tx_extra, winner);
   }
   //---------------------------------------------------------------
-  bool get_service_node_state_change_from_tx_extra(const std::vector<uint8_t>& tx_extra, tx_extra_service_node_state_change &state_change, const uint8_t hf_version)
+  bool get_service_node_state_change_from_tx_extra(const std::vector<uint8_t>& tx_extra, tx_extra_service_node_state_change &state_change, const hf hf_version)
   {
-    if (hf_version >= cryptonote::network_version_12_checkpointing) {
+    if (hf_version >= hf::hf12_checkpointing) {
       // Look for a new-style state change field:
       return get_field_from_tx_extra(tx_extra, state_change);
     }
@@ -803,7 +803,7 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------
-  void set_payment_id_to_tx_extra_nonce(blobdata& extra_nonce, const crypto::hash& payment_id)
+  void set_payment_id_to_tx_extra_nonce(std::string& extra_nonce, const crypto::hash& payment_id)
   {
     extra_nonce.clear();
     extra_nonce.push_back(TX_EXTRA_NONCE_PAYMENT_ID);
@@ -811,7 +811,7 @@ namespace cryptonote
     std::copy(payment_id_ptr, payment_id_ptr + sizeof(payment_id), std::back_inserter(extra_nonce));
   }
   //---------------------------------------------------------------
-  void set_encrypted_payment_id_to_tx_extra_nonce(blobdata& extra_nonce, const crypto::hash8& payment_id)
+  void set_encrypted_payment_id_to_tx_extra_nonce(std::string& extra_nonce, const crypto::hash8& payment_id)
   {
     extra_nonce.clear();
     extra_nonce.push_back(TX_EXTRA_NONCE_ENCRYPTED_PAYMENT_ID);
@@ -819,7 +819,7 @@ namespace cryptonote
     std::copy(payment_id_ptr, payment_id_ptr + sizeof(payment_id), std::back_inserter(extra_nonce));
   }
   //---------------------------------------------------------------
-  bool get_payment_id_from_tx_extra_nonce(const blobdata& extra_nonce, crypto::hash& payment_id)
+  bool get_payment_id_from_tx_extra_nonce(const std::string& extra_nonce, crypto::hash& payment_id)
   {
     if(sizeof(crypto::hash) + 1 != extra_nonce.size())
       return false;
@@ -829,7 +829,7 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------
-  bool get_encrypted_payment_id_from_tx_extra_nonce(const blobdata& extra_nonce, crypto::hash8& payment_id)
+  bool get_encrypted_payment_id_from_tx_extra_nonce(const std::string& extra_nonce, crypto::hash8& payment_id)
   {
     if(sizeof(crypto::hash8) + 1 != extra_nonce.size())
       return false;
@@ -873,7 +873,7 @@ namespace cryptonote
     {
       CHECK_AND_ASSERT_MES(b.miner_tx.vin.size() == 1, 0, "wrong miner tx in block: " << get_block_hash(b) << ", b.miner_tx.vin.size() != 1 (size is: " << b.miner_tx.vin.size() << ")");
       CHECKED_GET_SPECIFIC_VARIANT(b.miner_tx.vin[0], txin_gen, coinbase_in, 0);
-      if (b.major_version >= cryptonote::network_version_19)
+      if (b.major_version >= hf::hf19)
       {
         CHECK_AND_ASSERT_MES(coinbase_in.height == b.height, 0, "wrong miner tx in block: " << get_block_hash(b));
       }
@@ -1043,7 +1043,7 @@ namespace cryptonote
   //---------------------------------------------------------------
   std::string print_money(uint64_t amount, bool strip_zeros)
   {
-    constexpr unsigned int decimal_point = CRYPTONOTE_DISPLAY_DECIMAL_POINT;
+    constexpr unsigned int decimal_point = oxen::DISPLAY_DECIMAL_POINT;
     std::string s = std::to_string(amount);
     if(s.size() < decimal_point+1)
     {
@@ -1173,7 +1173,7 @@ namespace cryptonote
     return get_transaction_hash(t, res, NULL);
   }
   //---------------------------------------------------------------
-  [[nodiscard]] bool calculate_transaction_prunable_hash(const transaction& t, const cryptonote::blobdata *blob, crypto::hash& res)
+  [[nodiscard]] bool calculate_transaction_prunable_hash(const transaction& t, const std::string *blob, crypto::hash& res)
   {
     if (t.version == txversion::v1)
       return false;
@@ -1201,7 +1201,7 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------
-  crypto::hash get_transaction_prunable_hash(const transaction& t, const cryptonote::blobdata *blobdata)
+  crypto::hash get_transaction_prunable_hash(const transaction& t, const std::string* blobdata)
   {
     crypto::hash res;
     CHECK_AND_ASSERT_THROW_MES(calculate_transaction_prunable_hash(t, blobdata, res), "Failed to calculate tx prunable hash");
@@ -1257,7 +1257,7 @@ namespace cryptonote
     // prefix
     get_transaction_prefix_hash(t, hashes[0]);
 
-    const blobdata blob = tx_to_blob(t);
+    const std::string blob = tx_to_blob(t);
     CHECK_AND_ASSERT_MES(!blob.empty(), false, "Failed to convert tx to blob");
 
     // TODO(oxen): Not sure if this is the right fix, we may just want to set
@@ -1321,12 +1321,12 @@ namespace cryptonote
       LOG_ERROR("get_registration_hash addresses.size() != portions.size()");
       return false;
     }
-    uint64_t portions_left = STAKING_PORTIONS;
+    uint64_t portions_left = old::STAKING_PORTIONS;
     for (uint64_t portion : portions)
     {
       if (portion > portions_left)
       {
-        LOG_ERROR(tr("Your registration has more than ") << STAKING_PORTIONS << tr(" portions, this registration is invalid!"));
+        LOG_ERROR(tr("Your registration has more than ") << old::STAKING_PORTIONS << tr(" portions, this registration is invalid!"));
         return false;
       }
       portions_left -= portion;
@@ -1380,9 +1380,9 @@ namespace cryptonote
     return get_transaction_hash(t, res, &blob_size);
   }
   //---------------------------------------------------------------
-  blobdata get_block_hashing_blob(const block& b)
+  std::string get_block_hashing_blob(const block& b)
   {
-    blobdata blob = t_serializable_object_to_blob(static_cast<block_header>(b));
+    std::string blob = t_serializable_object_to_blob(static_cast<block_header>(b));
     crypto::hash tree_root_hash = get_tx_tree_hash(b);
     blob.append(reinterpret_cast<const char*>(&tree_root_hash), sizeof(tree_root_hash));
     blob.append(tools::get_varint_data(b.tx_hashes.size()+1));
@@ -1467,22 +1467,22 @@ namespace cryptonote
     return parse_and_validate_block_from_blob(b_blob, b, &block_hash);
   }
   //---------------------------------------------------------------
-  blobdata block_to_blob(const block& b)
+  std::string block_to_blob(const block& b)
   {
     return t_serializable_object_to_blob(b);
   }
   //---------------------------------------------------------------
-  bool block_to_blob(const block& b, blobdata& b_blob)
+  bool block_to_blob(const block& b, std::string& b_blob)
   {
     return t_serializable_object_to_blob(b, b_blob);
   }
   //---------------------------------------------------------------
-  blobdata tx_to_blob(const transaction& tx)
+  std::string tx_to_blob(const transaction& tx)
   {
     return t_serializable_object_to_blob(tx);
   }
   //---------------------------------------------------------------
-  bool tx_to_blob(const transaction& tx, blobdata& b_blob)
+  bool tx_to_blob(const transaction& tx, std::string& b_blob)
   {
     return t_serializable_object_to_blob(tx, b_blob);
   }

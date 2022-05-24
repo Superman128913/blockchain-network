@@ -741,7 +741,8 @@ KV_SERIALIZE_MAP_CODE_END()
 
 
 KV_SERIALIZE_MAP_CODE_BEGIN(HARD_FORK_INFO::response)
-  KV_SERIALIZE(version)
+  KV_SERIALIZE_ENUM(version);
+  KV_SERIALIZE(revision);
   KV_SERIALIZE(enabled)
   KV_SERIALIZE(earliest_height)
   KV_SERIALIZE(last_height)
@@ -1159,7 +1160,7 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_SERVICE_NODES::response::entry)
 
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(service_node_pubkey);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(registration_height);
-  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(registration_hf_version);
+  if (all || res->fields.registration_hf_version) KV_SERIALIZE_ENUM(registration_hf_version);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(requested_unlock_height);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(last_reward_block_height);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(last_reward_transaction_index);

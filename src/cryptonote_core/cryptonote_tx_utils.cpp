@@ -133,11 +133,11 @@ namespace cryptonote
     return correct_key == output_key;
   }
 
-  uint64_t governance_reward_formula(uint8_t hf_version, uint64_t base_reward)
+  uint64_t governance_reward_formula(hf hf_version, uint64_t base_reward)
   {
-    return hf_version >= network_version_17         ? FOUNDATION_REWARD_HF17 :
-           hf_version >= network_version_16_pulse   ? FOUNDATION_REWARD_HF15 + CHAINFLIP_LIQUIDITY_HF16 :
-           hf_version >= network_version_15_ons     ? FOUNDATION_REWARD_HF15 :
+    return hf_version >= hf::hf17         ? oxen::FOUNDATION_REWARD_HF17 :
+           hf_version >= hf::hf16_pulse   ? oxen::FOUNDATION_REWARD_HF15 + oxen::CHAINFLIP_LIQUIDITY_HF16 :
+           hf_version >= hf::hf15_ons     ? oxen::FOUNDATION_REWARD_HF15 :
            base_reward / 20;
   }
 
@@ -147,12 +147,12 @@ namespace cryptonote
     return result;
   }
 
-  bool height_has_governance_output(network_type nettype, uint8_t hard_fork_version, uint64_t height)
+  bool height_has_governance_output(network_type nettype, hf hard_fork_version, uint64_t height)
   {
     if (height == 0)
       return false;
 
-    if (hard_fork_version <= network_version_9_service_nodes || hard_fork_version >= cryptonote::network_version_19)
+    if (hard_fork_version <= hf::hf9_service_nodes || hard_fork_version >= hf::hf19)
       return true;
 
 
@@ -164,9 +164,9 @@ namespace cryptonote
     return true;
   }
 
-  uint64_t derive_governance_from_block_reward(network_type nettype, const cryptonote::block &block, uint8_t hf_version)
+  uint64_t derive_governance_from_block_reward(network_type nettype, const cryptonote::block &block, hf hf_version)
   {
-    if (hf_version >= 15)
+    if (hf_version >= hf::hf15_ons)
       return governance_reward_formula(hf_version);
 
     uint64_t result       = 0;
@@ -198,11 +198,11 @@ namespace cryptonote
     return result;
   }
 
-  uint64_t service_node_reward_formula(uint64_t base_reward, uint8_t hard_fork_version)
+  uint64_t service_node_reward_formula(uint64_t base_reward, hf hard_fork_version)
   {
     return
-      hard_fork_version >= network_version_15_ons          ? SN_REWARD_HF15 :
-      hard_fork_version >= network_version_9_service_nodes ? base_reward / 2 : // 50% of base reward up until HF15's fixed payout
+      hard_fork_version >= hf::hf15_ons          ? oxen::SN_REWARD_HF15 :
+      hard_fork_version >= hf::hf9_service_nodes ? base_reward / 2 : // 50% of base reward up until HF15's fixed payout
       0;
   }
 
@@ -210,7 +210,7 @@ namespace cryptonote
   {
     uint64_t hi, lo, rewardhi, rewardlo;
     lo = mul128(total_service_node_reward, portions, &hi);
-    div128_64(hi, lo, STAKING_PORTIONS, &rewardhi, &rewardlo);
+    div128_64(hi, lo, old::STAKING_PORTIONS, &rewardhi, &rewardlo);
     return rewardlo;
   }
 
@@ -253,8 +253,8 @@ namespace cryptonote
       transaction& tx,
       const oxen_miner_tx_context &miner_tx_context,
       const std::optional<std::vector<cryptonote::batch_sn_payment>> sn_rwds,
-      const blobdata& extra_nonce,
-      uint8_t hard_fork_version)
+      const std::string& extra_nonce,
+      hf hard_fork_version)
   {
     tx.vin.clear();
     tx.vout.clear();
@@ -332,7 +332,7 @@ namespace cryptonote
     std::vector<batch_sn_payment>   batched_rewards = {};
     const network_type nettype = miner_tx_context.nettype;
 
-    if (hard_fork_version >= cryptonote::network_version_9_service_nodes)
+    if (hard_fork_version >= hf::hf9_service_nodes)
       CHECK_AND_ASSERT_MES(miner_tx_context.block_leader.payouts.size(), std::make_pair(false, block_rewards), "Constructing a block leader reward for block but no payout entries specified");
 
     // NOTE: Add Block Producer Reward
@@ -343,7 +343,7 @@ namespace cryptonote
       
       CHECK_AND_ASSERT_MES(miner_tx_context.pulse_block_producer.payouts.size(), std::make_pair(false, block_rewards), "Constructing a reward for block produced by pulse but no payout entries specified");
       CHECK_AND_ASSERT_MES(miner_tx_context.pulse_block_producer.key, std::make_pair(false, block_rewards), "Null Key given for Pulse Block Producer");
-      CHECK_AND_ASSERT_MES(hard_fork_version >= cryptonote::network_version_16_pulse, std::make_pair(false, block_rewards), "Pulse Block Producer is not valid until HF16, current HF" << hard_fork_version);
+      CHECK_AND_ASSERT_MES(hard_fork_version >= hf::hf16_pulse, std::make_pair(false, block_rewards), "Pulse Block Producer is not valid until HF16, current HF" << static_cast<int>(hard_fork_version));
 
       uint64_t leader_reward = reward_parts.service_node_total;
       if (miner_tx_context.block_leader.key == miner_tx_context.pulse_block_producer.key)
@@ -357,7 +357,7 @@ namespace cryptonote
         std::vector<uint64_t> split_rewards   = distribute_reward_by_portions(producer.payouts, reward_parts.miner_fee, true /*distribute_remainder*/);
 
         for (size_t i = 0; i < producer.payouts.size(); i++)
-          if (hard_fork_version < cryptonote::network_version_19)
+          if (hard_fork_version < hf::hf19)
           {
             rewards.push_back({reward_type::snode, producer.payouts[i].address, split_rewards[i]});
           } else {
@@ -368,7 +368,7 @@ namespace cryptonote
       std::vector<uint64_t> split_rewards = distribute_reward_by_portions(leader.payouts, leader_reward, true /*distribute_remainder*/);
       for (size_t i = 0; i < leader.payouts.size(); i++)
       {
-        if (hard_fork_version < cryptonote::network_version_19) {
+        if (hard_fork_version < hf::hf19) {
           rewards.push_back({reward_type::snode, leader.payouts[i].address, split_rewards[i]});
         } else {
           batched_rewards.emplace_back(leader.payouts[i].address, split_rewards[i], nettype);
@@ -384,21 +384,21 @@ namespace cryptonote
 
       if (uint64_t miner_amount = reward_parts.base_miner + reward_parts.miner_fee; miner_amount)
       {
-        if (hard_fork_version < cryptonote::network_version_19) {
+        if (hard_fork_version < hf::hf19) {
           rewards.push_back({reward_type::miner, miner_tx_context.miner_block_producer, miner_amount});
         } else {
           batched_rewards.emplace_back(miner_tx_context.miner_block_producer, miner_amount, nettype);
         }
       }
 
-      if (hard_fork_version >= cryptonote::network_version_9_service_nodes) {
+      if (hard_fork_version >= hf::hf9_service_nodes) {
         std::vector<uint64_t> split_rewards =
             distribute_reward_by_portions(leader.payouts,
                                           reward_parts.service_node_total,
-                                          hard_fork_version >= cryptonote::network_version_16_pulse /*distribute_remainder*/);
+                                          hard_fork_version >= hf::hf16_pulse /*distribute_remainder*/);
         for (size_t i = 0; i < leader.payouts.size(); i++)
         {
-          if (hard_fork_version < cryptonote::network_version_19) {
+          if (hard_fork_version < hf::hf19) {
             rewards.push_back({reward_type::snode, leader.payouts[i].address, split_rewards[i]});
           } else {
             batched_rewards.emplace_back(leader.payouts[i].address, split_rewards[i], nettype);
@@ -412,14 +412,14 @@ namespace cryptonote
     {
       if (reward_parts.governance_paid == 0)
       {
-        CHECK_AND_ASSERT_MES(hard_fork_version >= network_version_10_bulletproofs, std::make_pair(false, block_rewards), "Governance reward can NOT be 0 before hardfork 10, hard_fork_version: " << hard_fork_version);
+        CHECK_AND_ASSERT_MES(hard_fork_version >= hf::hf10_bulletproofs, std::make_pair(false, block_rewards), "Governance reward can NOT be 0 before hardfork 10, hard_fork_version: " << static_cast<int>(hard_fork_version));
       }
       else
       {
         cryptonote::address_parse_info governance_wallet_address;
         cryptonote::get_account_address_from_str(governance_wallet_address, nettype, cryptonote::get_config(nettype).governance_wallet_address(hard_fork_version));
         // Governance reward paid out through SN rewards batching after HF19
-        if (hard_fork_version < cryptonote::network_version_19) {
+        if (hard_fork_version < hf::hf19) {
           rewards.push_back({reward_type::governance, governance_wallet_address.address, reward_parts.governance_paid});
         }
       }
@@ -436,7 +436,7 @@ namespace cryptonote
       }
     }
 
-    if (hard_fork_version < cryptonote::network_version_19)
+    if (hard_fork_version < hf::hf19)
     {
       CHECK_AND_ASSERT_MES(rewards.size() <= 9, std::make_pair(false, block_rewards), "More rewards specified than supported, number of rewards: " << rewards.size()  << ", capacity: " << rewards.size());
       CHECK_AND_ASSERT_MES(rewards.size() > 0, std::make_pair(false, block_rewards), "Zero rewards are to be payed out, there should be at least 1");
@@ -468,12 +468,12 @@ namespace cryptonote
       out.target = tk;
       out.amount = amount;
       tx.vout.push_back(out);
-      tx.output_unlock_times.push_back(height + CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW);
+      tx.output_unlock_times.push_back(height + MINED_MONEY_UNLOCK_WINDOW);
       summary_amounts += amount;
     }
 
     uint64_t expected_amount = 0;
-    if (hard_fork_version <= cryptonote::network_version_15_ons)
+    if (hard_fork_version <= hf::hf15_ons)
     {
       // NOTE: Use the amount actually paid out when we split the service node
       // reward (across up to 4 recipients) which may actually pay out less than
@@ -490,7 +490,7 @@ namespace cryptonote
     else
     {
       expected_amount = 0;
-      if (hard_fork_version < cryptonote::network_version_19)
+      if (hard_fork_version < hf::hf19)
         expected_amount = expected_amount + reward_parts.base_miner + reward_parts.miner_fee + reward_parts.service_node_total + reward_parts.governance_paid;
       else
         expected_amount = expected_amount + total_sn_rewards;
@@ -502,7 +502,7 @@ namespace cryptonote
     block_rewards = std::accumulate(batched_rewards.begin(), batched_rewards.end(), uint64_t(0), [](uint64_t const x, cryptonote::batch_sn_payment const y) { return x + y.amount; });
 
     //lock
-    tx.unlock_time = height + CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW;
+    tx.unlock_time = height + MINED_MONEY_UNLOCK_WINDOW;
     tx.vin.push_back(txin_gen{height});
     tx.invalidate_hashes();
 
@@ -512,7 +512,7 @@ namespace cryptonote
     return std::make_pair(true, block_rewards);
   }
 
-  bool get_oxen_block_reward(size_t median_weight, size_t current_block_weight, uint64_t already_generated_coins, int hard_fork_version, block_reward_parts &result, const oxen_block_reward_context &oxen_context)
+  bool get_oxen_block_reward(size_t median_weight, size_t current_block_weight, uint64_t already_generated_coins, hf hard_fork_version, block_reward_parts &result, const oxen_block_reward_context &oxen_context)
   {
     result = {};
     uint64_t base_reward, base_reward_unpenalized;
@@ -537,18 +537,18 @@ namespace cryptonote
     // We base governance fees and SN rewards based on the block reward formula.  (Prior to HF13,
     // however, they were accidentally based on the block reward formula *after* subtracting a
     // potential penalty if the block producer includes txes beyond the median size limit).
-    result.original_base_reward = hard_fork_version >= network_version_13_enforce_checkpoints ? base_reward_unpenalized : base_reward;
+    result.original_base_reward = hard_fork_version >= hf::hf13_enforce_checkpoints ? base_reward_unpenalized : base_reward;
 
     // There is a goverance fee due every block.  Beginning in hardfork 10 this is still subtracted
     // from the block reward as if it was paid, but the actual payments get batched into rare, large
     // accumulated payments.  (Before hardfork 10 they are included in every block, unbatched).
     result.governance_due  = governance_reward_formula(hard_fork_version, result.original_base_reward);
-    result.governance_paid = hard_fork_version >= network_version_10_bulletproofs
+    result.governance_paid = hard_fork_version >= hf::hf10_bulletproofs
         ? oxen_context.batched_governance
         : result.governance_due;
 
     uint64_t const service_node_reward = service_node_reward_formula(result.original_base_reward, hard_fork_version);
-    if (hard_fork_version < cryptonote::network_version_16_pulse)
+    if (hard_fork_version < hf::hf16_pulse)
     {
       result.service_node_total = calculate_sum_of_portions(oxen_context.block_leader_payouts, service_node_reward);
 
@@ -908,7 +908,7 @@ namespace cryptonote
       CHECK_AND_ASSERT_MES(key_image_proofs.proofs.size() >= 1, false, "No key image proofs were generated for staking tx");
       add_tx_key_image_proofs_to_tx_extra(tx.extra, key_image_proofs);
 
-      if (tx_params.hf_version <= cryptonote::network_version_13_enforce_checkpoints)
+      if (tx_params.hf_version <= hf::hf13_enforce_checkpoints)
         tx.type = txtype::standard;
     }
 
@@ -1077,12 +1077,12 @@ namespace cryptonote
     std::string tx_bl = oxenc::from_hex(conf.GENESIS_TX);
     bool r = parse_and_validate_tx_from_blob(tx_bl, bl.miner_tx);
     CHECK_AND_ASSERT_MES(r, false, "failed to parse coinbase tx from hard coded blob");
-    bl.major_version = 7;
-    bl.minor_version = 7;
+    bl.major_version = hf::hf7;
+    bl.minor_version = static_cast<uint8_t>(hf::hf7);
     bl.timestamp = 0;
     bl.nonce = conf.GENESIS_NONCE;
     miner::find_nonce_for_given_block([](const cryptonote::block &b, uint64_t height, unsigned int threads, crypto::hash &hash){
-      hash = cryptonote::get_block_longhash(UNDEFINED, cryptonote::randomx_longhash_context(NULL, b, height), b, height, threads);
+      hash = cryptonote::get_block_longhash(network_type::UNDEFINED, cryptonote::randomx_longhash_context(NULL, b, height), b, height, threads);
       return true;
     }, bl, 1, 0);
     bl.invalidate_hashes();
@@ -1092,13 +1092,13 @@ namespace cryptonote
   crypto::hash get_altblock_longhash(cryptonote::network_type nettype, randomx_longhash_context const &randomx_context, const block& b, uint64_t height)
   {
     crypto::hash result = {};
-    if (nettype == FAKECHAIN || b.major_version < network_version_12_checkpointing)
+    if (nettype == network_type::FAKECHAIN || b.major_version < hf::hf12_checkpointing)
     {
       result = get_block_longhash(nettype, randomx_context, b, height, 0);
     }
     else
     {
-      blobdata bd = get_block_hashing_blob(b);
+      std::string bd = get_block_hashing_blob(b);
       rx_slow_hash(randomx_context.current_blockchain_height, randomx_context.seed_height, randomx_context.seed_block_hash.data, bd.data(), bd.size(), result.data, 0, 1);
     }
 
@@ -1110,7 +1110,7 @@ namespace cryptonote
                                                      const uint64_t height)
   {
     *this = {};
-    if (b.major_version >= network_version_12_checkpointing)
+    if (b.major_version >= hf::hf12_checkpointing)
     {
       if (pbc) // null only happens when generating genesis block, 0 init randomx is ok
       {
@@ -1123,18 +1123,18 @@ namespace cryptonote
 
   crypto::hash get_block_longhash(cryptonote::network_type nettype, randomx_longhash_context const &randomx_context, const block& b, uint64_t height, int miners)
   {
-    crypto::hash result      = {};
-    const blobdata bd        = get_block_hashing_blob(b);
-    const uint8_t hf_version = b.major_version;
+    crypto::hash result{};
+    const auto bd = get_block_hashing_blob(b);
+    const auto hf_version = b.major_version;
 
     crypto::cn_slow_hash_type cn_type = cn_slow_hash_type::heavy_v1;
-    if (nettype == FAKECHAIN)
+    if (nettype == network_type::FAKECHAIN)
     {
       cn_type = cn_slow_hash_type::turtle_lite_v2;
     }
     else
     {
-      if (hf_version >= network_version_12_checkpointing)
+      if (hf_version >= hf::hf12_checkpointing)
       {
         rx_slow_hash(randomx_context.current_blockchain_height,
                      randomx_context.seed_height,
@@ -1147,9 +1147,9 @@ namespace cryptonote
         return result;
       }
 
-      if (hf_version >= network_version_11_infinite_staking)
+      if (hf_version >= hf::hf11_infinite_staking)
         cn_type = cn_slow_hash_type::turtle_lite_v2;
-      else if (hf_version >= network_version_7)
+      else if (hf_version >= hf::hf7)
         cn_type = crypto::cn_slow_hash_type::heavy_v2;
     }
 

@@ -114,7 +114,7 @@ int main(int argc, char* argv[])
   std::string opt_data_dir = command_line::get_arg(vm, cryptonote::arg_data_dir);
   bool opt_testnet = command_line::get_arg(vm, cryptonote::arg_testnet_on);
   bool opt_devnet = command_line::get_arg(vm, cryptonote::arg_devnet_on);
-  network_type net_type = opt_testnet ? TESTNET : opt_devnet ? DEVNET : MAINNET;
+  network_type net_type = opt_testnet ? network_type::TESTNET : opt_devnet ? network_type::DEVNET : network_type::MAINNET;
   block_start = command_line::get_arg(vm, arg_block_start);
   block_stop = command_line::get_arg(vm, arg_block_stop);
   bool do_inputs = command_line::get_arg(vm, arg_inputs);
@@ -207,7 +207,7 @@ plot 'stats.csv' index "DATA" using (timecolumn(1,"%Y-%m-%d")):4 with lines, '' 
 
   for (uint64_t h = block_start; h < block_stop; ++h)
   {
-    cryptonote::blobdata bd = db->get_block_blob_from_height(h);
+    std::string bd = db->get_block_blob_from_height(h);
     cryptonote::block blk;
     if (!cryptonote::parse_and_validate_block_from_blob(bd, blk))
     {

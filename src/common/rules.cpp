@@ -41,11 +41,11 @@ namespace rules
 
 bool is_output_unlocked(uint64_t unlock_time, uint64_t height)
 {
-  if(unlock_time < CRYPTONOTE_MAX_BLOCK_NUMBER)
+  if(unlock_time < MAX_BLOCK_NUMBER)
   {
     // ND: Instead of calling get_current_blockchain_height(), call m_db->height()
     //    directly as get_current_blockchain_height() locks the recursive mutex.
-    if(height - 1 + CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_BLOCKS >= unlock_time)
+    if(height - 1 + LOCKED_TX_ALLOWED_DELTA_BLOCKS >= unlock_time)
       return true;
     else
       return false;
@@ -54,7 +54,7 @@ bool is_output_unlocked(uint64_t unlock_time, uint64_t height)
   {
     //interpret as time
     uint64_t current_time = static_cast<uint64_t>(time(NULL));
-    if(current_time + tools::to_seconds(CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS_V2) >= unlock_time)
+    if(current_time + tools::to_seconds(LOCKED_TX_ALLOWED_DELTA_BLOCKS * TARGET_BLOCK_TIME) >= unlock_time)
       return true;
     else
       return false;

@@ -374,10 +374,10 @@ class Wallet(RPCDaemon):
         if 'error' in r:
             raise RuntimeError("Failed to submit service node registration tx: {}".format(r['error']['message']))
 
-    def register_sn_for_contributions(self, sn):
+    def register_sn_for_contributions(self, sn, cut, amount):
         r = sn.json_rpc("get_service_node_registration_cmd", {
-            "operator_cut": "10",
-            "contributions": [{"address": self.address(), "amount": 50000000000}],
+            "operator_cut": str(cut),
+            "contributions": [{"address": self.address(), "amount": amount}],
             "staking_requirement": 100000000000
         }).json()
         if 'error' in r:
@@ -387,10 +387,10 @@ class Wallet(RPCDaemon):
         if 'error' in r:
             raise RuntimeError("Failed to submit service node registration tx: {}".format(r['error']['message']))
 
-    def contribute_to_sn(self, sn):
+    def contribute_to_sn(self, sn, amount):
         r = self.json_rpc("stake", {
             "destination": self.address(),
-            "amount": 50000000000,
+            "amount": amount,
             "service_node_key": sn.sn_key(),
         }).json()
         if 'error' in r:
