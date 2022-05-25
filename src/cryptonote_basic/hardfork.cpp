@@ -71,16 +71,17 @@ static constexpr std::array testnet_hard_forks =
 
 static constexpr std::array devnet_hard_forks =
 {
-  hard_fork{ hf::hf7, 0,      0,  1599848400 },
-  hard_fork{ hf::hf11_infinite_staking,    0,     2,  1599848400 },
-  hard_fork{ hf::hf12_checkpointing,       0,     3,  1599848400 },
-  hard_fork{ hf::hf13_enforce_checkpoints, 0,     4,  1599848400 }, 
-  hard_fork{ hf::hf15_ons,                 0,     5,  1599848400 },
-  hard_fork{ hf::hf16_pulse,               0,   100,  1599848400 },
-  hard_fork{ hf::hf17,                     0,   151,  1599848400 },
-  hard_fork{ hf::hf18,                     0,   152,  1599848400 },
-  hard_fork{ hf::hf19_reward_batching,     0,   153,  1599848400 },
-  hard_fork{ hf::hf19_reward_batching,     1,   154,  1599848400 },
+  hard_fork{hf::hf7,                      0,     0,  1653500577},
+  hard_fork{hf::hf11_infinite_staking,    0,     2,  1653500577},
+  hard_fork{hf::hf12_checkpointing,       0,     3,  1653500577},
+  hard_fork{hf::hf13_enforce_checkpoints, 0,     4,  1653500577},
+  hard_fork{hf::hf14_blink,               0,     5,  1653500577},
+  hard_fork{hf::hf15_ons,                 0,     6,  1653500577},
+  hard_fork{hf::hf16_pulse,               0,   100,  1653500577},
+  hard_fork{hf::hf17,                     0,   151,  1653500577},
+  hard_fork{hf::hf18,                     0,   152,  1653500577},
+  hard_fork{hf::hf19_reward_batching,     0,   153,  1653500577},
+  hard_fork{hf::hf19_reward_batching,     1,   154,  1653500577},
 };
 
 
