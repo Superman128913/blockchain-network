@@ -403,6 +403,13 @@ namespace service_nodes
                   }
                 }
 
+                if (vote_for_state == new_state::deregister && height - *cryptonote::get_hard_fork_heights(m_core.get_nettype(), hf_version).first < netconf.HARDFORK_DEREGISTRATION_GRACE_PERIOD) {
+                  LOG_PRINT_L2("Decommissioned service node "
+                               << quorum->workers[node_index]
+                               << " is still not passing required checks, and has no remaining credits left. However it is within the grace period of a hardfork so has not been deregistered.");
+                  continue;
+                }
+
                 quorum_vote_t vote = service_nodes::make_state_change_vote(m_obligations_height, static_cast<uint16_t>(index_in_group), node_index, vote_for_state, reason, my_keys);
                 cryptonote::vote_verification_context vvc;
                 if (!handle_vote(vote, vvc))
