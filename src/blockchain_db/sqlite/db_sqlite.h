@@ -63,6 +63,14 @@ public:
   bool add_sn_rewards(const std::vector<cryptonote::batch_sn_payment>& payments);
   bool subtract_sn_rewards(const std::vector<cryptonote::batch_sn_payment>& payments);
 
+private:
+  bool reward_handler(
+      const cryptonote::block& block,
+      const service_nodes::service_node_list::state_t& service_nodes_state,
+      bool add);
+
+public:
+
   // get_payments -> passing a block height will return an array of payments that should be created in a coinbase transaction on that block given the current batching DB state.
   std::optional<std::vector<cryptonote::batch_sn_payment>> get_sn_payments(uint64_t block_height);
 

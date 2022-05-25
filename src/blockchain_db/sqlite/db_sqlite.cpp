@@ -190,8 +190,7 @@ namespace cryptonote {
 
     std::vector<cryptonote::batch_sn_payment> payments;
 
-    for (auto [address, amt] : accrued_amounts) {
-      auto amount = static_cast<uint64_t>(amt / 1000);
+    for (auto [address, amount] : accrued_amounts) {
       if (cryptonote::is_valid_address(address, m_nettype)) {
         cryptonote::address_parse_info addr_info {};
         cryptonote::get_account_address_from_str(addr_info, m_nettype, address);
@@ -223,8 +222,11 @@ namespace cryptonote {
       payments.emplace_back(sn_info.operator_address, operator_fee, m_nettype);
 
     // Pay the balance to all the contributors (including the operator again)
-    uint64_t total_contributed_to_sn = std::accumulate(sn_info.contributors.begin(), sn_info.contributors.end(), uint64_t(0),
-            [](const auto a, const auto b) { return a + b.amount; });
+    uint64_t total_contributed_to_sn = std::accumulate(
+        sn_info.contributors.begin(),
+        sn_info.contributors.end(),
+        uint64_t(0),
+        [](auto&& a, auto&& b) { return a + b.amount; });
 
     for (auto& contributor: sn_info.contributors) {
       // This calculates (contributor.amount / total_contributed_to_winner_sn) * (distribution_amount - operator_fee) but using 128 bit integer math
@@ -234,6 +236,76 @@ namespace cryptonote {
     }
 
     return payments;
+  }
+
+  // Calculates block rewards, then invokes either `add_sn_rewards` (if `add`) or
+  // `subtract_sn_rewards` (if `!add`) to process them.
+  bool BlockchainSQLite::reward_handler(
+      const cryptonote::block& block,
+      const service_nodes::service_node_list::state_t& service_nodes_state,
+      bool add)
+  {
+    // The method we call do actually handle the change: either `add_sn_payments` if add is true,
+    // `subtract_sn_payments` otherwise:
+    bool (BlockchainSQLite::* add_or_subtract)(const std::vector<cryptonote::batch_sn_payment>&)
+      = add ? &BlockchainSQLite::add_sn_rewards : &BlockchainSQLite::subtract_sn_rewards;
+
+    // From here on we calculate everything in milli-atomic OXEN (i.e. thousanths of an atomic
+    // OXEN) so that our integer math has minimal loss from integer division.
+    if (block.reward > std::numeric_limits<uint64_t>::max() / BATCH_REWARD_FACTOR)
+      throw std::logic_error{"Reward distribution amount is too large"};
+
+    uint64_t block_reward = block.reward * BATCH_REWARD_FACTOR;
+    uint64_t service_node_reward = cryptonote::service_node_reward_formula(0, block.major_version) * BATCH_REWARD_FACTOR;
+
+    // Step 1: Pay out the block producer their tx fees (note that, unlike the below, this applies
+    // even if the SN isn't currently payable).
+    if (block_reward < service_node_reward)
+      throw std::logic_error{"Invalid payment: block reward is too small"};
+
+    if (uint64_t tx_fees = block_reward - service_node_reward;
+        tx_fees > 0
+        && block.service_node_winner_key // "service_node_winner_key" tracks the pulse winner; 0 if a mined block
+        && crypto_core_ed25519_is_valid_point(reinterpret_cast<const unsigned char *>(block.service_node_winner_key.data))
+    ) {
+
+      if (auto service_node_winner = service_nodes_state.service_nodes_infos.find(block.service_node_winner_key);
+          service_node_winner != service_nodes_state.service_nodes_infos.end()) {
+        auto tx_fee_payments = calculate_rewards(block.major_version, tx_fees, *service_node_winner->second);
+        // Takes the block producer and adds its contributors to the batching database for the transaction fees
+        if (!(this->*add_or_subtract)(tx_fee_payments))
+          return false;
+      }
+    }
+
+    auto block_height = get_block_height(block);
+
+    // Step 2: Iterate over the whole service node list and pay each node 1/service_node_list fraction
+    const auto payable_service_nodes = service_nodes_state.payable_service_nodes_infos(block_height, m_nettype);
+    size_t total_service_nodes_payable = payable_service_nodes.size();
+    for (const auto& [node_pubkey, node_info]: payable_service_nodes) {
+      auto payable_service_node = service_nodes_state.service_nodes_infos.find(node_pubkey);
+      if (payable_service_node == service_nodes_state.service_nodes_infos.end())
+        continue;
+      auto snode_rewards = calculate_rewards(block.major_version, service_node_reward / total_service_nodes_payable, * payable_service_node -> second);
+      // Takes the node and adds its contributors to the batching database
+      if (!(this->*add_or_subtract)(snode_rewards))
+        return false;
+    }
+
+    // Step 3: Add Governance reward to the list
+    if (m_nettype != cryptonote::network_type::FAKECHAIN) {
+      std::vector<cryptonote::batch_sn_payment> governance_rewards;
+      cryptonote::address_parse_info governance_wallet_address;
+      cryptonote::get_account_address_from_str(governance_wallet_address, m_nettype,
+          cryptonote::get_config(m_nettype).governance_wallet_address(block.major_version));
+      uint64_t foundation_reward = cryptonote::governance_reward_formula(block.major_version);
+      governance_rewards.emplace_back(governance_wallet_address.address, foundation_reward, m_nettype);
+      if (!(this->*add_or_subtract)(governance_rewards))
+        return false;
+    }
+
+    return true;
   }
 
   bool BlockchainSQLite::add_block(const cryptonote::block& block,
@@ -277,56 +349,18 @@ namespace cryptonote {
       };
 
       // Goes through the miner transactions vouts checks they are right and marks them as paid in the database
-      if (!validate_batch_payment(miner_tx_vouts, * calculated_rewards, block_height)) {
+      if (!validate_batch_payment(miner_tx_vouts, *calculated_rewards, block_height)) {
         return false;
       }
 
-      // Step 1: Pay out the block producer their fees
-      uint64_t service_node_reward = cryptonote::service_node_reward_formula(0, block.major_version);
-      if (block.reward - service_node_reward > 0) {
-        if (block.service_node_winner_key // "service_node_winner_key" tracks the pulse winner; 0 if a mined block
-          &&
-          crypto_core_ed25519_is_valid_point(reinterpret_cast <
-            const unsigned char * > (block.service_node_winner_key.data))) {
-          auto service_node_winner = service_nodes_state.service_nodes_infos.find(block.service_node_winner_key);
-          if (service_node_winner != service_nodes_state.service_nodes_infos.end()) {
-            std::vector<cryptonote::batch_sn_payment> block_producer_fee_payments = calculate_rewards(block.major_version, block.reward - service_node_reward, * service_node_winner -> second);
-            // Takes the block producer and adds its contributors to the batching database for the transaction fees
-            if (!add_sn_payments(block_producer_fee_payments))
-              return false;
-          }
-        }
-      }
+      if (!reward_handler(block, service_nodes_state, /*add=*/ true))
+        return false;
 
-      // Step 2: Iterate over the whole service node list and pay each node 1/service_node_list fraction
-      const auto payable_service_nodes = service_nodes_state.payable_service_nodes_infos(block_height, m_nettype);
-      size_t total_service_nodes_payable = payable_service_nodes.size();
-      for (const auto& [node_pubkey, node_info]: payable_service_nodes) {
-        std::vector<cryptonote::batch_sn_payment> node_contributors;
-        auto payable_service_node = service_nodes_state.service_nodes_infos.find(node_pubkey);
-        if (payable_service_node == service_nodes_state.service_nodes_infos.end())
-          continue;
-        std::vector<cryptonote::batch_sn_payment> node_rewards = calculate_rewards(block.major_version, service_node_reward / total_service_nodes_payable, * payable_service_node -> second);
-        // Takes the node and adds its contributors to the batching database
-        if (!add_sn_payments(node_rewards))
-          return false;
-      }
-
-      // Step 3: Add Governance reward to the list
-      if (m_nettype != cryptonote::network_type::FAKECHAIN) {
-        std::vector<cryptonote::batch_sn_payment> governance_rewards;
-        cryptonote::address_parse_info governance_wallet_address;
-        cryptonote::get_account_address_from_str(governance_wallet_address, m_nettype, cryptonote::get_config(m_nettype).governance_wallet_address(hf_version));
-        uint64_t foundation_reward = cryptonote::governance_reward_formula(hf_version);
-        governance_rewards.emplace_back(governance_wallet_address.address, foundation_reward, m_nettype);
-        if (!add_sn_payments(governance_rewards))
-          return false;
-      }
       increment_height();
 
       transaction.commit();
     } catch (std::exception& e) {
-      MFATAL("Exception: " << e.what());
+      MFATAL("Error adding reward payments: " << e.what());
       return false;
     }
     return true;
@@ -347,7 +381,7 @@ namespace cryptonote {
     }
 
     const auto& conf = get_config(m_nettype);
-    auto hf_version = hf{block.major_version};
+    auto hf_version = block.major_version;
     if (hf_version < hf::hf19_reward_batching) {
       decrement_height();
       return true;
@@ -359,48 +393,8 @@ namespace cryptonote {
         SQLite::TransactionBehavior::IMMEDIATE
       };
 
-      // Step 1: Remove the block producers txn fees
-      uint64_t service_node_reward = cryptonote::service_node_reward_formula(0, block.major_version);
-      if (block.reward - service_node_reward > 0) // If true then we have tx fees to roll back
-      {
-        if (block.service_node_winner_key // "service_node_winner_key" tracks the pulse winner; 0 if a mined block
-          &&
-          crypto_core_ed25519_is_valid_point(reinterpret_cast <
-            const unsigned char * > (block.service_node_winner_key.data))) {
-          auto service_node_winner = service_nodes_state.service_nodes_infos.find(block.service_node_winner_key);
-          if (service_node_winner != service_nodes_state.service_nodes_infos.end()) {
-            std::vector<cryptonote::batch_sn_payment> block_producer_fee_payments = calculate_rewards(block.major_version, block.reward - service_node_reward, * service_node_winner -> second);
-            // Takes the block producer and adds its contributors to the batching database for the transaction fees
-            if (!subtract_sn_payments(block_producer_fee_payments))
-              return false;
-          }
-        }
-      }
-
-      // Step 2: Iterate over the whole service node list and subtract each node 1/service_node_list fraction
-      const auto payable_service_nodes = service_nodes_state.payable_service_nodes_infos(block_height, m_nettype);
-      size_t total_service_nodes_payable = payable_service_nodes.size();
-      for (const auto& [node_pubkey, node_info]: payable_service_nodes) {
-        std::vector<cryptonote::batch_sn_payment> node_contributors;
-        auto payable_service_node = service_nodes_state.service_nodes_infos.find(node_pubkey);
-        if (payable_service_node == service_nodes_state.service_nodes_infos.end())
-          continue;
-        std::vector<cryptonote::batch_sn_payment> node_rewards = calculate_rewards(block.major_version, service_node_reward / total_service_nodes_payable, * payable_service_node -> second);
-        // Takes the node and adds its contributors to the batching database
-
-        if (!subtract_sn_payments(node_rewards))
-          return false;
-      }
-      // Step 3: Remove Governance reward
-      if (m_nettype != cryptonote::network_type::FAKECHAIN) {
-        std::vector<cryptonote::batch_sn_payment> governance_rewards;
-        cryptonote::address_parse_info governance_wallet_address;
-        cryptonote::get_account_address_from_str(governance_wallet_address, m_nettype, cryptonote::get_config(m_nettype).governance_wallet_address(hf_version));
-        uint64_t foundation_reward = cryptonote::governance_reward_formula(hf_version);
-        governance_rewards.emplace_back(governance_wallet_address.address, foundation_reward, m_nettype);
-        if (!subtract_sn_payments(governance_rewards))
-          return false;
-      }
+      if (!reward_handler(block, service_nodes_state, /*add=*/ false))
+        return false;
 
       // Add back to the database payments that had been made in this block
       delete_block_payments(block_height);
@@ -408,7 +402,7 @@ namespace cryptonote {
       decrement_height();
       transaction.commit();
     } catch (std::exception& e) {
-      MFATAL("Exception: " << e.what());
+      MFATAL("Error subtracting reward payments: " << e.what());
       return false;
     }
     return true;
