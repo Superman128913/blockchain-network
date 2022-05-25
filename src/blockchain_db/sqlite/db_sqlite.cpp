@@ -141,7 +141,7 @@ namespace cryptonote {
     update_height(height - 1);
   }
 
-  bool BlockchainSQLite::add_sn_payments(std::vector<cryptonote::batch_sn_payment>& payments) {
+  bool BlockchainSQLite::add_sn_rewards(const std::vector<cryptonote::batch_sn_payment>& payments) {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
     auto insert_payment = prepared_st(
       "INSERT INTO batched_payments_accrued (address, amount) VALUES (?, ?)"
@@ -158,7 +158,7 @@ namespace cryptonote {
     return true;
   }
 
-  bool BlockchainSQLite::subtract_sn_payments(std::vector<cryptonote::batch_sn_payment>& payments) {
+  bool BlockchainSQLite::subtract_sn_rewards(const std::vector<cryptonote::batch_sn_payment>& payments) {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
     auto update_payment = prepared_st(
       "UPDATE batched_payments_accrued SET amount = (amount - ?) WHERE address = ?");
@@ -414,7 +414,10 @@ namespace cryptonote {
     return true;
   }
 
-  bool BlockchainSQLite::validate_batch_payment(std::vector<std::tuple<crypto::public_key, uint64_t>> miner_tx_vouts, std::vector<cryptonote::batch_sn_payment> calculated_payments_from_batching_db, uint64_t block_height) {
+  bool BlockchainSQLite::validate_batch_payment(
+      const std::vector<std::tuple<crypto::public_key, uint64_t>>& miner_tx_vouts,
+      const std::vector<cryptonote::batch_sn_payment>& calculated_payments_from_batching_db,
+      uint64_t block_height) {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
     size_t length_miner_tx_vouts = miner_tx_vouts.size();
     size_t length_calculated_payments_from_batching_db = calculated_payments_from_batching_db.size();
@@ -425,11 +428,11 @@ namespace cryptonote {
     }
 
     int8_t vout_index = 0;
-    uint64_t total_oxen_payout_in_our_db = std::accumulate(calculated_payments_from_batching_db.begin(), calculated_payments_from_batching_db.end(), uint64_t(0), [](auto
-      const a, auto
-      const b) {
-      return a + b.amount;
-    });
+    uint64_t total_oxen_payout_in_our_db = std::accumulate(
+        calculated_payments_from_batching_db.begin(),
+        calculated_payments_from_batching_db.end(),
+        uint64_t(0),
+        [](auto&& a, auto&& b) { return a + b.amount; });
     uint64_t total_oxen_payout_in_vouts = 0;
     std::vector<batch_sn_payment> finalised_payments;
     cryptonote::keypair
