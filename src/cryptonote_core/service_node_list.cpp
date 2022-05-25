@@ -2528,23 +2528,6 @@ namespace service_nodes
     //
 
     std::shared_ptr<const service_node_info> block_producer = nullptr;
-    size_t expected_vouts_size = 0;
-
-    if (mode == verify_mode::pulse_block_leader_is_producer || mode == verify_mode::pulse_different_block_producer)
-    {
-      auto info_it = m_state.service_nodes_infos.find(block_producer_key);
-      if (info_it == m_state.service_nodes_infos.end())
-      {
-        MGINFO_RED("The pulse block producer for round: " << +block.pulse.round << " is not currently a Service Node: " << block_producer_key);
-        return false;
-      }
-
-      block_producer = info_it->second;
-      if (mode == verify_mode::pulse_different_block_producer && reward_parts.miner_fee > 0 && block.major_version < hf::hf19_reward_batching)
-      {
-        expected_vouts_size += block_producer->contributors.size();
-      }
-    }
 
     if (block.major_version >= hf::hf19_reward_batching)
     {
@@ -2552,44 +2535,54 @@ namespace service_nodes
       MDEBUG("Batched miner reward");
     }
 
+    size_t expected_vouts_size;
+    switch (mode) {
+      case verify_mode::batched_sn_rewards:
+        expected_vouts_size = batched_sn_payments ? batched_sn_payments->size() : 0;
+        break;
+      case verify_mode::pulse_block_leader_is_producer:
+      case verify_mode::pulse_different_block_producer:
+        {
+          auto info_it = m_state.service_nodes_infos.find(block_producer_key);
+          if (info_it == m_state.service_nodes_infos.end())
+          {
+            MGINFO_RED("The pulse block producer for round: " << +block.pulse.round << " is not currently a Service Node: " << block_producer_key);
+            return false;
+          }
 
-    if (mode == verify_mode::miner)
-    {
-      if ((reward_parts.base_miner + reward_parts.miner_fee) > 0) // (HF >= 16) this can be zero, no miner coinbase.
-      {
-        expected_vouts_size += 1; /*miner*/
-      }
+          block_producer = info_it->second;
+          expected_vouts_size = mode == verify_mode::pulse_different_block_producer && reward_parts.miner_fee > 0
+            ? block_producer->contributors.size() : 0;
+        }
+        break;
+      case verify_mode::miner:
+        expected_vouts_size = reward_parts.base_miner + reward_parts.miner_fee > 0 // (HF >= 16) this can be zero, no miner coinbase.
+          ? 1 /* miner */ : 0;
+        break;
     }
 
-    if (mode == verify_mode::batched_sn_rewards)
+    if (mode != verify_mode::batched_sn_rewards)
     {
-      if (batched_sn_payments.has_value())
-        expected_vouts_size += batched_sn_payments->size();
-    } else {
       expected_vouts_size += block_leader.payouts.size();
       bool has_governance_output = cryptonote::height_has_governance_output(m_blockchain.nettype(), hf_version, height);
-      if (has_governance_output) {
+      if (has_governance_output)
         expected_vouts_size++;
-      }
     }
-
 
     if (miner_tx.vout.size() != expected_vouts_size)
     {
-      char const *type = mode == verify_mode::miner
-                             ? "miner"
-                             : mode == verify_mode::pulse_block_leader_is_producer ? "pulse" : "pulse alt round";
+      char const *type =
+        mode == verify_mode::miner ? "miner" :
+        mode == verify_mode::batched_sn_rewards ? "batch reward" :
+        mode == verify_mode::pulse_block_leader_is_producer ? "pulse" : "pulse alt round";
       MGINFO_RED("Expected " << type << " block, the miner TX specifies a different amount of outputs vs the expected: " << expected_vouts_size << ", miner tx outputs: " << miner_tx.vout.size());
       return false;
     }
 
-    if (hf_version >= hf::hf16_pulse)
+    if (hf_version >= hf::hf16_pulse && reward_parts.base_miner != 0)
     {
-      if (reward_parts.base_miner != 0)
-      {
-        MGINFO_RED("Miner reward is incorrect expected 0 reward, block specified " << cryptonote::print_money(reward_parts.base_miner));
-        return false;
-      }
+      MGINFO_RED("Miner reward is incorrect expected 0 reward, block specified " << cryptonote::print_money(reward_parts.base_miner));
+      return false;
     }
 
     // NOTE: Verify Coinbase Amounts
@@ -2675,41 +2668,57 @@ namespace service_nodes
 
       case verify_mode::batched_sn_rewards:
       {
-        size_t vout_index = 0;
-        uint64_t total_payout_in_our_db = std::accumulate(batched_sn_payments->begin(),batched_sn_payments->end(), uint64_t{0}, [](auto const a, auto const b){return a + b.amount;});
+        // NB: this amount is in milli-atomics, not atomics
+        uint64_t total_payout_in_our_db = batched_sn_payments ? std::accumulate(
+                batched_sn_payments->begin(),
+                batched_sn_payments->end(),
+                uint64_t{0},
+                [](auto&& a, auto&& b) { return a + b.amount; }) : 0;
+
         uint64_t total_payout_in_vouts = 0;
-        cryptonote::keypair const deterministic_keypair = cryptonote::get_deterministic_keypair_from_height(height);
-        for (auto & vout : block.miner_tx.vout)
+        const auto deterministic_keypair = cryptonote::get_deterministic_keypair_from_height(height);
+        for (size_t vout_index = 0; vout_index < block.miner_tx.vout.size(); vout_index++)
         {
+          const auto& vout = block.miner_tx.vout[vout_index];
+          const auto& batch_payment = (*batched_sn_payments)[vout_index];
+
           if (!std::holds_alternative<cryptonote::txout_to_key>(vout.target))
           {
             MGINFO_RED("Service node output target type should be txout_to_key");
             return false;
           }
 
-          if (vout.amount != (*batched_sn_payments)[vout_index].amount)
+          constexpr uint64_t max_amount = std::numeric_limits<uint64_t>::max() / cryptonote::BATCH_REWARD_FACTOR;
+          if (vout.amount > max_amount)
           {
-            MERROR("Service node reward amount incorrect. Should be " << cryptonote::print_money((*batched_sn_payments)[vout_index].amount) << ", is: " << cryptonote::print_money(vout.amount));
+            // We should never actually hit this limit unless someone is trying something nefarious
+            MGINFO_RED("Batched reward payout invalid: exceeds maximum possible payout size");
+            return false;
+          }
+
+          auto paid_amount = vout.amount * cryptonote::BATCH_REWARD_FACTOR;
+          total_payout_in_vouts += paid_amount;
+          if (paid_amount != batch_payment.amount)
+          {
+            MGINFO_RED(fmt::format("Batched reward payout incorrect: expected {}, not {}", batch_payment.amount, paid_amount));
             return false;
           }
           crypto::public_key out_eph_public_key{};
-          if (!cryptonote::get_deterministic_output_key((*batched_sn_payments)[vout_index].address_info.address, deterministic_keypair, vout_index, out_eph_public_key))
+          if (!cryptonote::get_deterministic_output_key(batch_payment.address_info.address, deterministic_keypair, vout_index, out_eph_public_key))
           {
-            MERROR("Failed to generate output one-time public key");
+            MGINFO_RED("Failed to generate output one-time public key");
             return false;
           }
           const auto& out_to_key = var::get<cryptonote::txout_to_key>(vout.target);
           if (tools::view_guts(out_to_key) != tools::view_guts(out_eph_public_key))
           {
-            MERROR("Output Ephermeral Public Key does not match");
+            MGINFO_RED("Output Ephermeral Public Key does not match (payment to wrong recipient)");
             return false;
           }
-          total_payout_in_vouts += vout.amount;
-          vout_index++;
         }
         if (total_payout_in_vouts != total_payout_in_our_db)
         {
-          MERROR("Total service node reward amount incorrect. Should be " << cryptonote::print_money(total_payout_in_our_db) << ", is: " << cryptonote::print_money(total_payout_in_vouts));
+          MGINFO_RED(fmt::format("Total service node reward amount incorrect: expected {}, not {}", total_payout_in_our_db, total_payout_in_vouts));
           return false;
         }
       }

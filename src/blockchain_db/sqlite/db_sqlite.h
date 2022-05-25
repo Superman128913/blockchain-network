@@ -41,10 +41,6 @@
 namespace cryptonote
 {
 
-// We calculate and store batch rewards in thousanths of atomic OXEN, to reduce the size of errors
-// from integer division of rewards.
-constexpr uint64_t BATCH_REWARD_FACTOR = 1000;
-
 fs::path check_if_copy_filename(std::string_view db_path);
 
 class BlockchainSQLite : public db::Database
