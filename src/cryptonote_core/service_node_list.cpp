@@ -2452,7 +2452,7 @@ namespace service_nodes
     return true;
   }
 
-  bool service_node_list::validate_miner_tx(cryptonote::block const &block, cryptonote::block_reward_parts const &reward_parts, std::optional<std::vector<cryptonote::batch_sn_payment>> const &batched_sn_payments) const
+  bool service_node_list::validate_miner_tx(const cryptonote::block& block, const cryptonote::block_reward_parts& reward_parts, const std::optional<std::vector<cryptonote::batch_sn_payment>>& batched_sn_payments) const
   {
     const auto hf_version = block.major_version;
     if (hf_version < hf::hf9_service_nodes)
@@ -2610,7 +2610,7 @@ namespace service_nodes
 
         for (size_t i = 0; i < block_leader.payouts.size(); i++)
         {
-          payout_entry const &payout = block_leader.payouts[i];
+          const auto& payout = block_leader.payouts[i];
           if (split_rewards[i])
           {
             if (!verify_coinbase_tx_output(miner_tx, height, vout_index, payout.address, split_rewards[i]))
@@ -2630,7 +2630,7 @@ namespace service_nodes
         size_t vout_index = 0;
         for (size_t i = 0; i < block_leader.payouts.size(); i++)
         {
-          payout_entry const &payout = block_leader.payouts[i];
+          const auto& payout = block_leader.payouts[i];
           if (split_rewards[i])
           {
             if (!verify_coinbase_tx_output(miner_tx, height, vout_index, payout.address, split_rewards[i]))
@@ -2649,7 +2649,7 @@ namespace service_nodes
           std::vector<uint64_t> split_rewards = cryptonote::distribute_reward_by_portions(block_producer_payouts.payouts, reward_parts.miner_fee, true /*distribute_remainder*/);
           for (size_t i = 0; i < block_producer_payouts.payouts.size(); i++)
           {
-            payout_entry const &payout = block_producer_payouts.payouts[i];
+            const auto& payout = block_producer_payouts.payouts[i];
             if (split_rewards[i])
             {
               if (!verify_coinbase_tx_output(miner_tx, height, vout_index, payout.address, split_rewards[i]))
@@ -2662,7 +2662,7 @@ namespace service_nodes
         std::vector<uint64_t> split_rewards = cryptonote::distribute_reward_by_portions(block_leader.payouts, reward_parts.service_node_total, true /*distribute_remainder*/);
         for (size_t i = 0; i < block_leader.payouts.size(); i++)
         {
-          payout_entry const &payout = block_leader.payouts[i];
+          const auto& payout = block_leader.payouts[i];
           if (split_rewards[i])
           {
             if (!verify_coinbase_tx_output(miner_tx, height, vout_index, payout.address, split_rewards[i]))

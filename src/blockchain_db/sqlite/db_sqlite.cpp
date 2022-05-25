@@ -27,25 +27,17 @@
 
 #include "db_sqlite.h"
 
-#include <sodium.h>
-
-#include <SQLiteCpp/SQLiteCpp.h>
-
 #include <sqlite3.h>
-
-#include <string>
+#include <sodium.h>
+#include <fmt/core.h>
 
 #include <iostream>
-
 #include <cassert>
 
 #include "cryptonote_config.h"
 #include "cryptonote_core/blockchain.h"
-
 #include "cryptonote_core/service_node_list.h"
-
 #include "common/string_util.h"
-
 #include "cryptonote_basic/hardfork.h"
 
 #undef OXEN_DEFAULT_LOG_CATEGORY
@@ -75,7 +67,10 @@ namespace cryptonote {
         CHECK(amount >= 0)
       );
 
-      CREATE TRIGGER batch_payments_delete_empty AFTER UPDATE ON batched_payments_accrued FOR EACH ROW WHEN NEW.amount = 0 BEGIN DELETE FROM batched_payments_accrued WHERE address = NEW.address; END;
+      CREATE TRIGGER batch_payments_delete_empty AFTER UPDATE ON batched_payments_accrued
+      FOR EACH ROW WHEN NEW.amount = 0 BEGIN
+          DELETE FROM batched_payments_accrued WHERE address = NEW.address;
+      END;
 
       CREATE TABLE batched_payments_raw(
         address VARCHAR NOT NULL,
@@ -93,13 +88,26 @@ namespace cryptonote {
 
       INSERT INTO batch_db_info(height) VALUES(0);
 
-      CREATE TRIGGER batch_payments_prune AFTER UPDATE ON batch_db_info FOR EACH ROW BEGIN DELETE FROM batched_payments_raw WHERE height_paid < (NEW.height - 10000); END;
+      CREATE TRIGGER batch_payments_prune AFTER UPDATE ON batch_db_info
+      FOR EACH ROW BEGIN
+          DELETE FROM batched_payments_raw WHERE height_paid < (NEW.height - 10000);
+      END;
 
       CREATE VIEW batched_payments_paid AS SELECT * FROM batched_payments_raw;
 
-      CREATE TRIGGER make_payment INSTEAD OF INSERT ON batched_payments_paid FOR EACH ROW BEGIN UPDATE batched_payments_accrued SET amount = (amount - NEW.amount) WHERE address = NEW.address; SELECT RAISE(ABORT, 'Address not found') WHERE changes() = 0; INSERT INTO batched_payments_raw(address, amount, height_paid) VALUES(NEW.address, NEW.amount, NEW.height_paid); END;
+      CREATE TRIGGER make_payment INSTEAD OF INSERT ON batched_payments_paid
+      FOR EACH ROW BEGIN
+          UPDATE batched_payments_accrued SET amount = (amount - NEW.amount) WHERE address = NEW.address;
+          SELECT RAISE(ABORT, 'Address not found') WHERE changes() = 0;
+          INSERT INTO batched_payments_raw(address, amount, height_paid) VALUES(NEW.address, NEW.amount, NEW.height_paid);
+      END;
 
-      CREATE TRIGGER rollback_payment INSTEAD OF DELETE ON batched_payments_paid FOR EACH ROW BEGIN DELETE FROM batched_payments_raw WHERE address = OLD.address AND height_paid = OLD.height_paid; INSERT INTO batched_payments_accrued(address, amount) VALUES(OLD.address, OLD.amount) ON CONFLICT(address) DO UPDATE SET amount = (amount + excluded.amount); END;
+      CREATE TRIGGER rollback_payment INSTEAD OF DELETE ON batched_payments_paid
+      FOR EACH ROW BEGIN
+          DELETE FROM batched_payments_raw WHERE address = OLD.address AND height_paid = OLD.height_paid;
+          INSERT INTO batched_payments_accrued(address, amount) VALUES(OLD.address, OLD.amount)
+              ON CONFLICT(address) DO UPDATE SET amount = (amount + excluded.amount);
+      END;
     )");
 
     MDEBUG("Database setup complete");
@@ -149,9 +157,11 @@ namespace cryptonote {
 
     for (auto& payment: payments) {
       std::string address_str = cryptonote::get_account_address_as_str(m_nettype, 0, payment.address_info.address);
-      MTRACE("Adding record for SN reward contributor " << address_str << "to database with amount " << static_cast<int64_t>(payment.amount));
+      auto amt = static_cast<int64_t>(payment.amount);
+      MTRACE(fmt::format("Adding record for SN reward contributor {} to database with amount {}",
+           address_str, amt));
 
-      db::exec_query(insert_payment, address_str, static_cast<int64_t>(payment.amount));
+      db::exec_query(insert_payment, address_str, amt);
       insert_payment->reset();
     }
 
@@ -167,7 +177,7 @@ namespace cryptonote {
       std::string address_str = cryptonote::get_account_address_as_str(m_nettype, 0, payment.address_info.address);
       auto result = db::exec_query(update_payment, static_cast<int64_t>(payment.amount), address_str);
       if (!result) {
-        MERROR("tried to subtract payment from an address that doesnt exist: " << address_str);
+        MERROR("tried to subtract payment from an address that doesn't exist: " << address_str);
         return false;
       }
       update_payment->reset();
@@ -330,7 +340,7 @@ namespace cryptonote {
     }
 
     if (block_height != height + 1) {
-      MERROR("Block height out of sync with batching database. Block height: " << block_height << " batching db height: " << height);
+      MERROR(fmt::format("Block height ({}) out of sync with batching database ({})", block_height, height));
       return false;
     }
 
@@ -416,11 +426,9 @@ namespace cryptonote {
       const std::vector<cryptonote::batch_sn_payment>& calculated_payments_from_batching_db,
       uint64_t block_height) {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
-    size_t length_miner_tx_vouts = miner_tx_vouts.size();
-    size_t length_calculated_payments_from_batching_db = calculated_payments_from_batching_db.size();
 
-    if (length_miner_tx_vouts != length_calculated_payments_from_batching_db) {
-      MERROR("Length of batch paments does not match, block vouts: " << length_miner_tx_vouts << " batch size: " << length_calculated_payments_from_batching_db);
+    if (miner_tx_vouts.size() != calculated_payments_from_batching_db.size()) {
+      MERROR(fmt::format("Length of batch payments ({}) does not match block vouts ({})", calculated_payments_from_batching_db.size(), miner_tx_vouts.size()));
       return false;
     }
 
@@ -434,29 +442,28 @@ namespace cryptonote {
     std::vector<batch_sn_payment> finalised_payments;
     cryptonote::keypair
     const deterministic_keypair = cryptonote::get_deterministic_keypair_from_height(block_height);
-    for (auto& vout: miner_tx_vouts) {
-      if (std::get<1>(vout) != calculated_payments_from_batching_db[vout_index].amount) {
-        MERROR("Service node reward amount incorrect. Should be " << cryptonote::print_money(calculated_payments_from_batching_db[vout_index].amount) << ", is: " << cryptonote::print_money(std::get<1>(vout)));
+    for (size_t vout_index = 0; vout_index < miner_tx_vouts.size(); vout_index++) {
+      const auto& [pubkey, amt] = miner_tx_vouts[vout_index];
+      uint64_t amount = amt * BATCH_REWARD_FACTOR;
+      const auto& from_db = calculated_payments_from_batching_db[vout_index];
+      if (amount != from_db.amount) {
+        MERROR(fmt::format("Batched payout amount incorrect. Should be {}, not {}", from_db.amount, amount));
         return false;
       }
-      crypto::public_key out_eph_public_key {};
-      if (!cryptonote::get_deterministic_output_key(calculated_payments_from_batching_db[vout_index].address_info.address, deterministic_keypair, vout_index, out_eph_public_key)) {
+      crypto::public_key out_eph_public_key{};
+      if (!cryptonote::get_deterministic_output_key(from_db.address_info.address, deterministic_keypair, vout_index, out_eph_public_key)) {
         MERROR("Failed to generate output one-time public key");
         return false;
       }
-      if (tools::view_guts(std::get<0>(vout)) != tools::view_guts(out_eph_public_key)) {
+      if (tools::view_guts(pubkey) != tools::view_guts(out_eph_public_key)) {
         MERROR("Output ephemeral public key does not match");
         return false;
       }
-      total_oxen_payout_in_vouts += std::get<1>(vout);
-      finalised_payments.emplace_back(
-          calculated_payments_from_batching_db[vout_index].address,
-          std::get<1>(vout) * BATCH_REWARD_FACTOR,
-          m_nettype);
-      vout_index++;
+      total_oxen_payout_in_vouts += amount;
+      finalised_payments.emplace_back(from_db.address, amount, m_nettype);
     }
     if (total_oxen_payout_in_vouts != total_oxen_payout_in_our_db) {
-      MERROR("Total service node reward amount incorrect. Should be " << cryptonote::print_money(total_oxen_payout_in_our_db) << ", is: " << cryptonote::print_money(total_oxen_payout_in_vouts));
+      MERROR(fmt::format("Total batched payout amount incorrect. Should be {}, not {}", total_oxen_payout_in_our_db, total_oxen_payout_in_vouts));
       return false;
     }
 
@@ -479,7 +486,8 @@ namespace cryptonote {
         auto amount = static_cast<uint64_t>(*maybe_amount) / BATCH_REWARD_FACTOR * BATCH_REWARD_FACTOR;
 
         if (amount != payment.amount) {
-          MERROR("Invalid amounts passed in to save payments for address: " << payment.address << " received " << payment.amount << " expected " << amount << " (truncated from " << *maybe_amount << ")");
+          MERROR(fmt::format("Invalid amounts passed in to save payments for address {}: received {}, expected {} (truncated from {})",
+                payment.address, payment.amount, amount, *maybe_amount));
           return false;
         }
 
@@ -488,7 +496,8 @@ namespace cryptonote {
       }
       else {
         // This shouldn't occur: we validate payout addresses much earlier in the block validation.
-        MERROR("Internal error: Invalid amounts passed in to save payments for address: " << payment.address << ": that address has no accrued rewards");
+        MERROR(fmt::format("Internal error: Invalid amounts passed in to save payments for address {}: that address has no accrued rewards",
+              payment.address));
         return false;
       }
 
