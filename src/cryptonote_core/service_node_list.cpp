@@ -2571,10 +2571,10 @@ namespace service_nodes
 
     if (miner_tx.vout.size() != expected_vouts_size)
     {
-      char const *type =
-        mode == verify_mode::miner ? "miner" :
-        mode == verify_mode::batched_sn_rewards ? "batch reward" :
-        mode == verify_mode::pulse_block_leader_is_producer ? "pulse" : "pulse alt round";
+      auto type =
+        mode == verify_mode::miner ? "miner"sv :
+        mode == verify_mode::batched_sn_rewards ? "batch reward"sv :
+        mode == verify_mode::pulse_block_leader_is_producer ? "pulse"sv : "pulse alt round"sv;
       MGINFO_RED("Expected " << type << " block, the miner TX specifies a different amount of outputs vs the expected: " << expected_vouts_size << ", miner tx outputs: " << miner_tx.vout.size());
       return false;
     }
