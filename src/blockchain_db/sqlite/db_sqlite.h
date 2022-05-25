@@ -41,6 +41,10 @@
 namespace cryptonote
 {
 
+// We calculate and store batch rewards in thousanths of atomic OXEN, to reduce the size of errors
+// from integer division of rewards.
+constexpr uint64_t BATCH_REWARD_FACTOR = 1000;
+
 fs::path check_if_copy_filename(std::string_view db_path);
 
 class BlockchainSQLite : public db::Database
@@ -74,7 +78,12 @@ public:
   // get_payments -> passing a block height will return an array of payments that should be created in a coinbase transaction on that block given the current batching DB state.
   std::optional<std::vector<cryptonote::batch_sn_payment>> get_sn_payments(uint64_t block_height);
 
-  // calculate_rewards -> takes the list of contributors from sn_info with their SN contribution amounts and will calculate how much of the block rewards should be the allocated to the contributors. The function will return a list suitable for passing to add_sn_payments
+  // calculate_rewards -> takes the list of contributors from sn_info with their SN contribution
+  // amounts and will calculate how much of the block rewards should be the allocated to the
+  // contributors. The function will return a list suitable for passing to add_sn_payments
+  //
+  // Note that distribution_amount here is typically passed as milli-atomic OXEN for extra
+  // precision.
   std::vector<cryptonote::batch_sn_payment> calculate_rewards(hf hf_version, uint64_t distribution_amount, service_nodes::service_node_info sn_info);
 
   // add/pop_block -> takes a block that contains new block rewards to be batched and added to the database

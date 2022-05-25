@@ -151,7 +151,7 @@ namespace cryptonote {
       std::string address_str = cryptonote::get_account_address_as_str(m_nettype, 0, payment.address_info.address);
       MTRACE("Adding record for SN reward contributor " << address_str << "to database with amount " << static_cast<int64_t>(payment.amount));
 
-      db::exec_query(insert_payment, address_str, static_cast<int64_t>(payment.amount * 1000));
+      db::exec_query(insert_payment, address_str, static_cast<int64_t>(payment.amount));
       insert_payment->reset();
     }
 
@@ -165,7 +165,7 @@ namespace cryptonote {
 
     for (auto& payment: payments) {
       std::string address_str = cryptonote::get_account_address_as_str(m_nettype, 0, payment.address_info.address);
-      auto result = db::exec_query(update_payment, static_cast<int64_t>(payment.amount * 1000), address_str);
+      auto result = db::exec_query(update_payment, static_cast<int64_t>(payment.amount), address_str);
       if (!result) {
         MERROR("tried to subtract payment from an address that doesnt exist: " << address_str);
         return false;
@@ -186,7 +186,7 @@ namespace cryptonote {
 
     auto accrued_amounts = prepared_results<std::string, int64_t>(
       "SELECT address, amount FROM batched_payments_accrued WHERE amount > ? ORDER BY address ASC",
-      static_cast<int64_t>(conf.MIN_BATCH_PAYMENT_AMOUNT * 1000));
+      static_cast<int64_t>(conf.MIN_BATCH_PAYMENT_AMOUNT * BATCH_REWARD_FACTOR));
 
     std::vector<cryptonote::batch_sn_payment> payments;
 
@@ -196,7 +196,10 @@ namespace cryptonote {
         cryptonote::get_account_address_from_str(addr_info, m_nettype, address);
         uint64_t next_payout_height = addr_info.address.next_payout_height(block_height - 1, conf.BATCHING_INTERVAL);
         if (block_height == next_payout_height) {
-          payments.emplace_back(std::move(address), amount, m_nettype);
+          payments.emplace_back(
+              std::move(address),
+              amount / BATCH_REWARD_FACTOR * BATCH_REWARD_FACTOR /* truncate to atomic OXEN */,
+              m_nettype);
         }
       } else {
         MERROR("Invalid address returned from batching database: " << address);
@@ -446,7 +449,10 @@ namespace cryptonote {
         return false;
       }
       total_oxen_payout_in_vouts += std::get<1>(vout);
-      finalised_payments.emplace_back(calculated_payments_from_batching_db[vout_index].address, std::get<1>(vout), m_nettype);
+      finalised_payments.emplace_back(
+          calculated_payments_from_batching_db[vout_index].address,
+          std::get<1>(vout) * BATCH_REWARD_FACTOR,
+          m_nettype);
       vout_index++;
     }
     if (total_oxen_payout_in_vouts != total_oxen_payout_in_our_db) {
@@ -469,9 +475,11 @@ namespace cryptonote {
     for (const auto& payment: paid_amounts) {
       if (auto maybe_amount = db::exec_and_maybe_get<int64_t>(select_sum, payment.address))
       {
-        auto amount = static_cast<uint64_t>(*maybe_amount);
-        if (amount != payment.amount * 1000) {
-          MERROR("Invalid amounts passed in to save payments for address: " << payment.address << " received " << payment.amount << " expected " << amount);
+        // Truncate the thousanths amount to an atomic OXEN:
+        auto amount = static_cast<uint64_t>(*maybe_amount) / BATCH_REWARD_FACTOR * BATCH_REWARD_FACTOR;
+
+        if (amount != payment.amount) {
+          MERROR("Invalid amounts passed in to save payments for address: " << payment.address << " received " << payment.amount << " expected " << amount << " (truncated from " << *maybe_amount << ")");
           return false;
         }
 
@@ -479,7 +487,8 @@ namespace cryptonote {
         update_paid->reset();
       }
       else {
-        MERROR("Invalid amounts passed in to save payments for address: " << payment.address << ": that address has no accrued rewards");
+        // This shouldn't occur: we validate payout addresses much earlier in the block validation.
+        MERROR("Internal error: Invalid amounts passed in to save payments for address: " << payment.address << ": that address has no accrued rewards");
         return false;
       }
 
