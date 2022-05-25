@@ -1923,7 +1923,7 @@ std::optional<std::string_view> is_invalid_staking_address(
 
 bool check_service_node_running(const GET_INFO::response& info, bool force_registration) {
 
-  if (!info.service_node)
+  if (!info.service_node.value_or(false))
   {
     tools::fail_msg_writer() << "Unable to prepare registration: this daemon is not running in --service-node mode";
     return false;
