@@ -249,7 +249,7 @@ namespace cryptonote
       uint64_t fee,
       transaction& tx,
       const oxen_miner_tx_context &miner_tx_context,
-      const std::optional<std::vector<cryptonote::batch_sn_payment>>& sn_rwds,
+      const std::vector<cryptonote::batch_sn_payment>& sn_rwds,
       const std::string& extra_nonce,
       hf hard_fork_version)
   {
@@ -425,9 +425,10 @@ namespace cryptonote
 
     uint64_t total_sn_rewards = 0;
     // Add batched SN rewards to the block:
-    if (sn_rwds)
+    if (!sn_rwds.empty())
     {
-      for (const auto& reward : *sn_rwds)
+      assert(hard_fork_version >= hf::hf19_reward_batching);
+      for (const auto& reward : sn_rwds)
       {
         assert(reward.amount % BATCH_REWARD_FACTOR == 0);
         auto atomic_amt = reward.amount / BATCH_REWARD_FACTOR;

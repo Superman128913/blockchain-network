@@ -129,7 +129,7 @@ namespace cryptonote
       uint64_t fee,
       transaction& tx,
       const oxen_miner_tx_context &miner_context,
-      const std::optional<std::vector<cryptonote::batch_sn_payment>>& sn_rwds,
+      const std::vector<cryptonote::batch_sn_payment>& sn_rwds,
       const std::string& extra_nonce,
       hf hard_fork_version);
 

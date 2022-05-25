@@ -72,7 +72,7 @@ private:
 public:
 
   // get_payments -> passing a block height will return an array of payments that should be created in a coinbase transaction on that block given the current batching DB state.
-  std::optional<std::vector<cryptonote::batch_sn_payment>> get_sn_payments(uint64_t block_height);
+  std::vector<cryptonote::batch_sn_payment> get_sn_payments(uint64_t block_height);
 
   // calculate_rewards -> takes the list of contributors from sn_info with their SN contribution
   // amounts and will calculate how much of the block rewards should be the allocated to the

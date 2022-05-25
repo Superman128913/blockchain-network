@@ -186,14 +186,14 @@ namespace cryptonote {
     return true;
   }
 
-  std::optional<std::vector<cryptonote::batch_sn_payment>> BlockchainSQLite::get_sn_payments(uint64_t block_height) {
+  std::vector<cryptonote::batch_sn_payment> BlockchainSQLite::get_sn_payments(uint64_t block_height) {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
 
     // <= here because we might have crap in the db that we don't clear until we actually add the HF
     // block later on.  (This is a pretty slim edge case that happened on devnet and is probably
     // virtually impossible on mainnet).
     if (block_height <= cryptonote::get_hard_fork_heights(m_nettype, hf::hf19_reward_batching).first.value_or(0))
-      return std::nullopt;
+      return {};
 
     const auto& conf = get_config(m_nettype);
 
@@ -216,7 +216,6 @@ namespace cryptonote {
         }
       } else {
         MERROR("Invalid address returned from batching database: " << address);
-        return std::nullopt;
       }
     }
 
@@ -365,7 +364,7 @@ namespace cryptonote {
       };
 
       // Goes through the miner transactions vouts checks they are right and marks them as paid in the database
-      if (!validate_batch_payment(miner_tx_vouts, *calculated_rewards, block_height)) {
+      if (!validate_batch_payment(miner_tx_vouts, calculated_rewards, block_height)) {
         return false;
       }
 

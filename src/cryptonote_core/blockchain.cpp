@@ -1393,8 +1393,8 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
   // TODO(oxen): eliminate all floating point math in reward calculations.
   uint64_t max_base_reward = reward_parts.governance_paid + 1;
 
-  if (version >= hf::hf19_reward_batching && batched_sn_payments.has_value()) {
-    max_base_reward += std::accumulate(batched_sn_payments->begin(), batched_sn_payments->end(), uint64_t{0}, [&](auto a, auto b){return a + b.amount;});
+  if (version >= hf::hf19_reward_batching) {
+    max_base_reward += std::accumulate(batched_sn_payments.begin(), batched_sn_payments.end(), uint64_t{0}, [&](auto a, auto b){return a + b.amount;});
   } else {
     max_base_reward += reward_parts.base_miner + reward_parts.service_node_total;
   }
@@ -1642,7 +1642,7 @@ bool Blockchain::create_block_template_internal(block& b, const crypto::hash *fr
   }
 
   // This will check the batching database for who is due to be paid out in this block
-  std::optional<std::vector<cryptonote::batch_sn_payment>> sn_rwds = std::nullopt;
+  std::vector<cryptonote::batch_sn_payment> sn_rwds;
   if (hf_version >= hf::hf19_reward_batching)
   {
     sn_rwds = m_sqlite_db->get_sn_payments(height); //Rewards to pay out

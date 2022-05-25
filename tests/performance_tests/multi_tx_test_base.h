@@ -51,14 +51,13 @@ public:
     using namespace cryptonote;
 
     std::vector<tx_source_entry::output_entry> output_entries;
-    std::optional<std::vector<cryptonote::batch_sn_payment>> sn_rwds;
     for (size_t i = 0; i < ring_size; ++i)
     {
       m_miners[i].generate();
 
       uint64_t block_rewards = 0;
       bool r;
-      std::tie(r, block_rewards) = construct_miner_tx(0, 0, 0, 2, 0, m_miner_txs[1], cryptonote::oxen_miner_tx_context::miner_block(network_type::FAKECHAIN, m_miners[i].get_keys().m_account_address), sn_rwds, {}, hf::none);
+      std::tie(r, block_rewards) = construct_miner_tx(0, 0, 0, 2, 0, m_miner_txs[1], cryptonote::oxen_miner_tx_context::miner_block(network_type::FAKECHAIN, m_miners[i].get_keys().m_account_address), {}, {}, hf::none);
       if (!r)
         return false;
 

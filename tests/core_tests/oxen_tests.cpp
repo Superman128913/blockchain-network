@@ -3793,20 +3793,20 @@ bool oxen_batch_sn_rewards_pop_blocks_after_big_cycle::generate(std::vector<test
     cryptonote::Blockchain& blockchain = c.get_blockchain_storage();
     uint64_t curr_height = blockchain.get_current_blockchain_height();
     auto sqliteDB = blockchain.sqlite_db();
-    CHECK_EQ((*sqliteDB).height, curr_height - 1);
+    CHECK_EQ(sqliteDB->height, curr_height - 1);
 
     blockchain.pop_blocks(conf.BATCHING_INTERVAL * 3 + 1);
 
 
-    CHECK_EQ((*sqliteDB).height + 1, blockchain.get_current_blockchain_height());
-    CHECK_EQ((*sqliteDB).height + 1, curr_height - conf.BATCHING_INTERVAL * 3 - 1);
+    CHECK_EQ(sqliteDB->height + 1, blockchain.get_current_blockchain_height());
+    CHECK_EQ(sqliteDB->height + 1, curr_height - conf.BATCHING_INTERVAL * 3 - 1);
 
     curr_height = blockchain.get_current_blockchain_height();
 
-    auto records = (*sqliteDB).get_sn_payments(curr_height);
-    CHECK_EQ((*records).size(), 1);
-    CHECK_EQ((*records)[0].amount, amount);
-    CHECK_EQ(tools::view_guts((*records)[0].address_info.address), tools::view_guts(alice.get_keys().m_account_address));
+    auto records = sqliteDB->get_sn_payments(curr_height);
+    CHECK_EQ(records.size(), 1);
+    CHECK_EQ(records[0].amount, amount);
+    CHECK_EQ(tools::view_guts(records[0].address_info.address), tools::view_guts(alice.get_keys().m_account_address));
 
     return true;
   });

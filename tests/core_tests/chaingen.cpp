@@ -851,7 +851,6 @@ oxen_blockchain_entry oxen_chain_generator::create_genesis_block(const cryptonot
 
   // TODO(doyle): Does this evaluate to 0? If so we can simplify this a lot more
   size_t target_block_weight = get_transaction_weight(blk.miner_tx);
-  std::optional<std::vector<cryptonote::batch_sn_payment>> sn_rwds;
 
   while (true)
   {
@@ -862,7 +861,7 @@ oxen_blockchain_entry oxen_chain_generator::create_genesis_block(const cryptonot
                                           0 /*total_fee*/,
                                           blk.miner_tx,
                                           cryptonote::oxen_miner_tx_context::miner_block(cryptonote::network_type::FAKECHAIN, miner.get_keys().m_account_address),
-                                          sn_rwds,
+                                          {},
                                           std::string(),
                                           hf_version_);
     assert(constructed);
@@ -1010,11 +1009,9 @@ bool oxen_chain_generator::block_begin(oxen_blockchain_entry &entry, oxen_create
   }
 
   size_t target_block_weight = txs_weight + get_transaction_weight(blk.miner_tx);
-  std::optional<std::vector<cryptonote::batch_sn_payment>> sn_rwds;
-  if (hf_version_ >= hf::hf19_reward_batching)
-  {
-    sn_rwds = sqlite_db_->get_sn_payments(height); //Rewards to pay out
-  }
+  auto sn_rwds = sqlite_db_->get_sn_payments(height);
+  if (hf_version_ < hf::hf19_reward_batching)
+    CHECK_AND_ASSERT_MES(sn_rwds.empty(), false, "batch payments should be empty before hf19");
   uint64_t block_rewards = 0;
   bool r;
   while (true)
@@ -1340,7 +1337,6 @@ bool test_generator::construct_block(cryptonote::block &blk,
   size_t target_block_weight = txs_weight + get_transaction_weight(blk.miner_tx);
   manual_calc_batched_governance(*this, prev_id, miner_tx_context, m_hf_version, height);
 
-  std::optional<std::vector<cryptonote::batch_sn_payment>> sn_rwds;
   while (true)
   {
     auto [r, block_rewards] = construct_miner_tx(height,
@@ -1350,7 +1346,7 @@ bool test_generator::construct_block(cryptonote::block &blk,
                                   total_fee,
                                   blk.miner_tx,
                                   miner_tx_context,
-                                  sn_rwds,
+                                  {},
                                   std::string(),
                                   m_hf_version);
     if (!r)
@@ -1464,9 +1460,8 @@ bool test_generator::construct_block_manually(
     miner_tx_context.nettype                           = cryptonote::network_type::FAKECHAIN;
     manual_calc_batched_governance(*this, prev_id, miner_tx_context, m_hf_version, height);
 
-    std::optional<std::vector<cryptonote::batch_sn_payment>> sn_rwds;
     size_t current_block_weight = txs_weight + get_transaction_weight(blk.miner_tx);
-    auto [r, block_rewards] = construct_miner_tx(height, tools::median(block_weights.begin(), block_weights.end()), already_generated_coins, current_block_weight, miner_fee, blk.miner_tx, cryptonote::oxen_miner_tx_context::miner_block(cryptonote::network_type::FAKECHAIN, miner_acc.get_keys().m_account_address), sn_rwds, std::string(), m_hf_version);
+    auto [r, block_rewards] = construct_miner_tx(height, tools::median(block_weights.begin(), block_weights.end()), already_generated_coins, current_block_weight, miner_fee, blk.miner_tx, cryptonote::oxen_miner_tx_context::miner_block(cryptonote::network_type::FAKECHAIN, miner_acc.get_keys().m_account_address), {}, std::string(), m_hf_version);
     if (!r)
       return false;
   }
