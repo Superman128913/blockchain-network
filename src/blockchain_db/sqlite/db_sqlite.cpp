@@ -189,7 +189,10 @@ namespace cryptonote {
   std::optional<std::vector<cryptonote::batch_sn_payment>> BlockchainSQLite::get_sn_payments(uint64_t block_height) {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
 
-    if (block_height == 0)
+    // <= here because we might have crap in the db that we don't clear until we actually add the HF
+    // block later on.  (This is a pretty slim edge case that happened on devnet and is probably
+    // virtually impossible on mainnet).
+    if (block_height <= cryptonote::get_hard_fork_heights(m_nettype, hf::hf19_reward_batching).first.value_or(0))
       return std::nullopt;
 
     const auto& conf = get_config(m_nettype);
