@@ -249,7 +249,7 @@ namespace cryptonote
       uint64_t fee,
       transaction& tx,
       const oxen_miner_tx_context &miner_tx_context,
-      const std::optional<std::vector<cryptonote::batch_sn_payment>> sn_rwds,
+      const std::optional<std::vector<cryptonote::batch_sn_payment>>& sn_rwds,
       const std::string& extra_nonce,
       hf hard_fork_version)
   {
@@ -296,10 +296,13 @@ namespace cryptonote
     //
     // Each block accrues a small reward to each service node this amount
     // is essentially 16.5 (Coinbase reward for Service Nodes) divided by
-    // the size of the service node list. 
+    // the size of the service node list. (Internally, these rewards are
+    // calculated with 3 extra digits of precision to reduce integer
+    // truncation errors).
     //
     // The service node list is adjusted to only accrue for nodes 
-    // that have been online for greater than 1 hour.
+    // that have been active (i.e. without decommission or ip penalty)
+    // for greater than 1 day.
     // 
     // By default, when Pulse round is 0, the Block Producer is the Block
     // Leader. Transaction fees are given to the Block Leader.
@@ -325,8 +328,8 @@ namespace cryptonote
     // (multiple non-participation marks over the monitoring period will induce
     // a decommission) by members of the quorum.
 
-    std::vector<reward_payout>   rewards = {};
-    std::vector<batch_sn_payment>   batched_rewards = {};
+    std::vector<reward_payout> rewards;
+    std::vector<batch_sn_payment> batched_rewards;
     const network_type nettype = miner_tx_context.nettype;
 
     if (hard_fork_version >= hf::hf9_service_nodes)
@@ -350,27 +353,28 @@ namespace cryptonote
       else if (reward_parts.miner_fee)
       {
         // Alternative Block Producer (receives just miner fee, if there is one)
-        service_nodes::payout const &producer = miner_tx_context.pulse_block_producer;
-        std::vector<uint64_t> split_rewards   = distribute_reward_by_portions(producer.payouts, reward_parts.miner_fee, true /*distribute_remainder*/);
+        const auto& p_payouts = miner_tx_context.pulse_block_producer.payouts;
+        std::vector<uint64_t> split_rewards = distribute_reward_by_portions(p_payouts, reward_parts.miner_fee, true /*distribute_remainder*/);
 
-        for (size_t i = 0; i < producer.payouts.size(); i++)
-          if (hard_fork_version < hf::hf19_reward_batching)
-          {
-            rewards.push_back({reward_type::snode, producer.payouts[i].address, split_rewards[i]});
-          } else {
-            batched_rewards.emplace_back(producer.payouts[i].address, split_rewards[i], nettype);
-          }
+        if (hard_fork_version >= hf::hf19_reward_batching) {
+          for (size_t i = 0; i < p_payouts.size(); i++)
+            batched_rewards.emplace_back(p_payouts[i].address, split_rewards[i], nettype);
+        } else {
+          for (size_t i = 0; i < p_payouts.size(); i++)
+            rewards.push_back({reward_type::snode, p_payouts[i].address, split_rewards[i]});
+        }
       }
 
       std::vector<uint64_t> split_rewards = distribute_reward_by_portions(leader.payouts, leader_reward, true /*distribute_remainder*/);
-      for (size_t i = 0; i < leader.payouts.size(); i++)
+      if (hard_fork_version >= hf::hf19_reward_batching)
       {
-        if (hard_fork_version < hf::hf19_reward_batching) {
-          rewards.push_back({reward_type::snode, leader.payouts[i].address, split_rewards[i]});
-        } else {
+        for (size_t i = 0; i < leader.payouts.size(); i++)
           batched_rewards.emplace_back(leader.payouts[i].address, split_rewards[i], nettype);
-        }
-
+      }
+      else
+      {
+        for (size_t i = 0; i < leader.payouts.size(); i++)
+          rewards.push_back({reward_type::snode, leader.payouts[i].address, split_rewards[i]});
       }
     }
     else
@@ -381,25 +385,24 @@ namespace cryptonote
 
       if (uint64_t miner_amount = reward_parts.base_miner + reward_parts.miner_fee; miner_amount)
       {
-        if (hard_fork_version < hf::hf19_reward_batching) {
-          rewards.push_back({reward_type::miner, miner_tx_context.miner_block_producer, miner_amount});
-        } else {
+        if (hard_fork_version >= hf::hf19_reward_batching) {
           batched_rewards.emplace_back(miner_tx_context.miner_block_producer, miner_amount, nettype);
+        } else {
+          rewards.push_back({reward_type::miner, miner_tx_context.miner_block_producer, miner_amount});
         }
       }
 
       if (hard_fork_version >= hf::hf9_service_nodes) {
-        std::vector<uint64_t> split_rewards =
+        auto split_rewards =
             distribute_reward_by_portions(leader.payouts,
                                           reward_parts.service_node_total,
                                           hard_fork_version >= hf::hf16_pulse /*distribute_remainder*/);
-        for (size_t i = 0; i < leader.payouts.size(); i++)
-        {
-          if (hard_fork_version < hf::hf19_reward_batching) {
-            rewards.push_back({reward_type::snode, leader.payouts[i].address, split_rewards[i]});
-          } else {
+        if (hard_fork_version >= hf::hf19_reward_batching) {
+          for (size_t i = 0; i < leader.payouts.size(); i++)
             batched_rewards.emplace_back(leader.payouts[i].address, split_rewards[i], nettype);
-          }
+        } else {
+          for (size_t i = 0; i < leader.payouts.size(); i++)
+            rewards.push_back({reward_type::snode, leader.payouts[i].address, split_rewards[i]});
         }
       }
     }
@@ -411,25 +414,25 @@ namespace cryptonote
       {
         CHECK_AND_ASSERT_MES(hard_fork_version >= hf::hf10_bulletproofs, std::make_pair(false, block_rewards), "Governance reward can NOT be 0 before hardfork 10, hard_fork_version: " << static_cast<int>(hard_fork_version));
       }
-      else
+      // Governance reward paid out through SN rewards batching from HF19
+      else if (hard_fork_version < hf::hf19_reward_batching)
       {
         cryptonote::address_parse_info governance_wallet_address;
         cryptonote::get_account_address_from_str(governance_wallet_address, nettype, cryptonote::get_config(nettype).governance_wallet_address(hard_fork_version));
-        // Governance reward paid out through SN rewards batching after HF19
-        if (hard_fork_version < hf::hf19_reward_batching) {
-          rewards.push_back({reward_type::governance, governance_wallet_address.address, reward_parts.governance_paid});
-        }
+        rewards.push_back({reward_type::governance, governance_wallet_address.address, reward_parts.governance_paid});
       }
     }
 
     uint64_t total_sn_rewards = 0;
-    // Add SN rewards to the block
+    // Add batched SN rewards to the block:
     if (sn_rwds)
     {
-      for (const auto &reward : *sn_rwds)
+      for (const auto& reward : *sn_rwds)
       {
-        rewards.emplace_back(reward_type::snode, reward.address_info.address, reward.amount);
-        total_sn_rewards += reward.amount;
+        assert(reward.amount % BATCH_REWARD_FACTOR == 0);
+        auto atomic_amt = reward.amount / BATCH_REWARD_FACTOR;
+        rewards.emplace_back(reward_type::snode, reward.address_info.address, atomic_amt);
+        total_sn_rewards += atomic_amt;
       }
     }
 
@@ -458,10 +461,10 @@ namespace cryptonote
         return std::make_pair(false, block_rewards);
       }
 
-      txout_to_key tk = {};
-      tk.key          = out_eph_public_key;
+      txout_to_key tk{};
+      tk.key = out_eph_public_key;
 
-      tx_out out = {};
+      tx_out out{};
       out.target = tk;
       out.amount = amount;
       tx.vout.push_back(out);
@@ -469,7 +472,7 @@ namespace cryptonote
       summary_amounts += amount;
     }
 
-    uint64_t expected_amount = 0;
+    uint64_t expected_amount;
     if (hard_fork_version <= hf::hf15_ons)
     {
       // NOTE: Use the amount actually paid out when we split the service node
@@ -478,33 +481,28 @@ namespace cryptonote
       // division). This occurred prior to HF15, after that we redistribute dust
       // properly.
       expected_amount = reward_parts.base_miner + reward_parts.miner_fee + reward_parts.governance_paid;
-      for (auto reward : rewards)
-      {
-        [[maybe_unused]] auto const &[type, address, amount] = reward;
-        if (type == reward_type::snode) expected_amount += amount;
-      }
+      for (const auto& [type, address, amount] : rewards)
+        if (type == reward_type::snode)
+          expected_amount += amount;
     }
+    else if (hard_fork_version < hf::hf19_reward_batching)
+      expected_amount = reward_parts.base_miner + reward_parts.miner_fee + reward_parts.service_node_total + reward_parts.governance_paid;
     else
-    {
-      expected_amount = 0;
-      if (hard_fork_version < hf::hf19_reward_batching)
-        expected_amount = expected_amount + reward_parts.base_miner + reward_parts.miner_fee + reward_parts.service_node_total + reward_parts.governance_paid;
-      else
-        expected_amount = expected_amount + total_sn_rewards;
-    }
+      expected_amount = total_sn_rewards;
 
     CHECK_AND_ASSERT_MES(summary_amounts == expected_amount, std::make_pair(false, block_rewards), "Failed to construct miner tx, summary_amounts = " << summary_amounts << " not equal total block_reward = " << expected_amount);
     CHECK_AND_ASSERT_MES(tx.vout.size() == rewards.size(), std::make_pair(false, block_rewards), "TX output mis-match with rewards expected: " << rewards.size() << ", tx outputs: " << tx.vout.size());
 
-    block_rewards = std::accumulate(batched_rewards.begin(), batched_rewards.end(), uint64_t(0), [](uint64_t const x, cryptonote::batch_sn_payment const y) { return x + y.amount; });
+    block_rewards = std::accumulate(
+        batched_rewards.begin(),
+        batched_rewards.end(),
+        uint64_t{0},
+        [](uint64_t x, auto&& y) { return x + y.amount; });
 
     //lock
     tx.unlock_time = height + MINED_MONEY_UNLOCK_WINDOW;
     tx.vin.push_back(txin_gen{height});
     tx.invalidate_hashes();
-
-    //LOG_PRINT("MINER_TX generated ok, block_reward=" << print_money(block_reward) << "("  << print_money(block_reward - fee) << "+" << print_money(fee)
-    //  << "), current_block_size=" << current_block_size << ", already_generated_coins=" << already_generated_coins << ", tx_id=" << get_transaction_hash(tx), LOG_LEVEL_2);
 
     return std::make_pair(true, block_rewards);
   }
