@@ -622,6 +622,7 @@ namespace rpc {
       uint64_t pulse_target_timestamp;      // For pulse blocks this is the target timestamp of the next block, which targets 2 minutes after the previous block but will be slightly faster/slower if the previous block is behind/ahead of the ideal timestamp.
       uint64_t difficulty;                  // Network difficulty (analogous to the strength of the network).
       uint64_t target;                      // Current target for next proof of work.
+      hf hard_fork;                         // Current network hard fork version
       uint64_t tx_count;                    // Total number of non-coinbase transaction in the chain.
       uint64_t tx_pool_size;                // Number of transactions that have been broadcast but not included in a block.
       std::optional<uint64_t> alt_blocks_count;            // Number of alternative blocks to main chain.
