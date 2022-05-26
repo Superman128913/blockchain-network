@@ -214,7 +214,6 @@ uint64_t get_min_node_contribution(hf version, uint64_t staking_requirement, uin
   const uint64_t needed = staking_requirement - total_reserved;
 
   const size_t max_contributors = version >= hf::hf19_reward_batching ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1;
-  assert(max_contributors > num_contributions);
   if (max_contributors <= num_contributions) return UINT64_MAX;
 
   const size_t num_contributions_remaining_avail = max_contributors - num_contributions;
