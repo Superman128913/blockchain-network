@@ -184,14 +184,13 @@ namespace cryptonote {
 
     const auto& conf = get_config(m_nettype);
 
-    auto select_payments = prepared_bind(
+    auto accrued_amounts = prepared_results<std::string, int64_t>(
       "SELECT address, amount FROM batched_payments_accrued WHERE amount > ? ORDER BY address ASC",
       static_cast<int64_t>(conf.MIN_BATCH_PAYMENT_AMOUNT * 1000));
 
     std::vector<cryptonote::batch_sn_payment> payments;
 
-    while (select_payments->executeStep()) {
-      auto [address, amt] = db::get<std::string, int64_t>(select_payments);
+    for (auto [address, amt] : accrued_amounts) {
       auto amount = static_cast<uint64_t>(amt / 1000);
       if (cryptonote::is_valid_address(address, m_nettype)) {
         cryptonote::address_parse_info addr_info {};
@@ -508,13 +507,13 @@ namespace cryptonote {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__ << " Called with height: " << block_height);
 
     std::vector<cryptonote::batch_sn_payment> payments_at_height;
-    auto st = prepared_bind(
+    auto paid = prepared_results<std::string, int64_t>(
       "SELECT address, amount FROM batched_payments_paid WHERE height_paid = ? ORDER BY address",
       static_cast<int64_t>(block_height));
-    while (st->executeStep()) {
-      auto [addr, amt] = db::get<std::string, int64_t>(st);
+
+    for (auto [addr, amt] : paid)
       payments_at_height.emplace_back(std::move(addr), static_cast<uint64_t>(amt), m_nettype);
-    }
+
     return payments_at_height;
   }
 

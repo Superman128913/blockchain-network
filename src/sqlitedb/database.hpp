@@ -197,33 +197,73 @@ namespace db
     /** Wrapper around a SQLite::Statement that calls `tryReset()` on destruction of the wrapper. */
     class StatementWrapper
     {
+     protected:
       SQLite::Statement& st;
 
      public:
       /// Whether we should reset on destruction; can be set to false if needed.
       bool reset_on_destruction = true;
 
-      explicit StatementWrapper(SQLite::Statement& st) noexcept : st{st}
-      {}
+      explicit StatementWrapper(SQLite::Statement& st) noexcept : st{st} {}
+
+      StatementWrapper(StatementWrapper&& sw) noexcept : st{sw.st}
+      {
+        sw.reset_on_destruction = false;
+      }
+
       ~StatementWrapper() noexcept
       {
         if (reset_on_destruction)
           st.tryReset();
       }
-      SQLite::Statement&
-      operator*() noexcept
-      {
-        return st;
-      }
-      SQLite::Statement*
-      operator->() noexcept
-      {
-        return &st;
-      }
-      operator SQLite::Statement&() noexcept
-      {
-        return st;
-      }
+      SQLite::Statement& operator*() noexcept { return st; }
+      SQLite::Statement* operator->() noexcept { return &st; }
+      operator SQLite::Statement&() noexcept { return st; }
+    };
+
+    /** Extends the above with the ability to iterate through results. */
+    template <typename... T>
+    class IterableStatementWrapper : StatementWrapper
+    {
+     public:
+      using StatementWrapper::StatementWrapper;
+
+      class iterator {
+        IterableStatementWrapper& sw;
+        bool finished;
+        explicit iterator(IterableStatementWrapper& sw, bool finished = false) : sw{sw}, finished{finished}
+        {
+          ++*this;
+        }
+        friend class IterableStatementWrapper;
+
+       public:
+        iterator(const iterator&) = delete;
+        iterator(iterator&&) = delete;
+        void operator=(const iterator&) = delete;
+        void operator=(iterator&&) = delete;
+
+        type_or_tuple<T...> operator*() { return get<T...>(sw); }
+
+        iterator& operator++()
+        {
+          if (!finished)
+            finished = !sw->executeStep();
+          return *this;
+        }
+        void operator++(int) { ++*this; }
+        bool operator==(const iterator& other) { return &sw == &other.sw && finished == other.finished; }
+        bool operator!=(const iterator& other) { return !(*this == other); }
+
+        using value_type = type_or_tuple<T...>;
+        using reference = value_type;
+        using difference_type = std::ptrdiff_t;
+        using pointer = const value_type*;
+        using iterator_category = std::input_iterator_tag;
+      };
+
+      iterator begin() { return iterator{*this}; }
+      iterator end() { return iterator{*this, true}; }
     };
 
    public:
@@ -242,6 +282,15 @@ namespace db
       auto st = prepared_st(query);
       bind_oneshot(st, bind...);
       return st;
+    }
+
+    /// Prepares (with caching), binds parameters, then returns an object that lets you iterate
+    /// through results where each row is a T or tuple<T...>:
+    template <typename... T, typename... Bind, typename = std::enable_if_t<sizeof...(T) != 0>>
+    IterableStatementWrapper<T...>
+    prepared_results(const std::string& query, const Bind&... bind)
+    {
+      return IterableStatementWrapper<T...>{prepared_bind(query, bind...)};
     }
 
     /// Prepares (with caching) a query and then executes it, optionally binding the given
