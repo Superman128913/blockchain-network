@@ -136,7 +136,7 @@ namespace {
       << "long term weight: " << header.long_term_weight << "\n"
       << "num txes: " << header.num_txes << "\n"
       << "reward: " << cryptonote::print_money(header.reward) << "\n"
-      << "miner reward: " << cryptonote::print_money(header.miner_reward) << "\n"
+      << "coinbase payouts: " << cryptonote::print_money(header.coinbase_payouts) << "\n"
       << "service node winner: " << header.service_node_winner << "\n"
       << "miner tx hash: " << header.miner_tx_hash;
   }

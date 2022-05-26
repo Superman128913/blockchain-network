@@ -815,7 +815,7 @@ namespace rpc {
       difficulty_type difficulty;             // The strength of the Loki network based on mining power.
       difficulty_type cumulative_difficulty;  // The cumulative strength of the Loki network based on mining power.
       uint64_t reward;                        // The amount of new generated in this block and rewarded to the miner, foundation and service Nodes. Note: 1 OXEN = 1e9 atomic units.
-      uint64_t miner_reward;                  // The amount of new generated in this block and rewarded to the miner. Note: 1 OXEN = 1e9 atomic units.
+      uint64_t coinbase_payouts;              // The amount of new generated in this block and rewarded to the miner. Note: 1 OXEN = 1e9 atomic units.
       uint64_t block_size;                    // The block size in bytes.
       uint64_t block_weight;                  // The block weight in bytes.
       uint64_t num_txes;                      // Number of transactions in the block, not counting the coinbase tx.
