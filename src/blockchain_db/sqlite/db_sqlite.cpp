@@ -192,13 +192,13 @@ namespace cryptonote {
     // <= here because we might have crap in the db that we don't clear until we actually add the HF
     // block later on.  (This is a pretty slim edge case that happened on devnet and is probably
     // virtually impossible on mainnet).
-    if (block_height <= cryptonote::get_hard_fork_heights(m_nettype, hf::hf19_reward_batching).first.value_or(0))
+    if (block_height <= cryptonote::get_hard_fork_heights(m_nettype, hf::hf19_reward_batching).first.value_or(0) && m_nettype != cryptonote::network_type::FAKECHAIN)
       return {};
 
     const auto& conf = get_config(m_nettype);
 
     auto accrued_amounts = prepared_results<std::string, int64_t>(
-      "SELECT address, amount FROM batched_payments_accrued WHERE amount > ? ORDER BY address ASC",
+      "SELECT address, amount FROM batched_payments_accrued WHERE amount >= ? ORDER BY address ASC",
       static_cast<int64_t>(conf.MIN_BATCH_PAYMENT_AMOUNT * BATCH_REWARD_FACTOR));
 
     std::vector<cryptonote::batch_sn_payment> payments;
@@ -275,7 +275,7 @@ namespace cryptonote {
 
     // Step 1: Pay out the block producer their tx fees (note that, unlike the below, this applies
     // even if the SN isn't currently payable).
-    if (block_reward < service_node_reward)
+    if (block_reward < service_node_reward && m_nettype != cryptonote::network_type::FAKECHAIN)
       throw std::logic_error{"Invalid payment: block reward is too small"};
 
     if (uint64_t tx_fees = block_reward - service_node_reward;

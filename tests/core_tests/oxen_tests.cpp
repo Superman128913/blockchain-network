@@ -2791,6 +2791,7 @@ bool oxen_service_nodes_test_rollback::generate(std::vector<test_event_entry>& e
     gen.create_and_add_next_block({tx});
   }
 
+
   fork.add_n_blocks(3); /// create blocks on the alt chain and trigger chain switch
   fork.add_n_blocks(15); // create a few more blocks to test winner selection
   oxen_register_callback(events, "test_registrations", [&events, deregister_index, reg_evnt_idx](cryptonote::core &c, size_t ev_index)
@@ -3718,7 +3719,7 @@ bool oxen_batch_sn_rewards_pop_blocks::generate(std::vector<test_event_entry> &e
       CHECK_EQ((*records).size(), 1);
       // Check that the database has a lower amount that does not include the popped block
       batched_rewards_earned = MK_COINS(1) * 16.5 * (more_blocks - conf.SERVICE_NODE_PAYABLE_AFTER_BLOCKS - 1);
-      CHECK_EQ((*records)[0].amount, batched_rewards_earned);
+      CHECK_EQ((*records)[0].amount, batched_rewards_earned * cryptonote::BATCH_REWARD_FACTOR);
       CHECK_EQ(tools::view_guts((*records)[0].address_info.address), tools::view_guts(alice.get_keys().m_account_address));
     }
     else
@@ -3805,7 +3806,7 @@ bool oxen_batch_sn_rewards_pop_blocks_after_big_cycle::generate(std::vector<test
 
     auto records = sqliteDB->get_sn_payments(curr_height);
     CHECK_EQ(records.size(), 1);
-    CHECK_EQ(records[0].amount, amount);
+    CHECK_EQ(records[0].amount, amount * cryptonote::BATCH_REWARD_FACTOR);
     CHECK_EQ(tools::view_guts(records[0].address_info.address), tools::view_guts(alice.get_keys().m_account_address));
 
     return true;

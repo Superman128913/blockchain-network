@@ -46,7 +46,7 @@ TEST(SQLITE, AddressModulus)
 
 TEST(SQLITE, AddSNRewards)
 {
-  test::BlockchainSQLiteTest sqliteDB(cryptonote::network_type::TESTNET, ":memory:");
+  test::BlockchainSQLiteTest sqliteDB(cryptonote::network_type::FAKECHAIN, ":memory:");
 
   EXPECT_EQ(sqliteDB.batching_count(), 0);
 
@@ -54,9 +54,9 @@ TEST(SQLITE, AddSNRewards)
 
   cryptonote::address_parse_info wallet_address;
 
-  cryptonote::get_account_address_from_str(wallet_address, cryptonote::network_type::TESTNET, "T6TzkJb5EiASaCkcH7idBEi1HSrpSQJE1Zq3aL65ojBMPZvqHNYPTL56i3dncGVNEYCG5QG5zrBmRiVwcg6b1cRM1SRNqbp44");
+  cryptonote::get_account_address_from_str(wallet_address, cryptonote::network_type::FAKECHAIN, "LCFxT37LAogDn1jLQKf4y7aAqfi21DjovX9qyijaLYQSdrxY1U5VGcnMJMjWrD9RhjeK5Lym67wZ73uh9AujXLQ1RKmXEyL");
 
-  t1.emplace_back(wallet_address.address, 16500000001'789/2, cryptonote::network_type::TESTNET);
+  t1.emplace_back(wallet_address.address, 16500000001'789/2, cryptonote::network_type::FAKECHAIN);
 
   bool success = false;
   success = sqliteDB.add_sn_rewards(t1);
@@ -64,28 +64,26 @@ TEST(SQLITE, AddSNRewards)
 
   EXPECT_EQ(sqliteDB.batching_count(), 1);
 
-  std::optional<std::vector<cryptonote::batch_sn_payment>> p1;
+  std::vector<cryptonote::batch_sn_payment> p1;
   const auto expected_payout = wallet_address.address.next_payout_height(0, cryptonote::config::BATCHING_INTERVAL);
   p1 = sqliteDB.get_sn_payments(expected_payout - 1);
-  EXPECT_TRUE(p1.has_value());
-  EXPECT_EQ((*p1).size(), 0);
+  EXPECT_EQ(p1.size(), 0);
 
-  std::optional<std::vector<cryptonote::batch_sn_payment>> p2;
+  std::vector<cryptonote::batch_sn_payment> p2;
   p2 = sqliteDB.get_sn_payments(expected_payout);
-  EXPECT_TRUE(p2.has_value());
-  EXPECT_EQ((*p2).size(), 1);
+  EXPECT_EQ(p2.size(), 1);
   // We shouldn't get a fractional atomic OXEN amount in the payment amount:
   uint64_t expected_amount = 8250000000'000;
-  EXPECT_EQ((*p2)[0].amount, expected_amount);
+  EXPECT_EQ(p2[0].amount, expected_amount);
 
   // Pay an amount less than the database expects and test for failure
   std::vector<cryptonote::batch_sn_payment> t2;
-  t2.emplace_back(wallet_address.address, expected_amount - 1000, cryptonote::network_type::TESTNET);
+  t2.emplace_back(wallet_address.address, expected_amount - 1000, cryptonote::network_type::FAKECHAIN);
   EXPECT_FALSE(sqliteDB.save_payments(expected_payout, t2));
 
   // Pay the amount back out and expect the database to be empty
   std::vector<cryptonote::batch_sn_payment> t3;
-  t3.emplace_back(wallet_address.address, expected_amount, cryptonote::network_type::TESTNET);
+  t3.emplace_back(wallet_address.address, expected_amount, cryptonote::network_type::FAKECHAIN);
   success = sqliteDB.save_payments(expected_payout, t3);
   EXPECT_TRUE(success);
   EXPECT_EQ(sqliteDB.batching_count(), 0);
