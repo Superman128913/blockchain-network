@@ -372,6 +372,8 @@ namespace cryptonote { namespace rpc {
     res.top_block_hash = tools::type_to_hex(top_hash);
     res.target_height = m_core.get_target_blockchain_height();
 
+    res.hard_fork = m_core.get_blockchain_storage().get_network_version();
+
     bool next_block_is_pulse = false;
     if (pulse::timings t; pulse::get_round_timings(m_core.get_blockchain_storage(), res.height, prev_ts, t)) {
       res.pulse_ideal_timestamp = tools::to_seconds(t.ideal_timestamp.time_since_epoch());
