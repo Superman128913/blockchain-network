@@ -184,25 +184,21 @@ namespace cryptonote {
 
     const auto& conf = get_config(m_nettype);
 
-    auto select_payments = prepared_st(
-      "SELECT address, amount FROM batched_payments_accrued WHERE amount > ? ORDER BY address ASC");
-
-    select_payments->bind(1, static_cast<int64_t>(conf.MIN_BATCH_PAYMENT_AMOUNT * 1000));
+    auto select_payments = prepared_bind(
+      "SELECT address, amount FROM batched_payments_accrued WHERE amount > ? ORDER BY address ASC",
+      static_cast<int64_t>(conf.MIN_BATCH_PAYMENT_AMOUNT * 1000));
 
     std::vector<cryptonote::batch_sn_payment> payments;
 
-    std::string address;
-    uint64_t amount;
     while (select_payments->executeStep()) {
-      auto [addr, amt] = db::get<std::string, int64_t>(select_payments);
-      address = std::move(addr);
-      amount = static_cast<uint64_t>(amt / 1000);
+      auto [address, amt] = db::get<std::string, int64_t>(select_payments);
+      auto amount = static_cast<uint64_t>(amt / 1000);
       if (cryptonote::is_valid_address(address, m_nettype)) {
         cryptonote::address_parse_info addr_info {};
         cryptonote::get_account_address_from_str(addr_info, m_nettype, address);
         uint64_t next_payout_height = addr_info.address.next_payout_height(block_height - 1, conf.BATCHING_INTERVAL);
         if (block_height == next_payout_height) {
-          payments.emplace_back(address, amount, m_nettype);
+          payments.emplace_back(std::move(address), amount, m_nettype);
         }
       } else {
         MERROR("Invalid address returned from batching database: " << address);
@@ -512,9 +508,9 @@ namespace cryptonote {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__ << " Called with height: " << block_height);
 
     std::vector<cryptonote::batch_sn_payment> payments_at_height;
-    auto st = prepared_st(
-      "SELECT address, amount FROM batched_payments_paid WHERE height_paid = ? ORDER BY address");
-    bind_oneshot(st, static_cast<int64_t>(block_height));
+    auto st = prepared_bind(
+      "SELECT address, amount FROM batched_payments_paid WHERE height_paid = ? ORDER BY address",
+      static_cast<int64_t>(block_height));
     while (st->executeStep()) {
       auto [addr, amt] = db::get<std::string, int64_t>(st);
       payments_at_height.emplace_back(std::move(addr), static_cast<uint64_t>(amt), m_nettype);

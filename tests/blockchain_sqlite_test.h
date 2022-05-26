@@ -15,8 +15,10 @@ public:
 
   BlockchainSQLiteTest(BlockchainSQLiteTest &other)
     : BlockchainSQLiteTest(other.m_nettype, check_if_copy_filename(other.filename)) {
-    auto all_payments_accrued = db::get_all<std::string, int64_t>(prepared_st("SELECT address, amount FROM batched_payments_accrued"));
-    auto all_payments_paid = db::get_all<std::string, int64_t, int64_t>(prepared_st("SELECT address, amount, height_paid FROM batched_payments_raw"));
+    auto all_payments_accrued = db::get_all<std::string, int64_t>(
+            other.prepared_st("SELECT address, amount FROM batched_payments_accrued"));
+    auto all_payments_paid = db::get_all<std::string, int64_t, int64_t>(
+            other.prepared_st("SELECT address, amount, height_paid FROM batched_payments_raw"));
 
     SQLite::Transaction transaction {
       db,

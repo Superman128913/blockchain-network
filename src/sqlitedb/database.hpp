@@ -228,9 +228,24 @@ namespace db
 
    public:
 
+    /// Prepares a query, caching it, and returns a wrapper that automatically resets the prepared
+    /// statement on destruction.
     StatementWrapper
     prepared_st(const std::string& query);
 
+    /// Prepares (with caching) and binds a query, returning the active statement handle.  Like
+    /// `prepared_st` the wrapper resets the prepared statement on destruction.
+    template <typename... T>
+    StatementWrapper
+    prepared_bind(const std::string& query, const T&... bind)
+    {
+      auto st = prepared_st(query);
+      bind_oneshot(st, bind...);
+      return st;
+    }
+
+    /// Prepares (with caching) a query and then executes it, optionally binding the given
+    /// parameters when executing.
     template <typename... T>
     int
     prepared_exec(const std::string& query, const T&... bind)
@@ -238,6 +253,8 @@ namespace db
       return exec_query(prepared_st(query), bind...);
     }
 
+    /// Prepares (with caching) a query that returns a single row (with optional bind parameters),
+    /// executes it, and returns the value.  Throws if the query returns 0 or more than 1 rows.
     template <typename... T, typename... Bind>
     auto
     prepared_get(const std::string& query, const Bind&... bind)
@@ -245,6 +262,9 @@ namespace db
       return exec_and_get<T...>(prepared_st(query), bind...);
     }
 
+    /// Prepares (with caching) a query that returns at most a single row (with optional bind
+    /// parameters), executes it, and returns the value or nullopt if the query returned no rows.
+    /// Throws if the query returns more than 1 rows.
     template <typename... T, typename... Bind>
     auto
     prepared_maybe_get(const std::string& query, const Bind&... bind)
