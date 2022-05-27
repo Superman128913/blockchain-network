@@ -37,7 +37,7 @@
 #include "common/oxen.h"
 #include "common/util.h"
 #include "epee/net/local_ip.h"
-#include <boost/endian/conversion.hpp>
+#include <oxenc/endian.h>
 
 #undef OXEN_DEFAULT_LOG_CATEGORY
 #define OXEN_DEFAULT_LOG_CATEGORY "quorum_cop"
@@ -127,7 +127,7 @@ namespace service_nodes
     }
 
     // TODO: perhaps come back and make this activate on some "soft fork" height before HF19?
-    if (!lokinet_reachable && hf_version >= hf::hf19)
+    if (!lokinet_reachable && hf_version >= hf::hf19_reward_batching)
     {
       LOG_PRINT_L1("Service Node lokinet is not reachable for node: " << pubkey);
       result.lokinet_reachable = false;
@@ -748,7 +748,7 @@ namespace service_nodes
         std::memcpy(local.data(), pkdata + offset, prewrap);
         std::memcpy(local.data() + prewrap, pkdata, sizeof(uint64_t) - prewrap);
       }
-      sum += boost::endian::little_to_native(*reinterpret_cast<uint64_t *>(local.data()));
+      sum += oxenc::little_to_host(*reinterpret_cast<uint64_t *>(local.data()));
       ++offset;
     }
     return sum;

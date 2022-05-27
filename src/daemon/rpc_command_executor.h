@@ -186,6 +186,8 @@ public:
   bool print_sr(uint64_t height);
 
   bool prepare_registration(bool force_registration=false);
+  // TODO FIXME: remove immediately after HF19 happens
+  bool prepare_registration_hf18(cryptonote::hf hf_version, bool force_registration);
 
   bool print_sn(const std::vector<std::string> &args);
 

@@ -1424,7 +1424,7 @@ round_state send_block_template(round_context &context, void *quorumnet_state, s
   cryptonote::block block = {};
   {
     uint64_t height                              = 0;
-    service_nodes::payout block_producer_payouts = service_nodes::service_node_info_to_payout(key.pub, *info);
+    service_nodes::payout block_producer_payouts = service_nodes::service_node_payout_portions(key.pub, *info);
     if (!blockchain.create_next_pulse_block_template(block,
                                                      block_producer_payouts,
                                                      context.prepare_for_round.round,

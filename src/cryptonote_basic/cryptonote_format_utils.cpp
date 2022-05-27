@@ -35,6 +35,7 @@
 #include <oxenc/hex.h>
 #include <variant>
 #include "common/hex.h"
+#include "cryptonote_core/service_node_list.h"
 #include "epee/wipeable_string.h"
 #include "epee/string_tools.h"
 #include "common/i18n.h"
@@ -700,36 +701,22 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------
-  bool add_service_node_register_to_tx_extra(
-      std::vector<uint8_t>& tx_extra,
-      const std::vector<cryptonote::account_public_address>& addresses,
-      uint64_t portions_for_operator,
-      const std::vector<uint64_t>& portions,
-      uint64_t expiration_timestamp,
-      const crypto::signature& service_node_signature)
+  bool add_service_node_registration_to_tx_extra(std::vector<uint8_t>& tx_extra, const service_nodes::registration_details& reg)
   {
-    if (addresses.size() != portions.size())
+    tx_extra_field field;
+    auto& txreg = field.emplace<tx_extra_service_node_register>();
+    txreg.amounts.reserve(reg.reserved.size());
+    txreg.public_spend_keys.reserve(reg.reserved.size());
+    txreg.public_view_keys.reserve(reg.reserved.size());
+    for (const auto& [addr, amount] : reg.reserved)
     {
-      LOG_ERROR("Tried to serialize registration with more addresses than portions, this should never happen");
-      return false;
+      txreg.public_spend_keys.push_back(addr.m_spend_public_key);
+      txreg.public_view_keys.push_back(addr.m_view_public_key);
+      txreg.amounts.push_back(amount);
     }
-    std::vector<crypto::public_key> public_view_keys(addresses.size());
-    std::vector<crypto::public_key> public_spend_keys(addresses.size());
-    for (size_t i = 0; i < addresses.size(); i++)
-    {
-      public_view_keys[i] = addresses[i].m_view_public_key;
-      public_spend_keys[i] = addresses[i].m_spend_public_key;
-    }
-    // convert to variant
-    tx_extra_field field =
-      tx_extra_service_node_register{
-        public_spend_keys,
-        public_view_keys,
-        portions_for_operator,
-        portions,
-        expiration_timestamp,
-        service_node_signature
-      };
+    txreg.fee = reg.fee;
+    txreg.hf_or_expiration = reg.hf;
+    txreg.signature = reg.signature;
 
     bool r = add_tx_extra_field_to_tx_extra(tx_extra, field);
     CHECK_AND_NO_ASSERT_MES_L1(r, false, "failed to serialize tx extra registration tx");
@@ -873,7 +860,7 @@ namespace cryptonote
     {
       CHECK_AND_ASSERT_MES(b.miner_tx.vin.size() == 1, 0, "wrong miner tx in block: " << get_block_hash(b) << ", b.miner_tx.vin.size() != 1 (size is: " << b.miner_tx.vin.size() << ")");
       CHECKED_GET_SPECIFIC_VARIANT(b.miner_tx.vin[0], txin_gen, coinbase_in, 0);
-      if (b.major_version >= hf::hf19)
+      if (b.major_version >= hf::hf19_reward_batching)
       {
         CHECK_AND_ASSERT_MES(coinbase_in.height == b.height, 0, "wrong miner tx in block: " << get_block_hash(b));
       }
@@ -1311,38 +1298,6 @@ namespace cryptonote
       *blob_size = t.blob_size;
     }
 
-    return true;
-  }
-  //---------------------------------------------------------------
-  bool get_registration_hash(const std::vector<cryptonote::account_public_address>& addresses, uint64_t operator_portions, const std::vector<uint64_t>& portions, uint64_t expiration_timestamp, crypto::hash& hash)
-  {
-    if (addresses.size() != portions.size())
-    {
-      LOG_ERROR("get_registration_hash addresses.size() != portions.size()");
-      return false;
-    }
-    uint64_t portions_left = old::STAKING_PORTIONS;
-    for (uint64_t portion : portions)
-    {
-      if (portion > portions_left)
-      {
-        LOG_ERROR(tr("Your registration has more than ") << old::STAKING_PORTIONS << tr(" portions, this registration is invalid!"));
-        return false;
-      }
-      portions_left -= portion;
-    }
-    size_t size = sizeof(uint64_t) + addresses.size() * (sizeof(cryptonote::account_public_address) + sizeof(uint64_t)) + sizeof(uint64_t);
-    std::string buffer;
-    buffer.reserve(size);
-    buffer += tools::view_guts(operator_portions);
-    for (size_t i = 0; i < addresses.size(); i++)
-    {
-      buffer += tools::view_guts(addresses[i]);
-      buffer += tools::view_guts(portions[i]);
-    }
-    buffer += tools::view_guts(expiration_timestamp);
-    assert(buffer.size() == size);
-    crypto::cn_fast_hash(buffer.data(), buffer.size(), hash);
     return true;
   }
   //---------------------------------------------------------------

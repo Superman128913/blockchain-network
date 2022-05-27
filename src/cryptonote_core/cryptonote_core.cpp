@@ -30,7 +30,6 @@
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #include <boost/algorithm/string.hpp>
-#include <boost/endian/conversion.hpp>
 
 #include "epee/string_tools.h"
 
@@ -2290,7 +2289,8 @@ namespace cryptonote
 
           m_service_node_list.for_each_service_node_info_and_proof(sn_pks.begin(), sn_pks.end(), [&](auto& pk, auto& sni, auto& proof) {
             if (pk != m_service_keys.pub && proof.proof->public_ip == m_sn_public_ip &&
-                (proof.proof->qnet_port == m_quorumnet_port || proof.proof->storage_https_port == storage_https_port() || proof.proof->storage_omq_port == storage_omq_port()))
+                (proof.proof->qnet_port == m_quorumnet_port || (
+                    m_nettype != network_type::DEVNET && (proof.proof->storage_https_port == storage_https_port() || proof.proof->storage_omq_port == storage_omq_port()))))
             MGINFO_RED(
                 "Another service node (" << pk << ") is broadcasting the same public IP and ports as this service node (" <<
                 epee::string_tools::get_ip_string_from_int32(m_sn_public_ip) << ":" << proof.proof->qnet_port << "[qnet], :" <<

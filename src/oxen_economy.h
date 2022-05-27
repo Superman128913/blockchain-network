@@ -54,8 +54,9 @@ inline constexpr size_t MAX_CONTRIBUTORS_HF19 = 10;
 // Max contributors before HF19:
 inline constexpr size_t MAX_CONTRIBUTORS_V1 = 4;
 
-// Required operator contribution is 1/4 of the staking requirement
-inline constexpr uint64_t MINIMUM_OPERATOR_DIVISOR = 4;
+// Required operator contribution is 1/4 of the staking requirement:
+inline constexpr uint64_t MINIMUM_OPERATOR_CONTRIBUTION = STAKING_REQUIREMENT / 4;
+inline constexpr uint64_t MINIMUM_OPERATOR_CONTRIBUTION_TESTNET = STAKING_REQUIREMENT_TESTNET / 4;
 
 
 // -------------------------------------------------------------------------------------------------

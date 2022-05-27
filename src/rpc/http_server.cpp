@@ -2,7 +2,6 @@
 #include "http_server.h"
 #include <chrono>
 #include <exception>
-#include <boost/endian/conversion.hpp>
 #include <oxenmq/variant.h>
 #include "common/command_line.h"
 #include "common/string_util.h"

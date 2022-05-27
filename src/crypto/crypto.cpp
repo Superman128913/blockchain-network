@@ -284,7 +284,7 @@ namespace crypto {
     ec_point Y;
   };
 
-  void generate_signature(const hash &prefix_hash, const public_key &pub, const secret_key &sec, signature &sig) {
+  signature generate_signature(const hash &prefix_hash, const public_key &pub, const secret_key &sec) {
     ge_p3 tmp3;
     ec_scalar k;
     s_comm buf;
@@ -300,6 +300,7 @@ namespace crypto {
 #endif
     buf.h = prefix_hash;
     buf.key = pub;
+    signature sig;
   try_again:
     random_scalar(k);
     ge_scalarmult_base(&tmp3, &k);
@@ -311,6 +312,11 @@ namespace crypto {
     if (!sc_isnonzero((const unsigned char*)sig.r.data))
       goto try_again;
     memwipe(&k, sizeof(k));
+    return sig;
+  }
+
+  void generate_signature(const hash &prefix_hash, const public_key &pub, const secret_key &sec, signature &sig) {
+    sig = generate_signature(prefix_hash, pub, sec);
   }
 
   static constexpr ec_point infinity = {{ 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};

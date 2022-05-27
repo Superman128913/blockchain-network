@@ -473,7 +473,7 @@ bool oxen_core_block_reward_unpenalized_pre_pulse::generate(std::vector<test_eve
 
 bool oxen_core_block_reward_unpenalized_post_pulse::generate(std::vector<test_event_entry>& events)
 {
-  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::hf_prev(hf::hf19), 150 /*Proof Of Stake Delay*/);
+  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::hf_prev(hf::hf19_reward_batching), 150 /*Proof Of Stake Delay*/);
   oxen_chain_generator gen(events, hard_forks);
 
   const auto newest_hf = hard_forks.back().version;
@@ -2791,6 +2791,7 @@ bool oxen_service_nodes_test_rollback::generate(std::vector<test_event_entry>& e
     gen.create_and_add_next_block({tx});
   }
 
+
   fork.add_n_blocks(3); /// create blocks on the alt chain and trigger chain switch
   fork.add_n_blocks(15); // create a few more blocks to test winner selection
   oxen_register_callback(events, "test_registrations", [&events, deregister_index, reg_evnt_idx](cryptonote::core &c, size_t ev_index)
@@ -2985,10 +2986,9 @@ bool oxen_service_nodes_insufficient_contribution::generate(std::vector<test_eve
   gen.create_and_add_next_block({tx0});
   gen.add_transfer_unlock_blocks();
 
-  uint64_t operator_portions = cryptonote::old::STAKING_PORTIONS / 2;
-  uint64_t remaining_portions = cryptonote::old::STAKING_PORTIONS - operator_portions;
+  uint64_t operator_amt = oxen::STAKING_REQUIREMENT_TESTNET / 2;
   cryptonote::keypair sn_keys{hw::get_device("default")};
-  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_portions);
+  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_amt);
   gen.add_tx(register_tx);
   gen.create_and_add_next_block({register_tx});
   gen.add_transfer_unlock_blocks();
@@ -3012,7 +3012,7 @@ bool oxen_service_nodes_insufficient_contribution::generate(std::vector<test_eve
 
 bool oxen_service_nodes_insufficient_contribution_HF18::generate(std::vector<test_event_entry> &events)
 {
-  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::hf_prev(hf::hf19));
+  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::hf::hf18);
   oxen_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().version);
@@ -3023,13 +3023,12 @@ bool oxen_service_nodes_insufficient_contribution_HF18::generate(std::vector<tes
   gen.create_and_add_next_block({tx0});
   gen.add_transfer_unlock_blocks();
 
-  uint64_t operator_portions = cryptonote::old::STAKING_PORTIONS / oxen::MAX_CONTRIBUTORS_V1;
-  uint64_t operator_amount = service_nodes::get_staking_requirement(cryptonote::network_type::FAKECHAIN, hard_forks.back().height) / oxen::MAX_CONTRIBUTORS_V1;
-  uint64_t remaining_portions = cryptonote::old::STAKING_PORTIONS - operator_portions;
-  uint64_t single_portion_illegal_HF18_legal_HF19 = remaining_portions / (oxen::MAX_CONTRIBUTORS_HF19 - 1);
-  uint64_t single_contributed_amount = (service_nodes::get_staking_requirement(cryptonote::network_type::FAKECHAIN, hard_forks.back().height) - operator_amount) / (oxen::MAX_CONTRIBUTORS_HF19 - 1);
+  uint64_t operator_amount = oxen::MINIMUM_OPERATOR_CONTRIBUTION_TESTNET;
+  uint64_t remaining_amount = oxen::STAKING_REQUIREMENT_TESTNET - operator_amount;
+  // This amount is too small under HF18 rules:
+  uint64_t single_contributed_amount = remaining_amount / (oxen::MAX_CONTRIBUTORS_HF19 - 1);
   cryptonote::keypair sn_keys{hw::get_device("default")};
-  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_portions);
+  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_amount);
   gen.add_tx(register_tx);
   gen.create_and_add_next_block({register_tx});
   gen.add_transfer_unlock_blocks();
@@ -3038,9 +3037,9 @@ bool oxen_service_nodes_insufficient_contribution_HF18::generate(std::vector<tes
   cryptonote::transaction stake = gen.create_and_add_staking_tx(sn_keys.pub, alice, single_contributed_amount);
   gen.create_and_add_next_block({stake});
 
-  oxen_register_callback(events, "test_insufficient_stake_does_not_get_accepted", [sn_keys, operator_amount](cryptonote::core &c, size_t ev_index)
+  oxen_register_callback(events, "test_insufficient_HF18_stake_does_not_get_accepted", [sn_keys, operator_amount](cryptonote::core &c, size_t ev_index)
   {
-    DEFINE_TESTS_ERROR_CONTEXT("test_insufficient_stake_does_not_get_accepted");
+    DEFINE_TESTS_ERROR_CONTEXT("test_insufficient_HF18_stake_does_not_get_accepted");
     const auto sn_list = c.get_service_node_list_state({sn_keys.pub});
     CHECK_TEST_CONDITION(sn_list.size() == 1);
     CHECK_TEST_CONDITION(sn_list[0].info->contributors.size() == 1);
@@ -3055,7 +3054,7 @@ bool oxen_service_nodes_insufficient_contribution_HF18::generate(std::vector<tes
 
 bool oxen_service_nodes_sufficient_contribution_HF19::generate(std::vector<test_event_entry> &events)
 {
-  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::hf::hf19);
+  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::hf::hf19_reward_batching);
   oxen_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().version);
@@ -3066,14 +3065,13 @@ bool oxen_service_nodes_sufficient_contribution_HF19::generate(std::vector<test_
   gen.create_and_add_next_block({tx0});
   gen.add_transfer_unlock_blocks();
 
-  uint64_t operator_portions = cryptonote::old::STAKING_PORTIONS / oxen::MAX_CONTRIBUTORS_V1;
-  uint64_t operator_amount = service_nodes::get_staking_requirement(cryptonote::network_type::FAKECHAIN, hard_forks.back().height) / oxen::MAX_CONTRIBUTORS_V1;
-  uint64_t remaining_portions = cryptonote::old::STAKING_PORTIONS - operator_portions;
-  uint64_t single_portion_illegal_HF18_legal_HF19 = remaining_portions / (oxen::MAX_CONTRIBUTORS_HF19 - 1);
-  uint64_t single_contributed_amount = (service_nodes::get_staking_requirement(cryptonote::network_type::FAKECHAIN, hard_forks.back().height) - operator_amount) / (oxen::MAX_CONTRIBUTORS_HF19 - 1);
+  uint64_t operator_amount = oxen::MINIMUM_OPERATOR_CONTRIBUTION_TESTNET;
+  uint64_t remaining_amount = oxen::STAKING_REQUIREMENT_TESTNET - operator_amount;
+  // This amount is too small under HF18 rules, but is accepted under HF19:
+  uint64_t single_contributed_amount = remaining_amount / (oxen::MAX_CONTRIBUTORS_HF19 - 1);
   uint64_t total_amount = operator_amount + single_contributed_amount;
   cryptonote::keypair sn_keys{hw::get_device("default")};
-  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_portions);
+  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_amount);
   gen.add_tx(register_tx);
   gen.create_and_add_next_block({register_tx});
 
@@ -3098,16 +3096,15 @@ bool oxen_service_nodes_sufficient_contribution_HF19::generate(std::vector<test_
 
 bool oxen_service_nodes_insufficient_operator_contribution_HF19::generate(std::vector<test_event_entry> &events)
 {
-  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::hf::hf19);
+  auto hard_forks = oxen_generate_hard_fork_table(cryptonote::hf::hf19_reward_batching);
   oxen_chain_generator gen(events, hard_forks);
 
   gen.add_blocks_until_version(hard_forks.back().version);
   gen.add_mined_money_unlock_blocks();
 
-  uint64_t operator_portions = cryptonote::old::STAKING_PORTIONS / oxen::MAX_CONTRIBUTORS_HF19;
-  uint64_t operator_amount = service_nodes::get_staking_requirement(cryptonote::network_type::FAKECHAIN, hard_forks.back().height) / oxen::MAX_CONTRIBUTORS_HF19;
+  uint64_t operator_amount = oxen::MINIMUM_OPERATOR_CONTRIBUTION_TESTNET - 1;
   cryptonote::keypair sn_keys{hw::get_device("default")};
-  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_portions);
+  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_amount);
   gen.add_tx(register_tx);
   gen.create_and_add_next_block({register_tx});
 
@@ -3722,7 +3719,7 @@ bool oxen_batch_sn_rewards_pop_blocks::generate(std::vector<test_event_entry> &e
       CHECK_EQ((*records).size(), 1);
       // Check that the database has a lower amount that does not include the popped block
       batched_rewards_earned = MK_COINS(1) * 16.5 * (more_blocks - conf.SERVICE_NODE_PAYABLE_AFTER_BLOCKS - 1);
-      CHECK_EQ((*records)[0].amount, batched_rewards_earned);
+      CHECK_EQ((*records)[0].amount, batched_rewards_earned * cryptonote::BATCH_REWARD_FACTOR);
       CHECK_EQ(tools::view_guts((*records)[0].address_info.address), tools::view_guts(alice.get_keys().m_account_address));
     }
     else
@@ -3797,20 +3794,20 @@ bool oxen_batch_sn_rewards_pop_blocks_after_big_cycle::generate(std::vector<test
     cryptonote::Blockchain& blockchain = c.get_blockchain_storage();
     uint64_t curr_height = blockchain.get_current_blockchain_height();
     auto sqliteDB = blockchain.sqlite_db();
-    CHECK_EQ((*sqliteDB).height, curr_height - 1);
+    CHECK_EQ(sqliteDB->height, curr_height - 1);
 
     blockchain.pop_blocks(conf.BATCHING_INTERVAL * 3 + 1);
 
 
-    CHECK_EQ((*sqliteDB).height + 1, blockchain.get_current_blockchain_height());
-    CHECK_EQ((*sqliteDB).height + 1, curr_height - conf.BATCHING_INTERVAL * 3 - 1);
+    CHECK_EQ(sqliteDB->height + 1, blockchain.get_current_blockchain_height());
+    CHECK_EQ(sqliteDB->height + 1, curr_height - conf.BATCHING_INTERVAL * 3 - 1);
 
     curr_height = blockchain.get_current_blockchain_height();
 
-    auto records = (*sqliteDB).get_sn_payments(curr_height);
-    CHECK_EQ((*records).size(), 1);
-    CHECK_EQ((*records)[0].amount, amount);
-    CHECK_EQ(tools::view_guts((*records)[0].address_info.address), tools::view_guts(alice.get_keys().m_account_address));
+    auto records = sqliteDB->get_sn_payments(curr_height);
+    CHECK_EQ(records.size(), 1);
+    CHECK_EQ(records[0].amount, amount * cryptonote::BATCH_REWARD_FACTOR);
+    CHECK_EQ(tools::view_guts(records[0].address_info.address), tools::view_guts(alice.get_keys().m_account_address));
 
     return true;
   });

@@ -111,6 +111,16 @@ namespace hashkey {
 // service node.
 using MAXIMUM_ACCEPTABLE_STAKE = std::ratio<101, 100>;
 
+// In HF19+ registrations the fee amount is a relative value out of this (for older registrations
+// the fee is a portion, i.e. value out of old::STAKING_PORTIONS).  For example a registration fee
+// value of 1000 corresponds to 1000/10000 = 10%.  This also implicitly defines the maximum
+// precision of HF19+ registrations (i.e. to a percentage with two decimal places of precision).
+inline constexpr uint64_t STAKING_FEE_BASIS = 10'000;
+
+// We calculate and store batch rewards in thousanths of atomic OXEN, to reduce the size of errors
+// from integer division of rewards.
+constexpr uint64_t BATCH_REWARD_FACTOR = 1000;
+
 
 // see src/cryptonote_protocol/levin_notify.cpp
 inline constexpr auto     NOISE_MIN_EPOCH   = 5min;
@@ -190,7 +200,7 @@ enum class hf : uint8_t
     hf16_pulse,
     hf17,
     hf18,
-    hf19,
+    hf19_reward_batching,
 
     _next,
     none = 0
@@ -202,6 +212,10 @@ constexpr auto hf_prev(hf x) {
     if (x <= hf::hf7 || x > hf_max) return hf::none;
     return static_cast<hf>(static_cast<uint8_t>(x) - 1);
 }
+
+// This is here to make sure the numeric value of the top hf enum value is correct (i.e.
+// hf19_reward_batching == 19 numerically); bump this when adding a new hf.
+static_assert(static_cast<uint8_t>(hf_max) == 19);
 
 // Constants for which hardfork activates various features:
 namespace feature {
@@ -380,7 +394,7 @@ namespace config
     inline constexpr uint16_t ZMQ_RPC_DEFAULT_PORT = 38858;
     inline constexpr uint16_t QNET_DEFAULT_PORT = 38859;
     inline constexpr boost::uuids::uuid const NETWORK_ID = { {
-        0xa9, 0xf7, 0x5c, 0x7d, 0x55, 0x17, 0xcb, 0x6b, 0x5b, 0xf4, 0x63, 0x79, 0x7a, 0x57, 0xab, 0xd3
+        0xa9, 0xf7, 0x5c, 0x7d, 0x55, 0x17, 0xcb, 0x6b, 0x5b, 0xf4, 0x63, 0x79, 0x7a, 0x57, 0xab, 0xd4
       } };
     inline constexpr std::string_view GENESIS_TX = "04011e1e01ff00018080c9db97f4fb2702fa27e905f604faa4eb084ee675faca77b0cfea9adec1526da33cae5e286f31624201dae05bf3fa1662b7fd373c92426763d921cf3745e10ee43edb510f690c656f247200000000000000000000000000000000000000000000000000000000000000000000"sv;
     inline constexpr uint32_t GENESIS_NONCE = 12345;

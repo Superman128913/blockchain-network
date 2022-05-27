@@ -2,6 +2,7 @@
 
 #include "crypto/crypto.h"
 #include "cryptonote_config.h"
+#include "oxen_economy.h"
 #include "service_node_voting.h"
 #include <chrono>
 
@@ -240,14 +241,9 @@ namespace service_nodes {
   //If the below percentage of service nodes are out of sync we will consider our clock out of sync
   inline constexpr uint8_t MAXIMUM_EXTERNAL_OUT_OF_SYNC = 80;
 
-  //The SN operator must contribute more than 25% of the nodes requirements
-  inline constexpr uint64_t MINIMUM_OPERATOR_PORTION = cryptonote::old::STAKING_PORTIONS / oxen::MINIMUM_OPERATOR_DIVISOR;
-
-  // In HF19 we allow some "fuzz" in the staking portion requirements of up to this much.  (These
-  // are portions; with a 15k OXEN staking requirement, 1 nanoOXEN =~ 1.23 million portions).  This
-  // allows us to not have to worry about making slight shifts in the staked amounts to ensure the
-  // staking portion doesn't fall below the required threshold.
-  inline constexpr uint64_t PORTION_FUZZ = 20;
+  // The SN operator must contribute at least 25% of the node's requirement, expressed as portions
+  // (for pre-HF19 registrations).
+  inline constexpr uint64_t MINIMUM_OPERATOR_PORTION = cryptonote::old::STAKING_PORTIONS / oxen::MAX_CONTRIBUTORS_V1;
 
 static_assert(cryptonote::old::STAKING_PORTIONS != UINT64_MAX, "UINT64_MAX is used as the invalid value for failing to calculate the min_node_contribution");
 // return: UINT64_MAX if (num_contributions > the max number of contributions), otherwise the amount in oxen atomic units
@@ -263,19 +259,38 @@ uint64_t get_min_node_contribution_in_portions(cryptonote::hf version, uint64_t 
 // available contribution room, which allows slight overstaking but disallows larger overstakes.
 uint64_t get_max_node_contribution(cryptonote::hf version, uint64_t staking_requirement, uint64_t total_reserved);
 
+// Returns the staking requirement at the given height; since HF16 (and always on testnet/devnet)
+// this is fixed, but before HF16 on mainnet this is height-dependent.
 uint64_t get_staking_requirement(cryptonote::network_type nettype, uint64_t height);
+
+// Return the (fixed) staking requirement for a hardfork.  This is only valid for hardfork 16+ as
+// earlier hardforks had a height-dependent staking requirement.
+uint64_t get_staking_requirement(cryptonote::network_type nettype, cryptonote::hf hardfork);
 
 uint64_t portions_to_amount(uint64_t portions, uint64_t staking_requirement);
 
-/// Check if portions are sufficiently large (provided the contributions
-/// are made in the specified order) and don't exceed the required amount
-bool check_service_node_portions(cryptonote::hf version, const std::vector<uint64_t>& portions);
+/// Check if portions (for pre-HF19 regisrations) are sufficiently large (provided the contributions
+/// are made in the specified order) and don't exceed the required amount.  Note that this *always*
+/// enforces a limit of 4 contributors, even when under HF19+; registrations with more spots must
+/// use HF19+ registrations with amounts instead of portions.
+bool check_service_node_portions(
+    cryptonote::hf version,
+    const std::vector<std::pair<cryptonote::account_public_address, uint64_t>>& portions);
+
+/// Check service node contribution amounts, for HF19+ registrations
+bool check_service_node_stakes(
+    cryptonote::hf hf_version,
+    cryptonote::network_type nettype,
+    uint64_t staking_requirement,
+    const std::vector<std::pair<cryptonote::account_public_address, uint64_t>>& stakes);
 
 crypto::hash generate_request_stake_unlock_hash(uint32_t nonce);
 uint64_t     get_locked_key_image_unlock_height(cryptonote::network_type nettype, uint64_t node_register_height, uint64_t curr_height);
 
 // Returns lowest x such that (staking_requirement * x/STAKING_PORTIONS) >= amount
 uint64_t get_portions_to_make_amount(uint64_t staking_requirement, uint64_t amount, uint64_t max_portions = cryptonote::old::STAKING_PORTIONS);
+
+std::optional<double> parse_fee_percent(std::string_view fee);
 
 bool get_portions_from_percent_str(std::string cut_str, uint64_t& portions);
 

@@ -221,9 +221,9 @@ bool gen_block_no_miner_tx::generate(std::vector<test_event_entry>& events) cons
                           0,                                                                                           \
                           TX,                                                                                          \
                           cryptonote::oxen_miner_tx_context::miner_block(cryptonote::network_type::FAKECHAIN, miner_account.get_keys().m_account_address), \
-                          std::nullopt,                                                                                \
                           {},                                                                                          \
-                          cryptonote::hf::none);                                                                        \
+                          {},                                                                                          \
+                          cryptonote::hf::none);                                                                       \
   if (!r)                                                                                                              \
     return false;
 

@@ -32,7 +32,9 @@
 #include <mutex>
 #include <shared_mutex>
 #include <string_view>
+#include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/hardfork.h"
+#include "cryptonote_config.h"
 #include "serialization/serialization.h"
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 #include "cryptonote_core/service_node_rules.h"
@@ -463,7 +465,7 @@ namespace service_nodes
     bool pop_batching_rewards_block(const cryptonote::block& block);
     void blockchain_detached(uint64_t height, bool by_pop_blocks) override;
     void init() override;
-    bool validate_miner_tx(cryptonote::block const &block, cryptonote::block_reward_parts const &base_reward, std::optional<std::vector<cryptonote::batch_sn_payment>> const &batched_sn_payments) const override;
+    bool validate_miner_tx(const cryptonote::block& block, const cryptonote::block_reward_parts& base_reward, const std::optional<std::vector<cryptonote::batch_sn_payment>>& batched_sn_payments) const override;
     bool alt_block_added(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs, cryptonote::checkpoint_t const *checkpoint) override;
     payout get_block_leader() const { std::lock_guard lock{m_sn_mutex}; return m_state.get_block_leader(); }
     bool is_service_node(const crypto::public_key& pubkey, bool require_active = true) const;
@@ -791,28 +793,42 @@ namespace service_nodes
   bool tx_get_staking_components            (cryptonote::transaction const &tx, staking_components *contribution);
   bool tx_get_staking_components_and_amounts(cryptonote::network_type nettype, cryptonote::hf hf_version, cryptonote::transaction const &tx, uint64_t block_height, staking_components *contribution);
 
-  struct contributor_args_t
-  {
-    bool                                            success;
-    std::vector<cryptonote::account_public_address> addresses;
-    std::vector<uint64_t>                           portions;
-    uint64_t                                        portions_for_operator;
-    std::string                                     err_msg; // if (success == false), this is set to the err msg otherwise empty
+  using contribution = std::pair<cryptonote::account_public_address, uint64_t>;
+  struct registration_details {
+    crypto::public_key service_node_pubkey;
+    std::vector<contribution> reserved;
+    uint64_t fee;
+    uint64_t hf; // expiration timestamp before HF19
+    bool uses_portions; // if true then `hf` is a timestamp
+    crypto::signature signature;
   };
 
-  bool     is_registration_tx   (cryptonote::network_type nettype, cryptonote::hf hf_version, const cryptonote::transaction& tx, uint64_t block_timestamp, uint64_t block_height, uint32_t index, crypto::public_key& key, service_node_info& info);
-  bool     reg_tx_extract_fields(const cryptonote::transaction& tx, contributor_args_t &contributor_args, uint64_t& expiration_timestamp, crypto::public_key& service_node_key, crypto::signature& signature);
+  bool is_registration_tx(
+      cryptonote::network_type nettype,
+      cryptonote::hf hf_version,
+      const cryptonote::transaction& tx,
+      uint64_t block_timestamp,
+      uint64_t block_height,
+      uint32_t index,
+      crypto::public_key& key,
+      service_node_info& info);
+  std::optional<registration_details> reg_tx_extract_fields(const cryptonote::transaction& tx);
   uint64_t offset_testing_quorum_height(quorum_type type, uint64_t height);
 
-  contributor_args_t convert_registration_args(cryptonote::network_type nettype,
-                                               const std::vector<std::string> &args,
-                                               uint64_t staking_requirement,
-                                               cryptonote::hf hf_version);
+  // validate_registration* and convert_registration_args functions throws this on error:
+  struct invalid_registration : std::invalid_argument { using std::invalid_argument::invalid_argument; };
 
-  // validate_contributors_* functions throws invalid_contributions exception
-  struct invalid_contributions : std::invalid_argument { using std::invalid_argument::invalid_argument; };
-  void validate_contributor_args(cryptonote::hf hf_version, contributor_args_t const &contributor_args);
-  void validate_contributor_args_signature(contributor_args_t const &contributor_args, uint64_t const expiration_timestamp, crypto::public_key const &service_node_key, crypto::signature const &signature);
+  // Converts string input values into a partially filled `registration_details`; pubkey and
+  // signature will be defaulted.  Throws invalid_registration on any invalid input.
+  registration_details convert_registration_args(
+      cryptonote::network_type nettype,
+      cryptonote::hf hf_version,
+      const std::vector<std::string>& args,
+      uint64_t staking_requirement);
+
+  void validate_registration(cryptonote::hf hf_version, cryptonote::network_type nettype, uint64_t staking_requirement, uint64_t block_timestamp, const registration_details& registration);
+  void validate_registration_signature(const registration_details& registration);
+  crypto::hash get_registration_hash(const registration_details& registration);
 
   bool make_registration_cmd(cryptonote::network_type nettype,
       cryptonote::hf hf_version,
@@ -836,7 +852,7 @@ namespace service_nodes
   // specified.
   std::vector<crypto::hash> get_pulse_entropy_for_next_block(cryptonote::BlockchainDB const &db, uint8_t pulse_round = 0);
 
-  payout service_node_info_to_payout(crypto::public_key const &key, service_node_info const &info);
+  payout service_node_payout_portions(const crypto::public_key& key, const service_node_info& info);
 
   const static payout_entry null_payout_entry = {cryptonote::null_address, cryptonote::old::STAKING_PORTIONS};
   const static payout null_payout             = {crypto::null_pkey, {null_payout_entry}};

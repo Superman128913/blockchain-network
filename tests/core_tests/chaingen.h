@@ -55,10 +55,13 @@
 #include "cryptonote_core/cryptonote_core.h"
 #include "cryptonote_basic/cryptonote_boost_serialization.h"
 #include "cryptonote_protocol/quorumnet.h"
+#include "oxen_economy.h"
 #include "serialization/boost_std_variant.h"
 #include "serialization/boost_std_optional.h"
 
 #include "blockchain_db/testdb.h"
+
+#include "../blockchain_sqlite_test.h"
 
 #undef OXEN_DEFAULT_LOG_CATEGORY
 #define OXEN_DEFAULT_LOG_CATEGORY "tests.core"
@@ -1379,12 +1382,6 @@ struct oxen_chain_generator_db : public cryptonote::BaseTestDB
   uint64_t height() const override { return blocks.size(); }
 };
 
-struct oxen_service_node_contribution
-{
-    cryptonote::account_public_address contributor;
-    uint64_t                           portions;
-};
-
 enum struct oxen_create_block_type
 {
   automatic,
@@ -1415,7 +1412,7 @@ struct oxen_chain_generator
   service_nodes::service_node_list::state_set                        state_history_;
   uint64_t                                                           last_cull_height_ = 0;
   std::shared_ptr<ons::name_system_db>                               ons_db_ = std::make_shared<ons::name_system_db>();
-  std::unique_ptr<cryptonote::BlockchainSQLiteTest>                  sqlite_db_;
+  std::unique_ptr<test::BlockchainSQLiteTest>                        sqlite_db_;
   oxen_chain_generator_db                                            db_;
   cryptonote::hf                                                     hf_version_ = cryptonote::hf::hf7;
   std::vector<test_event_entry>&                                     events_;
@@ -1424,7 +1421,7 @@ struct oxen_chain_generator
 
   oxen_chain_generator(std::vector<test_event_entry>& events, const std::vector<cryptonote::hard_fork>& hard_forks, std::string first_miner_seed = "");
   oxen_chain_generator(const oxen_chain_generator &other)
-    :tx_table_(other.tx_table_), service_node_keys_(other.service_node_keys_), state_history_(other.state_history_), last_cull_height_(other.last_cull_height_), sqlite_db_(std::make_unique<cryptonote::BlockchainSQLiteTest>(*other.sqlite_db_)),
+    :tx_table_(other.tx_table_), service_node_keys_(other.service_node_keys_), state_history_(other.state_history_), last_cull_height_(other.last_cull_height_), sqlite_db_(std::make_unique<test::BlockchainSQLiteTest>(*other.sqlite_db_)),
   ons_db_(other.ons_db_ ), db_(other.db_), hf_version_(other.hf_version_), events_(other.events_), hard_forks_(other.hard_forks_), first_miner_(other.first_miner_) {};
 
   uint64_t                                             height()       const { return cryptonote::get_block_height(db_.blocks.back().block); }
@@ -1469,12 +1466,11 @@ struct oxen_chain_generator
 
   // NOTE: Create transactions but don't add to events_
   cryptonote::transaction                              create_tx(const cryptonote::account_base &src, const cryptonote::account_public_address &dest, uint64_t amount, uint64_t fee) const;
-  cryptonote::transaction                              create_registration_tx(const cryptonote::account_base &src,
-                                                                              const cryptonote::keypair &service_node_keys = cryptonote::keypair{hw::get_device("default")},
-                                                                              uint64_t src_portions = cryptonote::old::STAKING_PORTIONS,
-                                                                              uint64_t src_operator_cut = 0,
-                                                                              std::array<oxen_service_node_contribution, 3> const &contributors = {},
-                                                                              int num_contributors = 0) const;
+  cryptonote::transaction                              create_registration_tx(const cryptonote::account_base& src,
+                                                                              const cryptonote::keypair& service_node_keys = cryptonote::keypair{hw::get_device("default")},
+                                                                              uint64_t operator_stake = oxen::STAKING_REQUIREMENT_TESTNET,
+                                                                              uint64_t fee = cryptonote::STAKING_FEE_BASIS,
+                                                                              const std::vector<service_nodes::contribution>& contributors = {}) const;
   cryptonote::transaction                              create_staking_tx     (const crypto::public_key& pub_key, const cryptonote::account_base &src, uint64_t amount) const;
   cryptonote::transaction                              create_state_change_tx(service_nodes::new_state state, const crypto::public_key& pub_key, uint16_t reasons_all, uint16_t reasons_any, uint64_t height = -1, const std::vector<uint64_t>& voters = {}, uint64_t fee = 0) const;
   cryptonote::checkpoint_t                             create_service_node_checkpoint(uint64_t block_height, size_t num_votes) const;

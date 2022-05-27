@@ -32,7 +32,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
-#include <boost/endian/conversion.hpp>
+#include <oxenc/endian.h>
 #include <sodium.h>
 
 #include "common/rules.h"
@@ -309,7 +309,7 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
   uint64_t sqlite_height = 0;
   if (m_sqlite_db)
   {
-    sqlite_height = std::max(hard_fork_begins(m_nettype, hf::hf19).value_or(0) - 1, m_sqlite_db->height + 1);
+    sqlite_height = std::max(hard_fork_begins(m_nettype, hf::hf19_reward_batching).value_or(0) - 1, m_sqlite_db->height + 1);
     start_height_options.push_back(sqlite_height);
   } else {
     if (m_nettype != network_type::FAKECHAIN)
@@ -1320,7 +1320,7 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
   //validate reward
   uint64_t const money_in_use = get_outs_money_amount(b.miner_tx);
   if (b.miner_tx.vout.size() == 0) {
-    if (b.major_version < hf::hf19) {
+    if (b.major_version < hf::hf19_reward_batching) {
       MERROR_VER("miner tx has no outputs");
       return false;
     }
@@ -1354,7 +1354,14 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
   if (!get_oxen_block_reward(median_weight, cumulative_block_weight, already_generated_coins, version, reward_parts, block_reward_context))
     return false;
 
-  auto batched_sn_payments = m_sqlite_db->get_sn_payments(height);
+  std::vector<cryptonote::batch_sn_payment> batched_sn_payments;
+  if (m_sqlite_db)
+  {
+    batched_sn_payments = m_sqlite_db->get_sn_payments(height);
+  } else {
+    if (m_nettype != network_type::FAKECHAIN)
+      throw std::logic_error("Blockchain missing SQLite Database");
+  }
   cryptonote::block bl = b;
   for (ValidateMinerTxHook* hook : m_validate_miner_tx_hooks)
   {
@@ -1362,7 +1369,7 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
       return false;
   }
 
-  if (already_generated_coins != 0 && block_has_governance_output(nettype(), b) && version < hf::hf19)
+  if (already_generated_coins != 0 && block_has_governance_output(nettype(), b) && version < hf::hf19_reward_batching)
   {
     if (version >= hf::hf10_bulletproofs && reward_parts.governance_paid == 0)
     {
@@ -1393,8 +1400,8 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
   // TODO(oxen): eliminate all floating point math in reward calculations.
   uint64_t max_base_reward = reward_parts.governance_paid + 1;
 
-  if (version >= hf::hf19 && batched_sn_payments.has_value()) {
-    max_base_reward += std::accumulate(batched_sn_payments->begin(), batched_sn_payments->end(), uint64_t{0}, [&](auto a, auto b){return a + b.amount;});
+  if (version >= hf::hf19_reward_batching) {
+    max_base_reward += std::accumulate(batched_sn_payments.begin(), batched_sn_payments.end(), uint64_t{0}, [&](auto a, auto b){return a + b.amount;});
   } else {
     max_base_reward += reward_parts.base_miner + reward_parts.service_node_total;
   }
@@ -1408,7 +1415,7 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
     return false;
   }
 
-  if (version < hf::hf19) {
+  if (version < hf::hf19_reward_batching) {
     CHECK_AND_ASSERT_MES(money_in_use >= reward_parts.miner_fee, false, "base reward calculation bug");
     base_reward = money_in_use - reward_parts.miner_fee;
   }
@@ -1642,8 +1649,8 @@ bool Blockchain::create_block_template_internal(block& b, const crypto::hash *fr
   }
 
   // This will check the batching database for who is due to be paid out in this block
-  std::optional<std::vector<cryptonote::batch_sn_payment>> sn_rwds = std::nullopt;
-  if (hf_version >= hf::hf19)
+  std::vector<cryptonote::batch_sn_payment> sn_rwds;
+  if (hf_version >= hf::hf19_reward_batching)
   {
     sn_rwds = m_sqlite_db->get_sn_payments(height); //Rewards to pay out
   }
@@ -4161,7 +4168,7 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
     // this is a cheap test
     // HF19 TODO: after hardfork 19 occurs we can remove the second line of this test:
     if (auto v = get_network_version(blk_height); blk.major_version != v ||
-            (v < hf::hf19 && blk.minor_version < static_cast<uint8_t>(v)))
+            (v < hf::hf19_reward_batching && blk.minor_version < static_cast<uint8_t>(v)))
     {
       LOG_PRINT_L1("Block with id: " << blk_hash << ", has invalid version " << static_cast<int>(blk.major_version) << "." << +blk.minor_version <<
               "; current: " << static_cast<int>(v) << "." << static_cast<int>(v) << " for height " << blk_height);
@@ -4196,7 +4203,7 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
 
     // HF19 TODO: after hardfork 19 occurs we can remove the second line of this test:
     if (blk.major_version != required_major_version ||
-            (blk.major_version < hf::hf19 && blk.minor_version < static_cast<uint8_t>(required_major_version)))
+            (blk.major_version < hf::hf19_reward_batching && blk.minor_version < static_cast<uint8_t>(required_major_version)))
     {
       MGINFO_RED("Block with id: " << blk_hash << ", has invalid version " << static_cast<int>(blk.major_version) << "." << +blk.minor_version <<
               "; current: " << static_cast<int>(required_major_version) << "." << static_cast<int>(required_major_version) << " for height " << blk_height);
@@ -5051,7 +5058,7 @@ bool Blockchain::calc_batched_governance_reward(uint64_t height, uint64_t &rewar
   }
 
   // Constant reward every block at HF19 and batched through service node batching 
-  if (hard_fork_version >= hf::hf19)
+  if (hard_fork_version >= hf::hf19_reward_batching)
   {
     reward = cryptonote::governance_reward_formula(hard_fork_version);
     return true;
@@ -5642,9 +5649,7 @@ void Blockchain::load_compiled_in_block_hashes(const GetCheckpointsCallback& get
 
     if (checkpoints.size() > 4)
     {
-      uint32_t nblocks;
-      std::memcpy(&nblocks, checkpoints.data(), 4);
-      boost::endian::little_to_native_inplace(nblocks);
+      auto nblocks = oxenc::load_little_to_host<uint32_t>(checkpoints.data());
       if (nblocks > (std::numeric_limits<uint32_t>::max() - 4) / sizeof(hash))
       {
         MERROR("Block hash data is too large");

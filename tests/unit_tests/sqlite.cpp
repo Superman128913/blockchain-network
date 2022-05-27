@@ -30,69 +30,68 @@
 
 #include "blockchain_db/sqlite/db_sqlite.h"
 
+#include "../blockchain_sqlite_test.h"
+
 TEST(SQLITE, AddressModulus)
 {
   cryptonote::address_parse_info wallet_address;
   cryptonote::get_account_address_from_str(wallet_address, cryptonote::network_type::TESTNET, "T6TzkJb5EiASaCkcH7idBEi1HSrpSQJE1Zq3aL65ojBMPZvqHNYPTL56i3dncGVNEYCG5QG5zrBmRiVwcg6b1cRM1SRNqbp44");
 
-  EXPECT_TRUE(wallet_address.address.modulus(10) == 0);
-  EXPECT_TRUE(wallet_address.address.modulus(100) == 90);
+  EXPECT_EQ(wallet_address.address.modulus(10), 0);
+  EXPECT_EQ(wallet_address.address.modulus(100), 90);
 
-  EXPECT_TRUE(wallet_address.address.next_payout_height(50, 100) == 90);
-  EXPECT_TRUE(wallet_address.address.next_payout_height(100, 100) == 190);
+  EXPECT_EQ(wallet_address.address.next_payout_height(50, 100), 90);
+  EXPECT_EQ(wallet_address.address.next_payout_height(100, 100), 190);
 }
 
 TEST(SQLITE, AddSNRewards)
 {
-  cryptonote::BlockchainSQLiteTest sqliteDB(cryptonote::network_type::TESTNET, ":memory:");
+  test::BlockchainSQLiteTest sqliteDB(cryptonote::network_type::FAKECHAIN, ":memory:");
 
-  std::cout << "in memory db opened" << std::endl;
-
-  EXPECT_TRUE(sqliteDB.batching_count() == 0);
+  EXPECT_EQ(sqliteDB.batching_count(), 0);
 
   std::vector<cryptonote::batch_sn_payment> t1;
 
   cryptonote::address_parse_info wallet_address;
 
-  cryptonote::get_account_address_from_str(wallet_address, cryptonote::network_type::TESTNET, "T6TzkJb5EiASaCkcH7idBEi1HSrpSQJE1Zq3aL65ojBMPZvqHNYPTL56i3dncGVNEYCG5QG5zrBmRiVwcg6b1cRM1SRNqbp44");
+  cryptonote::get_account_address_from_str(wallet_address, cryptonote::network_type::FAKECHAIN, "LCFxT37LAogDn1jLQKf4y7aAqfi21DjovX9qyijaLYQSdrxY1U5VGcnMJMjWrD9RhjeK5Lym67wZ73uh9AujXLQ1RKmXEyL");
 
-  t1.emplace_back(wallet_address.address, 16500000000/2, cryptonote::network_type::TESTNET);
+  t1.emplace_back(wallet_address.address, 16500000001'789/2, cryptonote::network_type::FAKECHAIN);
 
-  bool success = false; 
-  success = sqliteDB.add_sn_payments(t1); 
+  bool success = false;
+  success = sqliteDB.add_sn_rewards(t1);
   EXPECT_TRUE(success);
 
-  EXPECT_TRUE(sqliteDB.batching_count() == 1);
+  EXPECT_EQ(sqliteDB.batching_count(), 1);
 
-  std::optional<std::vector<cryptonote::batch_sn_payment>> p1;
+  std::vector<cryptonote::batch_sn_payment> p1;
   const auto expected_payout = wallet_address.address.next_payout_height(0, cryptonote::config::BATCHING_INTERVAL);
   p1 = sqliteDB.get_sn_payments(expected_payout - 1);
-  EXPECT_TRUE(p1.has_value());
-  EXPECT_TRUE((*p1).size() == 0);
+  EXPECT_EQ(p1.size(), 0);
 
-  std::optional<std::vector<cryptonote::batch_sn_payment>> p2;
+  std::vector<cryptonote::batch_sn_payment> p2;
   p2 = sqliteDB.get_sn_payments(expected_payout);
-  EXPECT_TRUE(p2.has_value());
-  EXPECT_TRUE((*p2).size() == 1);
-  uint64_t expected_amount = (16500000000/2);
-  EXPECT_TRUE((*p2)[0].amount == expected_amount);
+  EXPECT_EQ(p2.size(), 1);
+  // We shouldn't get a fractional atomic OXEN amount in the payment amount:
+  uint64_t expected_amount = 8250000000'000;
+  EXPECT_EQ(p2[0].amount, expected_amount);
 
   // Pay an amount less than the database expects and test for failure
   std::vector<cryptonote::batch_sn_payment> t2;
-  t2.emplace_back(wallet_address.address, expected_amount - 1, cryptonote::network_type::TESTNET);
+  t2.emplace_back(wallet_address.address, expected_amount - 1000, cryptonote::network_type::FAKECHAIN);
   EXPECT_FALSE(sqliteDB.save_payments(expected_payout, t2));
 
   // Pay the amount back out and expect the database to be empty
   std::vector<cryptonote::batch_sn_payment> t3;
-  t3.emplace_back(wallet_address.address, expected_amount, cryptonote::network_type::TESTNET);
-  success = sqliteDB.save_payments(expected_payout, t3); 
+  t3.emplace_back(wallet_address.address, expected_amount, cryptonote::network_type::FAKECHAIN);
+  success = sqliteDB.save_payments(expected_payout, t3);
   EXPECT_TRUE(success);
-  EXPECT_TRUE(sqliteDB.batching_count() == 0);
+  EXPECT_EQ(sqliteDB.batching_count(), 0);
 }
 
 TEST(SQLITE, CalculateRewards)
 {
-  cryptonote::BlockchainSQLiteTest sqliteDB(cryptonote::network_type::TESTNET, ":memory:");
+  test::BlockchainSQLiteTest sqliteDB(cryptonote::network_type::TESTNET, ":memory:");
 
   cryptonote::block block;
   block.reward = 200;
@@ -121,9 +120,9 @@ TEST(SQLITE, CalculateRewards)
   multiple_contributors.contributors.back().amount = 34;
   auto multiple_rewards = sqliteDB.calculate_rewards(block.major_version, block.reward, multiple_contributors);
 
-  EXPECT_TRUE(multiple_rewards[0].amount == 66);
-  EXPECT_TRUE(multiple_rewards[1].amount == 66);
-  EXPECT_TRUE(multiple_rewards[2].amount == 68);
+  EXPECT_EQ(multiple_rewards[0].amount, 66);
+  EXPECT_EQ(multiple_rewards[1].amount, 66);
+  EXPECT_EQ(multiple_rewards[2].amount, 68);
 
   // Check that 3 contributors receives their portion of the block reward when the operator takes a 10% fee
   multiple_contributors.portions_for_operator = cryptonote::old::STAKING_PORTIONS/10;

@@ -33,7 +33,11 @@
 #include <algorithm>
 #include <chrono>
 
-#include <boost/endian/conversion.hpp>
+#include <fmt/core.h>
+#include <fmt/chrono.h>
+
+#include <oxenc/endian.h>
+#include <oxenc/hex.h>
 
 extern "C" {
 #include <sodium.h>
@@ -297,29 +301,39 @@ namespace service_nodes
     return false;
   }
 
-  bool reg_tx_extract_fields(const cryptonote::transaction& tx, contributor_args_t &contributor_args, uint64_t& expiration_timestamp, crypto::public_key& service_node_key, crypto::signature& signature)
+  std::optional<registration_details> reg_tx_extract_fields(const cryptonote::transaction& tx)
   {
     cryptonote::tx_extra_service_node_register registration;
     if (!get_field_from_tx_extra(tx.extra, registration))
-      return false;
-    if (!cryptonote::get_service_node_pubkey_from_tx_extra(tx.extra, service_node_key))
-      return false;
+      return std::nullopt;
 
-    contributor_args.addresses.clear();
-    contributor_args.addresses.reserve(registration.m_public_spend_keys.size());
-    for (size_t i = 0; i < registration.m_public_spend_keys.size(); i++) {
-      contributor_args.addresses.emplace_back();
-      contributor_args.addresses.back().m_spend_public_key = registration.m_public_spend_keys[i];
-      contributor_args.addresses.back().m_view_public_key  = registration.m_public_view_keys[i];
+    if (registration.public_spend_keys.size() != registration.public_view_keys.size() ||
+        registration.amounts.size() != registration.public_spend_keys.size())
+      return std::nullopt;
+
+    registration_details reg{};
+    if (!cryptonote::get_service_node_pubkey_from_tx_extra(tx.extra, reg.service_node_pubkey))
+      return std::nullopt;
+
+    reg.reserved.reserve(registration.public_spend_keys.size());
+    for (size_t i = 0; i < registration.public_spend_keys.size(); i++) {
+      auto& [addr, amount] = reg.reserved.emplace_back();
+      addr.m_spend_public_key = registration.public_spend_keys[i];
+      addr.m_view_public_key = registration.public_view_keys[i];
+      amount = registration.amounts[i];
     }
 
-    contributor_args.portions_for_operator = registration.m_portions_for_operator;
-    contributor_args.portions              = registration.m_portions;
-    contributor_args.success               = true;
+    reg.hf = registration.hf_or_expiration;
+    if (registration.hf_or_expiration <= 255)
+      reg.uses_portions = false;
+    else
+      // Unix timestamp, so pre-HF19 and uses portions
+      reg.uses_portions = true;
 
-    expiration_timestamp = registration.m_expiration_timestamp;
-    signature            = registration.m_service_node_signature;
-    return true;
+    reg.fee = registration.fee;
+    reg.signature = registration.signature;
+
+    return reg;
   }
 
   uint64_t offset_testing_quorum_height(quorum_type type, uint64_t height)
@@ -334,42 +348,95 @@ namespace service_nodes
     return result;
   }
 
-  void validate_contributor_args(hf hf_version, contributor_args_t const &contributor_args)
+  void validate_registration(hf hf_version, cryptonote::network_type nettype, uint64_t staking_requirement, uint64_t block_timestamp, const registration_details& reg)
   {
-    const size_t max_contributors = hf_version >= hf::hf19 ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1;
-    if (contributor_args.portions.empty())
-      throw invalid_contributions{"No portions given"};
-    if (contributor_args.portions.size() != contributor_args.addresses.size())
-      throw invalid_contributions{"Number of portions (" + std::to_string(contributor_args.portions.size()) + ") doesn't match the number of addresses (" + std::to_string(contributor_args.portions.size()) + ")"};
-    if (contributor_args.portions.size() > max_contributors)
-      throw invalid_contributions{"Too many contributors"};
-    if (contributor_args.portions_for_operator > cryptonote::old::STAKING_PORTIONS)
-      throw invalid_contributions{"Operator portions are too high"};
-
-    if (!check_service_node_portions(hf_version, contributor_args.portions))
+    if (reg.uses_portions)
     {
-        std::stringstream stream;
-        for (size_t i = 0; i < contributor_args.portions.size(); i++)
-        {
-            if (i) stream << ", ";
-            stream << contributor_args.portions[i];
-        }
-        throw invalid_contributions{"Invalid portions: {" + stream.str() + "}"};
+      if (hf_version > hf::hf19_reward_batching)
+        throw invalid_registration{"Portion-based registrations are not permitted after HF19"};
     }
+    else
+    {
+      // If not using portions then the hf value must be >= 19 and equal to the current blockchain hf:
+      if (hf_version < hf::hf19_reward_batching || reg.hf != static_cast<uint8_t>(hf_version))
+        throw invalid_registration{"Wrong registration hardfork " +
+          std::to_string(reg.hf) + ", != current " + std::to_string(static_cast<uint8_t>(hf_version))};
+    }
+
+    const size_t max_contributors = (hf_version >= hf::hf19_reward_batching && !reg.uses_portions)
+      ? oxen::MAX_CONTRIBUTORS_HF19
+      : oxen::MAX_CONTRIBUTORS_V1;
+
+    if (reg.reserved.empty())
+      throw invalid_registration{"No operator contribution given"};
+    if (reg.reserved.size() > max_contributors)
+      throw invalid_registration{"Too many contributors"};
+
+    bool valid_stakes, valid_fee;
+    if (reg.uses_portions) {
+      // HF18 or earlier registration
+      valid_stakes = check_service_node_portions(hf_version, reg.reserved);
+      valid_fee = reg.fee <= cryptonote::old::STAKING_PORTIONS;
+    }
+    else
+    {
+      valid_stakes = check_service_node_stakes(hf_version, nettype, staking_requirement, reg.reserved);
+      valid_fee = reg.fee <= cryptonote::STAKING_FEE_BASIS;
+    }
+
+    if (!valid_fee)
+      throw invalid_registration{fmt::format("Operator fee is too high ({} > {})", reg.fee,
+              reg.uses_portions ? cryptonote::old::STAKING_PORTIONS : cryptonote::STAKING_FEE_BASIS)};
+
+    if (!valid_stakes) {
+      std::string amount_dump;
+      amount_dump.reserve(22 * reg.reserved.size());
+      for (size_t i = 0; i < reg.reserved.size(); i++)
+      {
+        if (i) amount_dump += ", ";
+        amount_dump += std::to_string(reg.reserved[i].second);
+      }
+      throw invalid_registration{"Invalid "s + (reg.uses_portions ? "portions" : "amounts") + ": {" + amount_dump + "}"};
+    }
+
+    // If using portions then `.hf` is actually the registration expiry (HF19+ registrations do not
+    // expire).
+    if (reg.uses_portions && reg.hf < block_timestamp)
+      throw invalid_registration{"Registration expired (" + std::to_string(reg.hf) + " < " + std::to_string(block_timestamp) + ")"};
   }
 
-  void validate_contributor_args_signature(contributor_args_t const &contributor_args, uint64_t const expiration_timestamp, crypto::public_key const &service_node_key, crypto::signature const &signature)
+  //---------------------------------------------------------------
+  crypto::hash get_registration_hash(const registration_details& registration)
   {
-    crypto::hash hash = {};
-    if (!get_registration_hash(contributor_args.addresses, contributor_args.portions_for_operator, contributor_args.portions, expiration_timestamp, hash))
-      throw invalid_contributions{"Failed to generate registration hash"};
-
-    if (!crypto::check_key(service_node_key))
-      throw invalid_contributions{"Service Node Key was not a valid crypto key" + tools::type_to_hex(service_node_key)};
-
-    if (!crypto::check_signature(hash, service_node_key, signature))
-      throw invalid_contributions{"Failed to validate service node with key:" + tools::type_to_hex(service_node_key) + " and hash: " + tools::type_to_hex(hash)};
+    std::string buffer;
+    size_t size =
+        sizeof(uint64_t) + // fee
+        registration.reserved.size() * (
+          sizeof(cryptonote::account_public_address) + sizeof(uint64_t)) + // addr+amount for each
+        sizeof(uint64_t); // expiration timestamp
+    buffer.reserve(size);
+    buffer += tools::view_guts(oxenc::host_to_little(registration.fee));
+    for (const auto& [addr, amount] : registration.reserved)
+    {
+      buffer += tools::view_guts(addr);
+      buffer += tools::view_guts(oxenc::host_to_little(amount));
+    }
+    buffer += tools::view_guts(oxenc::host_to_little(registration.hf));
+    assert(buffer.size() == size);
+    return crypto::cn_fast_hash(buffer.data(), buffer.size());
   }
+
+  void validate_registration_signature(const registration_details& registration)
+  {
+    auto hash = get_registration_hash(registration);
+    if (!crypto::check_key(registration.service_node_pubkey))
+      throw invalid_registration{"Service Node Key is not a valid public key (" + tools::type_to_hex(registration.service_node_pubkey) + ")"};
+
+    if (!crypto::check_signature(hash, registration.service_node_pubkey, registration.signature))
+      throw invalid_registration{"Registration signature verification failed for pubkey/hash: " +
+        tools::type_to_hex(registration.service_node_pubkey) + "/" + tools::type_to_hex(hash)};
+  }
+
 
   struct parsed_tx_contribution
   {
@@ -867,37 +934,25 @@ namespace service_nodes
 
   bool is_registration_tx(cryptonote::network_type nettype, hf hf_version, const cryptonote::transaction& tx, uint64_t block_timestamp, uint64_t block_height, uint32_t index, crypto::public_key& key, service_node_info& info)
   {
-    contributor_args_t contributor_args = {};
-    crypto::public_key service_node_key;
-    uint64_t expiration_timestamp{0};
-    crypto::signature signature;
-
-    if (!reg_tx_extract_fields(tx, contributor_args, expiration_timestamp, service_node_key, signature))
+    auto maybe_reg = reg_tx_extract_fields(tx);
+    if (!maybe_reg)
       return false;
-
-    try
-    {
-      validate_contributor_args(hf_version, contributor_args);
-      validate_contributor_args_signature(contributor_args, expiration_timestamp, service_node_key, signature);
-    }
-    catch (const invalid_contributions &e)
-    {
-      LOG_PRINT_L1("Register TX: " << cryptonote::get_transaction_hash(tx) << ", Height: " << block_height << ". " << e.what());
-      return false;
-    }
-
-    if (expiration_timestamp < block_timestamp)
-    {
-      LOG_PRINT_L1("Register TX: Has expired. The block timestamp: " << block_timestamp <<
-                   " is greater than the expiration timestamp: " << expiration_timestamp <<
-                   " on height: " << block_height <<
-                   " for tx:" << cryptonote::get_transaction_hash(tx));
-      return false;
-    }
-
-    // check the initial contribution exists
+    auto& reg = *maybe_reg;
 
     uint64_t staking_requirement = get_staking_requirement(nettype, block_height);
+    try
+    {
+      validate_registration(hf_version, nettype, staking_requirement, block_timestamp, reg);
+      validate_registration_signature(reg);
+    }
+    catch (const invalid_registration &e)
+    {
+      LOG_PRINT_L1("Invalid registration (" << cryptonote::get_transaction_hash(tx) << " @ " << block_height << "): " << e.what());
+      return false;
+    }
+
+    // check the operator contribution exists
+
     cryptonote::account_public_address address;
 
     staking_components stake = {};
@@ -919,7 +974,7 @@ namespace service_nodes
 
       // 2. the staked amount must be from the operator.  (Previously there was a weird edge case where you
       // could manually construct a registration tx that stakes for someone *other* than the operator).
-      if (stake.address != contributor_args.addresses[0])
+      if (stake.address != reg.reserved[0].first)
       {
         LOG_PRINT_L1("Register TX invalid: registration stake is not from the operator");
         return false;
@@ -938,8 +993,9 @@ namespace service_nodes
         return false;
       }
 
-      size_t total_num_of_addr = contributor_args.addresses.size();
-      if (std::find(contributor_args.addresses.begin(), contributor_args.addresses.end(), stake.address) == contributor_args.addresses.end())
+      size_t total_num_of_addr = reg.reserved.size();
+      if (std::find_if(reg.reserved.begin(), reg.reserved.end(),
+            [&](auto& addr_amt) { return addr_amt.first == stake.address; }) == reg.reserved.end())
         total_num_of_addr++;
 
       // Don't need this check for HF16+ because the number of reserved spots is already checked in
@@ -956,11 +1012,16 @@ namespace service_nodes
 
     // don't actually process this contribution now, do it when we fall through later.
 
-    key = service_node_key;
+    key = reg.service_node_pubkey;
 
-    info.staking_requirement           = staking_requirement;
-    info.operator_address              = contributor_args.addresses[0];
-    info.portions_for_operator         = contributor_args.portions_for_operator;
+    info.staking_requirement = staking_requirement;
+    info.operator_address = reg.reserved[0].first;
+
+    if (reg.uses_portions)
+      info.portions_for_operator = reg.fee;
+    else
+      info.portions_for_operator = mul128_div64(reg.fee, cryptonote::old::STAKING_PORTIONS, cryptonote::STAKING_FEE_BASIS);
+
     info.registration_height           = block_height;
     info.registration_hf_version       = hf_version;
     info.last_reward_block_height      = block_height;
@@ -968,25 +1029,27 @@ namespace service_nodes
     info.swarm_id                      = UNASSIGNED_SWARM_ID;
     info.last_ip_change_height         = block_height;
 
-    for (size_t i = 0; i < contributor_args.addresses.size(); i++)
+    for (auto it = reg.reserved.begin(); it != reg.reserved.end(); ++it)
     {
-      // Check for duplicates
-      auto iter = std::find(contributor_args.addresses.begin(), contributor_args.addresses.begin() + i, contributor_args.addresses[i]);
-      if (iter != contributor_args.addresses.begin() + i)
+      auto& [addr, amount] = *it;
+      bool dupe = false;
+      for (auto it2 = std::next(it); it2 != reg.reserved.end(); ++it2)
       {
-        LOG_PRINT_L1("Register TX: There was a duplicate participant for service node on height: " << block_height << " for tx: " << cryptonote::get_transaction_hash(tx));
-        return false;
+        if (it2->first == addr)
+        {
+          LOG_PRINT_L1("Invalid registration: duplicate reserved address in registration (tx " << cryptonote::get_transaction_hash(tx) << ")");
+          return false;
+        }
       }
 
-      uint64_t hi, lo, resulthi, resultlo;
-      lo = mul128(info.staking_requirement, contributor_args.portions[i], &hi);
-      div128_64(hi, lo, cryptonote::old::STAKING_PORTIONS, &resulthi, &resultlo);
+      auto& contributor = info.contributors.emplace_back();
+      if (reg.uses_portions)
+        contributor.reserved = mul128_div64(amount, info.staking_requirement, cryptonote::old::STAKING_PORTIONS);
+      else
+        contributor.reserved = amount;
 
-      info.contributors.emplace_back();
-      auto &contributor = info.contributors.back();
-      contributor.reserved                         = resultlo;
-      contributor.address                          = contributor_args.addresses[i];
-      info.total_reserved += resultlo;
+      contributor.address = addr;
+      info.total_reserved += contributor.reserved;
     }
 
     // In HF16 we require that the amount staked in the registration tx be at least the amount
@@ -1149,7 +1212,7 @@ namespace service_nodes
     // Check node contributor counts
     {
       bool too_many_contributions = false;
-      if (hf_version >= hf::hf19)
+      if (hf_version >= hf::hf19_reward_batching)
         // As of HF19 we allow up to 10 stakes total
         too_many_contributions = existing_contributions + other_reservations + 1 > oxen::MAX_CONTRIBUTORS_HF19;
       else if (hf_version >= hf::hf16_pulse)
@@ -1165,7 +1228,7 @@ namespace service_nodes
       if (too_many_contributions)
       {
         LOG_PRINT_L1("TX: Already hit the max number of contributions: "
-                     << (hf_version >= hf::hf19 ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1)
+                     << (hf_version >= hf::hf19_reward_batching ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1)
                      << " for contributor: " << cryptonote::get_account_address_as_str(nettype, false, stake.address)
                      << " on height: " << block_height << " for tx: " << cryptonote::get_transaction_hash(tx));
         return false;
@@ -1652,7 +1715,7 @@ namespace service_nodes
     {
       std::array<uint32_t, (sizeof(hash) / sizeof(uint32_t)) + 1> src = {static_cast<uint32_t>(type)};
       std::memcpy(&src[1], &hash, sizeof(hash));
-      for (uint32_t &val : src) boost::endian::little_to_native_inplace(val);
+      for (uint32_t &val : src) oxenc::little_to_host_inplace(val);
       std::seed_seq sequence(src.begin(), src.end());
       result.seed(sequence);
     }
@@ -1660,7 +1723,7 @@ namespace service_nodes
     {
       uint64_t seed = 0;
       std::memcpy(&seed, hash.data, sizeof(seed));
-      boost::endian::little_to_native_inplace(seed);
+      oxenc::little_to_host_inplace(seed);
       seed += static_cast<uint64_t>(type);
       result.seed(seed);
     }
@@ -2330,7 +2393,7 @@ namespace service_nodes
 
     if (key == crypto::null_pkey)
       return service_nodes::null_payout;
-    return service_node_info_to_payout(key, *info);
+    return service_node_payout_portions(key, *info);
   }
 
   template <typename T>
@@ -2389,7 +2452,7 @@ namespace service_nodes
     return true;
   }
 
-  bool service_node_list::validate_miner_tx(cryptonote::block const &block, cryptonote::block_reward_parts const &reward_parts, std::optional<std::vector<cryptonote::batch_sn_payment>> const &batched_sn_payments) const
+  bool service_node_list::validate_miner_tx(const cryptonote::block& block, const cryptonote::block_reward_parts& reward_parts, const std::optional<std::vector<cryptonote::batch_sn_payment>>& batched_sn_payments) const
   {
     const auto hf_version = block.major_version;
     if (hf_version < hf::hf9_service_nodes)
@@ -2465,68 +2528,61 @@ namespace service_nodes
     //
 
     std::shared_ptr<const service_node_info> block_producer = nullptr;
-    size_t expected_vouts_size = 0;
 
-    if (mode == verify_mode::pulse_block_leader_is_producer || mode == verify_mode::pulse_different_block_producer)
-    {
-      auto info_it = m_state.service_nodes_infos.find(block_producer_key);
-      if (info_it == m_state.service_nodes_infos.end())
-      {
-        MGINFO_RED("The pulse block producer for round: " << +block.pulse.round << " is not currently a Service Node: " << block_producer_key);
-        return false;
-      }
-
-      block_producer = info_it->second;
-      if (mode == verify_mode::pulse_different_block_producer && reward_parts.miner_fee > 0 && block.major_version < hf::hf19)
-      {
-        expected_vouts_size += block_producer->contributors.size();
-      }
-    }
-
-    if (block.major_version >= hf::hf19)
+    if (block.major_version >= hf::hf19_reward_batching)
     {
       mode = verify_mode::batched_sn_rewards;
       MDEBUG("Batched miner reward");
     }
 
+    size_t expected_vouts_size;
+    switch (mode) {
+      case verify_mode::batched_sn_rewards:
+        expected_vouts_size = batched_sn_payments ? batched_sn_payments->size() : 0;
+        break;
+      case verify_mode::pulse_block_leader_is_producer:
+      case verify_mode::pulse_different_block_producer:
+        {
+          auto info_it = m_state.service_nodes_infos.find(block_producer_key);
+          if (info_it == m_state.service_nodes_infos.end())
+          {
+            MGINFO_RED("The pulse block producer for round: " << +block.pulse.round << " is not currently a Service Node: " << block_producer_key);
+            return false;
+          }
 
-    if (mode == verify_mode::miner)
-    {
-      if ((reward_parts.base_miner + reward_parts.miner_fee) > 0) // (HF >= 16) this can be zero, no miner coinbase.
-      {
-        expected_vouts_size += 1; /*miner*/
-      }
+          block_producer = info_it->second;
+          expected_vouts_size = mode == verify_mode::pulse_different_block_producer && reward_parts.miner_fee > 0
+            ? block_producer->contributors.size() : 0;
+        }
+        break;
+      case verify_mode::miner:
+        expected_vouts_size = reward_parts.base_miner + reward_parts.miner_fee > 0 // (HF >= 16) this can be zero, no miner coinbase.
+          ? 1 /* miner */ : 0;
+        break;
     }
 
-    if (mode == verify_mode::batched_sn_rewards)
+    if (mode != verify_mode::batched_sn_rewards)
     {
-      if (batched_sn_payments.has_value())
-        expected_vouts_size += batched_sn_payments->size();
-    } else {
       expected_vouts_size += block_leader.payouts.size();
       bool has_governance_output = cryptonote::height_has_governance_output(m_blockchain.nettype(), hf_version, height);
-      if (has_governance_output) {
+      if (has_governance_output)
         expected_vouts_size++;
-      }
     }
-
 
     if (miner_tx.vout.size() != expected_vouts_size)
     {
-      char const *type = mode == verify_mode::miner
-                             ? "miner"
-                             : mode == verify_mode::pulse_block_leader_is_producer ? "pulse" : "pulse alt round";
+      auto type =
+        mode == verify_mode::miner ? "miner"sv :
+        mode == verify_mode::batched_sn_rewards ? "batch reward"sv :
+        mode == verify_mode::pulse_block_leader_is_producer ? "pulse"sv : "pulse alt round"sv;
       MGINFO_RED("Expected " << type << " block, the miner TX specifies a different amount of outputs vs the expected: " << expected_vouts_size << ", miner tx outputs: " << miner_tx.vout.size());
       return false;
     }
 
-    if (hf_version >= hf::hf16_pulse)
+    if (hf_version >= hf::hf16_pulse && reward_parts.base_miner != 0)
     {
-      if (reward_parts.base_miner != 0)
-      {
-        MGINFO_RED("Miner reward is incorrect expected 0 reward, block specified " << cryptonote::print_money(reward_parts.base_miner));
-        return false;
-      }
+      MGINFO_RED("Miner reward is incorrect expected 0 reward, block specified " << cryptonote::print_money(reward_parts.base_miner));
+      return false;
     }
 
     // NOTE: Verify Coinbase Amounts
@@ -2547,7 +2603,7 @@ namespace service_nodes
 
         for (size_t i = 0; i < block_leader.payouts.size(); i++)
         {
-          payout_entry const &payout = block_leader.payouts[i];
+          const auto& payout = block_leader.payouts[i];
           if (split_rewards[i])
           {
             if (!verify_coinbase_tx_output(miner_tx, height, vout_index, payout.address, split_rewards[i]))
@@ -2567,7 +2623,7 @@ namespace service_nodes
         size_t vout_index = 0;
         for (size_t i = 0; i < block_leader.payouts.size(); i++)
         {
-          payout_entry const &payout = block_leader.payouts[i];
+          const auto& payout = block_leader.payouts[i];
           if (split_rewards[i])
           {
             if (!verify_coinbase_tx_output(miner_tx, height, vout_index, payout.address, split_rewards[i]))
@@ -2582,11 +2638,11 @@ namespace service_nodes
       {
         size_t vout_index = 0;
         {
-          payout block_producer_payouts       = service_node_info_to_payout(block_producer_key, *block_producer);
+          payout block_producer_payouts       = service_node_payout_portions(block_producer_key, *block_producer);
           std::vector<uint64_t> split_rewards = cryptonote::distribute_reward_by_portions(block_producer_payouts.payouts, reward_parts.miner_fee, true /*distribute_remainder*/);
           for (size_t i = 0; i < block_producer_payouts.payouts.size(); i++)
           {
-            payout_entry const &payout = block_producer_payouts.payouts[i];
+            const auto& payout = block_producer_payouts.payouts[i];
             if (split_rewards[i])
             {
               if (!verify_coinbase_tx_output(miner_tx, height, vout_index, payout.address, split_rewards[i]))
@@ -2599,7 +2655,7 @@ namespace service_nodes
         std::vector<uint64_t> split_rewards = cryptonote::distribute_reward_by_portions(block_leader.payouts, reward_parts.service_node_total, true /*distribute_remainder*/);
         for (size_t i = 0; i < block_leader.payouts.size(); i++)
         {
-          payout_entry const &payout = block_leader.payouts[i];
+          const auto& payout = block_leader.payouts[i];
           if (split_rewards[i])
           {
             if (!verify_coinbase_tx_output(miner_tx, height, vout_index, payout.address, split_rewards[i]))
@@ -2612,41 +2668,57 @@ namespace service_nodes
 
       case verify_mode::batched_sn_rewards:
       {
-        size_t vout_index = 0;
-        uint64_t total_payout_in_our_db = std::accumulate(batched_sn_payments->begin(),batched_sn_payments->end(), uint64_t{0}, [](auto const a, auto const b){return a + b.amount;});
+        // NB: this amount is in milli-atomics, not atomics
+        uint64_t total_payout_in_our_db = batched_sn_payments ? std::accumulate(
+                batched_sn_payments->begin(),
+                batched_sn_payments->end(),
+                uint64_t{0},
+                [](auto&& a, auto&& b) { return a + b.amount; }) : 0;
+
         uint64_t total_payout_in_vouts = 0;
-        cryptonote::keypair const deterministic_keypair = cryptonote::get_deterministic_keypair_from_height(height);
-        for (auto & vout : block.miner_tx.vout)
+        const auto deterministic_keypair = cryptonote::get_deterministic_keypair_from_height(height);
+        for (size_t vout_index = 0; vout_index < block.miner_tx.vout.size(); vout_index++)
         {
+          const auto& vout = block.miner_tx.vout[vout_index];
+          const auto& batch_payment = (*batched_sn_payments)[vout_index];
+
           if (!std::holds_alternative<cryptonote::txout_to_key>(vout.target))
           {
             MGINFO_RED("Service node output target type should be txout_to_key");
             return false;
           }
 
-          if (vout.amount != (*batched_sn_payments)[vout_index].amount)
+          constexpr uint64_t max_amount = std::numeric_limits<uint64_t>::max() / cryptonote::BATCH_REWARD_FACTOR;
+          if (vout.amount > max_amount)
           {
-            MERROR("Service node reward amount incorrect. Should be " << cryptonote::print_money((*batched_sn_payments)[vout_index].amount) << ", is: " << cryptonote::print_money(vout.amount));
+            // We should never actually hit this limit unless someone is trying something nefarious
+            MGINFO_RED("Batched reward payout invalid: exceeds maximum possible payout size");
+            return false;
+          }
+
+          auto paid_amount = vout.amount * cryptonote::BATCH_REWARD_FACTOR;
+          total_payout_in_vouts += paid_amount;
+          if (paid_amount != batch_payment.amount)
+          {
+            MGINFO_RED(fmt::format("Batched reward payout incorrect: expected {}, not {}", batch_payment.amount, paid_amount));
             return false;
           }
           crypto::public_key out_eph_public_key{};
-          if (!cryptonote::get_deterministic_output_key((*batched_sn_payments)[vout_index].address_info.address, deterministic_keypair, vout_index, out_eph_public_key))
+          if (!cryptonote::get_deterministic_output_key(batch_payment.address_info.address, deterministic_keypair, vout_index, out_eph_public_key))
           {
-            MERROR("Failed to generate output one-time public key");
+            MGINFO_RED("Failed to generate output one-time public key");
             return false;
           }
           const auto& out_to_key = var::get<cryptonote::txout_to_key>(vout.target);
           if (tools::view_guts(out_to_key) != tools::view_guts(out_eph_public_key))
           {
-            MERROR("Output Ephermeral Public Key does not match");
+            MGINFO_RED("Output Ephermeral Public Key does not match (payment to wrong recipient)");
             return false;
           }
-          total_payout_in_vouts += vout.amount;
-          vout_index++;
         }
         if (total_payout_in_vouts != total_payout_in_our_db)
         {
-          MERROR("Total service node reward amount incorrect. Should be " << cryptonote::print_money(total_payout_in_our_db) << ", is: " << cryptonote::print_money(total_payout_in_vouts));
+          MGINFO_RED(fmt::format("Total service node reward amount incorrect: expected {}, not {}", total_payout_in_our_db, total_payout_in_vouts));
           return false;
         }
       }
@@ -3661,104 +3733,38 @@ namespace service_nodes
     return result;
   }
 
-  contributor_args_t convert_registration_args(cryptonote::network_type nettype,
-                                               const std::vector<std::string> &args,
-                                               uint64_t staking_requirement,
-                                               hf hf_version)
+  // Handles the deprecated, pre-HF19 registration parsing where values are portions rather than
+  // amounts.
+  // TODO: this can be deleted immediately after HF19, because this code is only used to process new
+  // registration commands (and after the HF, all registration commands are HF19+ registrations with
+  // raw amounts rather than portions).
+  void convert_registration_portions_hf18(
+      registration_details& result,
+      const std::vector<std::string>& args,
+      uint64_t staking_requirement,
+      std::vector<std::pair<cryptonote::address_parse_info, uint64_t>>& addr_to_portions,
+      hf hf_version)
   {
-    contributor_args_t result = {};
-    if (args.size() % 2 == 0 || args.size() < 3)
-    {
-      result.err_msg = tr("Usage: <operator cut> <address> <fraction> [<address> <fraction> [...]]]");
-      return result;
-    }
-
-    const size_t max_contributors = hf_version >= hf::hf19 ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1;
-    if (args.size() > 1 + 2 * max_contributors)
-    {
-      result.err_msg = tr("Exceeds the maximum number of contributors, which is ") + std::to_string(max_contributors);
-      return result;
-    }
-
-    try
-    {
-      result.portions_for_operator = boost::lexical_cast<uint64_t>(args[0]);
-      if (result.portions_for_operator > cryptonote::old::STAKING_PORTIONS)
-      {
-        result.err_msg = tr("Invalid portion amount: ") + args[0] + tr(". Must be between 0 and ") + std::to_string(cryptonote::old::STAKING_PORTIONS);
-        return result;
-      }
-    }
-    catch (const std::exception &e)
-    {
-      result.err_msg = tr("Invalid portion amount: ") + args[0] + tr(". Must be between 0 and ") + std::to_string(cryptonote::old::STAKING_PORTIONS);
-      return result;
-    }
-
-    struct addr_to_portion_t
-    {
-      cryptonote::address_parse_info info;
-      uint64_t portions;
-    };
-
-    std::vector<addr_to_portion_t> addr_to_portions;
-    size_t const OPERATOR_ARG_INDEX     = 1;
-    for (size_t i = OPERATOR_ARG_INDEX, num_contributions = 0;
-         i < args.size();
-         i += 2, ++num_contributions)
-    {
-      cryptonote::address_parse_info info;
-      if (!cryptonote::get_account_address_from_str(info, nettype, args[i]))
-      {
-        result.err_msg = tr("Failed to parse address: ") + args[i];
-        return result;
-      }
-
-      if (info.has_payment_id)
-      {
-        result.err_msg = tr("Can't use a payment id for staking tx");
-        return result;
-      }
-
-      if (info.is_subaddress)
-      {
-        result.err_msg = tr("Can't use a subaddress for staking tx");
-        return result;
-      }
-
-      try
-      {
-        uint64_t num_portions = boost::lexical_cast<uint64_t>(args[i+1]);
-        addr_to_portions.push_back({info, num_portions});
-      }
-      catch (const std::exception &e)
-      {
-        result.err_msg = tr("Invalid amount for contributor: ") + args[i] + tr(", with portion amount that could not be converted to a number: ") + args[i+1];
-        return result;
-      }
-    }
-
-
     //
     // FIXME(doyle): FIXME(oxen) !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     // This is temporary code to redistribute the insufficient portion dust
     // amounts between contributors. It should be removed in HF12.
     //
-    std::array<uint64_t, oxen::MAX_CONTRIBUTORS_HF19> excess_portions;
-    std::array<uint64_t, oxen::MAX_CONTRIBUTORS_HF19> min_contributions;
+    std::array<uint64_t, oxen::MAX_CONTRIBUTORS_V1> excess_portions;
+    std::array<uint64_t, oxen::MAX_CONTRIBUTORS_V1> min_contributions;
     {
       // NOTE: Calculate excess portions from each contributor
       uint64_t oxen_reserved = 0;
       for (size_t index = 0; index < addr_to_portions.size(); ++index)
       {
-        addr_to_portion_t const &addr_to_portion = addr_to_portions[index];
+        const auto& [addr, portion] = addr_to_portions[index];
         uint64_t min_contribution_portions       = service_nodes::get_min_node_contribution_in_portions(hf_version, staking_requirement, oxen_reserved, index);
-        uint64_t oxen_amount                     = service_nodes::portions_to_amount(staking_requirement, addr_to_portion.portions);
+        uint64_t oxen_amount                     = service_nodes::portions_to_amount(staking_requirement, portion);
         oxen_reserved                           += oxen_amount;
 
         uint64_t excess = 0;
-        if (addr_to_portion.portions > min_contribution_portions)
-          excess = addr_to_portion.portions - min_contribution_portions;
+        if (portion > min_contribution_portions)
+          excess = portion - min_contribution_portions;
 
         min_contributions[index] = min_contribution_portions;
         excess_portions[index]   = excess;
@@ -3769,15 +3775,15 @@ namespace service_nodes
     uint64_t total_reserved = 0;
     for (size_t i = 0; i < addr_to_portions.size(); ++i)
     {
-      addr_to_portion_t &addr_to_portion = addr_to_portions[i];
+      auto& [addr, portion] = addr_to_portions[i];
       uint64_t min_portions = get_min_node_contribution_in_portions(hf_version, staking_requirement, total_reserved, i);
 
       uint64_t portions_to_steal = 0;
-      if (addr_to_portion.portions < min_portions)
+      if (portion < min_portions)
       {
           // NOTE: Steal dust portions from other contributor if we fall below
           // the minimum by a dust amount.
-          uint64_t needed             = min_portions - addr_to_portion.portions;
+          uint64_t needed             = min_portions - portion;
           const uint64_t FUDGE_FACTOR = 10;
           const uint64_t DUST_UNIT    = cryptonote::old::STAKING_PORTIONS / staking_requirement;
           const uint64_t DUST         = DUST_UNIT * FUDGE_FACTOR;
@@ -3791,10 +3797,10 @@ namespace service_nodes
             if (contributor_excess > 0)
             {
               portions_to_steal = std::min(needed, contributor_excess);
-              addr_to_portion.portions += portions_to_steal;
+              portion += portions_to_steal;
               contributor_excess -= portions_to_steal;
               needed -= portions_to_steal;
-              result.portions[sub_index] -= portions_to_steal;
+              addr_to_portions[sub_index].second -= portions_to_steal;
 
               if (needed == 0)
                 break;
@@ -3803,32 +3809,83 @@ namespace service_nodes
 
           // NOTE: Operator is sending in the minimum amount and it falls below
           // the minimum by dust, just increase the portions so it passes
-          if (needed > 0 && addr_to_portions.size() < oxen::MAX_CONTRIBUTORS_HF19)
-            addr_to_portion.portions += needed;
+          if (needed > 0 && addr_to_portions.size() < oxen::MAX_CONTRIBUTORS_V1)
+            portion += needed;
       }
 
-      if (addr_to_portion.portions < min_portions || (addr_to_portion.portions - portions_to_steal) > portions_left)
-      {
-        result.err_msg = tr("Invalid amount for contributor: ") + args[i] + tr(", with portion amount: ") + args[i+1] + tr(". The contributors must each have at least 25%, except for the last contributor which may have the remaining amount");
-        return result;
-      }
+      if (portion < min_portions || portion - portions_to_steal > portions_left)
+        throw invalid_registration{tr("Invalid amount for contributor: ") + args[i] + tr(", with portion amount: ") +
+          args[i+1] + tr(". The contributors must each have at least 25%, except for the last contributor which may have the remaining amount")};
 
       if (min_portions == UINT64_MAX)
-      {
-        result.err_msg = tr("Too many contributors specified, you can only split a node with up to: ") + std::to_string(max_contributors) + tr(" people.");
-        return result;
-      }
+        throw invalid_registration{
+          tr("Too many contributors specified, you can only split a node with up to: ") + std::to_string(oxen::MAX_CONTRIBUTORS_V1) + tr(" people.")};
 
-      portions_left -= addr_to_portion.portions;
+      portions_left -= portion;
       portions_left += portions_to_steal;
-      result.addresses.push_back(addr_to_portion.info.address);
-      result.portions.push_back(addr_to_portion.portions);
-      uint64_t oxen_amount = service_nodes::portions_to_amount(addr_to_portion.portions, staking_requirement);
-      total_reserved      += oxen_amount;
+      result.reserved.emplace_back(addr.address, portion);
+      total_reserved += service_nodes::portions_to_amount(portion, staking_requirement);
+    }
+  }
+
+  registration_details convert_registration_args(
+      cryptonote::network_type nettype,
+      cryptonote::hf hf_version,
+      const std::vector<std::string>& args,
+      uint64_t staking_requirement)
+  {
+    registration_details result{};
+    if (args.size() % 2 == 0 || args.size() < 3)
+      throw invalid_registration{tr("Usage: <fee-basis-points> <address> <amount> [<address> <amount> [...]]]")};
+
+    const size_t max_contributors = hf_version >= hf::hf19_reward_batching ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1;
+    if (args.size() > 1 + 2 * max_contributors)
+      throw invalid_registration{tr("Exceeds the maximum number of contributors") + " ("s + std::to_string(max_contributors) + ")"};
+
+    const uint64_t max_fee = hf_version >= hf::hf19_reward_batching ? cryptonote::STAKING_FEE_BASIS : cryptonote::old::STAKING_PORTIONS;
+    if (!tools::parse_int(args[0], result.fee) || result.fee > max_fee)
+      throw invalid_registration{tr("Invalid operator fee: ") + args[0] + tr(". Must be between 0 and ") + std::to_string(max_fee)};
+
+    std::vector<std::pair<cryptonote::address_parse_info, uint64_t>> addr_to_amounts;
+    constexpr size_t OPERATOR_ARG_INDEX = 1;
+    for (size_t i = OPERATOR_ARG_INDEX, num_contributions = 0;
+         i < args.size();
+         i += 2, ++num_contributions)
+    {
+      auto& [info, portion] = addr_to_amounts.emplace_back();
+      if (!cryptonote::get_account_address_from_str(info, nettype, args[i]))
+        throw invalid_registration{tr("Failed to parse address: ") + args[i]};
+
+      if (info.has_payment_id)
+        throw invalid_registration{tr("Can't use a payment id for staking tx")};
+
+      if (info.is_subaddress)
+        throw invalid_registration{tr("Can't use a subaddress for staking tx")};
+
+      if (!tools::parse_int(args[i+1], portion))
+        throw invalid_registration{tr("Invalid amount for contributor: ") + args[i] + tr(", with portion amount that could not be converted to a number: ") + args[i+1]};
     }
 
+    uint64_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    if (hf_version < hf::hf19_reward_batching)
+    {
+      result.uses_portions = true;
+      result.hf = now;
+      convert_registration_portions_hf18(result, args, staking_requirement, addr_to_amounts, hf_version);
+    }
+    else
+    {
+      result.uses_portions = false;
+      result.hf = static_cast<uint8_t>(hf_version);
+      // For HF19+ we just stick in the registration amounts as-is, then validate the registration to
+      // make sure it looks good.
+      for (const auto& [addr, amount] : addr_to_amounts)
+        result.reserved.emplace_back(addr.address, amount);
+    }
 
-    result.success = true;
+    // Will throw if something is invalid:
+    validate_registration(hf_version, nettype, staking_requirement, now, result);
+
     return result;
   }
 
@@ -3841,59 +3898,46 @@ namespace service_nodes
       bool make_friendly)
   {
 
-    contributor_args_t contributor_args = convert_registration_args(nettype, args, staking_requirement, hf_version);
-    if (!contributor_args.success)
-    {
-      MERROR(tr("Could not convert registration args, reason: ") << contributor_args.err_msg);
+    registration_details reg;
+    try {
+      reg = convert_registration_args(nettype, hf_version, args, staking_requirement);
+    } catch (const invalid_registration& e) {
+      MERROR(tr("Could not parse registration arguments: ") << e.what());
       return false;
     }
 
-    uint64_t exp_timestamp = time(nullptr) + tools::to_seconds(cryptonote::old::STAKING_AUTHORIZATION_EXPIRATION_WINDOW);
+    reg.service_node_pubkey = keys.pub;
 
-    crypto::hash hash;
+    if (reg.uses_portions)
+      reg.hf = time(nullptr) + tools::to_seconds(cryptonote::old::STAKING_AUTHORIZATION_EXPIRATION_WINDOW);
 
-    bool hashed = cryptonote::get_registration_hash(contributor_args.addresses, contributor_args.portions_for_operator, contributor_args.portions, exp_timestamp, hash);
-    if (!hashed)
-    {
-      MERROR(tr("Could not make registration hash from addresses and portions"));
-      return false;
-    }
+    auto hash = get_registration_hash(reg);
 
-    crypto::signature signature;
-    crypto::generate_signature(hash, keys.pub, keys.key, signature);
+    reg.signature = crypto::generate_signature(hash, keys.pub, keys.key);
 
-    std::stringstream stream;
+    cmd.clear();
     if (make_friendly)
+      cmd += fmt::format("{} ({}):\n\n", 
+          tr("Run this command in the operator's wallet"),
+          cryptonote::get_account_address_as_str(nettype, false, reg.reserved[0].first));
+
+    cmd += fmt::format("register_service_node {} {} {} {}",
+            tools::join(" ", args),
+            reg.hf,
+            tools::type_to_hex(reg.service_node_pubkey),
+            tools::type_to_hex(reg.signature));
+
+    if (make_friendly && reg.uses_portions)
     {
-      stream << tr("Run this command in the operator wallet") << " (" <<
-        cryptonote::get_account_address_as_str(nettype, false, contributor_args.addresses[0])
-        << "):\n\n";
+      std::tm tm;
+      epee::misc_utils::get_gmt_time(reg.hf, tm);
+
+      cmd += "\n\n";
+      cmd += fmt::format(tr("This registration expires at {:%Y-%m-%d %I:%M:%S %p} UTC.\n"), tm);
+      cmd += tr("This should be about 2 weeks from now; if it isn't, check this computer's clock.\n");
+      cmd += tr("Please submit your registration into the blockchain before this time or it will be invalid.");
     }
 
-    stream << "register_service_node";
-    for (size_t i = 0; i < args.size(); ++i)
-    {
-      stream << " " << args[i];
-    }
-
-    stream << " " << exp_timestamp << " " << tools::type_to_hex(keys.pub) << " " << tools::type_to_hex(signature);
-
-    if (make_friendly)
-    {
-      stream << "\n\n";
-      time_t tt = exp_timestamp;
-
-      struct tm tm;
-      epee::misc_utils::get_gmt_time(tt, tm);
-
-      char buffer[128];
-      strftime(buffer, sizeof(buffer), "%Y-%m-%d %I:%M:%S %p UTC", &tm);
-      stream << tr("This registration expires at ") << buffer << tr(".\n");
-      stream << tr("This should be in about 2 weeks, if it isn't, check this computer's clock.\n");
-      stream << tr("Please submit your registration into the blockchain before this time or it will be invalid.");
-    }
-
-    cmd = stream.str();
     return true;
   }
 
@@ -3966,23 +4010,21 @@ namespace service_nodes
     return true;
   }
 
-  payout service_node_info_to_payout(crypto::public_key const &key, service_node_info const &info)
+  payout service_node_payout_portions(const crypto::public_key& key, const service_node_info& info)
   {
     service_nodes::payout result = {};
     result.key                   = key;
 
     // Add contributors and their portions to winners.
     result.payouts.reserve(info.contributors.size());
-    const uint64_t remaining_portions = cryptonote::old::STAKING_PORTIONS - info.portions_for_operator;
+    const uint64_t portions_after_fee = cryptonote::old::STAKING_PORTIONS - info.portions_for_operator;
     for (const auto& contributor : info.contributors)
     {
-      uint64_t hi, lo, resulthi, resultlo;
-      lo = mul128(contributor.amount, remaining_portions, &hi);
-      div128_64(hi, lo, info.staking_requirement, &resulthi, &resultlo);
+      uint64_t portion = mul128_div64(contributor.amount, portions_after_fee, info.staking_requirement);
 
       if (contributor.address == info.operator_address)
-        resultlo += info.portions_for_operator;
-      result.payouts.push_back({contributor.address, resultlo});
+        portion += info.portions_for_operator;
+      result.payouts.push_back({contributor.address, portion});
     }
 
     return result;

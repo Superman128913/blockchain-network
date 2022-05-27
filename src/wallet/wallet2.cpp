@@ -38,6 +38,7 @@
 #include <type_traits>
 #include <cpr/parameters.h>
 #include <oxenc/base64.h>
+#include <oxenc/endian.h>
 #include "common/password.h"
 #include "common/string_util.h"
 #include "cryptonote_basic/tx_extra.h"
@@ -8167,7 +8168,7 @@ wallet2::stake_result wallet2::check_stake_allowed(const crypto::public_key& sn_
   }
 
   const bool full = snode_info.contributors.size() >= (
-      *hf_version >= hf::hf19 ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1);
+      *hf_version >= hf::hf19_reward_batching ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1);
   if (full && !is_preexisting_contributor)
   {
     result.status = stake_result_status::service_node_contributors_maxed;
@@ -8323,11 +8324,8 @@ wallet2::register_service_node_result wallet2::create_register_service_node_tx(c
     if (local_args.size() > 0 && local_args[0].substr(0, 6) == "index=")
     {
       if (!tools::parse_subaddress_indices(local_args[0], subaddr_indices))
-      {
-        result.status = register_service_node_result_status::subaddr_indices_parse_fail;
-        result.msg = tr("Could not parse subaddress indices argument: ") + local_args[0];
-        return result;
-      }
+        return {register_service_node_result_status::subaddr_indices_parse_fail,
+          tr("Could not parse subaddress indices argument: ") + local_args[0]};
 
       local_args.erase(local_args.begin());
     }
@@ -8336,19 +8334,13 @@ wallet2::register_service_node_result wallet2::create_register_service_node_tx(c
       local_args.erase(local_args.begin());
 
     if (priority == tx_priority_blink)
-    {
-      result.status = register_service_node_result_status::no_blink;
-      result.msg += tr("Service node registrations cannot use blink priority");
-      return result;
-    }
+      return {register_service_node_result_status::no_blink,
+        tr("Service node registrations cannot use blink priority")};
 
     if (local_args.size() < 6)
-    {
-      result.status = register_service_node_result_status::insufficient_num_args;
-      result.msg += tr("\nPrepare this command in the daemon with the prepare_registration command");
-      result.msg += tr("\nThis command must be run from the daemon that will be acting as a service node");
-      return result;
-    }
+      return {register_service_node_result_status::insufficient_num_args,
+        std::string{tr("\nPrepare this command in the daemon with the prepare_registration command")}
+          + tr("\nThis command must be run from the daemon that will be acting as a service node")};
   }
 
   //
@@ -8356,198 +8348,166 @@ wallet2::register_service_node_result wallet2::create_register_service_node_tx(c
   //
   auto hf_version = get_hard_fork_version();
   if (!hf_version)
-  {
-    result.status = register_service_node_result_status::network_version_query_failed;
-    result.msg    = ERR_MSG_NETWORK_VERSION_QUERY_FAILED;
-    return result;
-  }
+    return {register_service_node_result_status::network_version_query_failed,
+      ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
 
-  uint64_t staking_requirement = 0, bc_height = 0;
-  service_nodes::contributor_args_t contributor_args = {};
+  uint64_t bc_height;
   {
     std::string err, err2;
     bc_height = std::max(get_daemon_blockchain_height(err),
                          get_daemon_blockchain_target_height(err2));
-    {
-      if (!err.empty() || !err2.empty())
-      {
-        result.msg = ERR_MSG_NETWORK_HEIGHT_QUERY_FAILED;
-        result.msg += (err.empty() ? err2 : err);
-        result.status = register_service_node_result_status::network_height_query_failed;
-        return result;
-      }
-
-      if (!is_synced(1))
-      {
-        result.status = register_service_node_result_status::wallet_not_synced;
-        result.msg    = tr("Wallet is not synced. Please synchronise your wallet to the blockchain");
-        return result;
-      }
-    }
-
-    staking_requirement = service_nodes::get_staking_requirement(nettype(), bc_height);
-    std::vector<std::string> const args(local_args.begin(), local_args.begin() + local_args.size() - 3);
-    contributor_args = service_nodes::convert_registration_args(nettype(), args, staking_requirement, *hf_version);
-
-    if (!contributor_args.success)
-    {
-      result.status = register_service_node_result_status::convert_registration_args_failed;
-      result.msg = tr("Could not convert registration args, reason: ") + contributor_args.err_msg;
-      return result;
-    }
+    if (!err.empty() || !err2.empty())
+      return {register_service_node_result_status::network_height_query_failed,
+        ERR_MSG_NETWORK_HEIGHT_QUERY_FAILED + (err.empty() ? err2 : err)};
   }
 
-  cryptonote::account_public_address address = contributor_args.addresses[0];
+  if (!is_synced(1))
+    return {register_service_node_result_status::wallet_not_synced,
+      tr("Wallet is not synced. Please synchronise your wallet to the blockchain")};
+
+  auto staking_requirement = service_nodes::get_staking_requirement(nettype(), bc_height);
+  service_nodes::registration_details registration;
+  try {
+    registration = service_nodes::convert_registration_args(
+        nettype(),
+        *hf_version,
+        std::vector<std::string>{local_args.begin(), std::prev(local_args.end(), 3)},
+        staking_requirement);
+  } catch (const std::exception& e) {
+    return {register_service_node_result_status::convert_registration_args_failed,
+      tr("Could not convert registration args: ") + std::string{e.what()}};
+  }
+
+  auto address = registration.reserved[0].first;
   if (!contains_address(address))
-  {
-    result.status = register_service_node_result_status::first_address_must_be_primary_address;
-    result.msg = tr(
-                    "The first reserved address for this registration does not belong to this wallet.\n"
-                    "Service node operator must specify an address owned by this wallet for service node registration."
-                   );
-    return result;
-  }
+    return {register_service_node_result_status::first_address_must_be_primary_address,
+      tr("The first reserved address for this registration does not belong to this wallet.\n"
+         "Service node operator must specify an address owned by this wallet for service node registration.")};
 
 
   //
   // Parse Registration Metadata Args
   //
-  size_t const timestamp_index  = local_args.size() - 3;
-  size_t const key_index        = local_args.size() - 2;
-  size_t const signature_index  = local_args.size() - 1;
-  const std::string &service_node_key_as_str = local_args[key_index];
+  size_t const hf_index = local_args.size() - 3;
+  size_t const pubkey_index = local_args.size() - 2;
+  size_t const signature_index = local_args.size() - 1;
+  const std::string &service_node_key_as_str = local_args[pubkey_index];
 
-  crypto::public_key service_node_key;
-  crypto::signature signature;
-  uint64_t expiration_timestamp = 0;
+  uint64_t hf_or_expiration;
+  if (!tools::parse_int<uint64_t>(local_args[hf_index], hf_or_expiration))
+    return {register_service_node_result_status::registration_timestamp_parse_fail,
+      tr("Failed to parse registration hf and/or timestamp") + " '"s + local_args[hf_index] + "'"};
+
+  auto now = std::chrono::system_clock::now();
+  if (registration.uses_portions)
   {
-    try
-    {
-      expiration_timestamp = boost::lexical_cast<uint64_t>(local_args[timestamp_index]);
-      if (expiration_timestamp <= (uint64_t)time(nullptr) + 600 /* 10 minutes */)
-      {
-        result.status = register_service_node_result_status::registration_timestamp_expired;
-        result.msg    = tr("The registration timestamp has expired.");
-        return result;
-      }
-    }
-    catch (const std::exception &e)
-    {
-      result.status = register_service_node_result_status::registration_timestamp_expired;
-      result.msg = tr("The registration timestamp failed to parse: ") + local_args[timestamp_index];
-      return result;
-    }
-
-    if (!tools::hex_to_type(local_args[key_index], service_node_key))
-    {
-      result.status = register_service_node_result_status::service_node_key_parse_fail;
-      result.msg = tr("Failed to parse service node pubkey");
-      return result;
-    }
-
-    if (!tools::hex_to_type(local_args[signature_index], signature))
-    {
-      result.status = register_service_node_result_status::service_node_signature_parse_fail;
-      result.msg = tr("Failed to parse service node signature");
-      return result;
-    }
+    if (static_cast<time_t>(hf_or_expiration) <= std::chrono::system_clock::to_time_t(now + 10min))
+      return {register_service_node_result_status::registration_timestamp_expired,
+        tr("The registration timestamp has expired.")};
+    registration.hf = hf_or_expiration;
   }
+  else
+  {
+    if (registration.hf != hf_or_expiration)
+      return {register_service_node_result_status::registration_timestamp_expired,
+        tr("The registration has the wrong hard fork: ") +
+          std::to_string(hf_or_expiration) + " != " + std::to_string(registration.hf)};
+  }
+
+  if (!tools::hex_to_type(local_args[pubkey_index], registration.service_node_pubkey))
+    return {register_service_node_result_status::service_node_key_parse_fail,
+      tr("Failed to parse service node pubkey")};
+
+  if (!tools::hex_to_type(local_args[signature_index], registration.signature))
+    return {register_service_node_result_status::service_node_signature_parse_fail,
+      tr("Failed to parse service node signature")};
 
   try
   {
-      service_nodes::validate_contributor_args(*hf_version, contributor_args);
-      service_nodes::validate_contributor_args_signature(contributor_args, expiration_timestamp, service_node_key, signature);
+    service_nodes::validate_registration(*hf_version, nettype(), staking_requirement, std::chrono::system_clock::to_time_t(now), registration);
+    service_nodes::validate_registration_signature(registration);
   }
-  catch(const service_nodes::invalid_contributions &e)
+  catch (const service_nodes::invalid_registration& e)
   {
-    result.status = register_service_node_result_status::validate_contributor_args_fail;
-    result.msg    = e.what();
-    return result;
+    return {register_service_node_result_status::validate_registration_args_fail,
+      e.what()};
   }
 
   std::vector<uint8_t> extra;
   add_service_node_contributor_to_tx_extra(extra, address);
-  add_service_node_pubkey_to_tx_extra(extra, service_node_key);
-  if (!add_service_node_register_to_tx_extra(extra, contributor_args.addresses, contributor_args.portions_for_operator, contributor_args.portions, expiration_timestamp, signature))
-  {
-    result.status = register_service_node_result_status::service_node_register_serialize_to_tx_extra_fail;
-    result.msg    = tr("Failed to serialize service node registration tx extra");
-    return result;
-  }
+  add_service_node_pubkey_to_tx_extra(extra, registration.service_node_pubkey);
+  if (!add_service_node_registration_to_tx_extra(extra, registration))
+    return {register_service_node_result_status::service_node_register_serialize_to_tx_extra_fail,
+      tr("Failed to serialize service node registration tx extra")};
 
   //
   // Check service is able to be registered
   //
   refresh(false);
-  {
-    const auto [success, response] = get_service_nodes({service_node_key_as_str});
-    if (!success)
-    {
-      result.status = register_service_node_result_status::service_node_list_query_failed;
-      result.msg    = ERR_MSG_NETWORK_VERSION_QUERY_FAILED;
-      return result;
-    }
-
-    if (response.size() >= 1)
-    {
-      result.status = register_service_node_result_status::service_node_cannot_reregister;
-      result.msg    = tr("This service node is already registered");
-      return result;
-    }
-  }
+  if (const auto [success, response] = get_service_nodes({service_node_key_as_str});
+      !success)
+    return {register_service_node_result_status::service_node_list_query_failed,
+      ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
+  else if (response.size() >= 1)
+    return {register_service_node_result_status::service_node_cannot_reregister,
+      tr("This service node is already registered")};
 
   //
   // Create Register Transaction
   //
+  uint64_t amount_payable_by_operator = 0;
+  if (!registration.uses_portions)
   {
-    uint64_t amount_payable_by_operator = 0;
+    amount_payable_by_operator = registration.reserved.at(0).second;
+  }
+  else
+  {
+    // TODO: all of this can be deleted after HF19 because it won't be used anymore
+    const uint64_t DUST = oxen::MAX_CONTRIBUTORS_V1;
+    uint64_t amount_left = staking_requirement;
+    for (size_t i = 0; i < registration.reserved.size(); i++)
     {
-      const uint64_t DUST                 = oxen::MAX_CONTRIBUTORS_HF19;
-      uint64_t amount_left                = staking_requirement;
-      for (size_t i = 0; i < contributor_args.portions.size(); i++)
-      {
-        uint64_t amount = service_nodes::portions_to_amount(staking_requirement, contributor_args.portions[i]);
-        if (i == 0) amount_payable_by_operator += amount;
-        amount_left -= amount;
-      }
-
-      if (amount_left <= DUST)
-        amount_payable_by_operator += amount_left;
+      uint64_t amount = service_nodes::portions_to_amount(staking_requirement, registration.reserved[i].second);
+      if (i == 0) amount_payable_by_operator += amount;
+      amount_left -= amount;
     }
 
-    std::vector<cryptonote::tx_destination_entry> dsts;
-    cryptonote::tx_destination_entry de;
-    de.addr = address;
-    de.is_subaddress = false;
-    de.amount = amount_payable_by_operator;
-    dsts.push_back(de);
+    if (amount_left <= DUST)
+      amount_payable_by_operator += amount_left;
+  }
 
-    try
-    {
-      // NOTE(oxen): We know the address should always be a primary address and has no payment id, so we can ignore the subaddress/payment id field here
-      cryptonote::address_parse_info dest = {};
-      dest.address                        = address;
+  std::vector<cryptonote::tx_destination_entry> dsts;
+  cryptonote::tx_destination_entry de;
+  de.addr = address;
+  de.is_subaddress = false;
+  de.amount = amount_payable_by_operator;
+  dsts.push_back(de);
 
-      oxen_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, txtype::stake, priority);
-      auto ptx_vector = create_transactions_2(dsts, cryptonote::TX_OUTPUT_DECOYS, 0 /* unlock_time */, priority, extra, subaddr_account, subaddr_indices, tx_params);
-      if (ptx_vector.size() == 1)
-      {
-        result.status = register_service_node_result_status::success;
-        result.ptx    = ptx_vector[0];
-      }
-      else
-      {
-        result.status = register_service_node_result_status::too_many_transactions_constructed;
-        result.msg    = ERR_MSG_TOO_MANY_TXS_CONSTRUCTED;
-      }
-    }
-    catch (const std::exception& e)
+  try
+  {
+    // NOTE(oxen): We know the address should always be a primary address and has no payment id, so we can ignore the subaddress/payment id field here
+    cryptonote::address_parse_info dest = {};
+    dest.address                        = address;
+
+    oxen_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, txtype::stake, priority);
+    auto ptx_vector = create_transactions_2(dsts, cryptonote::TX_OUTPUT_DECOYS, 0 /* unlock_time */, priority, extra, subaddr_account, subaddr_indices, tx_params);
+    if (ptx_vector.size() == 1)
     {
-      result.status = register_service_node_result_status::exception_thrown;
-      result.msg    = ERR_MSG_EXCEPTION_THROWN;
-      result.msg += e.what();
-      return result;
+      result.status = register_service_node_result_status::success;
+      result.ptx    = ptx_vector[0];
     }
+    else
+    {
+      result.status = register_service_node_result_status::too_many_transactions_constructed;
+      result.msg    = ERR_MSG_TOO_MANY_TXS_CONSTRUCTED;
+    }
+  }
+  catch (const std::exception& e)
+  {
+    result.status = register_service_node_result_status::exception_thrown;
+    result.msg    = ERR_MSG_EXCEPTION_THROWN;
+    result.msg += e.what();
+    return result;
   }
 
   assert(result.status != register_service_node_result_status::invalid);
@@ -13309,10 +13269,9 @@ bool wallet2::export_key_images_to_file(const fs::path& filename, bool requested
   std::pair<size_t, std::vector<std::pair<crypto::key_image, crypto::signature>>> ski = export_key_images(requested_only);
   const cryptonote::account_public_address &keys = get_account().get_keys().m_account_address;
   std::string data;
-  const uint32_t offset = boost::endian::native_to_little(ski.first);
-  data.reserve(sizeof(offset) + ski.second.size() * (sizeof(crypto::key_image) + sizeof(crypto::signature)) + 2 * sizeof(crypto::public_key));
-  data.resize(sizeof(offset));
-  std::memcpy(&data[0], &offset, sizeof(offset));
+  data.reserve(sizeof(uint32_t) + ski.second.size() * (sizeof(crypto::key_image) + sizeof(crypto::signature)) + 2 * sizeof(crypto::public_key));
+  data.resize(sizeof(uint32_t));
+  oxenc::write_host_as_little<uint32_t>(ski.first, data.data());
   data += tools::view_guts(keys.m_spend_public_key);
   data += tools::view_guts(keys.m_view_public_key);
   for (const auto &i: ski.second)
@@ -13410,9 +13369,7 @@ uint64_t wallet2::import_key_images_from_file(const fs::path& filename, uint64_t
   const size_t headerlen = 4 + 2 * sizeof(crypto::public_key);
   THROW_WALLET_EXCEPTION_IF(data.size() < headerlen, error::wallet_internal_error, std::string("Bad data size from file ") + filename.u8string());
 
-  uint32_t offset;
-  std::memcpy(&offset, data.data(), sizeof(offset));
-  boost::endian::little_to_native_inplace(offset);
+  uint32_t offset = oxenc::load_little_to_host<uint32_t>(data.data());
   THROW_WALLET_EXCEPTION_IF(offset > m_transfers.size(), error::wallet_internal_error, "Offset larger than known outputs");
 
   // Validate embedded spend/view public keys

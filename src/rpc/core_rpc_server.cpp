@@ -32,7 +32,6 @@
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/variables_map.hpp>
 #include <boost/preprocessor/stringize.hpp>
-#include <boost/endian/conversion.hpp>
 #include <algorithm>
 #include <cstring>
 #include <iterator>
@@ -736,12 +735,29 @@ namespace cryptonote { namespace rpc {
       void operator()(const tx_extra_service_node_pubkey& x) { entry.sn_pubkey = tools::type_to_hex(x.m_service_node_key); }
       void operator()(const tx_extra_service_node_register& x) {
         auto& reg = entry.sn_registration.emplace();
-        reg.fee = microportion(x.m_portions_for_operator);
-        reg.expiry = x.m_expiration_timestamp;
-        for (size_t i = 0; i < x.m_portions.size(); i++) {
-          auto& [wallet, portion] = reg.contributors.emplace_back();
-          wallet = get_account_address_as_str(nettype, false, {x.m_public_spend_keys[i], x.m_public_view_keys[i]});
-          portion = microportion(x.m_portions[i]);
+        if (x.hf_or_expiration <= 255) { // hard fork value
+          reg.hardfork = static_cast<hf>(x.hf_or_expiration);
+          reg.fee = x.fee * 1'000'000 / STAKING_FEE_BASIS;
+        } else { // timestamp
+          reg.hardfork = hf::none;
+          reg.expiry = x.hf_or_expiration;
+          reg.fee = microportion(x.fee);
+        }
+
+        for (size_t i = 0; i < x.amounts.size(); i++) {
+          auto& [wallet, amount, portion] = reg.contributors.emplace_back();
+          wallet = get_account_address_as_str(nettype, false, {x.public_spend_keys[i], x.public_view_keys[i]});
+          if (reg.hardfork >= hf::hf19_reward_batching) {
+            amount = x.amounts[i];
+            // We aren't given info on whether this is testnet/mainnet, but we can guess by looking
+            // at the operator amount, which has to be <= 100 on testnet, but >= 3750 on mainnet.
+            auto nettype = x.amounts[0] > oxen::STAKING_REQUIREMENT_TESTNET
+              ? network_type::MAINNET : network_type::TESTNET;
+            portion = std::lround(amount / (double) service_nodes::get_staking_requirement(nettype, reg.hardfork) * 1'000'000.0);
+          } else {
+            amount = 0;
+            portion = microportion(x.amounts[i]);
+          }
         }
       }
       void operator()(const tx_extra_service_node_contributor& x) {

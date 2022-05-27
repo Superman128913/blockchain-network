@@ -280,7 +280,7 @@ namespace cryptonote
       return false;
     }
 
-    if (hf_version < hf::hf19)
+    if (hf_version < hf::hf19_reward_batching)
     {
       if (!opts.kept_by_block && tx.is_transfer() && !m_blockchain.check_fee(tx_weight, tx.vout.size(), fee, burned, opts))
       {

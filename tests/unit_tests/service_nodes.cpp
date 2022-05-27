@@ -330,19 +330,28 @@ TEST(service_nodes, tx_extra_state_change_validation)
   }
 }
 
+static auto fake_portions(std::initializer_list<uint64_t> portions_in) {
+    std::vector<std::pair<cryptonote::account_public_address, uint64_t>> portions_out;
+    portions_out.reserve(portions_in.size());
+    cryptonote::account_public_address null_addr{};
+    for (auto& p : portions_in)
+        portions_out.emplace_back(null_addr, p);
+    return portions_out;
+}
+
 TEST(service_nodes, min_portions)
 {
 
   auto hf_version = cryptonote::hf::hf9_service_nodes;
   // Test new contributors can *NOT* stake to a registration with under 25% of the total stake if there is more than 25% available.
   {
-    ASSERT_FALSE(service_nodes::check_service_node_portions(hf_version, {0, cryptonote::old::STAKING_PORTIONS}));
+    ASSERT_FALSE(service_nodes::check_service_node_portions(hf_version, fake_portions({0, cryptonote::old::STAKING_PORTIONS})));
   }
 
   {
-    const auto small = cryptonote::old::STAKING_PORTIONS / oxen::MAX_CONTRIBUTORS_HF19 - 1;
+    const auto small = cryptonote::old::STAKING_PORTIONS / oxen::MAX_CONTRIBUTORS_V1 - 1;
     const auto rest = cryptonote::old::STAKING_PORTIONS - small;
-    ASSERT_FALSE(service_nodes::check_service_node_portions(hf_version, {small, rest}));
+    ASSERT_FALSE(service_nodes::check_service_node_portions(hf_version, fake_portions({small, rest})));
   }
 
   constexpr auto MIN_PORTIONS_HF19 = cryptonote::old::STAKING_PORTIONS / oxen::MAX_CONTRIBUTORS_HF19;
@@ -351,13 +360,13 @@ TEST(service_nodes, min_portions)
     /// TODO: fix this test
     const auto small = MIN_PORTIONS_HF19 - 1;
     const auto rest = cryptonote::old::STAKING_PORTIONS - small - cryptonote::old::STAKING_PORTIONS / 2;
-    ASSERT_FALSE(service_nodes::check_service_node_portions(hf_version, {cryptonote::old::STAKING_PORTIONS / 2, small, rest}));
+    ASSERT_FALSE(service_nodes::check_service_node_portions(hf_version, fake_portions({cryptonote::old::STAKING_PORTIONS / 2, small, rest})));
   }
 
   {
     const auto small = MIN_PORTIONS_HF19 - 1;
     const auto rest = cryptonote::old::STAKING_PORTIONS - small - 2 * MIN_PORTIONS_HF19;
-    ASSERT_FALSE(service_nodes::check_service_node_portions(hf_version, {MIN_PORTIONS_HF19, MIN_PORTIONS_HF19, small, rest}));
+    ASSERT_FALSE(service_nodes::check_service_node_portions(hf_version, fake_portions({MIN_PORTIONS_HF19, MIN_PORTIONS_HF19, small, rest})));
   }
 
   // Test new contributors *CAN* stake as the last person with under 25% if there is less than 25% available.
@@ -366,7 +375,7 @@ TEST(service_nodes, min_portions)
   {
     const auto large = 4 * (cryptonote::old::STAKING_PORTIONS / 5);
     const auto rest = cryptonote::old::STAKING_PORTIONS - large;
-    bool result = service_nodes::check_service_node_portions(hf_version, {large, rest});
+    bool result = service_nodes::check_service_node_portions(hf_version, fake_portions({large, rest}));
     ASSERT_TRUE(result);
   }
 
@@ -374,7 +383,7 @@ TEST(service_nodes, min_portions)
   {
     const auto half = cryptonote::old::STAKING_PORTIONS / 2 - 1;
     const auto rest = cryptonote::old::STAKING_PORTIONS - 2 * half;
-    bool result = service_nodes::check_service_node_portions(hf_version, {half, half, rest});
+    bool result = service_nodes::check_service_node_portions(hf_version, fake_portions({half, half, rest}));
     ASSERT_TRUE(result);
   }
 
@@ -382,7 +391,7 @@ TEST(service_nodes, min_portions)
   {
     const auto third = cryptonote::old::STAKING_PORTIONS / 3 - 1;
     const auto rest = cryptonote::old::STAKING_PORTIONS - 3 * third;
-    bool result = service_nodes::check_service_node_portions(hf_version, {third, third, third, rest});
+    bool result = service_nodes::check_service_node_portions(hf_version, fake_portions({third, third, third, rest}));
     ASSERT_TRUE(result);
   }
 
@@ -390,25 +399,25 @@ TEST(service_nodes, min_portions)
   hf_version = cryptonote::hf::hf11_infinite_staking;
 
   {
-    ASSERT_FALSE(service_nodes::check_service_node_portions(hf_version, {0, cryptonote::old::STAKING_PORTIONS}));
+    ASSERT_FALSE(service_nodes::check_service_node_portions(hf_version, fake_portions({0, cryptonote::old::STAKING_PORTIONS})));
   }
 
   {
     const auto small = MIN_PORTIONS_HF19 - 1;
     const auto rest = cryptonote::old::STAKING_PORTIONS - small;
-    ASSERT_FALSE(service_nodes::check_service_node_portions(hf_version, {small, rest}));
+    ASSERT_FALSE(service_nodes::check_service_node_portions(hf_version, fake_portions({small, rest})));
   }
 
   {
     const auto small = cryptonote::old::STAKING_PORTIONS / 8;
     const auto rest = cryptonote::old::STAKING_PORTIONS - small - cryptonote::old::STAKING_PORTIONS / 2;
-    ASSERT_FALSE(service_nodes::check_service_node_portions(hf_version, {cryptonote::old::STAKING_PORTIONS / 2, small, rest}));
+    ASSERT_FALSE(service_nodes::check_service_node_portions(hf_version, fake_portions({cryptonote::old::STAKING_PORTIONS / 2, small, rest})));
   }
 
   {
     const auto small = MIN_PORTIONS_HF19 - 1;
     const auto rest = cryptonote::old::STAKING_PORTIONS - small - 2 * MIN_PORTIONS_HF19;
-    ASSERT_FALSE(service_nodes::check_service_node_portions(hf_version, {MIN_PORTIONS_HF19, MIN_PORTIONS_HF19, small, rest}));
+    ASSERT_FALSE(service_nodes::check_service_node_portions(hf_version, fake_portions({MIN_PORTIONS_HF19, MIN_PORTIONS_HF19, small, rest})));
   }
 
   // Test new contributors *CAN* stake as the last person with under 25% if there is less than 25% available.
@@ -417,7 +426,7 @@ TEST(service_nodes, min_portions)
   {
     const auto large = 4 * (cryptonote::old::STAKING_PORTIONS / 5);
     const auto rest = cryptonote::old::STAKING_PORTIONS - large;
-    bool result = service_nodes::check_service_node_portions(hf_version, {large, rest});
+    bool result = service_nodes::check_service_node_portions(hf_version, fake_portions({large, rest}));
     ASSERT_TRUE(result);
   }
 
@@ -425,7 +434,7 @@ TEST(service_nodes, min_portions)
   {
     const auto half = cryptonote::old::STAKING_PORTIONS / 2 - 1;
     const auto rest = cryptonote::old::STAKING_PORTIONS - 2 * half;
-    bool result = service_nodes::check_service_node_portions(hf_version, {half, half, rest});
+    bool result = service_nodes::check_service_node_portions(hf_version, fake_portions({half, half, rest}));
     ASSERT_TRUE(result);
   }
 
@@ -433,7 +442,7 @@ TEST(service_nodes, min_portions)
   {
     const auto third = cryptonote::old::STAKING_PORTIONS / 3 - 1;
     const auto rest = cryptonote::old::STAKING_PORTIONS - 3 * third;
-    bool result = service_nodes::check_service_node_portions(hf_version, {third, third, third, rest});
+    bool result = service_nodes::check_service_node_portions(hf_version, fake_portions({third, third, third, rest}));
     ASSERT_TRUE(result);
   }
 
@@ -443,7 +452,7 @@ TEST(service_nodes, min_portions)
     const auto small_1 = cryptonote::old::STAKING_PORTIONS / 6;
     const auto small_2 = cryptonote::old::STAKING_PORTIONS / 6;
     const auto rest = cryptonote::old::STAKING_PORTIONS - large - small_1 - small_2;
-    bool result = service_nodes::check_service_node_portions(hf_version, {large, small_1, small_2, rest});
+    bool result = service_nodes::check_service_node_portions(hf_version, fake_portions({large, small_1, small_2, rest}));
     ASSERT_TRUE(result);
   }
 

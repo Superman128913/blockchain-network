@@ -104,12 +104,14 @@ KV_SERIALIZE_MAP_CODE_END()
 
 KV_SERIALIZE_MAP_CODE_BEGIN(GET_TRANSACTIONS::extra_entry::sn_reg_info::contribution)
   KV_SERIALIZE(wallet)
+  if (this_ref.amount > 0) KV_SERIALIZE(amount)
   KV_SERIALIZE(portion)
 KV_SERIALIZE_MAP_CODE_END()
 KV_SERIALIZE_MAP_CODE_BEGIN(GET_TRANSACTIONS::extra_entry::sn_reg_info)
   KV_SERIALIZE(contributors)
   KV_SERIALIZE(fee)
-  KV_SERIALIZE(expiry)
+  if (this_ref.hardfork >= hf::hf19_reward_batching) { KV_SERIALIZE_ENUM(hardfork) }
+  else { KV_SERIALIZE(expiry) }
 KV_SERIALIZE_MAP_CODE_END()
 KV_SERIALIZE_MAP_CODE_BEGIN(GET_TRANSACTIONS::extra_entry::state_change)
   KV_SERIALIZE(old_dereg)

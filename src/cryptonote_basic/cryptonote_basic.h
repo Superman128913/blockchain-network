@@ -455,7 +455,7 @@ namespace cryptonote
       throw std::invalid_argument{"too many txs in block"};
     if (b.major_version >= hf::hf16_pulse)
       field(ar, "signatures", b.signatures);
-    if (b.major_version >= hf::hf19)
+    if (b.major_version >= hf::hf19_reward_batching)
     {
       field_varint(ar, "height", b.height);
       field(ar, "service_node_winner_key", b.service_node_winner_key);

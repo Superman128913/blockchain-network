@@ -302,25 +302,46 @@ namespace cryptonote
   };
 
 
+  /// Service node registration details.
+  ///
+  /// A registration contains any reserved amounts + addresses starting with the operator, and must
+  /// always have at least one (the operator).
+  ///
+  /// Before HF19 this is limited to 4 spots per registrations, and amounts/fees are specified in
+  /// portions (i.e. the numerator of a fraction with denominator 2^64 - 4).
+  ///
+  /// Starting in HF19 we allow 10 spots per registration, reserved amounts are specified in atomic
+  /// OXEN (i.e. 1000000000 = 1 OXEN), and the operator fee is specified in a per-million value
+  /// (i.e.  1000000 = 100%).
+  ///
+  /// The `hf_or_expiration` field, before HF19, is a timestamp at which the registration expires;
+  /// starting in HF19, it is instead a hardfork version of the registration which must agree with
+  /// the current hardfork version (e.g. if set to 23 then the registration is only accepted on
+  /// HF23).
+  ///
+  /// For crossing-the-hardfork compatibility, we allow pre-HF19 registrations (i.e. using a
+  /// timestamp + portions + at most 4 reserved spots) during HF19 (but not in HF20+).
+  ///
   struct tx_extra_service_node_register
   {
-    std::vector<crypto::public_key> m_public_spend_keys;
-    std::vector<crypto::public_key> m_public_view_keys;
-    uint64_t m_portions_for_operator;
-    std::vector<uint64_t> m_portions;  // portions *or* amounts as of HF19
-    uint64_t m_expiration_timestamp;
-    crypto::signature m_service_node_signature;
+    std::vector<crypto::public_key> public_spend_keys; // public spend key half of the reserved wallets (at least one)
+    std::vector<crypto::public_key> public_view_keys; // public view key half of the reserved wallets (at least one)
+    uint64_t fee;  // portions before HF19, millionths (1000000 = 100%) in HF19+.
+    std::vector<uint64_t> amounts;  // portions before HF19, atomic amounts after.
+    uint64_t hf_or_expiration;  /// registration expiration unix timestamp before HF18; the hardfork version of the registration starting in HF19
+    crypto::signature signature;  /// Signature of ( fee || spend[0] || view[0] || amount[0] || ... || spend[n] || view[n] || amount[n] || hf_expiration ), where integer values are little-endian encoded 8-byte strings
 
     BEGIN_SERIALIZE()
-      FIELD(m_public_spend_keys)
-      FIELD(m_public_view_keys)
-      FIELD(m_portions_for_operator)
-      FIELD(m_portions)
-      FIELD(m_expiration_timestamp)
-      FIELD(m_service_node_signature)
+      FIELD(public_spend_keys)
+      FIELD(public_view_keys)
+      FIELD(fee)
+      FIELD(amounts)
+      FIELD(hf_or_expiration)
+      FIELD(signature)
     END_SERIALIZE()
   };
 
+  /// Service node contributor address.
   struct tx_extra_service_node_contributor
   {
     crypto::public_key m_spend_public_key;
