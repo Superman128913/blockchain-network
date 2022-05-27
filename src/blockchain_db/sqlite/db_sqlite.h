@@ -66,6 +66,13 @@ public:
   // get_payments -> passing a block height will return an array of payments that should be created in a coinbase transaction on that block given the current batching DB state.
   std::optional<std::vector<cryptonote::batch_sn_payment>> get_sn_payments(uint64_t block_height);
 
+  // get_accrued_earnings -> queries the database for the amount that has been accrued to `service_node_address` will return the atomic value in oxen that
+  // the service node is owed.
+  uint64_t get_accrued_earnings(const std::string& address);
+  // get_all_accrued_earnings -> queries the database for all the amount that has been accrued to service nodes will return 
+  // 2 vectors corresponding to the addresses and the atomic value in oxen that the service nodes are owed.
+  std::pair<std::vector<std::string>, std::vector<uint64_t>> get_all_accrued_earnings();
+
   // calculate_rewards -> takes the list of contributors from sn_info with their SN contribution amounts and will calculate how much of the block rewards should be the allocated to the contributors. The function will return a list suitable for passing to add_sn_payments
   std::vector<cryptonote::batch_sn_payment> calculate_rewards(hf hf_version, uint64_t distribution_amount, service_nodes::service_node_info sn_info);
 

@@ -1967,6 +1967,29 @@ namespace rpc {
   };
 
   OXEN_RPC_DOC_INTROSPECT
+  // Accesses the amounts accrued to addresses in the batching database
+  struct GET_ACCRUED_BATCHED_EARNINGS: PUBLIC
+  {
+    static constexpr auto names() { return NAMES("get_accrued_batched_earnings"); }
+
+    struct request
+    {
+      std::vector<std::string> addresses; // Array of addresses to query the batching database about.
+
+      KV_MAP_SERIALIZABLE
+    };
+
+    struct response
+    {
+      std::string status;            // Generic RPC error code. "OK" is the success value.
+      std::vector<std::string> addresses; // Array of addresses to query the batching database about.
+      std::vector<uint64_t> amounts; // An array of amounts according to the provided addressses
+
+      KV_MAP_SERIALIZABLE
+    };
+  };
+
+  OXEN_RPC_DOC_INTROSPECT
   // Get the service private keys of the queried daemon, encoded in hex.  Do not ever share
   // these keys: they would allow someone to impersonate your service node.  All three keys are used
   // when running as a service node; when running as a regular node only the x25519 key is regularly
@@ -2660,7 +2683,8 @@ namespace rpc {
     ONS_NAMES_TO_OWNERS,
     ONS_OWNERS_TO_NAMES,
     ONS_RESOLVE,
-    FLUSH_CACHE
+    FLUSH_CACHE,
+    GET_ACCRUED_BATCHED_EARNINGS
   >;
 
 } } // namespace cryptonote::rpc
