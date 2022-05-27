@@ -52,36 +52,32 @@ static constexpr std::array mainnet_hard_forks =
 
 static constexpr std::array testnet_hard_forks =
 {
-  hard_fork{hf::hf7,                      0,        0, 1533631121 }, // Testnet was rebooted during Loki 3 development
-  hard_fork{hf::hf8,                      0,        2, 1533631122 },
-  hard_fork{hf::hf9_service_nodes,        0,        3, 1533631123 },
-  hard_fork{hf::hf10_bulletproofs,        0,        4, 1542681077 },
-  hard_fork{hf::hf11_infinite_staking,    0,        5, 1551223964 },
-  hard_fork{hf::hf12_checkpointing,       0,    75471, 1561608000 }, // 2019-06-28 14:00 AEDT
-  hard_fork{hf::hf13_enforce_checkpoints, 0,   127028, 1568440800 }, // 2019-09-13 16:00 AEDT
-  hard_fork{hf::hf14_blink,               0,   174630, 1575075600 }, // 2019-11-30 07:00 UTC
-  hard_fork{hf::hf15_ons,                 0,   244777, 1583940000 }, // 2020-03-11 15:20 UTC
-  hard_fork{hf::hf16_pulse,               0,   382222, 1600468200 }, // 2020-09-18 22:30 UTC
-  hard_fork{hf::hf17,                     0,   447275, 1608276840 }, // 2020-12-18 05:34 UTC
-  hard_fork{hf::hf18,                     0,   501750, 1616631051 }, // 2021-03-25 12:10 UTC
-  hard_fork{hf::hf18,                     1,   578637, 1624040400 }, // 2021-06-18 18:20 UTC
-  hard_fork{hf::hf19_reward_batching,     0,   732355, 1650402545 },
-  hard_fork{hf::hf19_reward_batching,     1,   751553, 1652152424 },
+  hard_fork{hf::hf7,                      0,     0,  1653632397}, // Testnet was rebooted during HF19 - Oxen 10
+  hard_fork{hf::hf11_infinite_staking,    0,     2,  1653632397},
+  hard_fork{hf::hf12_checkpointing,       0,     3,  1653632397},
+  hard_fork{hf::hf13_enforce_checkpoints, 0,     4,  1653632397},
+  hard_fork{hf::hf14_blink,               0,     5,  1653632397},
+  hard_fork{hf::hf15_ons,                 0,     6,  1653632397},
+  hard_fork{hf::hf16_pulse,               0,   200,  1653632397},
+  hard_fork{hf::hf17,                     0,   251,  1653632397},
+  hard_fork{hf::hf18,                     0,   252,  1653632397},
+  hard_fork{hf::hf19_reward_batching,     0,   253,  1653632397},
+  hard_fork{hf::hf19_reward_batching,     1,   254,  1653632397}, // 2022-05-27T06:19:57.000Z UTC
 };
 
 static constexpr std::array devnet_hard_forks =
 {
-  hard_fork{hf::hf7,                      0,     0,  1653500577},
-  hard_fork{hf::hf11_infinite_staking,    0,     2,  1653500577},
-  hard_fork{hf::hf12_checkpointing,       0,     3,  1653500577},
-  hard_fork{hf::hf13_enforce_checkpoints, 0,     4,  1653500577},
-  hard_fork{hf::hf14_blink,               0,     5,  1653500577},
-  hard_fork{hf::hf15_ons,                 0,     6,  1653500577},
-  hard_fork{hf::hf16_pulse,               0,   100,  1653500577},
-  hard_fork{hf::hf17,                     0,   151,  1653500577},
-  hard_fork{hf::hf18,                     0,   152,  1653500577},
-  hard_fork{hf::hf19_reward_batching,     0,   153,  1653500577},
-  hard_fork{hf::hf19_reward_batching,     1,   154,  1653500577},
+  hard_fork{hf::hf7,                      0,     0,  1653632397},
+  hard_fork{hf::hf11_infinite_staking,    0,     2,  1653632397},
+  hard_fork{hf::hf12_checkpointing,       0,     3,  1653632397},
+  hard_fork{hf::hf13_enforce_checkpoints, 0,     4,  1653632397},
+  hard_fork{hf::hf14_blink,               0,     5,  1653632397},
+  hard_fork{hf::hf15_ons,                 0,     6,  1653632397},
+  hard_fork{hf::hf16_pulse,               0,   200,  1653632397},
+  hard_fork{hf::hf17,                     0,   251,  1653632397},
+  hard_fork{hf::hf18,                     0,   252,  1653632397},
+  hard_fork{hf::hf19_reward_batching,     0,   253,  1653632397},
+  hard_fork{hf::hf19_reward_batching,     1,   254,  1653632397}, // 2022-05-27T06:19:57.000Z UTC
 };
 
 
