@@ -352,7 +352,7 @@ namespace service_nodes
   {
     if (reg.uses_portions)
     {
-      if (hf_version > hf::hf19_reward_batching)
+      if (hf_version >= hf::hf19_reward_batching)
         throw invalid_registration{"Portion-based registrations are not permitted after HF19"};
     }
     else
