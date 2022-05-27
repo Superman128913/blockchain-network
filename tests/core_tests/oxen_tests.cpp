@@ -3112,7 +3112,7 @@ bool oxen_service_nodes_small_contribution_early_withdrawal::generate(std::vecto
   uint64_t operator_amount = staking_requirement / oxen::MAX_CONTRIBUTORS_HF19 * (oxen::MAX_CONTRIBUTORS_HF19 - 1);
   uint64_t single_contributed_amount = staking_requirement - operator_amount + 1;
   cryptonote::keypair sn_keys{hw::get_device("default")};
-  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_portions);
+  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_amount);
   gen.add_tx(register_tx);
   gen.create_and_add_next_block({register_tx});
 
@@ -3165,7 +3165,7 @@ bool oxen_service_nodes_large_contribution_early_withdrawal::generate(std::vecto
   uint64_t operator_amount = staking_requirement / oxen::MAX_CONTRIBUTORS_HF19 * (oxen::MAX_CONTRIBUTORS_HF19- 4);
   uint64_t single_contributed_amount = staking_requirement - operator_amount + 1;
   cryptonote::keypair sn_keys{hw::get_device("default")};
-  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_portions);
+  cryptonote::transaction register_tx = gen.create_registration_tx(gen.first_miner_, sn_keys, operator_amount);
   gen.add_tx(register_tx);
   gen.create_and_add_next_block({register_tx});
 
