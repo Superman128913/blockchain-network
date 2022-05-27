@@ -6390,13 +6390,13 @@ std::string wallet2::transfers_to_csv(const std::vector<wallet::transfer_view>& 
       transfer.lock_msg,
       (transfer.checkpointed ? "yes" : "no"),
       tools::get_human_readable_timestamp(transfer.timestamp),
-      fmt::format(coin_format, transfer.amount / COIN, transfer.amount % COIN),
-      fmt::format(coin_format, running_balance / COIN, running_balance % COIN),
+      fmt::format(coin_format, transfer.amount / oxen::COIN, transfer.amount % oxen::COIN),
+      fmt::format(coin_format, running_balance / oxen::COIN, running_balance % oxen::COIN),
       transfer.txid,
       transfer.payment_id,
       cryptonote::print_money(transfer.fee),
       (transfer.destinations.size() ? transfer.destinations.front().address : "-"),
-      (transfer.destinations.size() ? fmt::format(coin_format, transfer.destinations.front().amount / COIN, transfer.destinations.front().amount % COIN) : ""),
+      (transfer.destinations.size() ? fmt::format(coin_format, transfer.destinations.front().amount / oxen::COIN, transfer.destinations.front().amount % oxen::COIN) : ""),
       indices,
       transfer.note);
 
@@ -6407,7 +6407,7 @@ std::string wallet2::transfers_to_csv(const std::vector<wallet::transfer_view>& 
     for (auto it = std::next(transfer.destinations.cbegin()); it != transfer.destinations.cend(); ++it)
       output << fmt::format(data_format,
           "", "", "", "", "", "", "", "", "", "",
-          it->address, fmt::format(coin_format, it->amount / COIN, it->amount % COIN), "", "");
+          it->address, fmt::format(coin_format, it->amount / oxen::COIN, it->amount % oxen::COIN), "", "");
   }
   return output.str();
 }
