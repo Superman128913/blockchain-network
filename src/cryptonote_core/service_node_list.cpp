@@ -913,7 +913,7 @@ namespace service_nodes
                               });
       if (cit != contributor.locked_contributions.end())
       {
-        if (hf_version >= hf::hf19)
+        if (hf_version >= hf::hf19_reward_batching)
         {
           if (cit->amount < service_nodes::SMALL_CONTRIBUTOR_THRESHOLD && (block_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
           {
