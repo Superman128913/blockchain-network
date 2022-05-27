@@ -222,7 +222,45 @@ namespace cryptonote {
     return payments;
   }
 
+
+  uint64_t BlockchainSQLite::get_accrued_earnings(const std::string& address) {
+    LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
+
+    SQLite::Statement select_earnings {
+      db,
+      "SELECT amount FROM batched_payments_accrued WHERE address = ?;"
+    };
+    select_earnings.bind(1, address);
+
+    uint64_t amount{};
+    while (select_earnings.executeStep()) {
+      amount = static_cast<uint64_t>(select_earnings.getColumn(0).getInt64() / 1000);
+    }
+
+    return amount;
+  }
+
+  std::pair<std::vector<std::string>, std::vector<uint64_t>> BlockchainSQLite::get_all_accrued_earnings() {
+    LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
+
+    SQLite::Statement select_earnings {
+      db,
+      "SELECT address, amount FROM batched_payments_accrued;"
+    };
+
+    std::vector<uint64_t> amounts;
+    std::vector<std::string> addresses;
+    while (select_earnings.executeStep()) {
+      addresses.emplace_back(select_earnings.getColumn(0).getString());
+      amounts.emplace_back(static_cast<uint64_t>(select_earnings.getColumn(1).getInt64() / 1000));
+    }
+
+    return std::make_pair(addresses, amounts);
+  }
+
+
   std::vector<cryptonote::batch_sn_payment> BlockchainSQLite::calculate_rewards(hf hf_version, uint64_t distribution_amount, service_nodes::service_node_info sn_info) {
+
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
 
     // Find out how much is due for the operator: fee_portions/PORTIONS * reward

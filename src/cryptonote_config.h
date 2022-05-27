@@ -335,6 +335,8 @@ namespace config
     "LDBEN6Ut4NkMwyaXWZ7kBEAx8X64o6YtDhLXUP26uLHyYT4nFmcaPU2Z2fauqrhTLh4Qfr61pUUZVLaTHqAdycETKM1STrz"sv, // hardfork v11
   };
 
+  inline constexpr uint64_t HARDFORK_DEREGISTRATION_GRACE_PERIOD = 7 * cryptonote::BLOCKS_PER_DAY; // After a hardfork we will decommission sns but wont dereg, allowing time to update
+
   inline constexpr auto UPTIME_PROOF_TOLERANCE = 5min; // How much an uptime proof timestamp can deviate from our timestamp before we refuse it
   inline constexpr auto UPTIME_PROOF_STARTUP_DELAY = 30s; // How long to wait after startup before broadcasting a proof
   inline constexpr auto UPTIME_PROOF_CHECK_INTERVAL = 30s; // How frequently to check whether we need to broadcast a proof
@@ -446,6 +448,8 @@ struct network_config
   uint64_t LIMIT_BATCH_OUTPUTS;
   uint64_t SERVICE_NODE_PAYABLE_AFTER_BLOCKS;
 
+  uint64_t HARDFORK_DEREGISTRATION_GRACE_PERIOD;
+
 
   inline constexpr std::string_view governance_wallet_address(hf hard_fork_version) const {
     const auto wallet_switch =
@@ -480,6 +484,7 @@ inline constexpr network_config mainnet_config{
   config::MIN_BATCH_PAYMENT_AMOUNT,
   config::LIMIT_BATCH_OUTPUTS,
   config::SERVICE_NODE_PAYABLE_AFTER_BLOCKS,
+  config::HARDFORK_DEREGISTRATION_GRACE_PERIOD,
 };
 inline constexpr network_config testnet_config{
   network_type::TESTNET,
@@ -506,6 +511,7 @@ inline constexpr network_config testnet_config{
   config::MIN_BATCH_PAYMENT_AMOUNT,
   config::LIMIT_BATCH_OUTPUTS,
   config::testnet::SERVICE_NODE_PAYABLE_AFTER_BLOCKS,
+  config::HARDFORK_DEREGISTRATION_GRACE_PERIOD,
 };
 inline constexpr network_config devnet_config{
   network_type::DEVNET,
@@ -532,6 +538,7 @@ inline constexpr network_config devnet_config{
   config::MIN_BATCH_PAYMENT_AMOUNT,
   config::LIMIT_BATCH_OUTPUTS,
   config::testnet::SERVICE_NODE_PAYABLE_AFTER_BLOCKS,
+  config::HARDFORK_DEREGISTRATION_GRACE_PERIOD,
 };
 inline constexpr network_config fakenet_config{
   network_type::FAKECHAIN,
@@ -558,6 +565,7 @@ inline constexpr network_config fakenet_config{
   config::MIN_BATCH_PAYMENT_AMOUNT,
   config::LIMIT_BATCH_OUTPUTS,
   config::testnet::SERVICE_NODE_PAYABLE_AFTER_BLOCKS,
+  config::HARDFORK_DEREGISTRATION_GRACE_PERIOD,
 };
 
 inline constexpr const network_config& get_config(network_type nettype)

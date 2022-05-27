@@ -1852,13 +1852,9 @@ namespace cryptonote { namespace rpc {
       response.pow_hash = tools::type_to_hex(get_block_longhash_w_blockchain(m_core.get_nettype(), &(m_core.get_blockchain_storage()), blk, height, 0));
     response.long_term_weight = m_core.get_blockchain_storage().get_db().get_block_long_term_weight(height);
     response.service_node_winner = (tools::type_to_hex(blk.service_node_winner_key) == "") ? tools::type_to_hex(cryptonote::get_service_node_winner_from_tx_extra(blk.miner_tx.extra)) : tools::type_to_hex(blk.service_node_winner_key);
+    response.coinbase_payouts = get_block_reward(blk);
     if (blk.miner_tx.vout.size() > 0)
-    {
-      response.miner_reward = blk.miner_tx.vout[0].amount;
       response.miner_tx_hash = tools::type_to_hex(cryptonote::get_transaction_hash(blk.miner_tx));
-    } else {
-      response.miner_reward = get_block_reward(blk);
-    }
     if (get_tx_hashes)
     {
       response.tx_hashes.reserve(blk.tx_hashes.size());
@@ -2793,6 +2789,44 @@ namespace cryptonote { namespace rpc {
   }
 
 
+  //------------------------------------------------------------------------------------------------------------------------------
+  GET_ACCRUED_BATCHED_EARNINGS::response core_rpc_server::invoke(GET_ACCRUED_BATCHED_EARNINGS::request&& req, rpc_context context)
+  {
+    GET_ACCRUED_BATCHED_EARNINGS::response res{};
+
+    PERF_TIMER(on_get_accrued_batched_earnings);
+
+    auto& blockchain = m_core.get_blockchain_storage();
+    bool at_least_one_succeeded = false;
+
+    if (req.addresses.size() > 0)
+    {
+      for (const auto& address : req.addresses)
+      {
+        res.addresses.emplace_back(address);
+        if (cryptonote::is_valid_address(address, nettype()))
+        {
+          uint64_t amount = blockchain.sqlite_db()->get_accrued_earnings(address);
+          res.amounts.emplace_back(amount);
+          at_least_one_succeeded = true;
+        } else {
+          res.amounts.emplace_back(0);
+        }
+      }
+    } else {
+        auto [addresses, amounts] = blockchain.sqlite_db()->get_all_accrued_earnings();
+        res.addresses = std::move(addresses);
+        res.amounts = std::move(amounts);
+        at_least_one_succeeded = true;
+    }
+
+    if (!at_least_one_succeeded)
+      throw rpc_error{ERROR_WRONG_PARAM, "Failed to query any service nodes batched amounts at all"};
+
+    res.status = STATUS_OK;
+    return res;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   GET_QUORUM_STATE::response core_rpc_server::invoke(GET_QUORUM_STATE::request&& req, rpc_context context)
   {
     GET_QUORUM_STATE::response res{};

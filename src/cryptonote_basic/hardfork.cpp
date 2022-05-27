@@ -119,7 +119,6 @@ std::pair<const hard_fork*, const hard_fork*> get_hard_forks(network_type type)
   return {nullptr, nullptr};
 }
 
-
 std::pair<std::optional<uint64_t>, std::optional<uint64_t>>
 get_hard_fork_heights(network_type nettype, hf version) {
   std::pair<std::optional<uint64_t>, std::optional<uint64_t>> found;
