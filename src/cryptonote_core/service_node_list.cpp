@@ -353,17 +353,19 @@ namespace service_nodes
     if (reg.uses_portions)
     {
       if (hf_version >= hf::hf19_reward_batching)
-        throw invalid_registration{"Portion-based registrations are not permitted after HF19"};
+        throw invalid_registration{"Portion-based registrations are not permitted in HF19+"};
     }
     else
     {
       // If not using portions then the hf value must be >= 19 and equal to the current blockchain hf:
       if (hf_version < hf::hf19_reward_batching || reg.hf != static_cast<uint8_t>(hf_version))
-        throw invalid_registration{"Wrong registration hardfork " +
-          std::to_string(reg.hf) + ", != current " + std::to_string(static_cast<uint8_t>(hf_version))};
+        throw invalid_registration{fmt::format(
+                "Wrong registration hardfork {}; you likely need to regenerate "
+                "the registration for compatibility with hardfork {}",
+                reg.hf, static_cast<uint8_t>(hf_version))};
     }
 
-    const size_t max_contributors = (hf_version >= hf::hf19_reward_batching && !reg.uses_portions)
+    const size_t max_contributors = hf_version >= hf::hf19_reward_batching
       ? oxen::MAX_CONTRIBUTORS_HF19
       : oxen::MAX_CONTRIBUTORS_V1;
 
