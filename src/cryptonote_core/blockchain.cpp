@@ -1354,7 +1354,14 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
   if (!get_oxen_block_reward(median_weight, cumulative_block_weight, already_generated_coins, version, reward_parts, block_reward_context))
     return false;
 
-  auto batched_sn_payments = m_sqlite_db->get_sn_payments(height);
+  std::vector<cryptonote::batch_sn_payment> batched_sn_payments;
+  if (m_sqlite_db)
+  {
+    batched_sn_payments = m_sqlite_db->get_sn_payments(height);
+  } else {
+    if (m_nettype != network_type::FAKECHAIN)
+      throw std::logic_error("Blockchain missing SQLite Database");
+  }
   cryptonote::block bl = b;
   for (ValidateMinerTxHook* hook : m_validate_miner_tx_hooks)
   {

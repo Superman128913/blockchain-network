@@ -192,7 +192,7 @@ namespace cryptonote {
     // <= here because we might have crap in the db that we don't clear until we actually add the HF
     // block later on.  (This is a pretty slim edge case that happened on devnet and is probably
     // virtually impossible on mainnet).
-    if (block_height <= cryptonote::get_hard_fork_heights(m_nettype, hf::hf19_reward_batching).first.value_or(0) && m_nettype != cryptonote::network_type::FAKECHAIN)
+    if (m_nettype != cryptonote::network_type::FAKECHAIN && block_height <= cryptonote::get_hard_fork_heights(m_nettype, hf::hf19_reward_batching).first.value_or(0))
       return {};
 
     const auto& conf = get_config(m_nettype);
