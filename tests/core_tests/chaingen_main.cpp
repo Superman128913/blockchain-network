@@ -136,6 +136,8 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(oxen_service_nodes_insufficient_contribution);
     GENERATE_AND_PLAY(oxen_service_nodes_insufficient_contribution_HF18);
     GENERATE_AND_PLAY(oxen_service_nodes_sufficient_contribution_HF19);
+    GENERATE_AND_PLAY(oxen_service_nodes_small_contribution_early_withdrawal);
+    GENERATE_AND_PLAY(oxen_service_nodes_large_contribution_early_withdrawal);
     GENERATE_AND_PLAY(oxen_service_nodes_insufficient_operator_contribution_HF19);
     GENERATE_AND_PLAY(oxen_service_nodes_test_rollback);
     GENERATE_AND_PLAY(oxen_service_nodes_test_swarms_basic);

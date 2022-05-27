@@ -876,7 +876,7 @@ namespace service_nodes
     }
   }
 
-  bool service_node_list::state_t::process_key_image_unlock_tx(cryptonote::network_type nettype, uint64_t block_height, const cryptonote::transaction &tx)
+  bool service_node_list::state_t::process_key_image_unlock_tx(cryptonote::network_type nettype, cryptonote::hf hf_version, uint64_t block_height, const cryptonote::transaction &tx)
   {
     crypto::public_key snode_key;
     if (!cryptonote::get_service_node_pubkey_from_tx_extra(tx.extra, snode_key))
@@ -913,6 +913,18 @@ namespace service_nodes
                               });
       if (cit != contributor.locked_contributions.end())
       {
+        if (hf_version >= hf::hf19)
+        {
+          if (cit->amount < service_nodes::SMALL_CONTRIBUTOR_THRESHOLD && (block_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
+          {
+            LOG_PRINT_L1("Unlock TX: small contributor trying to unlock node before "
+                << std::to_string(service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
+                << " blocks have passed, rejected on height: "
+                << block_height << " for tx: "
+                << get_transaction_hash(tx));
+            return false;
+          }
+        }
         // NOTE(oxen): This should be checked in blockchain check_tx_inputs already
         if (crypto::check_signature(service_nodes::generate_request_stake_unlock_hash(unlock.nonce),
                     cit->key_image_pub_key, unlock.signature))
@@ -2166,7 +2178,7 @@ namespace service_nodes
       }
       else if (tx.type == cryptonote::txtype::key_image_unlock)
       {
-        process_key_image_unlock_tx(nettype, block_height, tx);
+        process_key_image_unlock_tx(nettype, hf_version, block_height, tx);
       }
     }
 

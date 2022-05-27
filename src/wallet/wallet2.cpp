@@ -8589,6 +8589,19 @@ wallet2::request_stake_unlock_result wallet2::can_request_stake_unlock(const cry
         return result;
       }
 
+      if (contribution.amount < service_nodes::SMALL_CONTRIBUTOR_THRESHOLD && (curr_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
+      {
+        result.msg.append("You are requesting to unlock a stake of: ");
+        result.msg.append(cryptonote::print_money(contribution.amount));
+        result.msg.append(" Oxen which is a small contributor stake.\nSmall contributors need to wait ");
+        result.msg.append(std::to_string(service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER));
+        result.msg.append(" blocks before being allowed to unlock.");
+        result.msg.append("You will need to wait: ");
+        result.msg.append(std::to_string(service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER - (curr_height - node_info.registration_height)));
+        result.msg.append(" more blocks.");
+        return result;
+      }
+
       result.msg.append("You are requesting to unlock a stake of: ");
       result.msg.append(cryptonote::print_money(contribution.amount));
       result.msg.append(" Oxen from the service node network.\nThis will schedule the service node: ");
