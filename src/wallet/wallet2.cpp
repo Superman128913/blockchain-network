@@ -95,6 +95,10 @@ extern "C"
 #include <sodium.h>
 }
 
+// Uncomment to enable scanning of the genesis block (which is only useful for the actual
+// testnet/devnet governance wallets)
+// #define SCAN_GENESIS_BLOCK
+
 using namespace crypto;
 using namespace cryptonote;
 
@@ -2608,8 +2612,12 @@ void wallet2::process_outgoing(const crypto::hash &txid, const cryptonote::trans
 //----------------------------------------------------------------------------------------------------
 bool wallet2::should_skip_block(const cryptonote::block &b, uint64_t height) const
 {
+#ifdef SCAN_GENESIS_BLOCK
+  return false;
+#else
   // seeking only for blocks that are not older then the wallet creation time plus 1 day. 1 day is for possible user incorrect time setup
   return !(b.timestamp + 60*60*24 > m_account.get_createtime() && height >= m_refresh_from_block_height);
+#endif
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::process_new_blockchain_entry(const cryptonote::block& b, const cryptonote::block_complete_entry& bche, const parsed_block &parsed_block, const crypto::hash& bl_id, uint64_t height, const std::vector<tx_cache_data> &tx_cache_data, size_t tx_cache_data_offset, std::map<std::pair<uint64_t, uint64_t>, size_t> *output_tracker_cache)
@@ -2861,7 +2869,11 @@ void wallet2::process_parsed_blocks(uint64_t start_height, const std::vector<cry
     const crypto::hash &bl_id = parsed_blocks[i].hash;
     const cryptonote::block &bl = parsed_blocks[i].block;
 
-    if(current_index >= m_blockchain.size())
+    if (current_index >= m_blockchain.size()
+#ifdef SCAN_GENESIS_BLOCK
+            || current_index == 0
+#endif
+    )
     {
       process_new_blockchain_entry(bl, blocks[i], parsed_blocks[i], bl_id, current_index, tx_cache_data, tx_cache_data_offset, output_tracker_cache);
       ++blocks_added;
@@ -5765,6 +5777,12 @@ void wallet2::load(const fs::path& wallet_, const epee::wipeable_string& passwor
     m_blockchain.push_back(genesis_hash);
     m_last_block_reward = cryptonote::get_outs_money_amount(genesis.miner_tx);
     m_cached_height = m_blockchain.size();
+#ifdef SCAN_GENESIS_BLOCK
+    std::vector<uint64_t> o_indices(genesis.miner_tx.vout.size());
+    std::iota(o_indices.begin(), o_indices.end(), 0);
+    process_new_transaction(get_transaction_hash(genesis.miner_tx), genesis.miner_tx, o_indices, 0,
+             genesis.major_version, genesis.timestamp, true, false, false, false, {}, nullptr);
+#endif
   }
   else
   {
