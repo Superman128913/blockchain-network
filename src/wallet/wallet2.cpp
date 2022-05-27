@@ -906,7 +906,7 @@ gamma_picker::gamma_picker(const std::vector<uint64_t> &rct_offsets, double shap
   THROW_WALLET_EXCEPTION_IF(rct_offsets.size() <= DEFAULT_TX_SPENDABLE_AGE, error::wallet_internal_error, "Bad offset calculation");
   const size_t blocks_in_a_year = BLOCKS_PER_DAY * 365;
   const size_t blocks_to_consider = std::min<size_t>(rct_offsets.size(), blocks_in_a_year);
-  const size_t outputs_to_consider = rct_offsets.back() - (blocks_to_consider < rct_offsets.size() ? rct_offsets[rct_offsets.size() - blocks_to_consider - 1] : 0);
+  const double outputs_to_consider = rct_offsets.back() - (blocks_to_consider < rct_offsets.size() ? rct_offsets[rct_offsets.size() - blocks_to_consider - 1] : 0);
   begin = rct_offsets.data();
   end = rct_offsets.data() + rct_offsets.size() - DEFAULT_TX_SPENDABLE_AGE;
   num_rct_outputs = *(end - 1);
