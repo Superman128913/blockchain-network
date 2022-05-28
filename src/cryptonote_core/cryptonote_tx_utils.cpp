@@ -559,15 +559,8 @@ namespace cryptonote
     {
       result.service_node_total = service_node_reward;
 
-      if (oxen_context.testnet_override)
-      {
-        result.miner_fee = oxen_context.fee;
-      }
-      else
-      {
-        uint64_t const penalty = base_reward_unpenalized - base_reward;
-        result.miner_fee = penalty >= oxen_context.fee ? 0 : oxen_context.fee - penalty;
-      }
+      uint64_t const penalty = base_reward_unpenalized - base_reward;
+      result.miner_fee = penalty >= oxen_context.fee ? 0 : oxen_context.fee - penalty;
 
       // In HF16, the block producer changes between the Miner and Service Node
       // depending on the state of the Service Node network. The producer is no

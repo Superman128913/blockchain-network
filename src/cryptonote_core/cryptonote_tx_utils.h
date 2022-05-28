@@ -152,7 +152,6 @@ namespace cryptonote
   struct oxen_block_reward_context
   {
     using portions = uint64_t;
-    bool                     testnet_override;
     uint64_t                 height;
     uint64_t                 fee;
     uint64_t                 batched_governance;   // Optional: 0 hardfork v10, then must be calculated using blockchain::calc_batched_governance_reward
