@@ -352,7 +352,7 @@ namespace cryptonote {
       cryptonote::address_parse_info governance_wallet_address;
       cryptonote::get_account_address_from_str(governance_wallet_address, m_nettype,
           cryptonote::get_config(m_nettype).governance_wallet_address(block.major_version));
-      uint64_t foundation_reward = cryptonote::governance_reward_formula(block.major_version);
+      uint64_t foundation_reward = cryptonote::governance_reward_formula(block.major_version) * BATCH_REWARD_FACTOR;
       governance_rewards.emplace_back(governance_wallet_address.address, foundation_reward, m_nettype);
       if (!(this->*add_or_subtract)(governance_rewards))
         return false;
