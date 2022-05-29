@@ -1790,11 +1790,13 @@ namespace tools
   GET_ATTRIBUTE::response wallet_rpc_server::invoke(GET_ATTRIBUTE::request&& req)
   {
     require_open();
-    GET_ATTRIBUTE::response res{};
 
-    if (!m_wallet->get_attribute(req.key, res.value))
-      throw wallet_rpc_error{error_code::ATTRIBUTE_NOT_FOUND, "Attribute not found."};
-    return res;
+    if (auto attr = m_wallet->get_attribute(req.key)) {
+      GET_ATTRIBUTE::response res{};
+      res.value = std::move(*attr);
+      return res;
+    }
+    throw wallet_rpc_error{error_code::ATTRIBUTE_NOT_FOUND, "Attribute not found."};
   }
   GET_TX_KEY::response wallet_rpc_server::invoke(GET_TX_KEY::request&& req)
   {

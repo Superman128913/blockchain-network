@@ -1866,9 +1866,7 @@ bool WalletImpl::setCacheAttribute(const std::string &key, const std::string &va
 EXPORT
 std::string WalletImpl::getCacheAttribute(const std::string &key) const
 {
-    std::string value;
-    wallet()->get_attribute(key, value);
-    return value;
+    return wallet()->get_attribute(key).value_or(""s);
 }
 
 EXPORT
