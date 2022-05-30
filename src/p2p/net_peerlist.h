@@ -104,7 +104,7 @@ namespace nodetool
     size_t get_white_peers_count(){std::lock_guard lock{m_peerlist_lock}; return m_peers_white.size();}
     size_t get_gray_peers_count(){std::lock_guard lock{m_peerlist_lock}; return m_peers_gray.size();}
     bool merge_peerlist(const std::vector<peerlist_entry>& outer_bs, const std::function<bool(const peerlist_entry&)> &f = NULL);
-    bool get_peerlist_head(std::vector<peerlist_entry>& bs_head, bool anonymize, uint32_t depth = P2P_DEFAULT_PEERS_IN_HANDSHAKE);
+    bool get_peerlist_head(std::vector<peerlist_entry>& bs_head, bool anonymize, uint32_t depth = cryptonote::p2p::DEFAULT_PEERS_IN_HANDSHAKE);
     void get_peerlist(std::vector<peerlist_entry>& pl_gray, std::vector<peerlist_entry>& pl_white);
     void get_peerlist(peerlist_types& peers);
     bool get_white_peer_by_index(peerlist_entry& p, size_t i);
@@ -197,7 +197,7 @@ namespace nodetool
   //--------------------------------------------------------------------------------------------------
   inline void peerlist_manager::trim_gray_peerlist()
   {
-    while(m_peers_gray.size() > P2P_LOCAL_GRAY_PEERLIST_LIMIT)
+    while(m_peers_gray.size() > cryptonote::p2p::LOCAL_GRAY_PEERLIST_LIMIT)
     {
       peers_indexed::index<by_time>::type& sorted_index=m_peers_gray.get<by_time>();
       sorted_index.erase(sorted_index.begin());
@@ -206,7 +206,7 @@ namespace nodetool
   //--------------------------------------------------------------------------------------------------
   inline void peerlist_manager::trim_white_peerlist()
   {
-    while(m_peers_white.size() > P2P_LOCAL_WHITE_PEERLIST_LIMIT)
+    while(m_peers_white.size() > cryptonote::p2p::LOCAL_WHITE_PEERLIST_LIMIT)
     {
       peers_indexed::index<by_time>::type& sorted_index=m_peers_white.get<by_time>();
       sorted_index.erase(sorted_index.begin());
@@ -235,7 +235,7 @@ namespace nodetool
       return false;
 
     peers_indexed::index<by_time>::type& by_time_index = m_peers_white.get<by_time>();
-    p = *epee::misc_utils::move_it_backward(std::prev(by_time_index.end()), i);
+    p = *std::prev(by_time_index.end(), i+1);
     return true;
   }
   //--------------------------------------------------------------------------------------------------
@@ -247,7 +247,7 @@ namespace nodetool
       return false;
 
     peers_indexed::index<by_time>::type& by_time_index = m_peers_gray.get<by_time>();
-    p = *epee::misc_utils::move_it_backward(std::prev(by_time_index.end()), i);
+    p = *std::prev(by_time_index.end(), i+1);
     return true;
   }
   //--------------------------------------------------------------------------------------------------
@@ -435,7 +435,7 @@ namespace nodetool
     size_t random_index = crypto::rand_idx(m_peers_gray.size());
 
     peers_indexed::index<by_time>::type& by_time_index = m_peers_gray.get<by_time>();
-    pe = *epee::misc_utils::move_it_backward(std::prev(by_time_index.end()), random_index);
+    pe = *std::prev(by_time_index.end(), random_index+1);
 
     return true;
 

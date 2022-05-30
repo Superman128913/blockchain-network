@@ -31,6 +31,7 @@
 #include "chaingen.h"
 #include "block_reward.h"
 #include "cryptonote_core/cryptonote_tx_utils.h"
+#include "common/median.h"
 
 #define EMISSION_SPEED_FACTOR_PER_MINUTE 20
 
@@ -42,7 +43,8 @@ namespace
     const account_public_address& miner_address, std::vector<uint64_t>& block_weights, size_t target_tx_weight,
     size_t target_block_weight, uint64_t fee = 0)
   {
-    if (!construct_miner_tx(height, misc_utils::median(block_weights), already_generated_coins, target_block_weight, fee, miner_tx, cryptonote::oxen_miner_tx_context::miner_block(cryptonote::FAKECHAIN, mminer_address)))
+    std::optional<std::vector<cryptonote::batch_sn_payment>> sn_rwds;
+    if (!construct_miner_tx(height, tools::median(block_weights.begin(), block_weights.end()), already_generated_coins, target_block_weight, fee, miner_tx, cryptonote::oxen_miner_tx_context::miner_block(network_type::FAKECHAIN, mminer_address), sn_rwds))
       return false;
 
     size_t current_weight = get_transaction_weight(miner_tx);
@@ -74,13 +76,13 @@ namespace
   }
 
   bool construct_max_weight_block(test_generator& generator, block& blk, const block& blk_prev, const account_base& miner_account,
-    size_t median_block_count = CRYPTONOTE_REWARD_BLOCKS_WINDOW)
+    size_t median_block_count = REWARD_BLOCKS_WINDOW)
   {
     std::vector<uint64_t> block_weights;
     generator.get_last_n_block_weights(block_weights, get_block_hash(blk_prev), median_block_count);
 
-    size_t median = misc_utils::median(block_weights);
-    median = std::max(median, static_cast<size_t>(CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V1));
+    size_t median = tools::median(block_weights.begin(), block_weights.end());
+    median = std::max(median, static_cast<size_t>(BLOCK_GRANTED_FULL_REWARD_ZONE_V1));
 
     transaction miner_tx;
     bool r = construct_miner_tx_by_weight(miner_tx, get_block_height(blk_prev) + 1, generator.get_already_generated_coins(blk_prev),
@@ -137,19 +139,19 @@ bool gen_block_reward::generate(std::vector<test_event_entry>& events) const
 
   // Test: miner transactions without outputs (block reward == 0)
   block blk_0r;
-  if (!rewind_blocks(events, generator, blk_0r, blk_0, miner_account, CRYPTONOTE_REWARD_BLOCKS_WINDOW))
+  if (!rewind_blocks(events, generator, blk_0r, blk_0, miner_account, REWARD_BLOCKS_WINDOW))
     return false;
 
-  // Test: block reward is calculated using median of the latest CRYPTONOTE_REWARD_BLOCKS_WINDOW blocks
+  // Test: block reward is calculated using median of the latest REWARD_BLOCKS_WINDOW blocks
   DO_CALLBACK(events, "mark_invalid_block");
   block blk_1_bad_1;
-  if (!construct_max_weight_block(generator, blk_1_bad_1, blk_0r, miner_account, CRYPTONOTE_REWARD_BLOCKS_WINDOW + 1))
+  if (!construct_max_weight_block(generator, blk_1_bad_1, blk_0r, miner_account, REWARD_BLOCKS_WINDOW + 1))
     return false;
   events.push_back(blk_1_bad_1);
 
   DO_CALLBACK(events, "mark_invalid_block");
   block blk_1_bad_2;
-  if (!construct_max_weight_block(generator, blk_1_bad_2, blk_0r, miner_account, CRYPTONOTE_REWARD_BLOCKS_WINDOW - 1))
+  if (!construct_max_weight_block(generator, blk_1_bad_2, blk_0r, miner_account, REWARD_BLOCKS_WINDOW - 1))
     return false;
   events.push_back(blk_1_bad_2);
 
@@ -170,7 +172,7 @@ bool gen_block_reward::generate(std::vector<test_event_entry>& events) const
   DO_CALLBACK(events, "mark_checked_block");
 
   block blk_5r;
-  if (!rewind_blocks(events, generator, blk_5r, blk_5, miner_account, CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW))
+  if (!rewind_blocks(events, generator, blk_5r, blk_5, miner_account, MINED_MONEY_UNLOCK_WINDOW))
     return false;
 
   // Test: fee increases block reward
@@ -193,8 +195,8 @@ bool gen_block_reward::generate(std::vector<test_event_entry>& events) const
     uint64_t txs_fee = get_tx_miner_fee(tx_1, true) + get_tx_miner_fee(tx_2, true);
 
     std::vector<uint64_t> block_weights;
-    generator.get_last_n_block_weights(block_weights, get_block_hash(blk_7), CRYPTONOTE_REWARD_BLOCKS_WINDOW);
-    size_t median = misc_utils::median(block_weights);
+    generator.get_last_n_block_weights(block_weights, get_block_hash(blk_7), REWARD_BLOCKS_WINDOW);
+    size_t median = tools::median(block_weights.begin(), block_weights.end());
 
     transaction miner_tx;
     bool r = construct_miner_tx_by_weight(miner_tx, get_block_height(blk_7) + 1, generator.get_already_generated_coins(blk_7),

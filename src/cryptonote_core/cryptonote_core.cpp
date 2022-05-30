@@ -30,14 +30,13 @@
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #include <boost/algorithm/string.hpp>
-#include <boost/endian/conversion.hpp>
 
 #include "epee/string_tools.h"
 
 #include <unordered_set>
 #include <sstream>
 #include <iomanip>
-#include <oxenmq/base32z.h>
+#include <oxenc/base32z.h>
 
 extern "C" {
 #include <sodium.h>
@@ -56,24 +55,21 @@ extern "C" {
 #include "common/command_line.h"
 #include "common/hex.h"
 #include "common/base58.h"
-#include "common/dns_utils.h"
 #include "epee/warnings.h"
 #include "crypto/crypto.h"
 #include "cryptonote_config.h"
 #include "cryptonote_basic/hardfork.h"
-#include "epee/misc_language.h"
 #include <csignal>
 #include "checkpoints/checkpoints.h"
 #include "ringct/rctTypes.h"
 #include "blockchain_db/blockchain_db.h"
+#include "blockchain_db/sqlite/db_sqlite.h"
 #include "ringct/rctSigs.h"
 #include "common/notify.h"
 #include "version.h"
 #include "epee/memwipe.h"
 #include "common/i18n.h"
 #include "epee/net/local_ip.h"
-
-#include "common/oxen_integration_test_hooks.h"
 
 #undef OXEN_DEFAULT_LOG_CATEGORY
 #define OXEN_DEFAULT_LOG_CATEGORY "cn"
@@ -179,7 +175,7 @@ namespace cryptonote
   static const command_line::arg_descriptor<size_t> arg_max_txpool_weight  = {
     "max-txpool-weight"
   , "Set maximum txpool weight in bytes."
-  , DEFAULT_TXPOOL_MAX_WEIGHT
+  , DEFAULT_MEMPOOL_MAX_WEIGHT
   };
   static const command_line::arg_descriptor<bool> arg_service_node  = {
     "service-node"
@@ -280,7 +276,7 @@ namespace cryptonote
   , m_starter_message_showed(false)
   , m_target_blockchain_height(0)
   , m_last_json_checkpoints_update(0)
-  , m_nettype(UNDEFINED)
+  , m_nettype(network_type::UNDEFINED)
   , m_last_storage_server_ping(0)
   , m_last_lokinet_ping(0)
   , m_pad_transactions(false)
@@ -359,10 +355,6 @@ namespace cryptonote
     command_line::add_arg(desc, arg_keep_alt_blocks);
 
     command_line::add_arg(desc, arg_store_quorum_history);
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    command_line::add_arg(desc, integration_test::arg_hardforks_override);
-    command_line::add_arg(desc, integration_test::arg_pipe_name);
-#endif
     command_line::add_arg(desc, arg_omq_quorumnet_public);
 
     miner::init_options(desc);
@@ -371,11 +363,11 @@ namespace cryptonote
   //-----------------------------------------------------------------------------------------------
   bool core::handle_command_line(const boost::program_options::variables_map& vm)
   {
-    if (m_nettype != FAKECHAIN)
+    if (m_nettype != network_type::FAKECHAIN)
     {
       const bool testnet = command_line::get_arg(vm, arg_testnet_on);
       const bool devnet = command_line::get_arg(vm, arg_devnet_on);
-      m_nettype = testnet ? TESTNET : devnet ? DEVNET : MAINNET;
+      m_nettype = testnet ? network_type::TESTNET : devnet ? network_type::DEVNET : network_type::MAINNET;
     }
     m_check_uptime_proof_interval.interval(get_net_config().UPTIME_PROOF_CHECK_INTERVAL);
 
@@ -446,12 +438,12 @@ namespace cryptonote
     top_id = m_blockchain_storage.get_tail_id(height);
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::get_blocks(uint64_t start_offset, size_t count, std::vector<std::pair<cryptonote::blobdata,block>>& blocks, std::vector<cryptonote::blobdata>& txs) const
+  bool core::get_blocks(uint64_t start_offset, size_t count, std::vector<std::pair<std::string,block>>& blocks, std::vector<std::string>& txs) const
   {
     return m_blockchain_storage.get_blocks(start_offset, count, blocks, txs);
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::get_blocks(uint64_t start_offset, size_t count, std::vector<std::pair<cryptonote::blobdata,block>>& blocks) const
+  bool core::get_blocks(uint64_t start_offset, size_t count, std::vector<std::pair<std::string,block>>& blocks) const
   {
     return m_blockchain_storage.get_blocks(start_offset, count, blocks);
   }
@@ -461,12 +453,12 @@ namespace cryptonote
     return m_blockchain_storage.get_blocks_only(start_offset, count, blocks);
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::get_transactions(const std::vector<crypto::hash>& txs_ids, std::vector<cryptonote::blobdata>& txs, std::vector<crypto::hash>& missed_txs) const
+  bool core::get_transactions(const std::vector<crypto::hash>& txs_ids, std::vector<std::string>& txs, std::vector<crypto::hash>& missed_txs) const
   {
     return m_blockchain_storage.get_transactions_blobs(txs_ids, txs, missed_txs);
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::get_split_transactions_blobs(const std::vector<crypto::hash>& txs_ids, std::vector<std::tuple<crypto::hash, cryptonote::blobdata, crypto::hash, cryptonote::blobdata>>& txs, std::vector<crypto::hash>& missed_txs) const
+  bool core::get_split_transactions_blobs(const std::vector<crypto::hash>& txs_ids, std::vector<std::tuple<crypto::hash, std::string, crypto::hash, std::string>>& txs, std::vector<crypto::hash>& missed_txs) const
   {
     return m_blockchain_storage.get_split_transactions_blobs(txs_ids, txs, missed_txs);
   }
@@ -566,44 +558,10 @@ namespace cryptonote
   {
     start_time = std::time(nullptr);
 
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    const std::string arg_hardforks_override = command_line::get_arg(vm, integration_test::arg_hardforks_override);
-
-    std::vector<std::pair<uint8_t, uint64_t>> integration_test_hardforks;
-    if (!arg_hardforks_override.empty())
-    {
-      // Expected format: <fork_version>:<fork_height>, ...
-      // Example: 7:0, 8:10, 9:20, 10:100
-      char const *ptr = arg_hardforks_override.c_str();
-      while (ptr[0])
-      {
-        int hf_version = atoi(ptr);
-        while(ptr[0] != ':') ptr++;
-        ++ptr;
-
-        int hf_height = atoi(ptr);
-        while(ptr[0] && ptr[0] != ',') ptr++;
-        integration_test_hardforks.push_back(std::make_pair(static_cast<uint8_t>(hf_version), static_cast<uint64_t>(hf_height)));
-
-        if (!ptr[0]) break;
-        ptr++;
-      }
-    }
-
-    cryptonote::test_options integration_hardfork_override = {integration_test_hardforks};
-    if (!arg_hardforks_override.empty())
-      test_options = &integration_hardfork_override;
-
-    {
-      const std::string arg_pipe_name = command_line::get_arg(vm, integration_test::arg_pipe_name);
-      integration_test::init(arg_pipe_name);
-    }
-#endif
-
     const bool regtest = command_line::get_arg(vm, arg_regtest_on);
     if (test_options != NULL || regtest)
     {
-      m_nettype = FAKECHAIN;
+      m_nettype = network_type::FAKECHAIN;
     }
 
     bool r = handle_command_line(vm);
@@ -629,7 +587,7 @@ namespace cryptonote
     }
 
     auto folder = m_config_folder;
-    if (m_nettype == FAKECHAIN)
+    if (m_nettype == network_type::FAKECHAIN)
       folder /= "fake";
 
     // make sure the data directory exists, and try to lock it
@@ -650,6 +608,12 @@ namespace cryptonote
     if(fs::exists(folder / "lns.db"))
       ons_db_file_path = folder / "lns.db";
 
+    auto sqlite_db_file_path = folder / "sqlite.db";
+    if (m_nettype == network_type::FAKECHAIN)
+    {
+      sqlite_db_file_path = ":memory:";
+    }
+    auto sqliteDB = std::make_shared<cryptonote::BlockchainSQLite>(m_nettype, sqlite_db_file_path);
 
     folder /= db->get_db_name();
     MGINFO("Loading blockchain from folder " << folder << " ...");
@@ -659,8 +623,7 @@ namespace cryptonote
     bool sync_on_blocks = true;
     uint64_t sync_threshold = 1;
 
-#if !defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS) // In integration mode, don't delete the DB. This should be explicitly done in the tests. Otherwise the more likely behaviour is persisting the DB across multiple daemons in the same test.
-    if (m_nettype == FAKECHAIN && !keep_fakechain)
+    if (m_nettype == network_type::FAKECHAIN && !keep_fakechain)
     {
       // reset the db by removing the database file before opening it
       if (!db->remove_data_file(folder))
@@ -670,7 +633,6 @@ namespace cryptonote
       }
       fs::remove(ons_db_file_path);
     }
-#endif
 
     try
     {
@@ -823,10 +785,11 @@ namespace cryptonote
     sqlite3 *ons_db = ons::init_oxen_name_system(ons_db_file_path, db->is_read_only());
     if (!ons_db) return false;
 
+
     init_oxenmq(vm);
 
     const difficulty_type fixed_difficulty = command_line::get_arg(vm, arg_fixed_difficulty);
-    r = m_blockchain_storage.init(db.release(), ons_db, m_nettype, m_offline, regtest ? &regtest_test_options : test_options, fixed_difficulty, get_checkpoints);
+    r = m_blockchain_storage.init(db.release(), ons_db, std::move(sqliteDB), m_nettype, m_offline, regtest ? &regtest_test_options : test_options, fixed_difficulty, get_checkpoints);
     CHECK_AND_ASSERT_MES(r, false, "Failed to initialize blockchain storage");
 
     r = m_mempool.init(max_txpool_weight);
@@ -979,7 +942,7 @@ namespace cryptonote
       MGINFO_YELLOW("- primary: " << tools::type_to_hex(keys.pub));
       MGINFO_YELLOW("- ed25519: " << tools::type_to_hex(keys.pub_ed25519));
       // .snode address is the ed25519 pubkey, encoded with base32z and with .snode appended:
-      MGINFO_YELLOW("- lokinet: " << oxenmq::to_base32z(tools::view_guts(keys.pub_ed25519)) << ".snode");
+      MGINFO_YELLOW("- lokinet: " << oxenc::to_base32z(tools::view_guts(keys.pub_ed25519)) << ".snode");
       MGINFO_YELLOW("-  x25519: " << tools::type_to_hex(keys.pub_x25519));
     } else {
       // Only print the x25519 version because it's the only thing useful for a non-SN (for
@@ -1150,7 +1113,7 @@ namespace cryptonote
   //-----------------------------------------------------------------------------------------------
   void core::parse_incoming_tx_pre(tx_verification_batch_info &tx_info)
   {
-    if(tx_info.blob->size() > get_max_tx_size())
+    if(tx_info.blob->size() > MAX_TX_SIZE)
     {
       LOG_PRINT_L1("WRONG TRANSACTION BLOB, too big size " << tx_info.blob->size() << ", rejected");
       tx_info.tvc.m_verifivation_failed = true;
@@ -1198,7 +1161,7 @@ namespace cryptonote
     if (proofs.size() != 1)
       return false;
     const size_t sz = proofs[0].V.size();
-    if (sz == 0 || sz > BULLETPROOF_MAX_OUTPUTS)
+    if (sz == 0 || sz > TX_BULLETPROOF_MAX_OUTPUTS)
       return false;
     return true;
   }
@@ -1297,11 +1260,11 @@ namespace cryptonote
     }
   }
   //-----------------------------------------------------------------------------------------------
-  std::vector<core::tx_verification_batch_info> core::parse_incoming_txs(const std::vector<blobdata>& tx_blobs, const tx_pool_options &opts)
+  std::vector<cryptonote::tx_verification_batch_info> core::parse_incoming_txs(const std::vector<std::string>& tx_blobs, const tx_pool_options &opts)
   {
     // Caller needs to do this around both this *and* handle_parsed_txs
     //auto lock = incoming_tx_lock();
-    std::vector<tx_verification_batch_info> tx_info(tx_blobs.size());
+    std::vector<cryptonote::tx_verification_batch_info> tx_info(tx_blobs.size());
 
     tools::threadpool& tpool = tools::threadpool::getInstance();
     tools::threadpool::waiter waiter;
@@ -1348,9 +1311,8 @@ namespace cryptonote
   {
     // Caller needs to do this around both this *and* parse_incoming_txs
     //auto lock = incoming_tx_lock();
-    uint8_t version      = m_blockchain_storage.get_network_version();
-    bool ok              = true;
-    bool tx_pool_changed = false;
+    auto version = m_blockchain_storage.get_network_version();
+    bool ok = true;
     if (blink_rollback_height)
       *blink_rollback_height = 0;
     tx_pool_options tx_opts;
@@ -1377,7 +1339,6 @@ namespace cryptonote
       }
       if (m_mempool.add_tx(info.tx, info.tx_hash, *info.blob, weight, info.tvc, *local_opts, version, blink_rollback_height))
       {
-        tx_pool_changed |= info.tvc.m_added_to_pool;
         MDEBUG("tx added: " << info.tx_hash);
       }
       else
@@ -1393,7 +1354,7 @@ namespace cryptonote
     return ok;
   }
   //-----------------------------------------------------------------------------------------------
-  std::vector<core::tx_verification_batch_info> core::handle_incoming_txs(const std::vector<blobdata>& tx_blobs, const tx_pool_options &opts)
+  std::vector<cryptonote::tx_verification_batch_info> core::handle_incoming_txs(const std::vector<std::string>& tx_blobs, const tx_pool_options &opts)
   {
     auto lock = incoming_tx_lock();
     auto parsed = parse_incoming_txs(tx_blobs, opts);
@@ -1401,9 +1362,9 @@ namespace cryptonote
     return parsed;
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::handle_incoming_tx(const blobdata& tx_blob, tx_verification_context& tvc, const tx_pool_options &opts)
+  bool core::handle_incoming_tx(const std::string& tx_blob, tx_verification_context& tvc, const tx_pool_options &opts)
   {
-    const std::vector<cryptonote::blobdata> tx_blobs{{tx_blob}};
+    const std::vector<std::string> tx_blobs{{tx_blob}};
     auto parsed = handle_incoming_txs(tx_blobs, opts);
     parsed[0].blob = &tx_blob; // Update pointer to the input rather than the copy in case the caller wants to use it for some reason
     tvc = parsed[0].tvc;
@@ -1417,7 +1378,7 @@ namespace cryptonote
     auto &new_blinks = results.first;
     auto &missing_txs = results.second;
 
-    if (m_blockchain_storage.get_network_version() < HF_VERSION_BLINK)
+    if (m_blockchain_storage.get_network_version() < feature::BLINK)
       return results;
 
     std::vector<uint8_t> want(blinks.size(), false); // Really bools, but std::vector<bool> is broken.
@@ -1629,9 +1590,9 @@ namespace cryptonote
       }
     }
 
-    if(!keeped_by_block && get_transaction_weight(tx) >= m_blockchain_storage.get_current_cumulative_block_weight_limit() - CRYPTONOTE_COINBASE_BLOB_RESERVED_SIZE)
+    if(!keeped_by_block && get_transaction_weight(tx) >= m_blockchain_storage.get_current_cumulative_block_weight_limit() - COINBASE_BLOB_RESERVED_SIZE)
     {
-      MERROR_VER("tx is too large " << get_transaction_weight(tx) << ", expected not bigger than " << m_blockchain_storage.get_current_cumulative_block_weight_limit() - CRYPTONOTE_COINBASE_BLOB_RESERVED_SIZE);
+      MERROR_VER("tx is too large " << get_transaction_weight(tx) << ", expected not bigger than " << m_blockchain_storage.get_current_cumulative_block_weight_limit() - COINBASE_BLOB_RESERVED_SIZE);
       return false;
     }
 
@@ -1728,9 +1689,7 @@ namespace cryptonote
   //-----------------------------------------------------------------------------------------------
   size_t core::get_block_sync_size(uint64_t height) const
   {
-    if (block_sync_size > 0)
-      return block_sync_size;
-    return BLOCKS_SYNCHRONIZING_DEFAULT_COUNT;
+    return block_sync_size > 0 ? block_sync_size : BLOCKS_SYNCHRONIZING_DEFAULT_COUNT;
   }
   //-----------------------------------------------------------------------------------------------
   bool core::are_key_images_spent_in_pool(const std::vector<crypto::key_image>& key_im, std::vector<bool> &spent) const
@@ -1825,8 +1784,8 @@ namespace cryptonote
       uint64_t tx_fee_amount = 0;
       for(const auto& tx: txs)
       {
-        tx_fee_amount += get_tx_miner_fee(tx, b.major_version >= HF_VERSION_FEE_BURNING);
-        if(b.major_version >= HF_VERSION_FEE_BURNING)
+        tx_fee_amount += get_tx_miner_fee(tx, b.major_version >= feature::FEE_BURNING);
+        if(b.major_version >= feature::FEE_BURNING)
         {
           burnt_oxen += get_burned_amount_from_tx_extra(tx.extra);
         }
@@ -1872,16 +1831,13 @@ namespace cryptonote
   //-----------------------------------------------------------------------------------------------
   bool core::check_tx_inputs_ring_members_diff(const transaction& tx) const
   {
-    const uint8_t version = m_blockchain_storage.get_network_version();
-    if (version >= 6)
+    const auto version = m_blockchain_storage.get_network_version();
+    for(const auto& in: tx.vin)
     {
-      for(const auto& in: tx.vin)
-      {
-        CHECKED_GET_SPECIFIC_VARIANT(in, txin_to_key, tokey_in, false);
-        for (size_t n = 1; n < tokey_in.key_offsets.size(); ++n)
-          if (tokey_in.key_offsets[n] == 0)
-            return false;
-      }
+      CHECKED_GET_SPECIFIC_VARIANT(in, txin_to_key, tokey_in, false);
+      for (size_t n = 1; n < tokey_in.key_offsets.size(); ++n)
+        if (tokey_in.key_offsets[n] == 0)
+          return false;
     }
     return true;
   }
@@ -1906,7 +1862,7 @@ namespace cryptonote
   bool core::relay_txpool_transactions()
   {
     // we attempt to relay txes that should be relayed, but were not
-    std::vector<std::pair<crypto::hash, cryptonote::blobdata>> txs;
+    std::vector<std::pair<crypto::hash, std::string>> txs;
     if (m_mempool.get_relayable_transactions(txs) && !txs.empty())
     {
       cryptonote_connection_context fake_context{};
@@ -1979,9 +1935,9 @@ namespace cryptonote
     return result;
   }
   //-----------------------------------------------------------------------------------------------
-  crypto::hash core::on_transaction_relayed(const cryptonote::blobdata& tx_blob)
+  crypto::hash core::on_transaction_relayed(const std::string& tx_blob)
   {
-    std::vector<std::pair<crypto::hash, cryptonote::blobdata>> txs;
+    std::vector<std::pair<crypto::hash, std::string>> txs;
     cryptonote::transaction tx;
     crypto::hash tx_hash;
     if (!parse_and_validate_tx_from_blob(tx_blob, tx, tx_hash))
@@ -2019,12 +1975,12 @@ namespace cryptonote
     m_quorum_cop.set_votes_relayed(votes);
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::create_next_miner_block_template(block& b, const account_public_address& adr, difficulty_type& diffic, uint64_t& height, uint64_t& expected_reward, const blobdata& ex_nonce)
+  bool core::create_next_miner_block_template(block& b, const account_public_address& adr, difficulty_type& diffic, uint64_t& height, uint64_t& expected_reward, const std::string& ex_nonce)
   {
     return m_blockchain_storage.create_next_miner_block_template(b, adr, diffic, height, expected_reward, ex_nonce);
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::create_miner_block_template(block& b, const crypto::hash *prev_block, const account_public_address& adr, difficulty_type& diffic, uint64_t& height, uint64_t& expected_reward, const blobdata& ex_nonce)
+  bool core::create_miner_block_template(block& b, const crypto::hash *prev_block, const account_public_address& adr, difficulty_type& diffic, uint64_t& height, uint64_t& expected_reward, const std::string& ex_nonce)
   {
     return m_blockchain_storage.create_miner_block_template(b, prev_block, adr, diffic, height, expected_reward, ex_nonce);
   }
@@ -2034,7 +1990,7 @@ namespace cryptonote
     return m_blockchain_storage.find_blockchain_supplement(qblock_ids, resp);
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::find_blockchain_supplement(const uint64_t req_start_block, const std::list<crypto::hash>& qblock_ids, std::vector<std::pair<std::pair<cryptonote::blobdata, crypto::hash>, std::vector<std::pair<crypto::hash, cryptonote::blobdata> > > >& blocks, uint64_t& total_height, uint64_t& start_height, bool pruned, bool get_miner_tx_hash, size_t max_count) const
+  bool core::find_blockchain_supplement(const uint64_t req_start_block, const std::list<crypto::hash>& qblock_ids, std::vector<std::pair<std::pair<std::string, crypto::hash>, std::vector<std::pair<crypto::hash, std::string> > > >& blocks, uint64_t& total_height, uint64_t& start_height, bool pruned, bool get_miner_tx_hash, size_t max_count) const
   {
     return m_blockchain_storage.find_blockchain_supplement(req_start_block, qblock_ids, blocks, total_height, start_height, pruned, get_miner_tx_hash, max_count);
   }
@@ -2080,7 +2036,7 @@ namespace cryptonote
     bce.block                = cryptonote::block_to_blob(b);
     for (const auto &tx_hash: b.tx_hashes)
     {
-      cryptonote::blobdata txblob;
+      std::string txblob;
       CHECK_AND_ASSERT_THROW_MES(pool.get_transaction(tx_hash, txblob), "Transaction not found in pool");
       bce.txs.push_back(txblob);
     }
@@ -2108,6 +2064,7 @@ namespace cryptonote
         MERROR("Block found, but failed to prepare to add");
         return false;
       }
+      // add_new_block will verify block and set bvc.m_verification_failed accordingly
       add_new_block(b, bvc, nullptr /*checkpoint*/);
       cleanup_handle_incoming_blocks(true);
       m_miner.on_block_chain_update();
@@ -2122,7 +2079,7 @@ namespace cryptonote
     else if(bvc.m_added_to_main_chain)
     {
       std::vector<crypto::hash> missed_txs;
-      std::vector<cryptonote::blobdata> txs;
+      std::vector<std::string> txs;
       m_blockchain_storage.get_transactions_blobs(b.tx_hashes, txs, missed_txs);
       if(missed_txs.size() &&  m_blockchain_storage.get_block_id_by_height(get_block_height(b)) != get_block_hash(b))
       {
@@ -2184,7 +2141,7 @@ namespace cryptonote
   }
 
   //-----------------------------------------------------------------------------------------------
-  bool core::handle_incoming_block(const blobdata& block_blob, const block *b, block_verification_context& bvc, checkpoint_t *checkpoint, bool update_miner_blocktemplate)
+  bool core::handle_incoming_block(const std::string& block_blob, const block *b, block_verification_context& bvc, checkpoint_t *checkpoint, bool update_miner_blocktemplate)
   {
     TRY_ENTRY();
     bvc = {};
@@ -2223,7 +2180,7 @@ namespace cryptonote
   //-----------------------------------------------------------------------------------------------
   // Used by the RPC server to check the size of an incoming
   // block_blob
-  bool core::check_incoming_block_size(const blobdata& block_blob) const
+  bool core::check_incoming_block_size(const std::string& block_blob) const
   {
     // note: we assume block weight is always >= block blob size, so we check incoming
     // blob size against the block weight limit, which acts as a sanity check without
@@ -2296,8 +2253,10 @@ namespace cryptonote
   {
     std::vector<service_nodes::service_node_pubkey_info> const states = get_service_node_list_state({ m_service_keys.pub });
 
-    // wait one block before starting uptime proofs.
-    if (!states.empty() && (states[0].info->registration_height + 1) < get_current_blockchain_height())
+    // wait one block before starting uptime proofs (but not on testnet/devnet, where we sometimes
+    // have mass registrations/deregistrations where the waiting causes problems).
+    uint64_t delay_blocks = m_nettype == network_type::MAINNET ? 1 : 0;
+    if (!states.empty() && (states[0].info->registration_height + delay_blocks) < get_current_blockchain_height())
     {
       m_check_uptime_proof_interval.do_call([this]() {
         // This timer is not perfectly precise and can leak seconds slightly, so send the uptime
@@ -2330,7 +2289,8 @@ namespace cryptonote
 
           m_service_node_list.for_each_service_node_info_and_proof(sn_pks.begin(), sn_pks.end(), [&](auto& pk, auto& sni, auto& proof) {
             if (pk != m_service_keys.pub && proof.proof->public_ip == m_sn_public_ip &&
-                (proof.proof->qnet_port == m_quorumnet_port || proof.proof->storage_https_port == storage_https_port() || proof.proof->storage_omq_port == storage_omq_port()))
+                (proof.proof->qnet_port == m_quorumnet_port || (
+                    m_nettype != network_type::DEVNET && (proof.proof->storage_https_port == storage_https_port() || proof.proof->storage_omq_port == storage_omq_port()))))
             MGINFO_RED(
                 "Another service node (" << pk << ") is broadcasting the same public IP and ports as this service node (" <<
                 epee::string_tools::get_ip_string_from_int32(m_sn_public_ip) << ":" << proof.proof->qnet_port << "[qnet], :" <<
@@ -2340,7 +2300,7 @@ namespace cryptonote
           });
         }
 
-        if (m_nettype != DEVNET)
+        if (m_nettype != network_type::DEVNET)
         {
           if (!check_external_ping(m_last_storage_server_ping, get_net_config().UPTIME_PROOF_FREQUENCY, "the storage server"))
           {
@@ -2405,10 +2365,6 @@ namespace cryptonote
     m_miner.on_idle();
     m_mempool.on_idle();
 
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    integration_test::state.core_is_idle = true;
-#endif
-
 #ifdef ENABLE_SYSTEMD
     m_systemd_notify_interval.do_call([this] { sd_notify(0, ("WATCHDOG=1\nSTATUS=" + get_status_string()).c_str()); });
 #endif
@@ -2461,16 +2417,11 @@ namespace cryptonote
   //-----------------------------------------------------------------------------------------------
   bool core::check_block_rate()
   {
-    if (m_offline || m_nettype == FAKECHAIN || m_target_blockchain_height > get_current_blockchain_height() || m_target_blockchain_height == 0)
+    if (m_offline || m_nettype == network_type::FAKECHAIN || m_target_blockchain_height > get_current_blockchain_height() || m_target_blockchain_height == 0)
     {
       MDEBUG("Not checking block rate, offline or syncing");
       return true;
     }
-
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    MDEBUG("Not checking block rate, integration test mode");
-    return true;
-#endif
 
     static constexpr double threshold = 1. / ((24h * 10) / TARGET_BLOCK_TIME); // one false positive every 10 days
     static constexpr unsigned int max_blocks_checked = 150;

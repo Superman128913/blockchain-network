@@ -46,6 +46,8 @@
 #undef OXEN_DEFAULT_LOG_CATEGORY
 #define OXEN_DEFAULT_LOG_CATEGORY "service_nodes"
 
+using cryptonote::hf;
+
 namespace service_nodes
 {
   static crypto::hash make_state_change_vote_hash(uint64_t block_height, uint32_t service_node_index, new_state state)
@@ -132,10 +134,10 @@ namespace service_nodes
                               uint64_t latest_height,
                               cryptonote::tx_verification_context &tvc,
                               const service_nodes::quorum &quorum,
-                              const uint8_t hf_version)
+                              const hf hf_version)
   {
     auto &vvc = tvc.m_vote_ctx;
-    if (state_change.state != new_state::deregister && hf_version < cryptonote::network_version_12_checkpointing)
+    if (state_change.state != new_state::deregister && hf_version < hf::hf12_checkpointing)
     {
       LOG_PRINT_L1("Non-deregister state changes are invalid before v12");
       return bad_tx(tvc);
@@ -196,7 +198,7 @@ namespace service_nodes
     int validator_index_tracker                                            = -1;
     for (const auto &vote : state_change.votes)
     {
-      if (hf_version >= cryptonote::network_version_13_enforce_checkpoints) // NOTE: After HF13, votes must be stored in ascending order
+      if (hf_version >= hf::hf13_enforce_checkpoints) // NOTE: After HF13, votes must be stored in ascending order
       {
         if (validator_index_tracker >= static_cast<int>(vote.validator_index))
         {
@@ -230,7 +232,7 @@ namespace service_nodes
     return true;
   }
 
-  bool verify_quorum_signatures(service_nodes::quorum const &quorum, service_nodes::quorum_type type, uint8_t hf_version, uint64_t height, crypto::hash const &hash, std::vector<quorum_signature> const &signatures, const cryptonote::block* block)
+  bool verify_quorum_signatures(service_nodes::quorum const &quorum, service_nodes::quorum_type type, hf hf_version, uint64_t height, crypto::hash const &hash, std::vector<quorum_signature> const &signatures, const cryptonote::block* block)
   {
     bool enforce_vote_ordering                          = true;
     constexpr size_t MAX_QUORUM_SIZE                    = std::max(CHECKPOINT_QUORUM_SIZE, PULSE_QUORUM_NUM_VALIDATORS);
@@ -258,7 +260,7 @@ namespace service_nodes
           return false;
         }
 
-        enforce_vote_ordering = hf_version >= cryptonote::network_version_13_enforce_checkpoints;
+        enforce_vote_ordering = hf_version >= hf::hf13_enforce_checkpoints;
       }
       break;
 
@@ -350,7 +352,7 @@ namespace service_nodes
     return result;
   }
 
-  bool verify_checkpoint(uint8_t hf_version, cryptonote::checkpoint_t const &checkpoint, service_nodes::quorum const &quorum)
+  bool verify_checkpoint(hf hf_version, cryptonote::checkpoint_t const &checkpoint, service_nodes::quorum const &quorum)
   {
     if (checkpoint.type == cryptonote::checkpoint_type::service_node)
     {
@@ -392,7 +394,7 @@ namespace service_nodes
     return result;
   }
 
-  quorum_vote_t make_checkpointing_vote(uint8_t hf_version, crypto::hash const &block_hash, uint64_t block_height, uint16_t index_in_quorum, const service_node_keys &keys)
+  quorum_vote_t make_checkpointing_vote(hf hf_version, crypto::hash const &block_hash, uint64_t block_height, uint16_t index_in_quorum, const service_node_keys &keys)
   {
     quorum_vote_t result         = {};
     result.type                  = quorum_type::checkpointing;
@@ -441,7 +443,7 @@ namespace service_nodes
     return result;
   }
 
-  bool verify_vote_signature(uint8_t hf_version, const quorum_vote_t &vote, cryptonote::vote_verification_context &vvc, const service_nodes::quorum &quorum)
+  bool verify_vote_signature(hf hf_version, const quorum_vote_t &vote, cryptonote::vote_verification_context &vvc, const service_nodes::quorum &quorum)
   {
     bool result = true;
     if (vote.type > tools::enum_top<quorum_type>)
@@ -586,29 +588,25 @@ namespace service_nodes
           result.push_back(vote_entry.vote);
   }
 
-  std::vector<quorum_vote_t> voting_pool::get_relayable_votes(uint64_t height, uint8_t hf_version, bool quorum_relay) const
+  std::vector<quorum_vote_t> voting_pool::get_relayable_votes(uint64_t height, hf hf_version, bool quorum_relay) const
   {
     std::unique_lock lock{m_lock};
 
     // TODO(doyle): Rate-limiting: A better threshold value that follows suite with transaction relay time back-off
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    constexpr uint64_t TIME_BETWEEN_RELAY = 0;
-#else
     constexpr uint64_t TIME_BETWEEN_RELAY = 60 * 2;
-#endif
 
     const uint64_t max_last_sent = static_cast<uint64_t>(time(nullptr)) - TIME_BETWEEN_RELAY;
     const uint64_t min_height = height > VOTE_LIFETIME ? height - VOTE_LIFETIME : 0;
 
     std::vector<quorum_vote_t> result;
 
-    if (quorum_relay && hf_version < cryptonote::network_version_14_blink)
+    if (quorum_relay && hf_version < hf::hf14_blink)
       return result; // no quorum relaying before HF14
 
-    if (hf_version < cryptonote::network_version_14_blink || quorum_relay)
+    if (hf_version < hf::hf14_blink || quorum_relay)
       append_relayable_votes(result, m_obligations_pool, max_last_sent, min_height);
 
-    if (hf_version < cryptonote::network_version_14_blink || !quorum_relay)
+    if (hf_version < hf::hf14_blink || !quorum_relay)
       append_relayable_votes(result, m_checkpoint_pool,  max_last_sent, min_height);
 
     return result;
@@ -643,7 +641,7 @@ namespace service_nodes
     return *votes;
   }
 
-  void voting_pool::remove_used_votes(std::vector<cryptonote::transaction> const &txs, uint8_t hard_fork_version)
+  void voting_pool::remove_used_votes(std::vector<cryptonote::transaction> const &txs, hf version)
   {
     // TODO(doyle): Cull checkpoint votes
     std::unique_lock lock{m_lock};
@@ -656,7 +654,7 @@ namespace service_nodes
         continue;
 
       cryptonote::tx_extra_service_node_state_change state_change;
-      if (!get_service_node_state_change_from_tx_extra(tx.extra, state_change, hard_fork_version))
+      if (!get_service_node_state_change_from_tx_extra(tx.extra, state_change, version))
       {
         LOG_ERROR("Could not get state change from tx, possibly corrupt tx");
         continue;

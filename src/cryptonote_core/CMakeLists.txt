@@ -52,9 +52,10 @@ target_link_libraries(cryptonote_core
     ringct
     device
     checkpoints
-    sqlite3
+    SQLite::SQLite3
   PRIVATE
     Boost::program_options
+    SQLiteCpp
     systemd
     extra)
 

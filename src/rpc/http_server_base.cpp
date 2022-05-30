@@ -1,7 +1,8 @@
 
 #include "http_server_base.h"
-#include <oxenmq/base64.h>
-#include <oxenmq/hex.h>
+#include <oxenc/base64.h>
+#include <oxenc/hex.h>
+#include <oxenc/endian.h>
 #include "common/string_util.h"
 
 // epee:
@@ -25,9 +26,9 @@ namespace cryptonote::rpc {
   std::optional<std::string> check_authorization(std::string_view auth_header, std::string_view realm, Callback check_login) {
     std::string fail = "Basic realm=\"" + std::string{realm} + "\", charset=\"UTF-8\"";
     auto parts = tools::split_any(auth_header, " \t\r\n", true);
-    if (parts.size() < 2 || parts[0] != "Basic"sv || !oxenmq::is_base64(parts[1]))
+    if (parts.size() < 2 || parts[0] != "Basic"sv || !oxenc::is_base64(parts[1]))
       return fail;
-    auto login = oxenmq::from_base64(parts[1]);
+    auto login = oxenc::from_base64(parts[1]);
     auto colon = login.find(':');
     if (colon == std::string_view::npos)
       return fail;
@@ -114,7 +115,7 @@ namespace cryptonote::rpc {
       // for example, localhost becomes `::1` instead of `0:0:0:0:0:0:0:1`).
       std::array<uint16_t, 8> a;
       std::memcpy(a.data(), addr.data(), 16);
-      for (auto& x : a) boost::endian::big_to_native_inplace(x);
+      for (auto& x : a) oxenc::big_to_host_inplace(x);
 
       size_t zero_start = 0, zero_end = 0;
       for (size_t i = 0, start = 0, end = 0; i < a.size(); i++) {
@@ -144,7 +145,7 @@ namespace cryptonote::rpc {
       result << ']';
     }
     else
-      result << "{unknown:" << oxenmq::to_hex(addr) << "}";
+      result << "{unknown:" << oxenc::to_hex(addr) << "}";
     return result.str();
   }
 

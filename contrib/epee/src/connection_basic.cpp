@@ -38,7 +38,6 @@
 #include "epee/misc_log_ex.h"
 #include <thread>
 #include <chrono>
-#include "epee/misc_language.h"
 #include "epee/pragma_comp_defs.h"
 #include <iomanip>
 
@@ -53,8 +52,8 @@
 #define GET_IO_SERVICE(s) ((s).get_io_service())
 #endif
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "net.conn"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "net.conn"
 
 // ################################################################################################
 // local (TU local) headers

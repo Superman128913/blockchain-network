@@ -237,6 +237,7 @@ namespace crypto {
    * Ed25519: given signature (R, s), (unhashed) message M, pubkey A:
    * Check: sB == R + H(R||A||M)A
    */
+  signature generate_signature(const hash &prefix_hash, const public_key &pub, const secret_key &sec);
   void generate_signature(const hash &prefix_hash, const public_key &pub, const secret_key &sec, signature &sig);
   // See above.
   bool check_signature(const hash &prefix_hash, const public_key &pub, const signature &sig);

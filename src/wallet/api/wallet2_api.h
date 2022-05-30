@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -117,6 +118,8 @@ struct StakeUnlockResult
   virtual bool success() = 0;
   virtual std::string msg() = 0;
   virtual PendingTransaction* ptx() = 0;
+
+  virtual ~StakeUnlockResult() = default;
 };
 
 /**
@@ -176,6 +179,7 @@ struct TransactionInfo
     virtual ~TransactionInfo() = 0;
     virtual bool isServiceNodeReward() const = 0;
     virtual bool isMinerReward() const = 0;
+    virtual bool isStake() const = 0;
     virtual int  direction() const = 0;
     virtual bool isPending() const = 0;
     virtual bool isFailed() const = 0;
@@ -527,7 +531,11 @@ struct Wallet
      * \param lightWallet - start wallet in light mode, connect to a openmonero compatible server.
      * \return  - true on success
      */
-    virtual bool init(const std::string &daemon_address, uint64_t upper_transaction_size_limit = 0, const std::string &daemon_username = "", const std::string &daemon_password = "", bool use_ssl = false, bool lightWallet = false) = 0;
+    virtual bool init(const std::string &daemon_address, uint64_t upper_transaction_size_limit = 0, const std::string &daemon_username = "", const std::string &daemon_password = "", bool use_ssl = false
+#ifdef ENABLE_LIGHT_WALLET
+        , bool lightWallet = false
+#endif
+        ) = 0;
 
    /*!
     * \brief createWatchOnly - Creates a watch only wallet
@@ -601,11 +609,20 @@ struct Wallet
         return result;
     }
 
+    // Information returned about stakes in listCurrentStakes()
+    struct stake_info {
+        std::string sn_pubkey;
+        uint64_t stake = 0;
+        std::optional<uint64_t> unlock_height;
+        bool awaiting = false;
+        bool decommissioned = false;
+    };
+
    /**
-    * @brief listCurrentStakes - returns a list of the wallets locked stakes, provides both service node address and the staked amount
+    * @brief listCurrentStakes - returns a list of the wallets locked stake info (see above).
     * @return
     */
-    virtual std::vector<std::pair<std::string, uint64_t>>* listCurrentStakes() const = 0;
+    virtual std::vector<stake_info>* listCurrentStakes() const = 0;
 
    /**
     * @brief watchOnly - checks if wallet is watch only
@@ -614,8 +631,8 @@ struct Wallet
     virtual bool watchOnly() const = 0;
 
     /**
-     * @brief blockChainHeight - returns current blockchain height
-     * @return
+     * @brief blockChainHeight - returns current blockchain height.  This is thread-safe and will
+     * not block if called from different threads.
      */
     virtual uint64_t blockChainHeight() const = 0;
 
@@ -632,7 +649,7 @@ struct Wallet
     **/ 
     virtual uint64_t estimateBlockChainHeight() const = 0;
     /**
-     * @brief daemonBlockChainHeight - returns daemon blockchain height
+     * @brief daemonBlockChainHeight - returns daemon blockchain height; thread-safe.
      * @return 0 - in case error communicating with the daemon.
      *             status() will return Status_Error and a return verbose error description
      */
@@ -689,6 +706,21 @@ struct Wallet
      * @brief refreshAsync - refreshes wallet asynchronously.
      */
     virtual void refreshAsync() = 0;
+
+    /**
+     * @brief refreshing - returns true if a refresh is currently underway; this is done *without*
+     * requiring a lock, unlike most other wallet-interacting functions.
+     *
+     * @param max_wait - the maximum time to try to obtain the refresh thread lock.  If this time
+     * expires without acquiring a lock, we return true, otherwise we return false.  Defaults to
+     * 50ms; can be set to 0ms to always return immediately.
+     *
+     * @return - true if the refresh thread is currently active, false otherwise.  If true, very few
+     * other methods here will work (i.e. they will block until the refresh finishes).  The most
+     * notably non-blocking, thread-safe methods that can be used when this returns true are
+     * blockChainHeight and daemonBlockChainHeight.
+     */
+    virtual bool isRefreshing(std::chrono::milliseconds max_wait = std::chrono::milliseconds{50}) = 0;
 
     /**
      * @brief rescanBlockchain - rescans the wallet, updating transactions from daemon
@@ -999,11 +1031,13 @@ struct Wallet
     //! secondary key reuse mitigation
     virtual void keyReuseMitigation2(bool mitigation) = 0;
 
+#ifdef ENABLE_LIGHT_WALLET
     //! Light wallet authenticate and login
     virtual bool lightWalletLogin(bool &isNewWallet) const = 0;
     
     //! Initiates a light wallet import wallet request
     virtual bool lightWalletImportWalletRequest(std::string &payment_id, uint64_t &fee, bool &new_request, bool &request_fulfilled, std::string &payment_address, std::string &status) = 0;
+#endif
 
     //! locks/unlocks the keys file; returns true on success
     virtual bool lockKeysFile() = 0;
@@ -1188,9 +1222,6 @@ struct WalletManagerBase
 
     //! returns current block target
     virtual uint64_t blockTarget() = 0;
-
-    //! resolves an OpenAlias address to a monero address
-    virtual std::string resolveOpenAlias(const std::string &address, bool &dnssec_valid) const = 0;
 };
 
 struct WalletManagerFactory

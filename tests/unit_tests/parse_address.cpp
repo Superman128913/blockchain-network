@@ -34,10 +34,10 @@
 
 using namespace cryptonote;
 
-TEST(ADDRESS, empty) { EXPECT_FALSE(cryptonote::is_valid_address("", cryptonote::MAINNET)); }
+TEST(ADDRESS, empty) { EXPECT_FALSE(cryptonote::is_valid_address("", cryptonote::network_type::MAINNET)); }
 
-TEST(ADDRESS, short_mainnet_address) { EXPECT_FALSE(cryptonote::is_valid_address("LDBEN6Ut4NkMwyaXWZ7kBEAx8X64o6YtDhLXUP26uLHyYT4nFmcaPU2Z2fauqrhTLh4Qfr61pUUZVLaTHqAdycETKM1STr", cryptonote::MAINNET)); }
-TEST(ADDRESS, long_mainnet_address) { EXPECT_FALSE(cryptonote::is_valid_address("LDBEN6Ut4NkMwyaXWZ7kBEAx8X64o6YtDhLXUP26uLHyYT4nFmcaPU2Z2fauqrhTLh4Qfr61pUUZVLaTHqAdycETKM1STrzz", cryptonote::MAINNET)); }
+TEST(ADDRESS, short_mainnet_address) { EXPECT_FALSE(cryptonote::is_valid_address("LDBEN6Ut4NkMwyaXWZ7kBEAx8X64o6YtDhLXUP26uLHyYT4nFmcaPU2Z2fauqrhTLh4Qfr61pUUZVLaTHqAdycETKM1STr", cryptonote::network_type::MAINNET)); }
+TEST(ADDRESS, long_mainnet_address) { EXPECT_FALSE(cryptonote::is_valid_address("LDBEN6Ut4NkMwyaXWZ7kBEAx8X64o6YtDhLXUP26uLHyYT4nFmcaPU2Z2fauqrhTLh4Qfr61pUUZVLaTHqAdycETKM1STrzz", cryptonote::network_type::MAINNET)); }
 
-TEST(ADDRESS, valid_test_address) { EXPECT_TRUE(cryptonote::is_valid_address("T6TzkJb5EiASaCkcH7idBEi1HSrpSQJE1Zq3aL65ojBMPZvqHNYPTL56i3dncGVNEYCG5QG5zrBmRiVwcg6b1cRM1SRNqbp44", cryptonote::TESTNET)); }
-TEST(ADDRESS, valid_mainnet_address) { EXPECT_TRUE(cryptonote::is_valid_address("LDBEN6Ut4NkMwyaXWZ7kBEAx8X64o6YtDhLXUP26uLHyYT4nFmcaPU2Z2fauqrhTLh4Qfr61pUUZVLaTHqAdycETKM1STrz", cryptonote::MAINNET)); }
+TEST(ADDRESS, valid_test_address) { EXPECT_TRUE(cryptonote::is_valid_address("T6TzkJb5EiASaCkcH7idBEi1HSrpSQJE1Zq3aL65ojBMPZvqHNYPTL56i3dncGVNEYCG5QG5zrBmRiVwcg6b1cRM1SRNqbp44", cryptonote::network_type::TESTNET)); }
+TEST(ADDRESS, valid_mainnet_address) { EXPECT_TRUE(cryptonote::is_valid_address("LDBEN6Ut4NkMwyaXWZ7kBEAx8X64o6YtDhLXUP26uLHyYT4nFmcaPU2Z2fauqrhTLh4Qfr61pUUZVLaTHqAdycETKM1STrz", cryptonote::network_type::MAINNET)); }

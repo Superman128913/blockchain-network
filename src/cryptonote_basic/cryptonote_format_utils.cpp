@@ -32,9 +32,10 @@
 #include <atomic>
 #include <boost/algorithm/string.hpp>
 #include <limits>
-#include <oxenmq/hex.h>
+#include <oxenc/hex.h>
 #include <variant>
 #include "common/hex.h"
+#include "cryptonote_core/service_node_list.h"
 #include "epee/wipeable_string.h"
 #include "epee/string_tools.h"
 #include "common/i18n.h"
@@ -54,11 +55,6 @@
 #define OXEN_DEFAULT_LOG_CATEGORY "cn"
 
 using namespace crypto;
-
-static std::atomic<uint64_t> tx_hashes_calculated_count(0);
-static std::atomic<uint64_t> tx_hashes_cached_count(0);
-static std::atomic<uint64_t> block_hashes_calculated_count(0);
-static std::atomic<uint64_t> block_hashes_cached_count(0);
 
 #define CHECK_AND_ASSERT_THROW_MES_L1(expr, message) {if(!(expr)) {MWARNING(message); throw std::runtime_error(message);}}
 
@@ -96,7 +92,7 @@ namespace cryptonote
       ++nlr;
     nlr += 6;
     const size_t bp_size = 32 * (9 + 2 * nlr);
-    CHECK_AND_ASSERT_THROW_MES_L1(n_outputs <= BULLETPROOF_MAX_OUTPUTS, "maximum number of outputs is " + std::to_string(BULLETPROOF_MAX_OUTPUTS) + " per transaction");
+    CHECK_AND_ASSERT_THROW_MES_L1(n_outputs <= TX_BULLETPROOF_MAX_OUTPUTS, "maximum number of outputs is " + std::to_string(TX_BULLETPROOF_MAX_OUTPUTS) + " per transaction");
     CHECK_AND_ASSERT_THROW_MES_L1(bp_base * n_padded_outputs >= bp_size, "Invalid bulletproof clawback: bp_base " + std::to_string(bp_base) + ", n_padded_outputs "
         + std::to_string(n_padded_outputs) + ", bp_size " + std::to_string(bp_size));
     const uint64_t bp_clawback = (bp_base * n_padded_outputs - bp_size) * 4 / 5;
@@ -358,80 +354,65 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------
-  uint64_t power_integral(uint64_t a, uint64_t b)
+  std::optional<uint64_t> parse_amount(std::string_view str_amount)
   {
-    if(b == 0)
-      return 1;
-    uint64_t total = a;
-    for(uint64_t i = 1; i != b; i++)
-      total *= a;
-    return total;
-  }
-  //---------------------------------------------------------------
-  bool parse_amount(uint64_t& amount, std::string_view str_amount)
-  {
+    uint64_t amount;
     tools::trim(str_amount);
 
     auto parts = tools::split(str_amount, "."sv);
     if (parts.size() > 2)
-      return false; // 123.456.789 no thanks.
+      return std::nullopt; // 123.456.789 no thanks.
 
     if (parts.size() == 2 && parts[1].empty())
       parts.pop_back(); // allow "123." (treat it as as "123")
 
     if (parts[0].find_first_not_of("0123456789"sv) != std::string::npos)
-      return false; // whole part contains non-digit
+      return std::nullopt; // whole part contains non-digit
 
     if (parts[0].empty()) {
       // Only allow an empty whole number part if there is a fractional part.
       if (parts.size() == 1)
-        return false;
+        return std::nullopt;
       amount = 0;
     }
     else
     {
       if (!tools::parse_int(parts[0], amount))
-        return false;
+        return std::nullopt;
 
       // Scale up the number (e.g. 12 from "12.45") to atomic units.
-      //
-      // TODO: get rid of the user-configurable default_decimal_point nonsense and just multiply
-      // this value by the `COIN` constant.
-      for (size_t i = 0; i < CRYPTONOTE_DISPLAY_DECIMAL_POINT; i++)
-      {
-        if (amount > std::numeric_limits<uint64_t>::max() / 10)
-          return false; // would overflow
-        amount *= 10;
-      }
+      if (amount > std::numeric_limits<uint64_t>::max() / oxen::COIN)
+        return std::nullopt; // would overflow
+      amount *= oxen::COIN;
     }
 
     if (parts.size() == 1)
-      return true;
+      return amount;
 
     if (parts[1].find_first_not_of("0123456789"sv) != std::string::npos)
-      return false; // fractional part contains non-digit
+      return std::nullopt; // fractional part contains non-digit
 
     // If too long, but with insignificant 0's, trim them off
-    while (parts[1].size() > CRYPTONOTE_DISPLAY_DECIMAL_POINT && parts[1].back() == '0')
+    while (parts[1].size() > oxen::DISPLAY_DECIMAL_POINT && parts[1].back() == '0')
       parts[1].remove_suffix(1);
 
-    if (parts[1].size() > CRYPTONOTE_DISPLAY_DECIMAL_POINT)
-      return false; // fractional part has too many significant digits
+    if (parts[1].size() > oxen::DISPLAY_DECIMAL_POINT)
+      return std::nullopt; // fractional part has too many significant digits
 
     uint64_t fractional;
     if (!tools::parse_int(parts[1], fractional))
-      return false;
+      return std::nullopt;
 
     // Scale up the value if it wasn't a full fractional value, e.g. if we have "10.45" then we
     // need to convert the 45 we just parsed to 450'000'000.
-    for (size_t i = parts[1].size(); i < CRYPTONOTE_DISPLAY_DECIMAL_POINT; i++)
+    for (size_t i = parts[1].size(); i < oxen::DISPLAY_DECIMAL_POINT; i++)
       fractional *= 10;
 
     if (fractional > std::numeric_limits<uint64_t>::max() - amount)
-      return false; // would overflow
+      return std::nullopt; // would overflow
 
     amount += fractional;
-    return true;
+    return amount;
   }
   //---------------------------------------------------------------
   uint64_t get_transaction_weight(const transaction &tx, size_t blob_size)
@@ -546,7 +527,7 @@ namespace cryptonote
     try {
       serialization::deserialize_all(ar, tx_extra_fields);
     } catch (const std::exception& e) {
-      MWARNING(__func__ << ": failed to deserialize extra field: " << e.what() << "; extra = " << oxenmq::to_hex(tx_extra.begin(), tx_extra.end()));
+      MWARNING(__func__ << ": failed to deserialize extra field: " << e.what() << "; extra = " << oxenc::to_hex(tx_extra.begin(), tx_extra.end()));
       return false;
     }
 
@@ -632,7 +613,7 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------
-  bool add_extra_nonce_to_tx_extra(std::vector<uint8_t>& tx_extra, const blobdata& extra_nonce)
+  bool add_extra_nonce_to_tx_extra(std::vector<uint8_t>& tx_extra, const std::string& extra_nonce)
   {
     CHECK_AND_ASSERT_MES(extra_nonce.size() <= TX_EXTRA_NONCE_MAX_COUNT, false, "extra nonce could be 255 bytes max");
     tx_extra.reserve(tx_extra.size() + 2 + extra_nonce.size());
@@ -642,10 +623,10 @@ namespace cryptonote
     return true;
   }
 
-  bool add_service_node_state_change_to_tx_extra(std::vector<uint8_t>& tx_extra, const tx_extra_service_node_state_change& state_change, const uint8_t hf_version)
+  bool add_service_node_state_change_to_tx_extra(std::vector<uint8_t>& tx_extra, const tx_extra_service_node_state_change& state_change, const hf hf_version)
   {
     tx_extra_field field;
-    if (hf_version < network_version_12_checkpointing)
+    if (hf_version < hf::hf12_checkpointing)
     {
       CHECK_AND_ASSERT_MES(state_change.state == service_nodes::new_state::deregister, false, "internal error: cannot construct an old deregistration for a non-deregistration state change (before hardfork v12)");
       field = tx_extra_service_node_deregister_old{state_change};
@@ -720,36 +701,22 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------
-  bool add_service_node_register_to_tx_extra(
-      std::vector<uint8_t>& tx_extra,
-      const std::vector<cryptonote::account_public_address>& addresses,
-      uint64_t portions_for_operator,
-      const std::vector<uint64_t>& portions,
-      uint64_t expiration_timestamp,
-      const crypto::signature& service_node_signature)
+  bool add_service_node_registration_to_tx_extra(std::vector<uint8_t>& tx_extra, const service_nodes::registration_details& reg)
   {
-    if (addresses.size() != portions.size())
+    tx_extra_field field;
+    auto& txreg = field.emplace<tx_extra_service_node_register>();
+    txreg.amounts.reserve(reg.reserved.size());
+    txreg.public_spend_keys.reserve(reg.reserved.size());
+    txreg.public_view_keys.reserve(reg.reserved.size());
+    for (const auto& [addr, amount] : reg.reserved)
     {
-      LOG_ERROR("Tried to serialize registration with more addresses than portions, this should never happen");
-      return false;
+      txreg.public_spend_keys.push_back(addr.m_spend_public_key);
+      txreg.public_view_keys.push_back(addr.m_view_public_key);
+      txreg.amounts.push_back(amount);
     }
-    std::vector<crypto::public_key> public_view_keys(addresses.size());
-    std::vector<crypto::public_key> public_spend_keys(addresses.size());
-    for (size_t i = 0; i < addresses.size(); i++)
-    {
-      public_view_keys[i] = addresses[i].m_view_public_key;
-      public_spend_keys[i] = addresses[i].m_spend_public_key;
-    }
-    // convert to variant
-    tx_extra_field field =
-      tx_extra_service_node_register{
-        public_spend_keys,
-        public_view_keys,
-        portions_for_operator,
-        portions,
-        expiration_timestamp,
-        service_node_signature
-      };
+    txreg.fee = reg.fee;
+    txreg.hf_or_expiration = reg.hf;
+    txreg.signature = reg.signature;
 
     bool r = add_tx_extra_field_to_tx_extra(tx_extra, field);
     CHECK_AND_NO_ASSERT_MES_L1(r, false, "failed to serialize tx extra registration tx");
@@ -761,9 +728,9 @@ namespace cryptonote
     add_tx_extra<tx_extra_service_node_winner>(tx_extra, winner);
   }
   //---------------------------------------------------------------
-  bool get_service_node_state_change_from_tx_extra(const std::vector<uint8_t>& tx_extra, tx_extra_service_node_state_change &state_change, const uint8_t hf_version)
+  bool get_service_node_state_change_from_tx_extra(const std::vector<uint8_t>& tx_extra, tx_extra_service_node_state_change &state_change, const hf hf_version)
   {
-    if (hf_version >= cryptonote::network_version_12_checkpointing) {
+    if (hf_version >= hf::hf12_checkpointing) {
       // Look for a new-style state change field:
       return get_field_from_tx_extra(tx_extra, state_change);
     }
@@ -812,7 +779,7 @@ namespace cryptonote
           value(newar, field);
       } while (ar.remaining_bytes() > 0);
     } catch (const std::exception& e) {
-      LOG_PRINT_L1(__func__ << ": failed to deserialize extra field: " << e.what() << "; extra = " << oxenmq::to_hex(tx_extra.begin(), tx_extra.end()));
+      LOG_PRINT_L1(__func__ << ": failed to deserialize extra field: " << e.what() << "; extra = " << oxenc::to_hex(tx_extra.begin(), tx_extra.end()));
       return false;
     }
 
@@ -823,7 +790,7 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------
-  void set_payment_id_to_tx_extra_nonce(blobdata& extra_nonce, const crypto::hash& payment_id)
+  void set_payment_id_to_tx_extra_nonce(std::string& extra_nonce, const crypto::hash& payment_id)
   {
     extra_nonce.clear();
     extra_nonce.push_back(TX_EXTRA_NONCE_PAYMENT_ID);
@@ -831,7 +798,7 @@ namespace cryptonote
     std::copy(payment_id_ptr, payment_id_ptr + sizeof(payment_id), std::back_inserter(extra_nonce));
   }
   //---------------------------------------------------------------
-  void set_encrypted_payment_id_to_tx_extra_nonce(blobdata& extra_nonce, const crypto::hash8& payment_id)
+  void set_encrypted_payment_id_to_tx_extra_nonce(std::string& extra_nonce, const crypto::hash8& payment_id)
   {
     extra_nonce.clear();
     extra_nonce.push_back(TX_EXTRA_NONCE_ENCRYPTED_PAYMENT_ID);
@@ -839,7 +806,7 @@ namespace cryptonote
     std::copy(payment_id_ptr, payment_id_ptr + sizeof(payment_id), std::back_inserter(extra_nonce));
   }
   //---------------------------------------------------------------
-  bool get_payment_id_from_tx_extra_nonce(const blobdata& extra_nonce, crypto::hash& payment_id)
+  bool get_payment_id_from_tx_extra_nonce(const std::string& extra_nonce, crypto::hash& payment_id)
   {
     if(sizeof(crypto::hash) + 1 != extra_nonce.size())
       return false;
@@ -849,7 +816,7 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------
-  bool get_encrypted_payment_id_from_tx_extra_nonce(const blobdata& extra_nonce, crypto::hash8& payment_id)
+  bool get_encrypted_payment_id_from_tx_extra_nonce(const std::string& extra_nonce, crypto::hash8& payment_id)
   {
     if(sizeof(crypto::hash8) + 1 != extra_nonce.size())
       return false;
@@ -888,9 +855,19 @@ namespace cryptonote
   //---------------------------------------------------------------
   uint64_t get_block_height(const block& b)
   {
-    CHECK_AND_ASSERT_MES(b.miner_tx.vin.size() == 1, 0, "wrong miner tx in block: " << get_block_hash(b) << ", b.miner_tx.vin.size() != 1 (size is: " << b.miner_tx.vin.size() << ")");
-    CHECKED_GET_SPECIFIC_VARIANT(b.miner_tx.vin[0], txin_gen, coinbase_in, 0);
-    return coinbase_in.height;
+    cryptonote::block bl = b;
+    if (b.miner_tx.vout.size() > 0)
+    {
+      CHECK_AND_ASSERT_MES(b.miner_tx.vin.size() == 1, 0, "wrong miner tx in block: " << get_block_hash(b) << ", b.miner_tx.vin.size() != 1 (size is: " << b.miner_tx.vin.size() << ")");
+      CHECKED_GET_SPECIFIC_VARIANT(b.miner_tx.vin[0], txin_gen, coinbase_in, 0);
+      if (b.major_version >= hf::hf19_reward_batching)
+      {
+        CHECK_AND_ASSERT_MES(coinbase_in.height == b.height, 0, "wrong miner tx in block: " << get_block_hash(b));
+      }
+      return coinbase_in.height;
+    } else {
+      return b.height;
+    }
   }
   //---------------------------------------------------------------
   bool check_inputs_types_supported(const transaction& tx)
@@ -900,7 +877,6 @@ namespace cryptonote
       CHECK_AND_ASSERT_MES(std::holds_alternative<txin_to_key>(in), false, "wrong variant type: "
         << tools::type_name(tools::variant_type(in)) << ", expected " << tools::type_name<txin_to_key>()
         << ", in transaction id=" << get_transaction_hash(tx));
-
     }
     return true;
   }
@@ -974,7 +950,7 @@ namespace cryptonote
   //---------------------------------------------------------------
   std::string short_hash_str(const crypto::hash& h)
   {
-    return oxenmq::to_hex(tools::view_guts(h).substr(0, 4)) + "....";
+    return oxenc::to_hex(tools::view_guts(h).substr(0, 4)) + "....";
   }
   //---------------------------------------------------------------
   bool is_out_to_acc(const account_keys& acc, const txout_to_key& out_key, const crypto::public_key& tx_pub_key, const std::vector<crypto::public_key>& additional_tx_pub_keys, size_t output_index)
@@ -1052,37 +1028,31 @@ namespace cryptonote
     cn_fast_hash(blob.data(), blob.size(), res);
   }
   //---------------------------------------------------------------
-  std::string get_unit(unsigned int decimal_point)
+  std::string print_money(uint64_t amount, bool strip_zeros)
   {
-    if (decimal_point == (unsigned int)-1)
-      decimal_point = CRYPTONOTE_DISPLAY_DECIMAL_POINT;
-    switch (decimal_point)
-    {
-      case 9:
-        return "oxen";
-      case 6:
-        return "megarok";
-      case 3:
-        return "kilorok";
-      case 0:
-        return "rok";
-      default:
-        ASSERT_MES_AND_THROW("Invalid decimal point specification: " << decimal_point);
-    }
-  }
-  //---------------------------------------------------------------
-  std::string print_money(uint64_t amount, unsigned int decimal_point)
-  {
-    if (decimal_point == (unsigned int)-1)
-      decimal_point = CRYPTONOTE_DISPLAY_DECIMAL_POINT;
+    constexpr unsigned int decimal_point = oxen::DISPLAY_DECIMAL_POINT;
     std::string s = std::to_string(amount);
     if(s.size() < decimal_point+1)
     {
       s.insert(0, decimal_point+1 - s.size(), '0');
     }
-    if (decimal_point > 0)
-      s.insert(s.size() - decimal_point, ".");
+    s.insert(s.size() - decimal_point, ".");
+    if (strip_zeros)
+    {
+      while (s.back() == '0')
+        s.pop_back();
+      if (s.back() == '.')
+        s.pop_back();
+    }
     return s;
+  }
+  //---------------------------------------------------------------
+  std::string format_money(uint64_t amount, bool strip_zeros)
+  {
+    auto value = print_money(amount, strip_zeros);
+    value += ' ';
+    value += get_unit();
+    return value;
   }
   //---------------------------------------------------------------
   std::string print_tx_verification_context(tx_verification_context const &tvc, transaction const *tx)
@@ -1190,7 +1160,7 @@ namespace cryptonote
     return get_transaction_hash(t, res, NULL);
   }
   //---------------------------------------------------------------
-  [[nodiscard]] bool calculate_transaction_prunable_hash(const transaction& t, const cryptonote::blobdata *blob, crypto::hash& res)
+  [[nodiscard]] bool calculate_transaction_prunable_hash(const transaction& t, const std::string *blob, crypto::hash& res)
   {
     if (t.version == txversion::v1)
       return false;
@@ -1218,7 +1188,7 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------
-  crypto::hash get_transaction_prunable_hash(const transaction& t, const cryptonote::blobdata *blobdata)
+  crypto::hash get_transaction_prunable_hash(const transaction& t, const std::string* blobdata)
   {
     crypto::hash res;
     CHECK_AND_ASSERT_THROW_MES(calculate_transaction_prunable_hash(t, blobdata, res), "Failed to calculate tx prunable hash");
@@ -1274,7 +1244,7 @@ namespace cryptonote
     // prefix
     get_transaction_prefix_hash(t, hashes[0]);
 
-    const blobdata blob = tx_to_blob(t);
+    const std::string blob = tx_to_blob(t);
     CHECK_AND_ASSERT_MES(!blob.empty(), false, "Failed to convert tx to blob");
 
     // TODO(oxen): Not sure if this is the right fix, we may just want to set
@@ -1331,38 +1301,6 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------
-  bool get_registration_hash(const std::vector<cryptonote::account_public_address>& addresses, uint64_t operator_portions, const std::vector<uint64_t>& portions, uint64_t expiration_timestamp, crypto::hash& hash)
-  {
-    if (addresses.size() != portions.size())
-    {
-      LOG_ERROR("get_registration_hash addresses.size() != portions.size()");
-      return false;
-    }
-    uint64_t portions_left = STAKING_PORTIONS;
-    for (uint64_t portion : portions)
-    {
-      if (portion > portions_left)
-      {
-        LOG_ERROR(tr("Your registration has more than ") << STAKING_PORTIONS << tr(" portions, this registration is invalid!"));
-        return false;
-      }
-      portions_left -= portion;
-    }
-    size_t size = sizeof(uint64_t) + addresses.size() * (sizeof(cryptonote::account_public_address) + sizeof(uint64_t)) + sizeof(uint64_t);
-    std::string buffer;
-    buffer.reserve(size);
-    buffer += tools::view_guts(operator_portions);
-    for (size_t i = 0; i < addresses.size(); i++)
-    {
-      buffer += tools::view_guts(addresses[i]);
-      buffer += tools::view_guts(portions[i]);
-    }
-    buffer += tools::view_guts(expiration_timestamp);
-    assert(buffer.size() == size);
-    crypto::cn_fast_hash(buffer.data(), buffer.size(), hash);
-    return true;
-  }
-  //---------------------------------------------------------------
   bool get_transaction_hash(const transaction& t, crypto::hash& res, size_t* blob_size)
   {
     if (t.is_hash_valid())
@@ -1377,10 +1315,8 @@ namespace cryptonote
         }
         *blob_size = t.blob_size;
       }
-      ++tx_hashes_cached_count;
       return true;
     }
-    ++tx_hashes_calculated_count;
     bool ret = calculate_transaction_hash(t, res, blob_size);
     if (!ret)
       return false;
@@ -1399,9 +1335,9 @@ namespace cryptonote
     return get_transaction_hash(t, res, &blob_size);
   }
   //---------------------------------------------------------------
-  blobdata get_block_hashing_blob(const block& b)
+  std::string get_block_hashing_blob(const block& b)
   {
-    blobdata blob = t_serializable_object_to_blob(static_cast<block_header>(b));
+    std::string blob = t_serializable_object_to_blob(static_cast<block_header>(b));
     crypto::hash tree_root_hash = get_tx_tree_hash(b);
     blob.append(reinterpret_cast<const char*>(&tree_root_hash), sizeof(tree_root_hash));
     blob.append(tools::get_varint_data(b.tx_hashes.size()+1));
@@ -1419,10 +1355,8 @@ namespace cryptonote
     if (b.is_hash_valid())
     {
       res = b.hash;
-      ++block_hashes_cached_count;
       return true;
     }
-    ++block_hashes_calculated_count;
     bool ret = calculate_block_hash(b, res);
     if (!ret)
       return false;
@@ -1472,7 +1406,6 @@ namespace cryptonote
     if (block_hash)
     {
       calculate_block_hash(b, *block_hash);
-      ++block_hashes_calculated_count;
       b.hash = *block_hash;
       b.set_hash_valid(true);
     }
@@ -1489,22 +1422,22 @@ namespace cryptonote
     return parse_and_validate_block_from_blob(b_blob, b, &block_hash);
   }
   //---------------------------------------------------------------
-  blobdata block_to_blob(const block& b)
+  std::string block_to_blob(const block& b)
   {
     return t_serializable_object_to_blob(b);
   }
   //---------------------------------------------------------------
-  bool block_to_blob(const block& b, blobdata& b_blob)
+  bool block_to_blob(const block& b, std::string& b_blob)
   {
     return t_serializable_object_to_blob(b, b_blob);
   }
   //---------------------------------------------------------------
-  blobdata tx_to_blob(const transaction& tx)
+  std::string tx_to_blob(const transaction& tx)
   {
     return t_serializable_object_to_blob(tx);
   }
   //---------------------------------------------------------------
-  bool tx_to_blob(const transaction& tx, blobdata& b_blob)
+  bool tx_to_blob(const transaction& tx, std::string& b_blob)
   {
     return t_serializable_object_to_blob(tx, b_blob);
   }
@@ -1532,14 +1465,6 @@ namespace cryptonote
     for(auto& th: b.tx_hashes)
       txs_ids.push_back(th);
     return get_tx_tree_hash(txs_ids);
-  }
-  //---------------------------------------------------------------
-  void get_hash_stats(uint64_t &tx_hashes_calculated, uint64_t &tx_hashes_cached, uint64_t &block_hashes_calculated, uint64_t & block_hashes_cached)
-  {
-    tx_hashes_calculated = tx_hashes_calculated_count;
-    tx_hashes_cached = tx_hashes_cached_count;
-    block_hashes_calculated = block_hashes_calculated_count;
-    block_hashes_cached = block_hashes_cached_count;
   }
   //---------------------------------------------------------------
   crypto::secret_key encrypt_key(crypto::secret_key key, const epee::wipeable_string &passphrase)

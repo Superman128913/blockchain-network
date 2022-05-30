@@ -1,5 +1,6 @@
 
 #include "lmq_server.h"
+#include "cryptonote_config.h"
 #include "oxenmq/oxenmq.h"
 
 #undef OXEN_DEFAULT_LOG_CATEGORY
@@ -64,10 +65,10 @@ auto as_x_pubkeys(const std::vector<std::string>& pk_strings) {
   std::vector<crypto::x25519_public_key> pks;
   pks.reserve(pk_strings.size());
   for (const auto& pkstr : pk_strings) {
-    if (pkstr.size() != 64 || !oxenmq::is_hex(pkstr))
+    if (pkstr.size() != 64 || !oxenc::is_hex(pkstr))
       throw std::runtime_error("Invalid LMQ login pubkey: '" + pkstr + "'; expected 64-char hex pubkey");
     pks.emplace_back();
-    oxenmq::to_hex(pkstr.begin(), pkstr.end(), reinterpret_cast<char *>(&pks.back()));
+    oxenc::to_hex(pkstr.begin(), pkstr.end(), reinterpret_cast<char *>(&pks.back()));
   }
   return pks;
 }
@@ -132,10 +133,10 @@ omq_rpc::omq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
     // enough to support unix domain sockets, but for now the Windows default is just "don't listen"
 #ifndef _WIN32
     // Push default .oxen/oxend.sock
-    locals.push_back("ipc://" + core.get_config_directory().u8string() + "/" + CRYPTONOTE_NAME + "d.sock");
+    locals.push_back("ipc://" + core.get_config_directory().u8string() + "/" + std::string{cryptonote::SOCKET_FILENAME});
     // Pushing old default lokid.sock onto the list. A symlink from .loki -> .oxen so the user should be able
     // to communicate via the old .loki/lokid.sock
-    locals.push_back("ipc://" + core.get_config_directory().u8string() + "/lokid.sock");
+    locals.push_back("ipc://" + core.get_config_directory().u8string() + "/" + std::string{cryptonote::old::SOCKET_FILENAME});
 #endif
   } else if (locals.size() == 1 && locals[0] == "none") {
     locals.clear();

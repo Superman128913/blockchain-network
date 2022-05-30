@@ -51,9 +51,9 @@ message(STATUS "CMake version ${CMAKE_VERSION}")
 set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12 CACHE STRING "macOS deployment target (Apple clang only)")
 
 project(oxen
-    VERSION 9.2.0
+    VERSION 10.1.0
     LANGUAGES CXX C)
-set(OXEN_RELEASE_CODENAME "Audacious Aurochs")
+set(OXEN_RELEASE_CODENAME "Wistful Wagyu")
 
 # String value to append to the full version string; this is intended to easily identify whether a
 # binary was build from the release or development branches.  This should be permanently set to an
@@ -284,16 +284,17 @@ if(NOT MANUAL_SUBMODULES)
     endfunction ()
     
     message(STATUS "Checking submodules")
-    check_submodule(external/miniupnp)
     check_submodule(external/rapidjson)
     check_submodule(external/trezor-common)
     check_submodule(external/randomx)
     check_submodule(external/loki-mq cppzmq)
+    check_submodule(external/SQLiteCpp)
     if(BUILD_TESTS)
       check_submodule(external/googletest)
     endif()
     check_submodule(external/uWebSockets uSockets)
     check_submodule(external/ghc-filesystem)
+    check_submodule(external/SQLiteCpp)
   endif()
 endif()
 
@@ -322,7 +323,6 @@ else()
 endif()
 message(STATUS "Building for a ${ARCH_WIDTH}-bit system")
 
-# Check if we're on FreeBSD so we can exclude the local miniupnpc (it should be installed from ports instead)
 # CMAKE_SYSTEM_NAME checks are commonly known, but specifically taken from libsdl's CMakeLists
 if(CMAKE_SYSTEM_NAME MATCHES "kFreeBSD.*|FreeBSD")
   set(FREEBSD TRUE)
@@ -429,24 +429,6 @@ find_package(Threads)
 
 if (APPLE AND NOT IOS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=x86-64 -fvisibility=default")
-  if (NOT OpenSSL_DIR)
-      EXECUTE_PROCESS(COMMAND brew --prefix openssl
-        OUTPUT_VARIABLE OPENSSL_ROOT_DIR
-        OUTPUT_STRIP_TRAILING_WHITESPACE)
-    message(STATUS "Using OpenSSL found at ${OPENSSL_ROOT_DIR}")
-  endif()
-endif()
-
-if(BUILD_STATIC_DEPS)
-  # SSL::* targets already set up
-else()
-  find_package(OpenSSL REQUIRED)
-endif()
-message(STATUS "Using OpenSSL include dir at ${OPENSSL_INCLUDE_DIR}")
-
-if(MINGW)
-  # OpenSSL doesn't seem to properly set up its dependencies on Windows, leading to linking errors
-  target_link_libraries(OpenSSL::Crypto INTERFACE ws2_32)
 endif()
 
 add_definition_if_library_exists(c memset_s "string.h" HAVE_MEMSET_S)
@@ -456,7 +438,6 @@ add_definition_if_function_found(strptime HAVE_STRPTIME)
 # Generate header for embedded translations
 add_subdirectory(translations)
 
-add_library(miniupnpc INTERFACE)
 add_library(systemd INTERFACE)  # Will do nothing unless we find and enable systemd support
 
 if(NOT TARGET sodium)
@@ -503,6 +484,12 @@ if (WITH_SYSTEMD AND NOT BUILD_STATIC_DEPS)
     endif()
 endif()
 
+
+if(NOT BUILD_STATIC_DEPS)
+  pkg_check_modules(SQLITE3 REQUIRED sqlite3 IMPORTED_TARGET GLOBAL)
+  message(STATUS "Found sqlite3 ${SQLITE3_VERSION}")
+  add_library(SQLite::SQLite3 ALIAS PkgConfig::SQLITE3)
+endif()
 
 add_subdirectory(external)
 
@@ -790,7 +777,7 @@ set(Boost_USE_MULTITHREADED TRUE) # Needed for macOS, at least, and won't hurt e
 if(BUILD_STATIC_DEPS)
   # StaticBuild.cmake sets Boost targets up for us
 else()
-  find_package(Boost 1.58 QUIET REQUIRED COMPONENTS system thread serialization program_options)
+  find_package(Boost 1.62 QUIET REQUIRED COMPONENTS system thread serialization program_options)
 endif()
 
 set(CMAKE_FIND_LIBRARY_SUFFIXES ${OLD_LIB_SUFFIXES})
@@ -798,12 +785,6 @@ if(NOT Boost_FOUND)
   message(FATAL_ERROR "Could not find Boost libraries, please make sure you have installed Boost or libboost-all-dev (>=1.58) or the equivalent")
 elseif(Boost_FOUND)
   message(STATUS "Found Boost Version: ${Boost_VERSION}")
-  if (OPENSSL_VERSION VERSION_GREATER_EQUAL 1.1 AND (
-        Boost_VERSION VERSION_LESS 1.62.0 OR (Boost_VERSION VERSION_GREATER 100000 AND Boost_VERSION VERSION_LESS 106200)))
-      message(FATAL_ERROR "Boost ${Boost_VERSION} (older than 1.62) is too old to link with OpenSSL ${OPENSSL_VERSION} (1.1 or newer) found at ${OPENSSL_INCLUDE_DIR} and ${OPENSSL_LIBRARIES}. "
-                          "Update Boost or install OpenSSL 1.0 and set path to it when running cmake: "
-                          "cmake -DOPENSSL_ROOT_DIR='/usr/include/openssl-1.0'")
-  endif()
 endif()
 
 # Interface target for random extra system libraries that we need to link everything against
@@ -845,23 +826,19 @@ if (WIN32)
   target_link_libraries(extra INTERFACE setupapi)
 endif()
 
-if (BUILD_INTEGRATION)
-  target_compile_definitions(extra INTERFACE OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-else()
-  option(USE_READLINE "Build with GNU readline support." ON)
-  if(USE_READLINE AND BUILD_STATIC_DEPS)
-    # readline target already set up
-  elseif(USE_READLINE)
-    find_package(Readline)
-    if(READLINE_FOUND AND GNU_READLINE_FOUND)
-      add_library(readline INTERFACE)
-      target_link_libraries(readline INTERFACE ${GNU_READLINE_LIBRARY})
-      target_include_directories(readline INTERFACE ${Readline_INCLUDE_DIR})
-      target_compile_definitions(readline INTERFACE HAVE_READLINE)
-      message(STATUS "Found readline library at: ${GNU_READLINE_LIBRARY}")
-    else()
-      message(STATUS "Could not find GNU readline library so building without readline support")
-    endif()
+option(USE_READLINE "Build with GNU readline support." ON)
+if(USE_READLINE AND BUILD_STATIC_DEPS)
+  # readline target already set up
+elseif(USE_READLINE)
+  find_package(Readline)
+  if(READLINE_FOUND AND GNU_READLINE_FOUND)
+    add_library(readline INTERFACE)
+    target_link_libraries(readline INTERFACE ${GNU_READLINE_LIBRARY})
+    target_include_directories(readline INTERFACE ${Readline_INCLUDE_DIR})
+    target_compile_definitions(readline INTERFACE HAVE_READLINE)
+    message(STATUS "Found readline library at: ${GNU_READLINE_LIBRARY}")
+  else()
+    message(STATUS "Could not find GNU readline library so building without readline support")
   endif()
 endif()
 
@@ -875,15 +852,6 @@ if(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND ARCH_WIDTH EQUAL "32" AND NOT IOS AN
   endif()
 endif()
 
-
-if(BUILD_STATIC_DEPS)
-  # sqlite3 target already set up
-else()
-  add_library(sqlite3 INTERFACE)
-  pkg_check_modules(SQLITE3 REQUIRED sqlite3 IMPORTED_TARGET)
-  message(STATUS "Found sqlite3 ${SQLITE3_VERSION}")
-  target_link_libraries(sqlite3 INTERFACE PkgConfig::SQLITE3)
-endif()
 
 add_subdirectory(contrib)
 add_subdirectory(src)

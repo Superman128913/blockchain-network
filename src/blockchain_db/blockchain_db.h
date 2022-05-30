@@ -36,7 +36,6 @@
 #include "common/command_line.h"
 #include "common/fs.h"
 #include "crypto/hash.h"
-#include "cryptonote_basic/blobdatatype.h"
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/difficulty.h"
 
@@ -414,7 +413,7 @@ private:
    * @param tx_prunable_hash the hash of the prunable part of the transaction
    * @return the transaction ID
    */
-  virtual uint64_t add_transaction_data(const crypto::hash& blk_hash, const std::pair<transaction, blobdata>& tx, const crypto::hash& tx_hash, const crypto::hash& tx_prunable_hash) = 0;
+  virtual uint64_t add_transaction_data(const crypto::hash& blk_hash, const std::pair<transaction, std::string>& tx, const crypto::hash& tx_hash, const crypto::hash& tx_prunable_hash) = 0;
 
   /**
    * @brief remove data about a transaction
@@ -542,7 +541,7 @@ protected:
    * @param tx_hash_ptr the hash of the transaction, if already calculated
    * @param tx_prunable_hash_ptr the hash of the prunable part of the transaction, if already calculated
    */
-  void add_transaction(const crypto::hash& blk_hash, const std::pair<transaction, blobdata>& tx, const crypto::hash* tx_hash_ptr = NULL, const crypto::hash* tx_prunable_hash_ptr = NULL);
+  void add_transaction(const crypto::hash& blk_hash, const std::pair<transaction, std::string>& tx, const crypto::hash* tx_hash_ptr = NULL, const crypto::hash* tx_prunable_hash_ptr = NULL);
 
   mutable uint64_t time_tx_exists = 0;  //!< a performance metric
   uint64_t time_commit1 = 0;  //!< a performance metric
@@ -815,12 +814,12 @@ public:
    *
    * @return the height of the chain post-addition
    */
-  virtual uint64_t add_block( const std::pair<block, blobdata>& blk
+  virtual uint64_t add_block( const std::pair<block, std::string>& blk
                             , size_t block_weight
                             , uint64_t long_term_block_weight
                             , const difficulty_type& cumulative_difficulty
                             , const uint64_t& coins_generated
-                            , const std::vector<std::pair<transaction, blobdata>>& txs
+                            , const std::vector<std::pair<transaction, std::string>>& txs
                             );
 
   virtual void update_block_checkpoint(checkpoint_t const &checkpoint) = 0;
@@ -854,7 +853,7 @@ public:
    *
    * @return the block requested
    */
-  virtual cryptonote::blobdata get_block_blob(const crypto::hash& h) const = 0;
+  virtual std::string get_block_blob(const crypto::hash& h) const = 0;
 
   /**
    * @brief fetches the block with the given hash
@@ -922,7 +921,7 @@ public:
    *
    * @return the block blob
    */
-  virtual cryptonote::blobdata get_block_blob_from_height(uint64_t height) const = 0;
+  virtual std::string get_block_blob_from_height(uint64_t height) const = 0;
 
   /**
    * @brief fetch a block by height
@@ -1266,7 +1265,7 @@ public:
    *
    * @return true iff the transaction was found
    */
-  virtual bool get_tx_blob(const crypto::hash& h, cryptonote::blobdata &tx) const = 0;
+  virtual bool get_tx_blob(const crypto::hash& h, std::string &tx) const = 0;
 
   /**
    * @brief fetches the pruned transaction blob with the given hash
@@ -1280,7 +1279,7 @@ public:
    *
    * @return true iff the transaction was found
    */
-  virtual bool get_pruned_tx_blob(const crypto::hash& h, cryptonote::blobdata &tx) const = 0;
+  virtual bool get_pruned_tx_blob(const crypto::hash& h, std::string &tx) const = 0;
 
   /**
    * @brief fetches a number of pruned transaction blob from the given hash, in canonical blockchain order
@@ -1296,7 +1295,7 @@ public:
    *
    * @return true iff the transactions were found
    */
-  virtual bool get_pruned_tx_blobs_from(const crypto::hash& h, size_t count, std::vector<cryptonote::blobdata> &bd) const = 0;
+  virtual bool get_pruned_tx_blobs_from(const crypto::hash& h, size_t count, std::vector<std::string> &bd) const = 0;
 
   /**
    * @brief fetches the prunable transaction blob with the given hash
@@ -1311,7 +1310,7 @@ public:
    *
    * @return true iff the transaction was found and we have its prunable data
    */
-  virtual bool get_prunable_tx_blob(const crypto::hash& h, cryptonote::blobdata &tx) const = 0;
+  virtual bool get_prunable_tx_blob(const crypto::hash& h, std::string &tx) const = 0;
 
   /**
    * @brief fetches the prunable transaction hash
@@ -1512,7 +1511,7 @@ public:
    *
    * @param details the details of the transaction to add
    */
-  virtual void add_txpool_tx(const crypto::hash &txid, const cryptonote::blobdata &blob, const txpool_tx_meta_t& details) = 0;
+  virtual void add_txpool_tx(const crypto::hash &txid, const std::string &blob, const txpool_tx_meta_t& details) = 0;
 
   /**
    * @brief update a txpool transaction's metadata
@@ -1557,7 +1556,7 @@ public:
    *
    * @return true if the txid was in the txpool, false otherwise
    */
-  virtual bool get_txpool_tx_blob(const crypto::hash& txid, cryptonote::blobdata &bd) const = 0;
+  virtual bool get_txpool_tx_blob(const crypto::hash& txid, std::string &bd) const = 0;
 
   /**
    * @brief get a txpool transaction's blob
@@ -1566,7 +1565,7 @@ public:
    *
    * @return the blob for that transaction
    */
-  virtual cryptonote::blobdata get_txpool_tx_blob(const crypto::hash& txid) const = 0;
+  virtual std::string get_txpool_tx_blob(const crypto::hash& txid) const = 0;
 
   /**
    * @brief prune output data for the given amount
@@ -1621,7 +1620,7 @@ public:
    * @param: data: the metadata for the block
    * @param: blob: the block's blob
    */
-  virtual void add_alt_block(const crypto::hash &blkid, const cryptonote::alt_block_data_t &data, const cryptonote::blobdata &blob, const cryptonote::blobdata *checkpoint) = 0;
+  virtual void add_alt_block(const crypto::hash &blkid, const cryptonote::alt_block_data_t &data, const std::string &blob, const std::string *checkpoint) = 0;
 
   /**
    * @brief get an alternative block by hash
@@ -1632,7 +1631,7 @@ public:
    *
    * @return true if the block was found in the alternative blocks list, false otherwise
    */
-  virtual bool get_alt_block(const crypto::hash &blkid, alt_block_data_t *data, cryptonote::blobdata *blob, cryptonote::blobdata *checkpoint) const = 0;
+  virtual bool get_alt_block(const crypto::hash &blkid, alt_block_data_t *data, std::string *blob, std::string *checkpoint) const = 0;
 
   /**
    * @brief get the block header from the alternative block db
@@ -1644,7 +1643,7 @@ public:
    *
    * @return true if the block was found in the alternative blocks list, false otherwise
    */
-  bool get_alt_block_header(const crypto::hash &blkid, alt_block_data_t *data, cryptonote::block_header *header, cryptonote::blobdata *checkpoint) const;
+  bool get_alt_block_header(const crypto::hash &blkid, alt_block_data_t *data, cryptonote::block_header *header, std::string *checkpoint) const;
 
   /**
    * @brief remove an alternative block
@@ -1676,7 +1675,7 @@ public:
    *
    * @return false if the function returns false for any transaction, otherwise true
    */
-  virtual bool for_all_txpool_txes(std::function<bool(const crypto::hash&, const txpool_tx_meta_t&, const cryptonote::blobdata*)>, bool include_blob = false, bool include_unrelayed_txes = true) const = 0;
+  virtual bool for_all_txpool_txes(std::function<bool(const crypto::hash&, const txpool_tx_meta_t&, const std::string*)>, bool include_blob = false, bool include_unrelayed_txes = true) const = 0;
 
   /**
    * @brief runs a function over all key images stored
@@ -1768,7 +1767,7 @@ public:
    *
    * @return false if the function returns false for any output, otherwise true
    */
-  virtual bool for_all_alt_blocks(std::function<bool(const crypto::hash &blkid, const alt_block_data_t &data, const cryptonote::blobdata *block_blob, const cryptonote::blobdata *checkpoint_blob)> f, bool include_blob = false) const = 0;
+  virtual bool for_all_alt_blocks(std::function<bool(const crypto::hash &blkid, const alt_block_data_t &data, const std::string *block_blob, const std::string *checkpoint_blob)> f, bool include_blob = false) const = 0;
 
   /**
    * @brief return a histogram of outputs on the blockchain

@@ -2,8 +2,6 @@
 #include "http_server.h"
 #include <chrono>
 #include <exception>
-#include <oxenmq/base64.h>
-#include <boost/endian/conversion.hpp>
 #include <oxenmq/variant.h>
 #include "common/command_line.h"
 #include "common/string_util.h"
@@ -582,7 +580,7 @@ namespace cryptonote::rpc {
 
     auto net = m_server.nettype();
     m_server_header = "oxend/"s + (m_restricted ? std::to_string(OXEN_VERSION[0]) : std::string{OXEN_VERSION_FULL})
-      + (net == MAINNET ? " mainnet" : net == TESTNET ? " testnet" : net == DEVNET ? " devnet" : net == FAKECHAIN ? " fakenet" : " unknown net");
+      + (net == network_type::MAINNET ? " mainnet" : net == network_type::TESTNET ? " testnet" : net == network_type::DEVNET ? " devnet" : net == network_type::FAKECHAIN ? " fakenet" : " unknown net");
 
     m_startup_promise.set_value(true);
     m_sent_startup = true;

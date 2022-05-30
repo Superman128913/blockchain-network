@@ -40,7 +40,6 @@
 
 #include "epee/net/net_utils_base.h"
 #include "epee/misc_log_ex.h"
-#include "epee/misc_language.h"
 #include "epee/pragma_comp_defs.h"
 
 #include "epee/net/abstract_tcp_server2.h"
@@ -48,8 +47,8 @@
 // TODO:
 #include "epee/net/network_throttle-detail.hpp"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "net.throttle"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "net.throttle"
 
 // ################################################################################################
 // ################################################################################################

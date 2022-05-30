@@ -29,7 +29,6 @@
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #pragma once
-#include "blobdatatype.h"
 #include "cryptonote_basic_impl.h"
 #include "tx_extra.h"
 #include "account.h"
@@ -46,7 +45,10 @@ namespace epee
   class wipeable_string;
 }
 
-namespace service_nodes { struct quorum_vote_t; }
+namespace service_nodes {
+  struct quorum_vote_t;
+  struct registration_details;
+}
 
 namespace cryptonote
 {
@@ -129,12 +131,12 @@ namespace cryptonote
   crypto::public_key get_tx_pub_key_from_extra(const std::vector<uint8_t>& tx_extra, size_t pk_index = 0);
   crypto::public_key get_tx_pub_key_from_extra(const transaction_prefix& tx, size_t pk_index = 0);
 
-  bool add_service_node_state_change_to_tx_extra(std::vector<uint8_t>& tx_extra, const tx_extra_service_node_state_change& state_change, uint8_t hf_version);
-  bool get_service_node_state_change_from_tx_extra(const std::vector<uint8_t>& tx_extra, tx_extra_service_node_state_change& state_change, uint8_t hf_version);
+  bool add_service_node_state_change_to_tx_extra(std::vector<uint8_t>& tx_extra, const tx_extra_service_node_state_change& state_change, hf hf_version);
+  bool get_service_node_state_change_from_tx_extra(const std::vector<uint8_t>& tx_extra, tx_extra_service_node_state_change& state_change, hf hf_version);
 
   bool get_service_node_pubkey_from_tx_extra(const std::vector<uint8_t>& tx_extra, crypto::public_key& pubkey);
   bool get_service_node_contributor_from_tx_extra(const std::vector<uint8_t>& tx_extra, cryptonote::account_public_address& address);
-  bool add_service_node_register_to_tx_extra(std::vector<uint8_t>& tx_extra, const std::vector<cryptonote::account_public_address>& addresses, uint64_t portions_for_operator, const std::vector<uint64_t>& portions, uint64_t expiration_timestamp, const crypto::signature& signature);
+  bool add_service_node_registration_to_tx_extra(std::vector<uint8_t>& tx_extra, const service_nodes::registration_details& registration);
 
   bool get_tx_secret_key_from_tx_extra(const std::vector<uint8_t>& tx_extra, crypto::secret_key& key);
   void add_tx_secret_key_to_tx_extra(std::vector<uint8_t>& tx_extra, const crypto::secret_key& key);
@@ -151,16 +153,16 @@ namespace cryptonote
   std::vector<crypto::public_key> get_additional_tx_pub_keys_from_extra(const std::vector<uint8_t>& tx_extra);
   std::vector<crypto::public_key> get_additional_tx_pub_keys_from_extra(const transaction_prefix& tx);
   bool add_additional_tx_pub_keys_to_extra(std::vector<uint8_t>& tx_extra, const std::vector<crypto::public_key>& additional_pub_keys);
-  bool add_extra_nonce_to_tx_extra(std::vector<uint8_t>& tx_extra, const blobdata& extra_nonce);
+  bool add_extra_nonce_to_tx_extra(std::vector<uint8_t>& tx_extra, const std::string& extra_nonce);
   bool remove_field_from_tx_extra(std::vector<uint8_t>& tx_extra, size_t variant_index);
   template <typename T>
   bool remove_field_from_tx_extra(std::vector<uint8_t>& tx_extra) {
     return remove_field_from_tx_extra(tx_extra, tools::template_index<T, tx_extra_field>);
   }
-  void set_payment_id_to_tx_extra_nonce(blobdata& extra_nonce, const crypto::hash& payment_id);
-  void set_encrypted_payment_id_to_tx_extra_nonce(blobdata& extra_nonce, const crypto::hash8& payment_id);
-  bool get_payment_id_from_tx_extra_nonce(const blobdata& extra_nonce, crypto::hash& payment_id);
-  bool get_encrypted_payment_id_from_tx_extra_nonce(const blobdata& extra_nonce, crypto::hash8& payment_id);
+  void set_payment_id_to_tx_extra_nonce(std::string& extra_nonce, const crypto::hash& payment_id);
+  void set_encrypted_payment_id_to_tx_extra_nonce(std::string& extra_nonce, const crypto::hash8& payment_id);
+  bool get_payment_id_from_tx_extra_nonce(const std::string& extra_nonce, crypto::hash& payment_id);
+  bool get_encrypted_payment_id_from_tx_extra_nonce(const std::string& extra_nonce, crypto::hash8& payment_id);
   bool add_burned_amount_to_tx_extra(std::vector<uint8_t>& tx_extra, uint64_t burn);
   uint64_t get_burned_amount_from_tx_extra(const std::vector<uint8_t>& tx_extra);
   bool is_out_to_acc(const account_keys& acc, const txout_to_key& out_key, const crypto::public_key& tx_pub_key, const std::vector<crypto::public_key>& additional_tx_public_keys, size_t output_index);
@@ -180,18 +182,16 @@ namespace cryptonote
   crypto::hash get_blob_hash(const std::string_view blob);
   std::string short_hash_str(const crypto::hash& h);
 
-  bool get_registration_hash(const std::vector<cryptonote::account_public_address>& addresses, uint64_t operator_portions, const std::vector<uint64_t>& portions, uint64_t expiration_timestamp, crypto::hash& hash);
-
   crypto::hash get_transaction_hash(const transaction& t);
   bool get_transaction_hash(const transaction& t, crypto::hash& res);
   bool get_transaction_hash(const transaction& t, crypto::hash& res, size_t& blob_size);
   bool get_transaction_hash(const transaction& t, crypto::hash& res, size_t* blob_size);
-  bool calculate_transaction_prunable_hash(const transaction& t, const cryptonote::blobdata *blob, crypto::hash& res);
-  crypto::hash get_transaction_prunable_hash(const transaction& t, const cryptonote::blobdata *blob = NULL);
+  bool calculate_transaction_prunable_hash(const transaction& t, const std::string *blob, crypto::hash& res);
+  crypto::hash get_transaction_prunable_hash(const transaction& t, const std::string *blob = NULL);
   bool calculate_transaction_hash(const transaction& t, crypto::hash& res, size_t* blob_size);
   crypto::hash get_pruned_transaction_hash(const transaction& t, const crypto::hash &pruned_data_hash);
 
-  blobdata get_block_hashing_blob(const block& b);
+  std::string get_block_hashing_blob(const block& b);
   bool calculate_block_hash(const block& b, crypto::hash& res);
   bool get_block_hash(const block& b, crypto::hash& res);
   crypto::hash get_block_hash(const block& b);
@@ -202,7 +202,7 @@ namespace cryptonote
   uint64_t get_outs_money_amount(const transaction& tx);
   bool check_inputs_types_supported(const transaction& tx);
   bool check_outs_valid(const transaction& tx);
-  bool parse_amount(uint64_t& amount, std::string_view str_amount);
+  std::optional<uint64_t> parse_amount(std::string_view str_amount);
   uint64_t get_transaction_weight(const transaction &tx);
   uint64_t get_transaction_weight(const transaction &tx, size_t blob_size);
   uint64_t get_pruned_transaction_weight(const transaction &tx);
@@ -213,8 +213,12 @@ namespace cryptonote
   uint64_t get_block_height(const block& b);
   std::vector<uint64_t> relative_output_offsets_to_absolute(const std::vector<uint64_t>& off);
   std::vector<uint64_t> absolute_output_offsets_to_relative(const std::vector<uint64_t>& off);
-  std::string get_unit(unsigned int decimal_point = -1);
-  std::string print_money(uint64_t amount, unsigned int decimal_point = -1);
+  constexpr std::string_view get_unit() { return "OXEN"sv; }
+  // Returns a monetary value with a decimal point; optionally strips insignificant trailing 0s.
+  std::string print_money(uint64_t amount, bool strip_zeros = false);
+  // Returns a formatted monetary value including the unit, e.g. "1.234567 OXEN"; strips
+  // insignificant trailing 0s by default (unlike the above) but can be overridden to not do that.
+  std::string format_money(uint64_t amount, bool strip_zeros = true);
 
   std::string print_tx_verification_context  (tx_verification_context const &tvc, transaction const *tx = nullptr);
   std::string print_vote_verification_context(vote_verification_context const &vvc, service_nodes::quorum_vote_t const *vote = nullptr);
@@ -229,7 +233,7 @@ namespace cryptonote
 
   //---------------------------------------------------------------
   template <typename T>
-  bool t_serializable_object_from_blob(T& to, const blobdata& blob)
+  bool t_serializable_object_from_blob(T& to, const std::string& blob)
   {
     try {
       serialization::parse_binary(blob, to);
@@ -240,7 +244,7 @@ namespace cryptonote
   }
   //---------------------------------------------------------------
   template <typename T>
-  bool t_serializable_object_to_blob(T& val, blobdata& blob)
+  bool t_serializable_object_to_blob(T& val, std::string& blob)
   {
     try {
       blob = serialization::dump_binary(const_cast<std::remove_const_t<T>&>(val));
@@ -252,9 +256,9 @@ namespace cryptonote
   }
   //---------------------------------------------------------------
   template <typename T>
-  blobdata t_serializable_object_to_blob(const T& val)
+  std::string t_serializable_object_to_blob(const T& val)
   {
-    blobdata b;
+    std::string b;
     t_serializable_object_to_blob(val, b);
     return b;
   }
@@ -275,7 +279,7 @@ namespace cryptonote
   template <typename T>
   bool get_object_hash(const T& o, crypto::hash& res, size_t& blob_size)
   {
-    blobdata bl;
+    std::string bl;
     if (!t_serializable_object_to_blob(o, bl))
       return false;
     blob_size = bl.size();
@@ -297,14 +301,13 @@ namespace cryptonote
     return ss.str();
   }
   //---------------------------------------------------------------
-  blobdata block_to_blob(const block& b);
-  bool block_to_blob(const block& b, blobdata& b_blob);
-  blobdata tx_to_blob(const transaction& b);
-  bool tx_to_blob(const transaction& b, blobdata& b_blob);
+  std::string block_to_blob(const block& b);
+  bool block_to_blob(const block& b, std::string& b_blob);
+  std::string tx_to_blob(const transaction& b);
+  bool tx_to_blob(const transaction& b, std::string& b_blob);
   void get_tx_tree_hash(const std::vector<crypto::hash>& tx_hashes, crypto::hash& h);
   crypto::hash get_tx_tree_hash(const std::vector<crypto::hash>& tx_hashes);
   crypto::hash get_tx_tree_hash(const block& b);
-  void get_hash_stats(uint64_t &tx_hashes_calculated, uint64_t &tx_hashes_cached, uint64_t &block_hashes_calculated, uint64_t & block_hashes_cached);
 
   crypto::secret_key encrypt_key(crypto::secret_key key, const epee::wipeable_string &passphrase);
   crypto::secret_key decrypt_key(crypto::secret_key key, const epee::wipeable_string &passphrase);

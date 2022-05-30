@@ -74,7 +74,7 @@ void BlockchainDB::pop_block()
   pop_block(blk, txs);
 }
 
-void BlockchainDB::add_transaction(const crypto::hash& blk_hash, const std::pair<transaction, blobdata>& txp, const crypto::hash* tx_hash_ptr, const crypto::hash* tx_prunable_hash_ptr)
+void BlockchainDB::add_transaction(const crypto::hash& blk_hash, const std::pair<transaction, std::string>& txp, const crypto::hash* tx_hash_ptr, const crypto::hash* tx_prunable_hash_ptr)
 {
   const transaction &tx = txp.first;
 
@@ -171,12 +171,12 @@ void BlockchainDB::add_transaction(const crypto::hash& blk_hash, const std::pair
   add_tx_amount_output_indices(tx_id, amount_output_indices);
 }
 
-uint64_t BlockchainDB::add_block( const std::pair<block, blobdata>& blck
+uint64_t BlockchainDB::add_block( const std::pair<block, std::string>& blck
                                 , size_t block_weight
                                 , uint64_t long_term_block_weight
                                 , const difficulty_type& cumulative_difficulty
                                 , const uint64_t& coins_generated
-                                , const std::vector<std::pair<transaction, blobdata>>& txs
+                                , const std::vector<std::pair<transaction, std::string>>& txs
                                 )
 {
   const block &blk = blck.first;
@@ -203,7 +203,7 @@ uint64_t BlockchainDB::add_block( const std::pair<block, blobdata>& blck
 
   int tx_i = 0;
   crypto::hash tx_hash = crypto::null_hash;
-  for (const std::pair<transaction, blobdata>& tx : txs)
+  for (const std::pair<transaction, std::string>& tx : txs)
   {
     tx_hash = blk.tx_hashes[tx_i];
     add_transaction(blk_hash, tx, &tx_hash);
@@ -276,7 +276,7 @@ block BlockchainDB::get_block(const crypto::hash& h) const
 
 bool BlockchainDB::get_tx(const crypto::hash& h, cryptonote::transaction &tx) const
 {
-  blobdata bd;
+  std::string bd;
   if (!get_tx_blob(h, bd))
     return false;
   if (!parse_and_validate_tx_from_blob(bd, tx))
@@ -287,11 +287,13 @@ bool BlockchainDB::get_tx(const crypto::hash& h, cryptonote::transaction &tx) co
 
 bool BlockchainDB::get_pruned_tx(const crypto::hash& h, cryptonote::transaction &tx) const
 {
-  blobdata bd;
+  std::string bd;
   if (!get_pruned_tx_blob(h, bd))
     return false;
   if (!parse_and_validate_tx_base_from_blob(bd, tx))
+  {
     throw DB_ERROR("Failed to parse transaction base from blob retrieved from the db");
+  }
 
   return true;
 }
@@ -399,9 +401,9 @@ uint64_t BlockchainDB::get_tx_block_height(const crypto::hash &h) const
   return result;
 }
 
-bool BlockchainDB::get_alt_block_header(const crypto::hash &blkid, alt_block_data_t *data, cryptonote::block_header *header, cryptonote::blobdata *checkpoint) const
+bool BlockchainDB::get_alt_block_header(const crypto::hash &blkid, alt_block_data_t *data, cryptonote::block_header *header, std::string *checkpoint) const
 {
-  cryptonote::blobdata blob;
+  std::string blob;
   if (!get_alt_block(blkid, data, &blob, checkpoint))
   {
     throw BLOCK_DNE("Alt-block with hash " + tools::type_to_hex(blkid) + " not found in db");
@@ -432,8 +434,8 @@ void BlockchainDB::fill_timestamps_and_difficulties_for_pow(cryptonote::network_
     return;
 
   uint64_t const top_block_height   = chain_height - 1;
-  bool const before_hf16            = !is_hard_fork_at_least(nettype, network_version_16_pulse, chain_height);
-  uint64_t const block_count        = DIFFICULTY_BLOCKS_COUNT(before_hf16);
+  bool const before_hf16            = !is_hard_fork_at_least(nettype, hf::hf16_pulse, chain_height);
+  uint64_t const block_count        = old::DIFFICULTY_BLOCKS_COUNT(before_hf16);
 
   timestamps.reserve(block_count);
   difficulties.reserve(block_count);

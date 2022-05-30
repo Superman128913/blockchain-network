@@ -84,14 +84,14 @@ namespace cryptonote
     static tx_pool_options from_block() { tx_pool_options o; o.kept_by_block = true; o.relayed = true; return o; }
     static tx_pool_options from_peer() { tx_pool_options o; o.relayed = true; return o; }
     static tx_pool_options new_tx(bool do_not_relay = false) { tx_pool_options o; o.do_not_relay = do_not_relay; return o; }
-    static tx_pool_options new_blink(bool approved, uint8_t hf_version) {
+    static tx_pool_options new_blink(bool approved, hf hf_version) {
       tx_pool_options o;
       o.do_not_relay = !approved;
       o.approved_blink = approved;
-      o.fee_percent = BLINK_MINER_TX_FEE_PERCENT;
+      o.fee_percent = oxen::BLINK_MINER_TX_FEE_PERCENT;
 
-      o.burn_percent = BLINK_BURN_TX_FEE_PERCENT_V18;
-      o.burn_fixed = BLINK_BURN_FIXED;
+      o.burn_percent = oxen::BLINK_BURN_TX_FEE_PERCENT_V18;
+      o.burn_fixed = oxen::BLINK_BURN_FIXED;
       return o;
     }
   };
@@ -125,7 +125,7 @@ namespace cryptonote
     tx_memory_pool &operator=(const tx_memory_pool &) = delete;
 
     /**
-     * @copydoc add_tx(transaction&, tx_verification_context&, const tx_pool_options &, uint8_t)
+     * @copydoc add_tx(transaction&, tx_verification_context&, const tx_pool_options &, hf)
      *
      * @param id the transaction's hash
      * @param tx_weight the transaction's weight
@@ -133,7 +133,7 @@ namespace cryptonote
      * block tx then set this pointer to the required new height: that is, all blocks with height
      * `block_rollback_height` and above must be removed.
      */
-    bool add_tx(transaction &tx, const crypto::hash &id, const cryptonote::blobdata &blob, size_t tx_weight, tx_verification_context& tvc, const tx_pool_options &opts, uint8_t hf_version, uint64_t *blink_rollback_height = nullptr);
+    bool add_tx(transaction &tx, const crypto::hash &id, const std::string &blob, size_t tx_weight, tx_verification_context& tvc, const tx_pool_options &opts, hf hf_version, uint64_t *blink_rollback_height = nullptr);
 
     /**
      * @brief add a transaction to the transaction pool
@@ -150,7 +150,7 @@ namespace cryptonote
      *
      * @return true if the transaction passes validations, otherwise false
      */
-    bool add_tx(transaction &tx, tx_verification_context& tvc, const tx_pool_options &opts, uint8_t hf_version);
+    bool add_tx(transaction &tx, tx_verification_context& tvc, const tx_pool_options &opts, hf hf_version);
 
     /**
      * @brief attempts to add a blink transaction to the transaction pool.
@@ -269,7 +269,7 @@ namespace cryptonote
      *
      * @return true unless the transaction cannot be found in the pool
      */
-    bool take_tx(const crypto::hash &id, transaction &tx, cryptonote::blobdata &txblob, size_t& tx_weight, uint64_t& fee, bool &relayed, bool &do_not_relay, bool &double_spend_seen);
+    bool take_tx(const crypto::hash &id, transaction &tx, std::string &txblob, size_t& tx_weight, uint64_t& fee, bool &relayed, bool &do_not_relay, bool &double_spend_seen);
 
     /**
      * @brief checks if the pool has a transaction with the given hash
@@ -390,7 +390,7 @@ namespace cryptonote
      *
      * @return true
      */
-    bool fill_block_template(block &bl, size_t median_weight, uint64_t already_generated_coins, size_t &total_weight, uint64_t &raw_fee, uint64_t &expected_reward, uint8_t version, uint64_t height);
+    bool fill_block_template(block &bl, size_t median_weight, uint64_t already_generated_coins, size_t &total_weight, uint64_t &raw_fee, uint64_t &expected_reward, hf version, uint64_t height);
 
     /**
      * @brief get a list of all transactions in the pool
@@ -460,18 +460,18 @@ namespace cryptonote
      *
      * @return true if the transaction is found, otherwise false
      */
-    bool get_transaction(const crypto::hash& h, cryptonote::blobdata& txblob) const;
+    bool get_transaction(const crypto::hash& h, std::string& txblob) const;
 
     /**
      * @brief get specific transactions from the pool
      *
      * @param hashes - tx hashes of desired transactions
-     * @param txblobs - vector of blobdata (i.e. std::strings) to which found blobs should be
+     * @param txblobs - vector of std::string (i.e. std::strings) to which found blobs should be
      * appended.  The vector is *not* cleared of existing values.
      *
      * @return number of transactions added to txblobs
      */
-    int find_transactions(const std::vector<crypto::hash> &tx_hashes, std::vector<cryptonote::blobdata> &txblobs) const;
+    int find_transactions(const std::vector<crypto::hash> &tx_hashes, std::vector<std::string> &txblobs) const;
 
     /**
      * @brief get a list of all relayable transactions and their hashes
@@ -486,7 +486,7 @@ namespace cryptonote
      *
      * @return true
      */
-    bool get_relayable_transactions(std::vector<std::pair<crypto::hash, cryptonote::blobdata>>& txs) const;
+    bool get_relayable_transactions(std::vector<std::pair<crypto::hash, std::string>>& txs) const;
 
     /**
      * @brief clear transactions' `do_not_relay` flags (if set) so that they can start being
@@ -503,7 +503,7 @@ namespace cryptonote
      *
      * @param txs the list of transactions (and their hashes)
      */
-    void set_relayed(const std::vector<std::pair<crypto::hash, cryptonote::blobdata>>& txs);
+    void set_relayed(const std::vector<std::pair<crypto::hash, std::string>>& txs);
 
     /**
      * @brief get the total number of transactions in the pool
@@ -523,7 +523,7 @@ namespace cryptonote
      *
      * @return the number of transactions removed
      */
-    size_t validate(uint8_t version);
+    size_t validate(hf version);
 
      /**
       * @brief return the cookie
@@ -581,7 +581,7 @@ namespace cryptonote
      * @return true if it already exists
      *
      */
-    bool have_duplicated_non_standard_tx(transaction const &tx, uint8_t hard_fork_version) const;
+    bool have_duplicated_non_standard_tx(transaction const &tx, hf version) const;
 
     /**
      * @brief check if any spent key image in a transaction is in the pool
@@ -622,7 +622,7 @@ namespace cryptonote
      *
      * @return true if the transaction is good to go, otherwise false
      */
-    bool is_transaction_ready_to_go(txpool_tx_meta_t& txd, const crypto::hash &txid, const cryptonote::blobdata &txblob, transaction&tx) const;
+    bool is_transaction_ready_to_go(txpool_tx_meta_t& txd, const crypto::hash &txid, const std::string &txblob, transaction&tx) const;
 
     /**
      * @brief mark all transactions double spending the one passed

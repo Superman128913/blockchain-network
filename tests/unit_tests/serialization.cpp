@@ -160,7 +160,7 @@ TEST(serialization, custom_type_serialization) {
 
   std::string blob;
   ASSERT_NO_THROW(blob = serialization::dump_binary(s1));
-  ASSERT_EQ(oxenmq::to_hex(blob), "03e100000000e005000000030001003132333435363738e101000000020a001600");
+  ASSERT_EQ(oxenc::to_hex(blob), "03e100000000e005000000030001003132333435363738e101000000020a001600");
   ASSERT_NO_THROW(try_parse(blob));
 
   blob[6] = '\xE1';
@@ -191,53 +191,53 @@ TEST(serialization, serializes_vector_uint64_as_varint)
   std::string blob;
 
   ASSERT_NO_THROW(blob = serialization::dump_binary(v));
-  ASSERT_EQ(oxenmq::to_hex(blob), "00");
+  ASSERT_EQ(oxenc::to_hex(blob), "00");
 
   // +1 byte
   v.push_back(0);
   ASSERT_NO_THROW(blob = serialization::dump_binary(v));
-  ASSERT_EQ(oxenmq::to_hex(blob), "0100");
+  ASSERT_EQ(oxenc::to_hex(blob), "0100");
   //                                 ^^
 
   // +1 byte
   v.push_back(1);
   ASSERT_NO_THROW(blob = serialization::dump_binary(v));
-  ASSERT_EQ(oxenmq::to_hex(blob), "020001");
+  ASSERT_EQ(oxenc::to_hex(blob), "020001");
   //                                   ^^
 
   // +2 bytes
   v.push_back(0x80);
   ASSERT_NO_THROW(blob = serialization::dump_binary(v));
-  ASSERT_EQ(oxenmq::to_hex(blob), "0300018001");
+  ASSERT_EQ(oxenc::to_hex(blob), "0300018001");
   //                                     ^^^^
 
   // +2 bytes
   v.push_back(0xFF);
   ASSERT_NO_THROW(blob = serialization::dump_binary(v));
-  ASSERT_EQ(oxenmq::to_hex(blob), "0400018001ff01");
+  ASSERT_EQ(oxenc::to_hex(blob), "0400018001ff01");
   //                                         ^^^^
 
   // +2 bytes
   v.push_back(0x3FFF);
   ASSERT_NO_THROW(blob = serialization::dump_binary(v));
-  ASSERT_EQ(oxenmq::to_hex(blob), "0500018001ff01ff7f");
+  ASSERT_EQ(oxenc::to_hex(blob), "0500018001ff01ff7f");
   //                                             ^^^^
 
   // +3 bytes
   v.push_back(0x40FF);
   ASSERT_NO_THROW(blob = serialization::dump_binary(v));
-  ASSERT_EQ(oxenmq::to_hex(blob), "0600018001ff01ff7fff8101");
+  ASSERT_EQ(oxenc::to_hex(blob), "0600018001ff01ff7fff8101");
   //                                                 ^^^^^^
 
   // +10 bytes
   v.push_back(0xFFFF'FFFF'FFFF'FFFF);
   ASSERT_NO_THROW(blob = serialization::dump_binary(v));
-  ASSERT_EQ(oxenmq::to_hex(blob), "0700018001ff01ff7fff8101ffffffffffffffffff01");
+  ASSERT_EQ(oxenc::to_hex(blob), "0700018001ff01ff7fff8101ffffffffffffffffff01");
   //                                                       ^^^^^^^^^^^^^^^^^^^^
 
   v = {0x64, 0xcc, 0xbf04};
   ASSERT_NO_THROW(blob = serialization::dump_binary(v));
-  ASSERT_EQ(oxenmq::to_hex(blob), "0364cc0184fe02");
+  ASSERT_EQ(oxenc::to_hex(blob), "0364cc0184fe02");
 }
 
 TEST(serialization, serializes_vector_int64_as_fixed_int)
@@ -445,7 +445,7 @@ TEST(serialization, serializes_transaction_signatures_correctly)
       tx.signatures[i][j].c.data[2*i + j] = ((i+1) << 4) + 2*i + j + 1;
   tx.invalidate_hashes();
   ASSERT_NO_THROW(blob = serialization::dump_binary(tx));
-  ASSERT_EQ(oxenmq::to_hex(blob),
+  ASSERT_EQ(oxenc::to_hex(blob),
       "0100020201020cfd1a42424242424242424242424242424242424242424242424242424242424242420201020cfd1a42424242424242424242424242424242424242424242424242424242424242420000"
       "11000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
       "00120000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
@@ -603,7 +603,7 @@ TEST(serialization, serializes_ringct)
 #if 0
 TEST(serialization, portability_wallet)
 {
-  const cryptonote::network_type nettype = cryptonote::TESTNET;
+  const cryptonote::network_type nettype = cryptonote::network_type::TESTNET;
   tools::wallet2 w(nettype);
   const fs::path wallet_file = unit_test::data_dir / "wallet_testnet";
   std::string password = "test";
@@ -740,7 +740,7 @@ TEST(serialization, portability_wallet)
 TEST(serialization, portability_outputs)
 {
   const bool restricted = false;
-  tools::wallet2 w(cryptonote::TESTNET, restricted);
+  tools::wallet2 w(cryptonote::network_type::TESTNET, restricted);
 
   const fs::path wallet_file = unit_test::data_dir / "wallet_testnet";
   const std::string password = "test";
@@ -887,7 +887,7 @@ TEST(serialization, portability_unsigned_tx)
 {
   // TODO(oxen): We updated testnet genesis, is broken
   const bool restricted = false;
-  tools::wallet2 w(cryptonote::TESTNET, restricted);
+  tools::wallet2 w(cryptonote::network_type::TESTNET, restricted);
 
   const fs::path filename    = unit_test::data_dir / "unsigned_oxen_tx";
   const fs::path wallet_file = unit_test::data_dir / "wallet_testnet";
@@ -895,7 +895,7 @@ TEST(serialization, portability_unsigned_tx)
   w.load(wallet_file.string(), password);
 
   std::string s;
-  const cryptonote::network_type nettype = cryptonote::TESTNET;
+  const cryptonote::network_type nettype = cryptonote::network_type::TESTNET;
   bool r = tools::slurp_file(filename.string(), s);
   ASSERT_TRUE(r);
   size_t const magiclen = strlen(UNSIGNED_TX_PREFIX);
@@ -1086,14 +1086,14 @@ TEST(serialization, portability_unsigned_tx)
 TEST(serialization, portability_signed_tx)
 {
   const bool restricted = false;
-  tools::wallet2 w(cryptonote::TESTNET, restricted);
+  tools::wallet2 w(cryptonote::network_type::TESTNET, restricted);
 
   const fs::path filename    = unit_test::data_dir / "signed_oxen_tx";
   const fs::path wallet_file = unit_test::data_dir / "wallet_testnet";
   const std::string password = "test";
   w.load(wallet_file.string(), password);
 
-  const cryptonote::network_type nettype = cryptonote::TESTNET;
+  const cryptonote::network_type nettype = cryptonote::network_type::TESTNET;
   std::string s;
   bool r = tools::slurp_file(filename.string(), s);
   ASSERT_TRUE(r);

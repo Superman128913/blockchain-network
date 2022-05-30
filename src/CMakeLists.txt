@@ -70,11 +70,10 @@ add_subdirectory(p2p)
 add_subdirectory(daemonizer)
 add_subdirectory(daemon)
 add_subdirectory(simplewallet)
+add_subdirectory(sqlitedb)
 
-if (NOT BUILD_INTEGRATION)
-  add_subdirectory(gen_multisig)
-  add_subdirectory(blockchain_utilities)
-endif()
+add_subdirectory(gen_multisig)
+add_subdirectory(blockchain_utilities)
 
 # We'll always add, but with EXCLUDE_FROM_ALL if you didn't ask for them (but this lets you do a
 # `make cn_deserialize` or whatever from a build dir without needing to reconfigure).

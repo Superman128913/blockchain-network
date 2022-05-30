@@ -40,18 +40,15 @@
 #include "cryptonote_config.h"
 #include <sodium/crypto_generichash.h>
 
-namespace hw {
-
-    namespace core {
-
-        device_default::device_default() { }
-
-        device_default::~device_default() { }
+namespace hw::core {
 
         /* ===================================================================== */
         /* ===                        Misc                                ==== */
         /* ===================================================================== */
-        static inline unsigned char *operator &(crypto::ec_scalar &scalar) {
+
+        // EW, this crap is NASTY.  See the comment/TODO in crypto/crypto.cpp (which is where this
+        // nasty crap was copied from).
+        static inline unsigned char* operator &(crypto::ec_scalar &scalar) {
             return &reinterpret_cast<unsigned char &>(scalar);
         }
         static inline const unsigned char *operator &(const crypto::ec_scalar &scalar) {
@@ -61,30 +58,26 @@ namespace hw {
         /* ======================================================================= */
         /*                              SETUP/TEARDOWN                             */
         /* ======================================================================= */
-        bool device_default::set_name(std::string_view name) {
-            this->name = name;
+        bool device_default::set_name(std::string_view n) {
+            name = n;
             return true;
         }
         std::string device_default::get_name() const {
             return name;
         }
         
-        bool device_default::init(void) {
+        bool device_default::init() {
             return true;
         }
         bool device_default::release() {
             return true;
         }
 
-        bool device_default::connect(void) {
+        bool device_default::connect() {
             return true;
         }
         bool device_default::disconnect() {
             return true;
-        }
-
-        bool  device_default::set_mode(device_mode mode) {
-            return device::set_mode(mode);
         }
 
         /* ======================================================================= */
@@ -107,15 +100,15 @@ namespace hw {
             epee::mlocked<tools::scrubbed_arr<char, sizeof(view_key) + sizeof(spend_key) + 1>> data;
             memcpy(data.data(), &view_key, sizeof(view_key));
             memcpy(data.data() + sizeof(view_key), &spend_key, sizeof(spend_key));
-            data[sizeof(data) - 1] = config::HASH_KEY_WALLET;
+            data[sizeof(data) - 1] = cryptonote::hashkey::WALLET;
             crypto::generate_chacha_key(data.data(), sizeof(data), key, kdf_rounds);
             return true;
         }
         bool  device_default::get_public_address(cryptonote::account_public_address &pubkey) {
-             dfns();
+           throw std::runtime_error{"device function not supported: get_public_address"};
         }
         bool  device_default::get_secret_keys(crypto::secret_key &viewkey , crypto::secret_key &spendkey)  {
-             dfns();
+           throw std::runtime_error{"device function not supported: get_secret_keys"};
         }
         /* ======================================================================= */
         /*                               SUB ADDRESS                               */
@@ -196,13 +189,13 @@ namespace hw {
         }
 
         crypto::secret_key  device_default::get_subaddress_secret_key(const crypto::secret_key &a, const cryptonote::subaddress_index &index) {
-            char data[config::HASH_KEY_SUBADDRESS.size() + sizeof(crypto::secret_key) + 2 * sizeof(uint32_t)];
-            memcpy(data, config::HASH_KEY_SUBADDRESS.data(), config::HASH_KEY_SUBADDRESS.size());
-            memcpy(data + config::HASH_KEY_SUBADDRESS.size(), &a, sizeof(crypto::secret_key));
+            char data[cryptonote::hashkey::SUBADDRESS.size() + sizeof(crypto::secret_key) + 2 * sizeof(uint32_t)];
+            memcpy(data, cryptonote::hashkey::SUBADDRESS.data(), cryptonote::hashkey::SUBADDRESS.size());
+            memcpy(data + cryptonote::hashkey::SUBADDRESS.size(), &a, sizeof(crypto::secret_key));
             uint32_t idx = SWAP32LE(index.major);
-            memcpy(data + config::HASH_KEY_SUBADDRESS.size() + sizeof(crypto::secret_key), &idx, sizeof(uint32_t));
+            memcpy(data + cryptonote::hashkey::SUBADDRESS.size() + sizeof(crypto::secret_key), &idx, sizeof(uint32_t));
             idx = SWAP32LE(index.minor);
-            memcpy(data + config::HASH_KEY_SUBADDRESS.size() + sizeof(crypto::secret_key) + sizeof(uint32_t), &idx, sizeof(uint32_t));
+            memcpy(data + cryptonote::hashkey::SUBADDRESS.size() + sizeof(crypto::secret_key) + sizeof(uint32_t), &idx, sizeof(uint32_t));
             crypto::secret_key m;
             crypto::hash_to_scalar(data, sizeof(data), m);
             return m;
@@ -381,7 +374,7 @@ namespace hw {
                 return false;
 
             memcpy(data, &derivation, 32);
-            data[32] = config::HASH_KEY_ENCRYPTED_PAYMENT_ID;
+            data[32] = cryptonote::hashkey::ENCRYPTED_PAYMENT_ID;
             cn_fast_hash(data, 33, hash);
 
             for (size_t b = 0; b < 8; ++b)
@@ -441,19 +434,10 @@ namespace hw {
             return true;
         }
 
-
-        /* ---------------------------------------------------------- */
-        static device_default *default_core_device = NULL;
         void register_all(std::map<std::string, std::unique_ptr<device>> &registry) {
-            if (!default_core_device) {
-                default_core_device = new device_default();
-                default_core_device->set_name("default_core_device");
-
-            }
-            registry.insert(std::make_pair("default", std::unique_ptr<device>(default_core_device)));
+            auto dev = std::make_unique<device_default>();
+            dev->set_name("default_core_device");
+            registry.emplace("default", std::move(dev));
         }
-
-
-    }
 
 }

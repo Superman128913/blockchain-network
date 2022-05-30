@@ -280,13 +280,15 @@ namespace rpc {
         struct contribution
         {
           std::string wallet; // Contributor wallet
-          uint32_t portion;   // Reserved portion, as the rounded nearest value out of 1'000'000 (i.e. 234567 == 23.4567%).
+          uint64_t amount;  // For HF19+ registrations, the atomic OXEN amount of the contribution.  Omitted for older registrations.
+          uint32_t portion; // Reserved portion, as the rounded nearest value out of 1'000'000 (i.e. 234567 == 23.4567%).
           KV_MAP_SERIALIZABLE
         };
 
         std::vector<contribution> contributors; // Operator contribution plus any reserved contributions
-        uint32_t fee;                           // Operator fee, as the rounded nearest value out of 1'000'000
-        uint64_t expiry;                        // unix timestamp at which the registration expires
+        uint32_t fee;                           // Operator fee, out of 1'000'000.  For HF19+ registrations this is exact, for earlier ones this is rounded to the nearest value.
+        hf hardfork;                            // For HF19+ registrations, this is the hard fork for which the registration is valid.  Omitted for earlier registrations.
+        uint64_t expiry;                        // For HF18 and earlier registrations, this is the unix timestamp at which the registration expires.  Omitted for HF19+ registrations.
         KV_MAP_SERIALIZABLE
       };
       struct state_change
@@ -622,6 +624,7 @@ namespace rpc {
       uint64_t pulse_target_timestamp;      // For pulse blocks this is the target timestamp of the next block, which targets 2 minutes after the previous block but will be slightly faster/slower if the previous block is behind/ahead of the ideal timestamp.
       uint64_t difficulty;                  // Network difficulty (analogous to the strength of the network).
       uint64_t target;                      // Current target for next proof of work.
+      hf hard_fork;                         // Current network hard fork version
       uint64_t tx_count;                    // Total number of non-coinbase transaction in the chain.
       uint64_t tx_pool_size;                // Number of transactions that have been broadcast but not included in a block.
       std::optional<uint64_t> alt_blocks_count;            // Number of alternative blocks to main chain.
@@ -632,7 +635,7 @@ namespace rpc {
       bool mainnet;                         // States if the node is on the mainnet (`true`) or not (`false`).
       bool testnet;                         // States if the node is on the testnet (`true`) or not (`false`).
       bool devnet;                          // States if the node is on the devnet (`true`) or not (`false`).
-      std::string nettype;                  // Nettype value used.
+      std::string nettype;                  // Network type as a string ("mainnet", "testnet", "devnet", or "fakechain").
       std::string top_block_hash;           // Hash of the highest block in the chain.
       std::string immutable_block_hash;     // Hash of the highest block in the chain that can not be reorganized.
       uint64_t cumulative_difficulty;       // Cumulative difficulty of all blocks in the blockchain.
@@ -749,8 +752,8 @@ namespace rpc {
       std::string prev_hash;       // Hash of the most recent block on which to mine the next block.
       std::string seed_hash;       // RandomX current seed hash
       std::string next_seed_hash;  // RandomX upcoming seed hash
-      blobdata blocktemplate_blob; // Blob on which to try to mine a new block.
-      blobdata blockhashing_blob;  // Blob on which to try to find a valid nonce.
+      std::string blocktemplate_blob; // Blob on which to try to mine a new block.
+      std::string blockhashing_blob;  // Blob on which to try to find a valid nonce.
       std::string status;          // General RPC error code. "OK" means everything looks good.
       bool untrusted;              // States if the result is obtained using the bootstrap mode, and is therefore not trusted (`true`), or when the daemon is fully synced (`false`).
 
@@ -815,7 +818,7 @@ namespace rpc {
       difficulty_type difficulty;             // The strength of the Loki network based on mining power.
       difficulty_type cumulative_difficulty;  // The cumulative strength of the Loki network based on mining power.
       uint64_t reward;                        // The amount of new generated in this block and rewarded to the miner, foundation and service Nodes. Note: 1 OXEN = 1e9 atomic units.
-      uint64_t miner_reward;                  // The amount of new generated in this block and rewarded to the miner. Note: 1 OXEN = 1e9 atomic units.
+      uint64_t coinbase_payouts;              // The amount of new generated in this block and rewarded to the miner. Note: 1 OXEN = 1e9 atomic units.
       uint64_t block_size;                    // The block size in bytes.
       uint64_t block_weight;                  // The block weight in bytes.
       uint64_t num_txes;                      // Number of transactions in the block, not counting the coinbase tx.
@@ -1437,7 +1440,8 @@ namespace rpc {
 
     struct response
     {
-      uint8_t version;          // The major block version for the fork.
+      hf version;               // The major block version for the fork.
+      uint8_t revision;         // The network revision of this daemon (e.g. 1 for HF 19.1).
       bool enabled;             // Indicates whether hard fork is enforced (that is, at or above the requested hardfork)
       std::optional<uint64_t> earliest_height; // Block height at which hard fork will be enabled.
       std::optional<uint64_t> last_height; // The last block height at which this hard fork will be active; will be omitted if this oxend is not aware of any future hard fork.
@@ -1965,6 +1969,29 @@ namespace rpc {
   };
 
   OXEN_RPC_DOC_INTROSPECT
+  // Accesses the amounts accrued to addresses in the batching database
+  struct GET_ACCRUED_BATCHED_EARNINGS: PUBLIC
+  {
+    static constexpr auto names() { return NAMES("get_accrued_batched_earnings"); }
+
+    struct request
+    {
+      std::vector<std::string> addresses; // Array of addresses to query the batching database about.
+
+      KV_MAP_SERIALIZABLE
+    };
+
+    struct response
+    {
+      std::string status;            // Generic RPC error code. "OK" is the success value.
+      std::vector<std::string> addresses; // Array of addresses to query the batching database about.
+      std::vector<uint64_t> amounts; // An array of amounts according to the provided addressses
+
+      KV_MAP_SERIALIZABLE
+    };
+  };
+
+  OXEN_RPC_DOC_INTROSPECT
   // Get the service private keys of the queried daemon, encoded in hex.  Do not ever share
   // these keys: they would allow someone to impersonate your service node.  All three keys are used
   // when running as a service node; when running as a regular node only the x25519 key is regularly
@@ -2088,11 +2115,11 @@ namespace rpc {
       struct entry {
         std::string                           service_node_pubkey;           // The public key of the Service Node.
         uint64_t                              registration_height;           // The height at which the registration for the Service Node arrived on the blockchain.
-        uint16_t                              registration_hf_version;       // The hard fork at which the registration for the Service Node arrived on the blockchain.
+        hf                                    registration_hf_version;       // The hard fork at which the registration for the Service Node arrived on the blockchain.
         uint64_t                              requested_unlock_height;       // The height at which contributions will be released and the Service Node expires. 0 if not requested yet.
         uint64_t                              last_reward_block_height;      // The height that determines when this service node will next receive a reward.  This field is updated when receiving a reward, but is also updated when a SN is activated, recommissioned, or has an IP change position reset.
         uint32_t                              last_reward_transaction_index; // When multiple Service Nodes register (or become active/reactivated) at the same height (i.e. have the same last_reward_block_height), this field contains the activating transaction position in the block which is used to break ties in determining which SN is next in the reward list.
-        bool                                  active;                        // True if fully funded and not currently decommissioned (and so `active && !funded` implicitly defines decommissioned)
+        bool                                  active;                        // True if fully funded and not currently decommissioned (and so `funded && !active` implicitly defines decommissioned)
         bool                                  funded;                        // True if the required stakes have been submitted to activate this Service Node
         uint64_t                              state_height;                  // If active: the state at which the service node became active (i.e. fully staked height, or last recommissioning); if decommissioned: the decommissioning height; if awaiting: the last contribution (or registration) height
         uint32_t                              decommission_count;            // The number of times the Service Node has been decommissioned since registration
@@ -2188,6 +2215,7 @@ namespace rpc {
       std::array<uint16_t, 3> version; // Storage server version
       uint16_t https_port; // Storage server https port to include in uptime proofs
       uint16_t omq_port; // Storage Server oxenmq port to include in uptime proofs
+      std::string ed25519_pubkey; // Service node Ed25519 pubkey for verifying that storage server is using the right one
       KV_MAP_SERIALIZABLE
     };
 
@@ -2202,6 +2230,7 @@ namespace rpc {
     struct request
     {
       std::array<uint16_t, 3> version; // Lokinet version
+      std::string ed25519_pubkey; // Service node Ed25519 pubkey for verifying that lokinet is using the right one
       KV_MAP_SERIALIZABLE
     };
 
@@ -2656,7 +2685,8 @@ namespace rpc {
     ONS_NAMES_TO_OWNERS,
     ONS_OWNERS_TO_NAMES,
     ONS_RESOLVE,
-    FLUSH_CACHE
+    FLUSH_CACHE,
+    GET_ACCRUED_BATCHED_EARNINGS
   >;
 
 } } // namespace cryptonote::rpc

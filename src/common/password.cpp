@@ -45,8 +45,6 @@
 
 #define EOT 0x4
 
-#include "common/oxen_integration_test_hooks.h"
-
 namespace
 {
 #if defined(_WIN32)
@@ -115,7 +113,6 @@ namespace
 
 #else // end WIN32 
 
-#if !defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
   bool is_cin_tty() noexcept
   {
     return 0 != isatty(fileno(stdin));
@@ -177,11 +174,9 @@ namespace
 
     return true;
   }
-#endif // !defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
 
 #endif // end !WIN32
 
-#if !defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
   bool read_from_tty(const bool verify, const char *message, bool hide_input, epee::wipeable_string& pass1, epee::wipeable_string& pass2)
   {
     while (true)
@@ -233,7 +228,6 @@ namespace
     }
     return true;
   }
-#endif // !defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
 
 } // anonymous namespace
 
@@ -250,9 +244,6 @@ namespace tools
 
   std::optional<password_container> password_container::prompt(const bool verify, const char *message, bool hide_input)
   {
-#if defined(OXEN_ENABLE_INTEGRATION_TEST_HOOKS)
-    return password_container(std::string(""));
-#else
     is_prompting = true;
     password_container pass1{};
     password_container pass2{};
@@ -264,7 +255,6 @@ namespace tools
 
     is_prompting = false;
     return std::nullopt;
-#endif
   }
 
   std::optional<login> login::parse(std::string&& userpass, bool verify, const std::function<std::optional<password_container>(bool)> &prompt)

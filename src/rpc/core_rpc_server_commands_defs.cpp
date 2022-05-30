@@ -92,15 +92,26 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_TRANSACTIONS::request)
   KV_SERIALIZE(stake_info)
 KV_SERIALIZE_MAP_CODE_END()
 
+KV_SERIALIZE_MAP_CODE_BEGIN(GET_ACCRUED_BATCHED_EARNINGS::request)
+  KV_SERIALIZE(addresses)
+KV_SERIALIZE_MAP_CODE_END()
+
+KV_SERIALIZE_MAP_CODE_BEGIN(GET_ACCRUED_BATCHED_EARNINGS::response)
+  KV_SERIALIZE(status)
+  KV_SERIALIZE(addresses)
+  KV_SERIALIZE(amounts)
+KV_SERIALIZE_MAP_CODE_END()
 
 KV_SERIALIZE_MAP_CODE_BEGIN(GET_TRANSACTIONS::extra_entry::sn_reg_info::contribution)
   KV_SERIALIZE(wallet)
+  if (this_ref.amount > 0) KV_SERIALIZE(amount)
   KV_SERIALIZE(portion)
 KV_SERIALIZE_MAP_CODE_END()
 KV_SERIALIZE_MAP_CODE_BEGIN(GET_TRANSACTIONS::extra_entry::sn_reg_info)
   KV_SERIALIZE(contributors)
   KV_SERIALIZE(fee)
-  KV_SERIALIZE(expiry)
+  if (this_ref.hardfork >= hf::hf19_reward_batching) { KV_SERIALIZE_ENUM(hardfork) }
+  else { KV_SERIALIZE(expiry) }
 KV_SERIALIZE_MAP_CODE_END()
 KV_SERIALIZE_MAP_CODE_BEGIN(GET_TRANSACTIONS::extra_entry::state_change)
   KV_SERIALIZE(old_dereg)
@@ -299,6 +310,7 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_INFO::response)
   KV_SERIALIZE(pulse_target_timestamp)
   KV_SERIALIZE(difficulty)
   KV_SERIALIZE(target)
+  KV_SERIALIZE_ENUM(hard_fork)
   KV_SERIALIZE(tx_count)
   KV_SERIALIZE(tx_pool_size)
   KV_SERIALIZE(alt_blocks_count)
@@ -421,7 +433,7 @@ KV_SERIALIZE_MAP_CODE_BEGIN(block_header_response)
   KV_SERIALIZE(difficulty)
   KV_SERIALIZE(cumulative_difficulty)
   KV_SERIALIZE(reward)
-  KV_SERIALIZE(miner_reward)
+  KV_SERIALIZE(coinbase_payouts)
   KV_SERIALIZE(block_size)
   KV_SERIALIZE_OPT(block_weight, (uint64_t)0)
   KV_SERIALIZE(num_txes)
@@ -732,7 +744,8 @@ KV_SERIALIZE_MAP_CODE_END()
 
 
 KV_SERIALIZE_MAP_CODE_BEGIN(HARD_FORK_INFO::response)
-  KV_SERIALIZE(version)
+  KV_SERIALIZE_ENUM(version);
+  KV_SERIALIZE(revision);
   KV_SERIALIZE(enabled)
   KV_SERIALIZE(earliest_height)
   KV_SERIALIZE(last_height)
@@ -1150,7 +1163,7 @@ KV_SERIALIZE_MAP_CODE_BEGIN(GET_SERVICE_NODES::response::entry)
 
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(service_node_pubkey);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(registration_height);
-  KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(registration_hf_version);
+  if (all || res->fields.registration_hf_version) KV_SERIALIZE_ENUM(registration_hf_version);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(requested_unlock_height);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(last_reward_block_height);
   KV_SERIALIZE_ENTRY_FIELD_IF_REQUESTED(last_reward_transaction_index);
@@ -1222,11 +1235,13 @@ KV_SERIALIZE_MAP_CODE_BEGIN(STORAGE_SERVER_PING::request)
   KV_SERIALIZE(version);
   KV_SERIALIZE(https_port);
   KV_SERIALIZE(omq_port);
+  KV_SERIALIZE(ed25519_pubkey);
 KV_SERIALIZE_MAP_CODE_END()
 
 
 KV_SERIALIZE_MAP_CODE_BEGIN(LOKINET_PING::request)
   KV_SERIALIZE(version);
+  KV_SERIALIZE(ed25519_pubkey);
 KV_SERIALIZE_MAP_CODE_END()
 
 

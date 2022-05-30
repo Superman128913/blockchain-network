@@ -32,10 +32,20 @@ add_library(wallet
   wallet_args.cpp
   ringdb.cpp
   node_rpc_proxy.cpp
-  message_store.cpp
-  message_transporter.cpp
   transfer_view.cpp
 )
+
+# Unmaintained wallet features, disabled by default
+option(ENABLE_LIGHT_WALLET "Enable (unsupported) light wallet support" OFF)
+option(ENABLE_WALLET_MMS "Enable (unsupported) monero Multisig Messaging System" OFF)
+
+if (ENABLE_LIGHT_WALLET)
+  target_compile_definitions(wallet PUBLIC ENABLE_LIGHT_WALLET)
+endif()
+if (ENABLE_WALLET_MMS)
+  target_compile_definitions(wallet PUBLIC ENABLE_WALLET_MMS)
+  target_sources(wallet PRIVATE message_store.cpp message_transporter.cpp)
+endif()
 
 target_link_libraries(wallet
   PUBLIC
@@ -44,7 +54,6 @@ target_link_libraries(wallet
     rpc_server_base
     cryptonote_core
     mnemonics
-    device_trezor
     net
     lmdb
     rpc_http_client
@@ -52,9 +61,11 @@ target_link_libraries(wallet
     filesystem
     Boost::thread
   PRIVATE
-    OpenSSL::SSL
-    OpenSSL::Crypto
     extra)
+
+if(TARGET device_trezor)
+  target_link_libraries(wallet PUBLIC device_trezor)
+endif()
 
 oxen_add_executable(wallet_rpc_server "oxen-wallet-rpc"
   wallet_rpc_server.cpp

@@ -176,9 +176,9 @@ namespace cryptonote
     static char const* version_to_string(txversion v);
     static char const* type_to_string(txtype type);
 
-    static constexpr txversion get_min_version_for_hf(uint8_t hf_version);
-    static           txversion get_max_version_for_hf(uint8_t hf_version);
-    static constexpr txtype    get_max_type_for_hf   (uint8_t hf_version);
+    static constexpr txversion get_min_version_for_hf(hf hf_version);
+    static           txversion get_max_version_for_hf(hf hf_version);
+    static constexpr txtype    get_max_type_for_hf   (hf hf_version);
 
     // tx information
     txversion version;
@@ -208,7 +208,9 @@ namespace cryptonote
       FIELD(vin)
       FIELD(vout)
       if (version >= txversion::v3_per_output_unlock_times && vout.size() != output_unlock_times.size())
+      {
         throw std::invalid_argument{"v3 tx without correct unlock times"};
+      }
       FIELD(extra)
       if (version >= txversion::v4_tx_types)
         ENUM_FIELD_N("type", type, type < txtype::_count);
@@ -392,22 +394,12 @@ namespace cryptonote
 
   struct block_header
   {
-    uint8_t major_version = cryptonote::network_version_7;
-    uint8_t minor_version = cryptonote::network_version_7;  // now used as a voting mechanism, rather than how this particular block is built
+    hf major_version = hf::hf7;
+    uint8_t minor_version = 0;
     uint64_t timestamp;
     crypto::hash  prev_id;
     uint32_t nonce;
     pulse_header pulse = {};
-
-    BEGIN_SERIALIZE()
-      VARINT_FIELD(major_version)
-      VARINT_FIELD(minor_version)
-      VARINT_FIELD(timestamp)
-      FIELD(prev_id)
-      FIELD(nonce)
-      if (major_version >= cryptonote::network_version_16_pulse)
-        FIELD(pulse)
-    END_SERIALIZE()
   };
 
   struct block: public block_header
@@ -428,25 +420,48 @@ namespace cryptonote
     void set_hash_valid(bool v) const;
 
     transaction miner_tx;
+    size_t height;
+    crypto::public_key service_node_winner_key;
+    uint64_t reward = 0;
     std::vector<crypto::hash> tx_hashes;
 
     // hash cache
     mutable crypto::hash hash;
     std::vector<service_nodes::quorum_signature> signatures;
-
-    BEGIN_SERIALIZE_OBJECT()
-      if (Archive::is_deserializer)
-        set_hash_valid(false);
-
-      FIELDS(static_cast<block_header&>(*this))
-      FIELD(miner_tx)
-      FIELD(tx_hashes)
-      if (tx_hashes.size() > CRYPTONOTE_MAX_TX_PER_BLOCK)
-        throw std::invalid_argument{"too many txs in block"};
-      if (major_version >= cryptonote::network_version_16_pulse)
-        FIELD(signatures)
-    END_SERIALIZE()
   };
+
+  template <class Archive>
+  void serialize_value(Archive& ar, block_header& b) {
+    using namespace serialization;
+    field(ar, "major_version", b.major_version);
+    field_varint(ar, "minor_version", b.minor_version);
+    field_varint(ar, "timestamp", b.timestamp);
+    field(ar, "prev_id", b.prev_id);
+    field(ar, "nonce", b.nonce);
+    if (b.major_version >= hf::hf16_pulse)
+      field(ar, "pulse", b.pulse);
+  }
+
+  template <class Archive>
+  void serialize_value(Archive& ar, block& b) {
+    auto _obj = ar.begin_object();
+    if constexpr (Archive::is_deserializer)
+      b.set_hash_valid(false);
+
+    serialization::value(ar, static_cast<block_header&>(b));
+    field(ar, "miner_tx", b.miner_tx);
+    field(ar, "tx_hashes", b.tx_hashes);
+    if (b.tx_hashes.size() > MAX_TX_PER_BLOCK)
+      throw std::invalid_argument{"too many txs in block"};
+    if (b.major_version >= hf::hf16_pulse)
+      field(ar, "signatures", b.signatures);
+    if (b.major_version >= hf::hf19_reward_batching)
+    {
+      field_varint(ar, "height", b.height);
+      field(ar, "service_node_winner_key", b.service_node_winner_key);
+      field(ar, "reward", b.reward);
+    }
+  }
 
 
   /************************************************************************/
@@ -477,6 +492,10 @@ namespace cryptonote
     {
       return !(*this == rhs);
     }
+
+    uint64_t modulus(uint64_t interval) const;
+    uint64_t next_payout_height(uint64_t current_height, uint64_t interval) const;
+
   };
   inline constexpr account_public_address null_address{};
 
@@ -502,9 +521,9 @@ namespace cryptonote
   using byte_and_output_fees = std::pair<uint64_t, uint64_t>;
 
   //---------------------------------------------------------------
-  constexpr txversion transaction_prefix::get_min_version_for_hf(uint8_t hf_version)
+  constexpr txversion transaction_prefix::get_min_version_for_hf(hf hf_version)
   {
-    if (hf_version >= cryptonote::network_version_7 && hf_version <= cryptonote::network_version_10_bulletproofs)
+    if (hf_version >= hf::hf7 && hf_version <= hf::hf10_bulletproofs)
       return txversion::v2_ringct;
     return txversion::v4_tx_types;
   }
@@ -513,26 +532,26 @@ namespace cryptonote
   // tests can still use particular hard forks without needing to actually generate pre-v4 txes.
   namespace hack { inline bool test_suite_permissive_txes = false; }
 
-  inline txversion transaction_prefix::get_max_version_for_hf(uint8_t hf_version)
+  inline txversion transaction_prefix::get_max_version_for_hf(hf hf_version)
   {
     if (!hack::test_suite_permissive_txes) {
-      if (hf_version >= cryptonote::network_version_7 && hf_version <= cryptonote::network_version_8)
+      if (hf_version >= hf::hf7 && hf_version <= hf::hf8)
         return txversion::v2_ringct;
 
-      if (hf_version >= cryptonote::network_version_9_service_nodes && hf_version <= cryptonote::network_version_10_bulletproofs)
+      if (hf_version >= hf::hf9_service_nodes && hf_version <= hf::hf10_bulletproofs)
         return txversion::v3_per_output_unlock_times;
     }
 
     return txversion::v4_tx_types;
   }
 
-  constexpr txtype transaction_prefix::get_max_type_for_hf(uint8_t hf_version)
+  constexpr txtype transaction_prefix::get_max_type_for_hf(hf hf_version)
   {
     txtype result = txtype::standard;
-    if      (hf_version >= network_version_15_ons)              result = txtype::oxen_name_system;
-    else if (hf_version >= network_version_14_blink)            result = txtype::stake;
-    else if (hf_version >= network_version_11_infinite_staking) result = txtype::key_image_unlock;
-    else if (hf_version >= network_version_9_service_nodes)     result = txtype::state_change;
+    if      (hf_version >= hf::hf15_ons)              result = txtype::oxen_name_system;
+    else if (hf_version >= hf::hf14_blink)            result = txtype::stake;
+    else if (hf_version >= hf::hf11_infinite_staking) result = txtype::key_image_unlock;
+    else if (hf_version >= hf::hf9_service_nodes)     result = txtype::state_change;
 
     return result;
   }
@@ -562,11 +581,24 @@ namespace cryptonote
     }
   }
 
-  inline std::ostream &operator<<(std::ostream &os, txtype t) {
+  inline std::ostream& operator<<(std::ostream& os, txtype t) {
     return os << transaction::type_to_string(t);
   }
-  inline std::ostream &operator<<(std::ostream &os, txversion v) {
+  inline std::ostream& operator<<(std::ostream& os, txversion v) {
     return os << transaction::version_to_string(v);
+  }
+
+  inline std::ostream& operator<<(std::ostream& os, hf v)  = delete;/*{
+    return os << "HF" << static_cast<int>(v);
+  }*/
+
+  // Serialization for the `hf` type; this is simply writing/reading the underlying uint8_t value
+  template <class Archive>
+  void serialize_value(Archive& ar, hf& x) {
+    auto val = static_cast<std::underlying_type_t<hf>>(x);
+    serialization::value(ar, val);
+    if constexpr (Archive::is_deserializer)
+      x = static_cast<hf>(val);
   }
 }
 

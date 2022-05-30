@@ -30,8 +30,8 @@
 #include "keyvalue_serialization_overloads.h"
 #include "../storages/portable_storage.h"
 
-#undef LOKI_DEFAULT_LOG_CATEGORY
-#define LOKI_DEFAULT_LOG_CATEGORY "serialization"
+#undef OXEN_DEFAULT_LOG_CATEGORY
+#define OXEN_DEFAULT_LOG_CATEGORY "serialization"
 
 namespace epee
 {
@@ -158,8 +158,8 @@ public: \
   using int_t = std::underlying_type_t<enum_t>; \
   int_t int_value = is_store ? static_cast<int_t>(this_ref.enum_) : 0; \
   epee::serialization::perform_serialize<is_store>(int_value, stg, parent_section, #enum_); \
-  if (!is_store) \
-    const_cast<enum_t&>(this_ref.enum_) = static_cast<enum_t>(int_value); \
+  if constexpr (!is_store) \
+    this_ref.enum_ = static_cast<enum_t>(int_value); \
 } while(0);
 
 // Stashes `this` in the storage object's context for a dependent type that needs to access it.

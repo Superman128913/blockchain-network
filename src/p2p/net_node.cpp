@@ -28,7 +28,7 @@
 //
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
-#include <boost/endian/conversion.hpp>
+#include <oxenc/endian.h>
 #include <future>
 #include <optional>
 #include <chrono>
@@ -51,7 +51,7 @@
 namespace
 {
     constexpr const std::chrono::milliseconds future_poll_interval = 500ms;
-    constexpr const std::chrono::seconds socks_connect_timeout{P2P_DEFAULT_SOCKS_CONNECT_TIMEOUT};
+    constexpr const std::chrono::seconds socks_connect_timeout{cryptonote::p2p::DEFAULT_SOCKS_CONNECT_TIMEOUT};
 
     std::int64_t get_max_connections(const std::string_view value) noexcept
     {
@@ -111,26 +111,27 @@ namespace nodetool
     const command_line::arg_descriptor<std::string, false, true, 2> arg_p2p_bind_port = {
         "p2p-bind-port"
       , "Port for p2p network protocol (IPv4)"
-      , std::to_string(config::P2P_DEFAULT_PORT)
+      , std::to_string(cryptonote::config::P2P_DEFAULT_PORT)
       , {{ &cryptonote::arg_testnet_on, &cryptonote::arg_devnet_on }}
       , [](std::array<bool, 2> testnet_devnet, bool defaulted, std::string val)->std::string {
-          if (testnet_devnet[0] && defaulted)
-            return std::to_string(config::testnet::P2P_DEFAULT_PORT);
+          auto [testnet, devnet] = testnet_devnet;
+          if (testnet && defaulted)
+            return std::to_string(cryptonote::config::testnet::P2P_DEFAULT_PORT);
           else if (testnet_devnet[1] && defaulted)
-            return std::to_string(config::devnet::P2P_DEFAULT_PORT);
+            return std::to_string(cryptonote::config::devnet::P2P_DEFAULT_PORT);
           return val;
         }
       };
     const command_line::arg_descriptor<std::string, false, true, 2> arg_p2p_bind_port_ipv6 = {
         "p2p-bind-port-ipv6"
       , "Port for p2p network protocol (IPv6)"
-      , std::to_string(config::P2P_DEFAULT_PORT)
+      , std::to_string(cryptonote::config::P2P_DEFAULT_PORT)
       , {{ &cryptonote::arg_testnet_on, &cryptonote::arg_devnet_on }}
       , [](std::array<bool, 2> testnet_devnet, bool defaulted, std::string val)->std::string {
           if (testnet_devnet[0] && defaulted)
-            return std::to_string(config::testnet::P2P_DEFAULT_PORT);
+            return std::to_string(cryptonote::config::testnet::P2P_DEFAULT_PORT);
           else if (testnet_devnet[1] && defaulted)
-            return std::to_string(config::devnet::P2P_DEFAULT_PORT);
+            return std::to_string(cryptonote::config::devnet::P2P_DEFAULT_PORT);
           return val;
         }
       };
@@ -147,16 +148,16 @@ namespace nodetool
     const command_line::arg_descriptor<bool> arg_p2p_hide_my_port   =    {"hide-my-port", "Do not announce yourself as peerlist candidate", false, true};
     const command_line::arg_descriptor<bool> arg_no_sync = {"no-sync", "Don't synchronize the blockchain with other peers", false};
 
-    const command_line::arg_descriptor<bool>        arg_no_igd  = {"no-igd", "Backwards compatibility option (this is now the default)"};
-    const command_line::arg_descriptor<std::string> arg_igd = {"igd", "UPnP port mapping (disabled, enabled, delayed)", "disabled"};
+    const command_line::arg_descriptor<bool>        arg_no_igd  = {"no-igd", "Deprecated option; ignored"};
+    const command_line::arg_descriptor<std::string> arg_igd = {"igd", "Deprecated option; ignored", ""};
     const command_line::arg_descriptor<bool>        arg_p2p_use_ipv6  = {"p2p-use-ipv6", "Enable IPv6 for p2p", false};
     const command_line::arg_descriptor<bool>        arg_p2p_ignore_ipv4  = {"p2p-ignore-ipv4", "Ignore unsuccessful IPv4 bind for p2p", false};
     const command_line::arg_descriptor<int64_t>     arg_out_peers = {"out-peers", "set max number of out peers", -1};
     const command_line::arg_descriptor<int64_t>     arg_in_peers = {"in-peers", "set max number of in peers", -1};
     const command_line::arg_descriptor<int> arg_tos_flag = {"tos-flag", "set TOS flag", -1};
 
-    const command_line::arg_descriptor<int64_t> arg_limit_rate_up = {"limit-rate-up", "set limit-rate-up [kB/s]", P2P_DEFAULT_LIMIT_RATE_UP};
-    const command_line::arg_descriptor<int64_t> arg_limit_rate_down = {"limit-rate-down", "set limit-rate-down [kB/s]", P2P_DEFAULT_LIMIT_RATE_DOWN};
+    const command_line::arg_descriptor<int64_t> arg_limit_rate_up = {"limit-rate-up", "set limit-rate-up [kB/s]", cryptonote::p2p::DEFAULT_LIMIT_RATE_UP};
+    const command_line::arg_descriptor<int64_t> arg_limit_rate_down = {"limit-rate-down", "set limit-rate-down [kB/s]", cryptonote::p2p::DEFAULT_LIMIT_RATE_DOWN};
     const command_line::arg_descriptor<int64_t> arg_limit_rate = {"limit-rate", "set limit-rate [kB/s]", -1};
 
     std::optional<std::vector<proxy>> get_proxies(boost::program_options::variables_map const& vm)
@@ -219,7 +220,7 @@ namespace nodetool
                 MERROR("Invalid ipv4:port given for --" << arg_tx_proxy.name);
                 return std::nullopt;
             }
-            set_proxy.address = ip::tcp::endpoint{ip::address_v4{boost::endian::native_to_big(ip)}, port};
+            set_proxy.address = ip::tcp::endpoint{ip::address_v4{oxenc::host_to_big(ip)}, port};
         }
 
         return proxies;

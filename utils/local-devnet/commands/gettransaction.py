@@ -23,7 +23,7 @@ def instruct_daemon(method, params):
 
 
 parser = argparse.ArgumentParser(description='Get Block.')
-parser.add_argument("--hash", help="An integer for the height to be queried", type=int)
+parser.add_argument("--hash", help="An integer for the height to be queried", type=str)
 args = parser.parse_args()
 
 if not (args.hash):

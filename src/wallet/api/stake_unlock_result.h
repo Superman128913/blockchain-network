@@ -12,7 +12,7 @@ class StakeUnlockResultImpl : public StakeUnlockResult
 public:
     StakeUnlockResultImpl(WalletImpl& w, tools::wallet2::request_stake_unlock_result res);
     StakeUnlockResultImpl();
-    ~StakeUnlockResultImpl();
+    ~StakeUnlockResultImpl() override;
 
     bool success() override;
     std::string msg() override;

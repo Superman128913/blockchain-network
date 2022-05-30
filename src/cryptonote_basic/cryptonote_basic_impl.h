@@ -54,10 +54,32 @@ namespace cryptonote {
     virtual void init() = 0;
   };
 
+  struct address_parse_info
+  {
+    account_public_address address;
+    bool is_subaddress;
+    bool has_payment_id;
+    crypto::hash8 payment_id;
+
+    std::string as_str(network_type nettype) const;
+
+    KV_MAP_SERIALIZABLE
+  };
+
+  struct batch_sn_payment {
+    std::string address;
+    cryptonote::address_parse_info address_info;
+    uint64_t amount;
+    batch_sn_payment() = default;
+    batch_sn_payment(std::string addr, uint64_t amt, cryptonote::network_type nettype);
+    batch_sn_payment(cryptonote::address_parse_info& addr_info, uint64_t amt, cryptonote::network_type nettype);
+    batch_sn_payment(const cryptonote::account_public_address& addr, uint64_t amt, cryptonote::network_type nettype);
+  };
+
   class ValidateMinerTxHook
   {
   public:
-    virtual bool validate_miner_tx(cryptonote::block const &block, struct block_reward_parts const &reward_parts) const = 0;
+    virtual bool validate_miner_tx(cryptonote::block const &block, struct block_reward_parts const &reward_parts, std::optional<std::vector<cryptonote::batch_sn_payment>> const &batched_sn_payments) const = 0;
   };
 
   class AltBlockAddedHook
@@ -89,28 +111,17 @@ namespace cryptonote {
     return addresses[0];
   }
 
-  struct address_parse_info
-  {
-    account_public_address address;
-    bool is_subaddress;
-    bool has_payment_id;
-    crypto::hash8 payment_id;
 
-    std::string as_str(network_type nettype) const;
-
-    KV_MAP_SERIALIZABLE
-  };
 
   /************************************************************************/
   /* Cryptonote helper functions                                          */
   /************************************************************************/
   bool block_header_has_pulse_components(block_header const &blk_header);
   bool block_has_pulse_components(block const &blk);
-  size_t get_min_block_weight(uint8_t version);
-  size_t get_max_tx_size();
+  size_t get_min_block_weight(hf version);
   uint64_t block_reward_unpenalized_formula_v7(uint64_t already_generated_coins, uint64_t height);
   uint64_t block_reward_unpenalized_formula_v8(uint64_t height);
-  bool get_base_block_reward(size_t median_weight, size_t current_block_weight, uint64_t already_generated_coins, uint64_t &reward, uint64_t &reward_unpenalized, uint8_t version, uint64_t height);
+  bool get_base_block_reward(size_t median_weight, size_t current_block_weight, uint64_t already_generated_coins, uint64_t &reward, uint64_t &reward_unpenalized, hf version, uint64_t height);
   uint8_t get_account_address_checksum(const public_address_outer_blob& bl);
   uint8_t get_account_integrated_address_checksum(const public_integrated_address_outer_blob& bl);
 
@@ -138,13 +149,6 @@ namespace cryptonote {
       address_parse_info& info
     , network_type nettype
     , const std::string_view str
-    );
-
-  bool get_account_address_from_str_or_url(
-      address_parse_info& info
-    , network_type nettype
-    , const std::string_view str_or_url
-    , std::function<std::string(const std::string_view, const std::vector<std::string>&, bool)> dns_confirm = return_first_address
     );
 
   bool is_coinbase(const transaction& tx);

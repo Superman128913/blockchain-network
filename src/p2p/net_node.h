@@ -56,6 +56,7 @@
 #include "common/command_line.h"
 #include "common/periodic_task.h"
 #include "common/fs.h"
+#include "common/util.h"
 
 PUSH_WARNINGS
 DISABLE_VS_WARNINGS(4355)
@@ -201,21 +202,14 @@ namespace nodetool
       void set_config_defaults() noexcept
       {
         // at this moment we have a hardcoded config
-        m_config.m_net_config.handshake_interval = P2P_DEFAULT_HANDSHAKE_INTERVAL;
-        m_config.m_net_config.packet_max_size = P2P_DEFAULT_PACKET_MAX_SIZE;
+        m_config.m_net_config.handshake_interval = tools::to_seconds(cryptonote::p2p::DEFAULT_HANDSHAKE_INTERVAL);
+        m_config.m_net_config.packet_max_size = cryptonote::p2p::DEFAULT_PACKET_MAX_SIZE;
         m_config.m_net_config.config_id = 0;
-        m_config.m_net_config.connection_timeout = P2P_DEFAULT_CONNECTION_TIMEOUT;
-        m_config.m_net_config.ping_connection_timeout = P2P_DEFAULT_PING_CONNECTION_TIMEOUT;
-        m_config.m_net_config.send_peerlist_sz = P2P_DEFAULT_PEERS_IN_HANDSHAKE;
+        m_config.m_net_config.connection_timeout = cryptonote::p2p::DEFAULT_CONNECTION_TIMEOUT;
+        m_config.m_net_config.ping_connection_timeout = cryptonote::p2p::DEFAULT_PING_CONNECTION_TIMEOUT;
+        m_config.m_net_config.send_peerlist_sz = cryptonote::p2p::DEFAULT_PEERS_IN_HANDSHAKE;
         m_config.m_support_flags = 0; // only set in public zone
       }
-    };
-
-    enum igd_t
-    {
-      no_igd,
-      igd,
-      delayed_igd,
     };
 
   public:
@@ -227,14 +221,13 @@ namespace nodetool
         m_rpc_port(0),
         m_allow_local_ip(false),
         m_hide_my_port(false),
-        m_igd(no_igd),
         m_offline(false),
         is_closing(false),
         m_network_id()
     {}
     virtual ~node_server();
 
-    static void init_options(boost::program_options::options_description& desc);
+    static void init_options(boost::program_options::options_description& desc, boost::program_options::options_description& hidden);
 
     bool run();
     network_zone& add_zone(epee::net_utils::zone zone);
@@ -260,9 +253,9 @@ namespace nodetool
     uint32_t get_max_out_public_peers() const;
     void change_max_in_public_peers(size_t count);
     uint32_t get_max_in_public_peers() const;
-    virtual bool block_host(const epee::net_utils::network_address &adress, time_t seconds = P2P_IP_BLOCKTIME);
+    virtual bool block_host(const epee::net_utils::network_address &adress, time_t seconds = tools::to_seconds(cryptonote::p2p::IP_BLOCK_TIME));
     virtual bool unblock_host(const epee::net_utils::network_address &address);
-    virtual bool block_subnet(const epee::net_utils::ipv4_network_subnet &subnet, time_t seconds = P2P_IP_BLOCKTIME);
+    virtual bool block_subnet(const epee::net_utils::ipv4_network_subnet &subnet, time_t seconds = tools::to_seconds(cryptonote::p2p::IP_BLOCK_TIME));
     virtual bool unblock_subnet(const epee::net_utils::ipv4_network_subnet &subnet);
     virtual bool is_host_blocked(const epee::net_utils::network_address &address, time_t *seconds) { return !is_remote_host_allowed(address, seconds); }
     virtual std::map<std::string, time_t> get_blocked_hosts() { std::shared_lock lock{m_blocked_hosts_lock}; return m_blocked_hosts; }
@@ -273,10 +266,6 @@ namespace nodetool
     virtual void clear_used_stripe_peers();
 
   private:
-    const std::vector<std::string> m_seed_nodes_list =
-    {
-      // TODO(oxen): "seeds.oxen.network"
-    };
 
     bool islimitup=false;
     bool islimitdown=false;
@@ -314,7 +303,7 @@ namespace nodetool
     virtual void callback(p2p_connection_context& context);
     //----------------- i_p2p_endpoint -------------------------------------------------------------
     virtual bool relay_notify_to_list(int command, const epee::span<const uint8_t> data_buff, std::vector<std::pair<epee::net_utils::zone, boost::uuids::uuid>> connections);
-    virtual epee::net_utils::zone send_txs(std::vector<cryptonote::blobdata> txs, const epee::net_utils::zone origin, const boost::uuids::uuid& source, const bool pad_txs);
+    virtual epee::net_utils::zone send_txs(std::vector<std::string> txs, const epee::net_utils::zone origin, const boost::uuids::uuid& source, const bool pad_txs);
     virtual bool invoke_command_to_peer(int command, const epee::span<const uint8_t> req_buff, std::string& resp_buff, const epee::net_utils::connection_context_base& context);
     virtual bool invoke_notify_to_peer(int command, const epee::span<const uint8_t> req_buff, const epee::net_utils::connection_context_base& context);
     virtual bool drop_connection(const epee::net_utils::connection_context_base& context);
@@ -348,14 +337,6 @@ namespace nodetool
     bool is_peer_used(const peerlist_entry& peer);
     bool is_peer_used(const anchor_peerlist_entry& peer);
     bool is_addr_connected(const epee::net_utils::network_address& peer);
-    void add_upnp_port_mapping_impl(uint32_t port, bool ipv6=false);
-    void add_upnp_port_mapping_v4(uint32_t port);
-    void add_upnp_port_mapping_v6(uint32_t port);
-    void add_upnp_port_mapping(uint32_t port, bool ipv4=true, bool ipv6=false);
-    void delete_upnp_port_mapping_impl(uint32_t port, bool ipv6=false);
-    void delete_upnp_port_mapping_v4(uint32_t port);
-    void delete_upnp_port_mapping_v6(uint32_t port);
-    void delete_upnp_port_mapping(uint32_t port);
     template<class t_callback>
     bool try_ping(basic_node_data& node_data, p2p_connection_context& context, const t_callback &cb);
     bool try_get_support_flags(const p2p_connection_context& context, std::function<void(p2p_connection_context&, const uint32_t&)> f);
@@ -426,7 +407,6 @@ namespace nodetool
     uint16_t m_rpc_port;
     bool m_allow_local_ip;
     bool m_hide_my_port;
-    igd_t m_igd;
     bool m_offline;
     bool m_use_ipv6;
     bool m_require_ipv4;
@@ -436,7 +416,7 @@ namespace nodetool
     t_payload_net_handler& m_payload_handler;
     peerlist_storage m_peerlist_storage;
 
-    tools::periodic_task m_peer_handshake_idle_maker_interval{std::chrono::seconds{P2P_DEFAULT_HANDSHAKE_INTERVAL}};
+    tools::periodic_task m_peer_handshake_idle_maker_interval{cryptonote::p2p::DEFAULT_HANDSHAKE_INTERVAL};
     tools::periodic_task m_connections_maker_interval{1s};
     tools::periodic_task m_peerlist_store_interval{30min};
     tools::periodic_task m_gray_peerlist_housekeeping_interval{1min};
@@ -476,14 +456,12 @@ namespace nodetool
     std::map<std::string, uint64_t> m_host_fails_score;
 
     std::mutex m_used_stripe_peers_mutex;
-    std::array<std::list<epee::net_utils::network_address>, 1 << CRYPTONOTE_PRUNING_LOG_STRIPES> m_used_stripe_peers;
+    std::array<std::list<epee::net_utils::network_address>, 1 << cryptonote::PRUNING_LOG_STRIPES> m_used_stripe_peers;
 
     boost::uuids::uuid m_network_id;
     cryptonote::network_type m_nettype;
   };
 
-    const int64_t default_limit_up = P2P_DEFAULT_LIMIT_RATE_UP;      // kB/s
-    const int64_t default_limit_down = P2P_DEFAULT_LIMIT_RATE_DOWN;  // kB/s
     extern const command_line::arg_descriptor<std::string> arg_p2p_bind_ip;
     extern const command_line::arg_descriptor<std::string> arg_p2p_bind_ipv6_address;
     extern const command_line::arg_descriptor<std::string, false, true, 2> arg_p2p_bind_port;

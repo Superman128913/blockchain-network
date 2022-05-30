@@ -32,12 +32,16 @@
 #include <mutex>
 #include <shared_mutex>
 #include <string_view>
+#include "cryptonote_basic/cryptonote_basic.h"
+#include "cryptonote_basic/hardfork.h"
+#include "cryptonote_config.h"
 #include "serialization/serialization.h"
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 #include "cryptonote_core/service_node_rules.h"
 #include "cryptonote_core/service_node_voting.h"
 #include "cryptonote_core/service_node_quorum_cop.h"
 #include "common/util.h"
+#include "uptime_proof.h"
 
 namespace cryptonote
 {
@@ -45,11 +49,6 @@ class Blockchain;
 class BlockchainDB;
 struct checkpoint_t;
 }; // namespace cryptonote
-
-namespace uptime_proof
-{
-  class Proof;
-}
 
 namespace service_nodes
 {
@@ -176,11 +175,11 @@ namespace service_nodes
         bool unreachable_for(std::chrono::seconds threshold, const std::chrono::steady_clock::time_point& now = std::chrono::steady_clock::now()) const;
 
     };
-    reachable_stats ss_reachable;
-    reachable_stats lokinet_reachable;
+    reachable_stats ss_reachable{};
+    reachable_stats lokinet_reachable{};
 
     // Unlike all of the above (except for timestamp), these values *do* get serialized
-    std::unique_ptr<uptime_proof::Proof> proof;
+    std::unique_ptr<uptime_proof::Proof> proof{};
 
     // Derived from pubkey_ed25519, not serialized
     crypto::x25519_public_key pubkey_x25519 = crypto::x25519_public_key::null();
@@ -308,15 +307,19 @@ namespace service_nodes
     cryptonote::account_public_address operator_address{};
     uint64_t                           last_ip_change_height = 0; // The height of the last quorum penalty for changing IPs
     version_t                          version = tools::enum_top<version_t>;
-    uint8_t                            registration_hf_version = 0;
+    cryptonote::hf                     registration_hf_version = cryptonote::hf::none;
     pulse_sort_key                     pulse_sorter;
 
     service_node_info() = default;
     bool is_fully_funded() const { return total_contributed >= staking_requirement; }
     bool is_decommissioned() const { return active_since_height < 0; }
     bool is_active() const { return is_fully_funded() && !is_decommissioned(); }
+    bool is_payable(uint64_t at_height, cryptonote::network_type nettype) const { 
+      auto& netconf = get_config(nettype);
+      return is_active() && at_height >= active_since_height + netconf.SERVICE_NODE_PAYABLE_AFTER_BLOCKS;
+    }
 
-    bool can_transition_to_state(uint8_t hf_version, uint64_t block_height, new_state proposed_state) const;
+    bool can_transition_to_state(cryptonote::hf hf_version, uint64_t block_height, new_state proposed_state) const;
     bool can_be_voted_on        (uint64_t block_height) const;
     size_t total_num_locked_contributions() const;
 
@@ -458,9 +461,11 @@ namespace service_nodes
     service_node_list &operator=(const service_node_list &) = delete;
 
     bool block_added(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs, cryptonote::checkpoint_t const *checkpoint) override;
+    bool process_batching_rewards(const cryptonote::block& block);
+    bool pop_batching_rewards_block(const cryptonote::block& block);
     void blockchain_detached(uint64_t height, bool by_pop_blocks) override;
     void init() override;
-    bool validate_miner_tx(cryptonote::block const &block, cryptonote::block_reward_parts const &base_reward) const override;
+    bool validate_miner_tx(const cryptonote::block& block, const cryptonote::block_reward_parts& base_reward, const std::optional<std::vector<cryptonote::batch_sn_payment>>& batched_sn_payments) const override;
     bool alt_block_added(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs, cryptonote::checkpoint_t const *checkpoint) override;
     payout get_block_leader() const { std::lock_guard lock{m_sn_mutex}; return m_state.get_block_leader(); }
     bool is_service_node(const crypto::public_key& pubkey, bool require_active = true) const;
@@ -632,7 +637,7 @@ namespace service_nodes
     struct state_serialized
     {
       enum struct version_t : uint8_t { version_0, version_1_serialize_hash, count, };
-      static version_t get_version(uint8_t /*hf_version*/) { return version_t::version_1_serialize_hash; }
+      static version_t get_version(cryptonote::hf /*hf_version*/) { return version_t::version_1_serialize_hash; }
 
       version_t                              version;
       uint64_t                               height;
@@ -658,7 +663,7 @@ namespace service_nodes
     struct data_for_serialization
     {
       enum struct version_t : uint8_t { version_0, count, };
-      static version_t get_version(uint8_t /*hf_version*/) { return version_t::version_0; }
+      static version_t get_version(cryptonote::hf /*hf_version*/) { return version_t::version_0; }
 
       version_t version;
       std::vector<quorum_for_serialization> quorum_states;
@@ -694,7 +699,9 @@ namespace service_nodes
 
       std::vector<pubkey_and_sninfo>  active_service_nodes_infos() const;
       std::vector<pubkey_and_sninfo>  decommissioned_service_nodes_infos() const; // return: All nodes that are fully funded *and* decommissioned.
-      std::vector<crypto::public_key> get_expired_nodes(cryptonote::BlockchainDB const &db, cryptonote::network_type nettype, uint8_t hf_version, uint64_t block_height) const;
+      std::vector<pubkey_and_sninfo>  payable_service_nodes_infos(uint64_t height, cryptonote::network_type nettype) const; // return: All nodes that are active and have been online for a period greater than SERVICE_NODE_PAYABLE_AFTER_BLOCKS
+
+      std::vector<crypto::public_key> get_expired_nodes(cryptonote::BlockchainDB const &db, cryptonote::network_type nettype, cryptonote::hf hf_version, uint64_t block_height) const;
       void update_from_block(
           cryptonote::BlockchainDB const &db,
           cryptonote::network_type nettype,
@@ -718,7 +725,7 @@ namespace service_nodes
           const cryptonote::block &block,
           const cryptonote::transaction& tx,
           const service_node_keys *my_keys);
-      bool process_key_image_unlock_tx(cryptonote::network_type nettype, uint64_t block_height, const cryptonote::transaction &tx);
+      bool process_key_image_unlock_tx(cryptonote::network_type nettype, cryptonote::hf hf_version, uint64_t block_height, const cryptonote::transaction &tx);
       payout get_block_leader() const;
       payout get_block_producer(uint8_t pulse_round) const;
     };
@@ -784,33 +791,47 @@ namespace service_nodes
   };
   bool tx_get_staking_components            (cryptonote::transaction_prefix const &tx_prefix, staking_components *contribution, crypto::hash const &txid);
   bool tx_get_staking_components            (cryptonote::transaction const &tx, staking_components *contribution);
-  bool tx_get_staking_components_and_amounts(cryptonote::network_type nettype, uint8_t hf_version, cryptonote::transaction const &tx, uint64_t block_height, staking_components *contribution);
+  bool tx_get_staking_components_and_amounts(cryptonote::network_type nettype, cryptonote::hf hf_version, cryptonote::transaction const &tx, uint64_t block_height, staking_components *contribution);
 
-  struct contributor_args_t
-  {
-    bool                                            success;
-    std::vector<cryptonote::account_public_address> addresses;
-    std::vector<uint64_t>                           portions;
-    uint64_t                                        portions_for_operator;
-    std::string                                     err_msg; // if (success == false), this is set to the err msg otherwise empty
+  using contribution = std::pair<cryptonote::account_public_address, uint64_t>;
+  struct registration_details {
+    crypto::public_key service_node_pubkey;
+    std::vector<contribution> reserved;
+    uint64_t fee;
+    uint64_t hf; // expiration timestamp before HF19
+    bool uses_portions; // if true then `hf` is a timestamp
+    crypto::signature signature;
   };
 
-  bool     is_registration_tx   (cryptonote::network_type nettype, uint8_t hf_version, const cryptonote::transaction& tx, uint64_t block_timestamp, uint64_t block_height, uint32_t index, crypto::public_key& key, service_node_info& info);
-  bool     reg_tx_extract_fields(const cryptonote::transaction& tx, contributor_args_t &contributor_args, uint64_t& expiration_timestamp, crypto::public_key& service_node_key, crypto::signature& signature, crypto::public_key& tx_pub_key);
+  bool is_registration_tx(
+      cryptonote::network_type nettype,
+      cryptonote::hf hf_version,
+      const cryptonote::transaction& tx,
+      uint64_t block_timestamp,
+      uint64_t block_height,
+      uint32_t index,
+      crypto::public_key& key,
+      service_node_info& info);
+  std::optional<registration_details> reg_tx_extract_fields(const cryptonote::transaction& tx);
   uint64_t offset_testing_quorum_height(quorum_type type, uint64_t height);
 
-  contributor_args_t convert_registration_args(cryptonote::network_type nettype,
-                                               const std::vector<std::string> &args,
-                                               uint64_t staking_requirement,
-                                               uint8_t hf_version);
+  // validate_registration* and convert_registration_args functions throws this on error:
+  struct invalid_registration : std::invalid_argument { using std::invalid_argument::invalid_argument; };
 
-  // validate_contributors_* functions throws invalid_contributions exception
-  struct invalid_contributions : std::invalid_argument { using std::invalid_argument::invalid_argument; };
-  void validate_contributor_args(uint8_t hf_version, contributor_args_t const &contributor_args);
-  void validate_contributor_args_signature(contributor_args_t const &contributor_args, uint64_t const expiration_timestamp, crypto::public_key const &service_node_key, crypto::signature const &signature);
+  // Converts string input values into a partially filled `registration_details`; pubkey and
+  // signature will be defaulted.  Throws invalid_registration on any invalid input.
+  registration_details convert_registration_args(
+      cryptonote::network_type nettype,
+      cryptonote::hf hf_version,
+      const std::vector<std::string>& args,
+      uint64_t staking_requirement);
+
+  void validate_registration(cryptonote::hf hf_version, cryptonote::network_type nettype, uint64_t staking_requirement, uint64_t block_timestamp, const registration_details& registration);
+  void validate_registration_signature(const registration_details& registration);
+  crypto::hash get_registration_hash(const registration_details& registration);
 
   bool make_registration_cmd(cryptonote::network_type nettype,
-      uint8_t hf_version,
+      cryptonote::hf hf_version,
       uint64_t staking_requirement,
       const std::vector<std::string>& args,
       const service_node_keys &keys,
@@ -819,7 +840,7 @@ namespace service_nodes
 
   service_nodes::quorum generate_pulse_quorum(cryptonote::network_type nettype,
                                               crypto::public_key const &leader,
-                                              uint8_t hf_version,
+                                              cryptonote::hf hf_version,
                                               std::vector<pubkey_and_sninfo> const &active_snode_list,
                                               std::vector<crypto::hash> const &pulse_entropy,
                                               uint8_t pulse_round);
@@ -831,8 +852,8 @@ namespace service_nodes
   // specified.
   std::vector<crypto::hash> get_pulse_entropy_for_next_block(cryptonote::BlockchainDB const &db, uint8_t pulse_round = 0);
 
-  payout service_node_info_to_payout(crypto::public_key const &key, service_node_info const &info);
+  payout service_node_payout_portions(const crypto::public_key& key, const service_node_info& info);
 
-  const static payout_entry null_payout_entry = {cryptonote::null_address, STAKING_PORTIONS};
+  const static payout_entry null_payout_entry = {cryptonote::null_address, cryptonote::old::STAKING_PORTIONS};
   const static payout null_payout             = {crypto::null_pkey, {null_payout_entry}};
 }
