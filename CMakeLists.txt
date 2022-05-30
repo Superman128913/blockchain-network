@@ -287,7 +287,7 @@ if(NOT MANUAL_SUBMODULES)
     check_submodule(external/rapidjson)
     check_submodule(external/trezor-common)
     check_submodule(external/randomx)
-    check_submodule(external/loki-mq cppzmq)
+    check_submodule(external/oxen-mq cppzmq)
     check_submodule(external/SQLiteCpp)
     if(BUILD_TESTS)
       check_submodule(external/googletest)
@@ -460,7 +460,7 @@ if(NOT TARGET sodium)
     target_link_libraries(sodium INTERFACE sodium_vendor)
   endif()
 
-  # Need this target export so that loki-mq properly picks up sodium
+  # Need this target export so that oxen-mq properly picks up sodium
   export(TARGETS sodium NAMESPACE sodium:: FILE sodium-exports.cmake)
 endif()
 
