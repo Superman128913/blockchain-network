@@ -464,13 +464,6 @@ if(NOT TARGET sodium)
   export(TARGETS sodium NAMESPACE sodium:: FILE sodium-exports.cmake)
 endif()
 
-if (NOT BUILD_STATIC_DEPS)
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(UNBOUND libunbound REQUIRED IMPORTED_TARGET)
-  add_library(libunbound INTERFACE)
-  target_link_libraries(libunbound INTERFACE PkgConfig::UNBOUND)
-endif()
-
 option(WITH_SYSTEMD "Attempts to link against and enable systemd daemon notification support" ON)
 if (WITH_SYSTEMD AND NOT BUILD_STATIC_DEPS)
   find_package(PkgConfig REQUIRED)
@@ -486,6 +479,7 @@ endif()
 
 
 if(NOT BUILD_STATIC_DEPS)
+  find_package(PkgConfig REQUIRED)
   pkg_check_modules(SQLITE3 REQUIRED sqlite3 IMPORTED_TARGET GLOBAL)
   message(STATUS "Found sqlite3 ${SQLITE3_VERSION}")
   add_library(SQLite::SQLite3 ALIAS PkgConfig::SQLITE3)
