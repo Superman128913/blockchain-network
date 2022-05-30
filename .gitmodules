@@ -8,7 +8,7 @@
 	path = external/randomx
 	url = https://github.com/oxen-io/loki-randomXL
 [submodule "external/loki-mq"]
-	path = external/loki-mq
+	path = external/oxen-mq
 	url = https://github.com/oxen-io/loki-mq.git
 [submodule "external/googletest"]
 	path = external/googletest
