@@ -1,4 +1,5 @@
 # Copyright (c) 2014-2018, The Monero Project
+# Copyright (c) 2019-2022, The Oxen Project
 # 
 # All rights reserved.
 # 
@@ -33,32 +34,27 @@ execute_process(COMMAND "${GIT}" rev-parse --short=9 HEAD RESULT_VARIABLE RET OU
 
 if(RET)
 	# Something went wrong, set the version tag to -unknown
-	
     message(WARNING "Cannot determine current commit. Make sure that you are building either from a Git working tree or from a source archive.")
     set(VERSIONTAG "unknown")
-    configure_file("version.cpp.in" "version.cpp")
 else()
-	string(SUBSTRING ${COMMIT} 0 9 COMMIT)
 	message(STATUS "You are currently on commit ${COMMIT}")
-	
+
 	# Get all the tags
 	execute_process(COMMAND "${GIT}" rev-list --tags --max-count=1 --abbrev-commit RESULT_VARIABLE RET OUTPUT_VARIABLE TAGGEDCOMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
-	
+
     if(NOT TAGGEDCOMMIT)
         message(WARNING "Cannot determine most recent tag. Make sure that you are building either from a Git working tree or from a source archive.")
         set(VERSIONTAG "${COMMIT}")
     else()
-        message(STATUS "The most recent tag was at ${TAGGEDCOMMIT}")
-        
         # Check if we're building that tagged commit or a different one
         if(COMMIT STREQUAL TAGGEDCOMMIT)
-            message(STATUS "You are building a tagged release")
+            message(STATUS "${COMMIT} is a tagged release; setting version tag to 'release'")
             set(VERSIONTAG "release")
         else()
-            message(STATUS "You are ahead of or behind a tagged release")
+            message(STATUS "You are not building a tagged release; setting version tag to '${COMMIT}'")
             set(VERSIONTAG "${COMMIT}")
         endif()
-    endif()	    
-
-    configure_file("version.cpp.in" "version.cpp")
+    endif()
 endif()
+
+configure_file("${SRC}" "${DEST}" @ONLY)

@@ -47,10 +47,6 @@ function (oxen_add_executable target binary)
   set_property(GLOBAL PROPERTY oxen_executable_targets "${exec_tgt}")
 endfunction ()
 
-include(Version)
-add_library(version ${CMAKE_BINARY_DIR}/version.cpp)
-add_dependencies(version genversion)
-
 add_subdirectory(common)
 add_subdirectory(crypto)
 add_subdirectory(ringct)
@@ -92,3 +88,38 @@ endif()
 
 add_subdirectory(device)
 add_subdirectory(device_trezor)
+
+
+if(OXEN_VERSIONTAG)
+  set(VERSIONTAG "${OXEN_VERSIONTAG}")
+  configure_file("${CMAKE_CURRENT_SOURCE_DIR}/version.cpp.in" "${CMAKE_CURRENT_BINARY_DIR}/version.cpp")
+else()
+  set(GIT_INDEX_FILE "${PROJECT_SOURCE_DIR}/.git/index")
+  find_package(Git)
+  if(EXISTS ${GIT_INDEX_FILE} AND ( GIT_FOUND OR Git_FOUND) )
+    message(STATUS "Found Git: ${GIT_EXECUTABLE}")
+
+    set(genversion_args "-DGIT=${GIT_EXECUTABLE}")
+    foreach(v oxen_VERSION oxen_VERSION_MAJOR oxen_VERSION_MINOR oxen_VERSION_PATCH OXEN_RELEASE_CODENAME OXEN_RELEASE_SUFFIX)
+      list(APPEND genversion_args "-D${v}=${${v}}")
+    endforeach()
+
+    add_custom_command(
+      OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/version.cpp"
+      COMMAND
+        "${CMAKE_COMMAND}"
+        ${genversion_args}
+        "-DSRC=${CMAKE_CURRENT_SOURCE_DIR}/version.cpp.in"
+        "-DDEST=${CMAKE_CURRENT_BINARY_DIR}/version.cpp"
+        "-P" "${PROJECT_SOURCE_DIR}/cmake/GenVersion.cmake"
+      DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/version.cpp.in"
+        "${GIT_INDEX_FILE}")
+  else()
+    message(STATUS "Git was not found! Setting version tag to to nogit")
+    set(VERSIONTAG "nogit")
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/version.cpp.in" "${CMAKE_CURRENT_BINARY_DIR}/version.cpp")
+  endif()
+endif()
+
+add_library(version "${CMAKE_CURRENT_BINARY_DIR}/version.cpp")
