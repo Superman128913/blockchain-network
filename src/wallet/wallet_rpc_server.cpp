@@ -610,6 +610,18 @@ namespace tools
       res.balance = req.all_accounts ? m_wallet->balance_all(req.strict) : m_wallet->balance(req.account_index, req.strict);
       res.unlocked_balance = req.all_accounts ? m_wallet->unlocked_balance_all(req.strict, &res.blocks_to_unlock, &res.time_to_unlock) : m_wallet->unlocked_balance(req.account_index, req.strict, &res.blocks_to_unlock, &res.time_to_unlock);
       res.multisig_import_needed = m_wallet->multisig() && m_wallet->has_multisig_partial_key_images();
+      std::string current_address_str = m_wallet->get_subaddress_as_str({(req.all_accounts ? 0 : req.account_index), 0});
+      res.accrued_balance = m_wallet->get_batched_amount(current_address_str);
+      if (res.accrued_balance > 0)
+      {
+        cryptonote::address_parse_info info;
+        auto& conf = cryptonote::get_config(m_wallet->nettype());
+        get_account_address_from_str(info, m_wallet->nettype(), current_address_str);
+        res.accrued_balance_next_payout = info.address.next_payout_height(m_wallet->get_blockchain_current_height(), conf.BATCHING_INTERVAL);
+      } else {
+        res.accrued_balance_next_payout = 0;
+      }
+
       std::map<uint32_t, std::map<uint32_t, uint64_t>> balance_per_subaddress_per_account;
       std::map<uint32_t, std::map<uint32_t, std::pair<uint64_t, std::pair<uint64_t, uint64_t>>>> unlocked_balance_per_subaddress_per_account;
       if (req.all_accounts)

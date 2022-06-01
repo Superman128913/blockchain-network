@@ -849,6 +849,11 @@ private:
 
     std::unordered_map<std::string, ons_detail> get_ons_cache();
 
+    std::unordered_map<std::string, uint64_t> batching_records_cache;
+
+    void refresh_batching_cache();
+    uint64_t get_batched_amount(const std::string& address) const;
+
     // Returns the current height up to which the wallet has synchronized the blockchain.  Thread
     // safe (though the value may be behind if another thread is in the middle of adding blocks).
     uint64_t get_blockchain_current_height() const { return m_cached_height; }

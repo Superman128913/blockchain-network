@@ -609,6 +609,12 @@ struct Wallet
         return result;
     }
 
+    /**
+     * @brief accruedBalance - returns the accounts balance that has been batched and yet to be paid.
+     * @return
+     */
+    virtual uint64_t accruedBalance(const std::string& address) const = 0;
+
     // Information returned about stakes in listCurrentStakes()
     struct stake_info {
         std::string sn_pubkey;

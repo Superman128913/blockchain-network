@@ -1064,6 +1064,12 @@ uint64_t WalletImpl::unlockedBalance(uint32_t accountIndex) const
 }
 
 EXPORT
+uint64_t WalletImpl::accruedBalance(const std::string& address) const
+{
+    return wallet()->get_batched_amount(address);
+}
+
+EXPORT
 std::vector<Wallet::stake_info>* WalletImpl::listCurrentStakes() const
 {
     auto* stakes = new std::vector<Wallet::stake_info>;

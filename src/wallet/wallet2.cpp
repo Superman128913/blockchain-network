@@ -3639,6 +3639,8 @@ void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blo
     LOG_PRINT_L1("Failed to check pending transactions");
   }
 
+  refresh_batching_cache();
+
   m_first_refresh_done = true;
 
   LOG_PRINT_L1("Refresh done, blocks received: " << blocks_fetched << ", balance (all accounts): " << print_money(balance_all(false)) << ", unlocked: " << print_money(unlocked_balance_all(false)));
@@ -12992,6 +12994,26 @@ void wallet2::delete_ons_cache_record(const std::string& hashed_name)
 std::unordered_map<std::string, wallet2::ons_detail> wallet2::get_ons_cache()
 {
   return ons_records_cache;
+}
+
+void wallet2::refresh_batching_cache()
+{
+  rpc::GET_ACCRUED_BATCHED_EARNINGS::request req{};
+  rpc::GET_ACCRUED_BATCHED_EARNINGS::response daemon_resp{};
+  bool r = invoke_http<rpc::GET_ACCRUED_BATCHED_EARNINGS>(req, daemon_resp);
+  if (r && daemon_resp.status == rpc::STATUS_OK)
+  {
+    batching_records_cache.clear();
+    for (size_t i = 0; i < daemon_resp.addresses.size(); ++i)
+      batching_records_cache.insert({std::move(daemon_resp.addresses[i]), std::move(daemon_resp.amounts[i])});
+  }
+}
+
+uint64_t wallet2::get_batched_amount(const std::string& address) const
+{
+  if (auto i = batching_records_cache.find(address); i != batching_records_cache.end())
+    return i->second;
+  return 0;
 }
 
 void wallet2::set_tx_note(const crypto::hash &txid, const std::string &note)
