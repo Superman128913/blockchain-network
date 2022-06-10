@@ -852,7 +852,10 @@ private:
     std::unordered_map<std::string, uint64_t> batching_records_cache;
 
     void refresh_batching_cache();
-    uint64_t get_batched_amount(const std::string& address) const;
+    // Returns the batched amount for the given address, or main address if empty.
+    uint64_t get_batched_amount(std::optional<std::string> address = std::nullopt) const;
+    // Calculates the next batching height for the given address, or main address if nullopt
+    uint64_t get_next_batch_payout(std::optional<std::string> address = std::nullopt) const;
 
     // Returns the current height up to which the wallet has synchronized the blockchain.  Thread
     // safe (though the value may be behind if another thread is in the middle of adding blocks).

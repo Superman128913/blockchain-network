@@ -613,14 +613,7 @@ namespace tools
       std::string current_address_str = m_wallet->get_subaddress_as_str({(req.all_accounts ? 0 : req.account_index), 0});
       res.accrued_balance = m_wallet->get_batched_amount(current_address_str);
       if (res.accrued_balance > 0)
-      {
-        cryptonote::address_parse_info info;
-        auto& conf = cryptonote::get_config(m_wallet->nettype());
-        get_account_address_from_str(info, m_wallet->nettype(), current_address_str);
-        res.accrued_balance_next_payout = info.address.next_payout_height(m_wallet->get_blockchain_current_height(), conf.BATCHING_INTERVAL);
-      } else {
-        res.accrued_balance_next_payout = 0;
-      }
+        res.accrued_balance_next_payout = m_wallet->get_next_batch_payout(current_address_str);
 
       std::map<uint32_t, std::map<uint32_t, uint64_t>> balance_per_subaddress_per_account;
       std::map<uint32_t, std::map<uint32_t, std::pair<uint64_t, std::pair<uint64_t, uint64_t>>>> unlocked_balance_per_subaddress_per_account;

@@ -616,6 +616,14 @@ struct Wallet
      */
     virtual uint64_t accruedBalance(std::optional<std::string> address = std::nullopt) const = 0;
 
+    /**
+     * @brief nextBatchPayout - returns the height at which this wallet is next eligible to receive
+     * an accrued balance payment.
+     * @param address - the address to check; if omitted then look up the current primary wallet
+     * address.
+     */
+    virtual uint64_t nextAccruedPaymentHeight(std::optional<std::string> address = std::nullopt) const = 0;
+
     // Information returned about stakes in listCurrentStakes()
     struct stake_info {
         std::string sn_pubkey;

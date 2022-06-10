@@ -13009,11 +13009,28 @@ void wallet2::refresh_batching_cache()
   }
 }
 
-uint64_t wallet2::get_batched_amount(const std::string& address) const
+uint64_t wallet2::get_batched_amount(std::optional<std::string> address) const
 {
-  if (auto i = batching_records_cache.find(address); i != batching_records_cache.end())
+  if (!address)
+      address = get_address_as_str();
+  if (auto i = batching_records_cache.find(*address); i != batching_records_cache.end())
     return i->second;
   return 0;
+}
+
+uint64_t wallet2::get_next_batch_payout(std::optional<std::string> address) const
+{
+  auto& conf = cryptonote::get_config(nettype());
+  cryptonote::account_public_address addr;
+  if (address) {
+    cryptonote::address_parse_info info;
+    if (!get_account_address_from_str(info, nettype(), *address))
+      return 0;
+    addr = std::move(info.address);
+  } else {
+    addr = get_address();
+  }
+  return addr.next_payout_height(get_blockchain_current_height(), conf.BATCHING_INTERVAL);
 }
 
 void wallet2::set_tx_note(const crypto::hash &txid, const std::string &note)

@@ -5060,18 +5060,19 @@ bool simple_wallet::show_balance_unlocked(bool detailed)
     << tr("unlocked balance: ") << print_money(unlocked_balance) << unlock_time_message << extra;
   std::map<uint32_t, uint64_t> balance_per_subaddress = m_wallet->balance_per_subaddress(m_current_subaddress_account, false);
   std::map<uint32_t, std::pair<uint64_t, std::pair<uint64_t, uint64_t>>> unlocked_balance_per_subaddress = m_wallet->unlocked_balance_per_subaddress(m_current_subaddress_account, false);
-  address_parse_info info;
-  const auto& conf = get_config(m_wallet->nettype());
-  std::string current_address_str = m_wallet->get_subaddress_as_str({m_current_subaddress_account, 0});
-  if(cryptonote::get_account_address_from_str(info, m_wallet->nettype(), current_address_str))
-  {
-    const uint64_t blockchain_height = m_wallet->get_blockchain_current_height();
-    if(uint64_t batched_amount = m_wallet->get_batched_amount(current_address_str); batched_amount > 0)
+
+  if (m_current_subaddress_account == 0) { // Only the primary account can earn rewards, currently
+    if (uint64_t batched_amount = m_wallet->get_batched_amount(); batched_amount > 0)
     {
-      uint64_t next_payout_block = info.address.next_payout_height(blockchain_height, conf.BATCHING_INTERVAL);
-      std::string next_batch_payout = fmt::format(" (next payout: block {}, in about {})", next_payout_block, tools::get_human_readable_timespan(std::chrono::seconds((next_payout_block - blockchain_height) * TARGET_BLOCK_TIME)));
+      uint64_t next_payout_block = m_wallet->get_next_batch_payout();
+      uint64_t blockchain_height = m_wallet->get_blockchain_current_height();
+      std::string next_batch_payout = next_payout_block > 0
+        ? fmt::format(" (next payout: block {}, in about {})",
+            next_payout_block,
+            tools::get_human_readable_timespan((next_payout_block - blockchain_height) * TARGET_BLOCK_TIME))
+        : " (next payout: unknown)";
       success_msg_writer() << tr("Pending SN rewards: ")
-        << print_money(m_wallet->get_batched_amount(current_address_str)) << ", "
+        << print_money(batched_amount) << ", "
         << next_batch_payout;
     }
   }

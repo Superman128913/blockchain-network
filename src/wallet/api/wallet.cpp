@@ -1066,9 +1066,13 @@ uint64_t WalletImpl::unlockedBalance(uint32_t accountIndex) const
 EXPORT
 uint64_t WalletImpl::accruedBalance(std::optional<std::string> address) const
 {
-    if (!address)
-        address = this->address();
-    return wallet()->get_batched_amount(*address);
+    return wallet()->get_batched_amount(std::move(address));
+}
+
+EXPORT
+uint64_t WalletImpl::nextAccruedPaymentHeight(std::optional<std::string> address) const
+{
+    return wallet()->get_next_batch_payout(std::move(address));
 }
 
 EXPORT
