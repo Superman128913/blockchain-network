@@ -611,9 +611,10 @@ struct Wallet
 
     /**
      * @brief accruedBalance - returns the accounts balance that has been batched and yet to be paid.
+     * @param address - the address to look up; if omitted, looks up the current primary wallet address.
      * @return
      */
-    virtual uint64_t accruedBalance(const std::string& address) const = 0;
+    virtual uint64_t accruedBalance(std::optional<std::string> address = std::nullopt) const = 0;
 
     // Information returned about stakes in listCurrentStakes()
     struct stake_info {
