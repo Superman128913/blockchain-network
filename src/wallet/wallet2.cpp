@@ -12998,14 +12998,13 @@ std::unordered_map<std::string, wallet2::ons_detail> wallet2::get_ons_cache()
 
 void wallet2::refresh_batching_cache()
 {
-  rpc::GET_ACCRUED_BATCHED_EARNINGS::request req{};
   rpc::GET_ACCRUED_BATCHED_EARNINGS::response daemon_resp{};
-  bool r = invoke_http<rpc::GET_ACCRUED_BATCHED_EARNINGS>(req, daemon_resp);
-  if (r && daemon_resp.status == rpc::STATUS_OK)
+  if (invoke_http<rpc::GET_ACCRUED_BATCHED_EARNINGS>({}, daemon_resp)
+      && daemon_resp.status == rpc::STATUS_OK && daemon_resp.addresses.size() == daemon_resp.amounts.size())
   {
     batching_records_cache.clear();
     for (size_t i = 0; i < daemon_resp.addresses.size(); ++i)
-      batching_records_cache.insert({std::move(daemon_resp.addresses[i]), std::move(daemon_resp.amounts[i])});
+      batching_records_cache.emplace(std::move(daemon_resp.addresses[i]), std::move(daemon_resp.amounts[i]));
   }
 }
 
