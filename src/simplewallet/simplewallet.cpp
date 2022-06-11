@@ -5061,16 +5061,30 @@ bool simple_wallet::show_balance_unlocked(bool detailed)
   std::map<uint32_t, uint64_t> balance_per_subaddress = m_wallet->balance_per_subaddress(m_current_subaddress_account, false);
   std::map<uint32_t, std::pair<uint64_t, std::pair<uint64_t, uint64_t>>> unlocked_balance_per_subaddress = m_wallet->unlocked_balance_per_subaddress(m_current_subaddress_account, false);
 
-  if (m_current_subaddress_account == 0) { // Only the primary account can earn rewards, currently
+  if (m_current_subaddress_account == 0) { // Only the primary account can stake and earn rewards, currently
+    if (auto stakes = m_wallet->get_staked_service_nodes(); !stakes.empty()) {
+      auto my_addr = m_wallet->get_address_as_str();
+      uint64_t total_staked = 0, stakes_unlocking = 0;
+      for (auto& stake : stakes)
+        for (auto& contr : stake.contributors)
+          if (contr.address == my_addr)
+          {
+            total_staked += contr.amount;
+            if (stake.requested_unlock_height > 0)
+              stakes_unlocking += contr.amount;
+          }
+      success_msg_writer() << fmt::format(tr("Total staked: {}, {} unlocking"), print_money(total_staked), print_money(stakes_unlocking));
+    }
+
     if (uint64_t batched_amount = m_wallet->get_batched_amount(); batched_amount > 0)
     {
       uint64_t next_payout_block = m_wallet->get_next_batch_payout();
       uint64_t blockchain_height = m_wallet->get_blockchain_current_height();
       std::string next_batch_payout = next_payout_block > 0
-        ? fmt::format(" (next payout: block {}, in about {})",
+        ? fmt::format(tr(" (next payout: block {}, in about {})"),
             next_payout_block,
             tools::get_human_readable_timespan((next_payout_block - blockchain_height) * TARGET_BLOCK_TIME))
-        : " (next payout: unknown)";
+        : tr(" (next payout: unknown)");
       success_msg_writer() << tr("Pending SN rewards: ")
         << print_money(batched_amount) << ", "
         << next_batch_payout;
@@ -6275,9 +6289,8 @@ bool simple_wallet::query_locked_stakes(bool print_result)
   std::string msg_buf;
   {
     using namespace cryptonote;
-    auto response = m_wallet->list_current_stakes();
 
-    for (rpc::GET_SERVICE_NODES::response::entry const &node_info : response)
+    for (const auto &node_info : m_wallet->get_staked_service_nodes())
     {
       bool only_once = true;
       for (const auto& contributor : node_info.contributors)

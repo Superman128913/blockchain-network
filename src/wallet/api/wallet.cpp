@@ -1080,7 +1080,7 @@ std::vector<Wallet::stake_info>* WalletImpl::listCurrentStakes() const
 {
     auto* stakes = new std::vector<Wallet::stake_info>;
 
-    auto response = wallet()->list_current_stakes();
+    auto response = wallet()->get_staked_service_nodes();
     auto main_addr = mainAddress();
 
     for (const auto& node_info : response)
