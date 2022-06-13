@@ -53,6 +53,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
 #include <boost/format.hpp>
+#include <fmt/core.h>
 #include <oxenc/hex.h>
 #include "epee/console_handler.h"
 #include "common/i18n.h"
@@ -5059,18 +5060,49 @@ bool simple_wallet::show_balance_unlocked(bool detailed)
     << tr("unlocked balance: ") << print_money(unlocked_balance) << unlock_time_message << extra;
   std::map<uint32_t, uint64_t> balance_per_subaddress = m_wallet->balance_per_subaddress(m_current_subaddress_account, false);
   std::map<uint32_t, std::pair<uint64_t, std::pair<uint64_t, uint64_t>>> unlocked_balance_per_subaddress = m_wallet->unlocked_balance_per_subaddress(m_current_subaddress_account, false);
+
+  if (m_current_subaddress_account == 0) { // Only the primary account can stake and earn rewards, currently
+    if (auto stakes = m_wallet->get_staked_service_nodes(); !stakes.empty()) {
+      auto my_addr = m_wallet->get_address_as_str();
+      uint64_t total_staked = 0, stakes_unlocking = 0;
+      for (auto& stake : stakes)
+        for (auto& contr : stake.contributors)
+          if (contr.address == my_addr)
+          {
+            total_staked += contr.amount;
+            if (stake.requested_unlock_height > 0)
+              stakes_unlocking += contr.amount;
+          }
+      success_msg_writer() << fmt::format(tr("Total staked: {}, {} unlocking"), print_money(total_staked), print_money(stakes_unlocking));
+    }
+
+    if (uint64_t batched_amount = m_wallet->get_batched_amount(); batched_amount > 0)
+    {
+      uint64_t next_payout_block = m_wallet->get_next_batch_payout();
+      uint64_t blockchain_height = m_wallet->get_blockchain_current_height();
+      std::string next_batch_payout = next_payout_block > 0
+        ? fmt::format(tr(" (next payout: block {}, in about {})"),
+            next_payout_block,
+            tools::get_human_readable_timespan((next_payout_block - blockchain_height) * TARGET_BLOCK_TIME))
+        : tr(" (next payout: unknown)");
+      success_msg_writer() << tr("Pending SN rewards: ")
+        << print_money(batched_amount) << ", "
+        << next_batch_payout;
+    }
+  }
   if (!detailed || balance_per_subaddress.empty())
     return true;
   success_msg_writer() << tr("Balance per address:");
-  success_msg_writer() << boost::format("%15s %21s %21s %7s %21s") % tr("Address") % tr("Balance") % tr("Unlocked balance") % tr("Outputs") % tr("Label");
+  success_msg_writer() << boost::format("%15s %21s %21s %21s %7s %21s") % tr("Address") % tr("Balance") % tr("Unlocked balance") % tr("Batched Amount") % tr("Outputs") % tr("Label");
   std::vector<wallet::transfer_details> transfers;
   m_wallet->get_transfers(transfers);
   for (const auto& i : balance_per_subaddress)
   {
     cryptonote::subaddress_index subaddr_index = {m_current_subaddress_account, i.first};
     std::string address_str = m_wallet->get_subaddress_as_str(subaddr_index).substr(0, 6);
+    uint64_t batched_amount = m_wallet->get_batched_amount(address_str);
     uint64_t num_unspent_outputs = std::count_if(transfers.begin(), transfers.end(), [&subaddr_index](const wallet::transfer_details& td) { return !td.m_spent && td.m_subaddr_index == subaddr_index; });
-    success_msg_writer() << boost::format(tr("%8u %6s %21s %21s %7u %21s")) % i.first % address_str % print_money(i.second) % print_money(unlocked_balance_per_subaddress[i.first].first) % num_unspent_outputs % m_wallet->get_subaddress_label(subaddr_index);
+    success_msg_writer() << boost::format(tr("%8u %6s %21s %21s %21s %7u %21s")) % i.first % address_str % print_money(i.second) % print_money(unlocked_balance_per_subaddress[i.first].first) % print_money(batched_amount) % num_unspent_outputs % m_wallet->get_subaddress_label(subaddr_index);
   }
   return true;
 }
@@ -6257,9 +6289,8 @@ bool simple_wallet::query_locked_stakes(bool print_result)
   std::string msg_buf;
   {
     using namespace cryptonote;
-    auto response = m_wallet->list_current_stakes();
 
-    for (rpc::GET_SERVICE_NODES::response::entry const &node_info : response)
+    for (const auto &node_info : m_wallet->get_staked_service_nodes())
     {
       bool only_once = true;
       for (const auto& contributor : node_info.contributors)
@@ -9107,18 +9138,20 @@ void simple_wallet::print_accounts(const std::string& tag)
     success_msg_writer() << tr("Accounts with tag: ") << tag;
     success_msg_writer() << tr("Tag's description: ") << account_tags.first.find(tag)->second;
   }
-  success_msg_writer() << boost::format("  %15s %21s %21s %21s") % tr("Account") % tr("Balance") % tr("Unlocked balance") % tr("Label");
+  success_msg_writer() << boost::format("  %15s %21s %21s %21s %21s") % tr("Address") % tr("Balance") % tr("Unlocked balance") % tr("Batched Amount") % tr("Label");
   uint64_t total_balance = 0, total_unlocked_balance = 0;
   for (uint32_t account_index = 0; account_index < m_wallet->get_num_subaddress_accounts(); ++account_index)
   {
+    std::string address_str = m_wallet->get_subaddress_as_str({account_index, 0}).substr(0, 6);
     if (account_tags.second[account_index] != tag)
       continue;
-    success_msg_writer() << boost::format(tr(" %c%8u %6s %21s %21s %21s"))
+    success_msg_writer() << boost::format(tr(" %c%8u %6s %21s %21s %21s %21s"))
       % (m_current_subaddress_account == account_index ? '*' : ' ')
       % account_index
-      % m_wallet->get_subaddress_as_str({account_index, 0}).substr(0, 6)
+      % address_str
       % print_money(m_wallet->balance(account_index, false))
       % print_money(m_wallet->unlocked_balance(account_index, false))
+      % print_money(m_wallet->get_batched_amount(address_str))
       % m_wallet->get_subaddress_label({account_index, 0});
     total_balance += m_wallet->balance(account_index, false);
     total_unlocked_balance += m_wallet->unlocked_balance(account_index, false);

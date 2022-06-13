@@ -121,6 +121,8 @@ namespace tools::wallet_rpc {
     {
       uint64_t   balance;                              // The total balance (atomic units) of the currently opened wallet.
       uint64_t   unlocked_balance;                     // Unlocked funds are those funds that are sufficiently deep enough in the oxen blockchain to be considered safe to spend.
+      uint64_t   accrued_balance;                      // The unpaid accrued service node rewards currently in the batching database for this currently opened wallet
+      uint64_t   accrued_balance_next_payout;          // Height that the accrued service node rewards will be paid out
       bool       multisig_import_needed;               // True if importing multisig data is needed for returning a correct balance.
       std::vector<per_subaddress_info> per_subaddress; // Balance information for each subaddress in an account.
       uint64_t blocks_to_unlock;                       // The number of blocks remaining for the balance to unlock

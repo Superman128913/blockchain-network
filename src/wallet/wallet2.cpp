@@ -3639,6 +3639,8 @@ void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blo
     LOG_PRINT_L1("Failed to check pending transactions");
   }
 
+  refresh_batching_cache();
+
   m_first_refresh_done = true;
 
   LOG_PRINT_L1("Refresh done, blocks received: " << blocks_fetched << ", balance (all accounts): " << print_money(balance_all(false)) << ", unlocked: " << print_money(unlocked_balance_all(false)));
@@ -12946,37 +12948,10 @@ uint64_t wallet2::get_approximate_blockchain_height() const
   return approx_blockchain_height;
 }
 
-std::vector<rpc::GET_SERVICE_NODES::response::entry> wallet2::list_current_stakes()
+std::vector<rpc::GET_SERVICE_NODES::response::entry> wallet2::get_staked_service_nodes()
 {
-
-  std::vector<rpc::GET_SERVICE_NODES::response::entry> service_node_states;
-
-  auto [success, all_nodes] = this->get_all_service_nodes();
-  if (!success)
-  {
-    return service_node_states;
-  }
-
-  const auto primary_address = this->get_address();
-  for (auto& node_info : all_nodes)
-  {
-    for (const auto& contributor : node_info.contributors)
-    {
-      address_parse_info address_info = {};
-      if (!cryptonote::get_account_address_from_str(address_info, this->nettype(), contributor.address))
-      {
-        continue;
-      }
-
-      if (primary_address != address_info.address)
-        continue;
-
-      service_node_states.push_back(std::move(node_info));
-      break;
-    }
-  }
-
-  return service_node_states;
+  auto [success, contributed_nodes] = m_node_rpc_proxy.get_contributed_service_nodes(get_address_as_str());
+  return std::move(contributed_nodes);
 }
 
 void wallet2::set_ons_cache_record(wallet2::ons_detail detail)
@@ -12992,6 +12967,42 @@ void wallet2::delete_ons_cache_record(const std::string& hashed_name)
 std::unordered_map<std::string, wallet2::ons_detail> wallet2::get_ons_cache()
 {
   return ons_records_cache;
+}
+
+void wallet2::refresh_batching_cache()
+{
+  rpc::GET_ACCRUED_BATCHED_EARNINGS::response daemon_resp{};
+  if (invoke_http<rpc::GET_ACCRUED_BATCHED_EARNINGS>({}, daemon_resp)
+      && daemon_resp.status == rpc::STATUS_OK && daemon_resp.addresses.size() == daemon_resp.amounts.size())
+  {
+    batching_records_cache.clear();
+    for (size_t i = 0; i < daemon_resp.addresses.size(); ++i)
+      batching_records_cache.emplace(std::move(daemon_resp.addresses[i]), std::move(daemon_resp.amounts[i]));
+  }
+}
+
+uint64_t wallet2::get_batched_amount(std::optional<std::string> address) const
+{
+  if (!address)
+      address = get_address_as_str();
+  if (auto i = batching_records_cache.find(*address); i != batching_records_cache.end())
+    return i->second;
+  return 0;
+}
+
+uint64_t wallet2::get_next_batch_payout(std::optional<std::string> address) const
+{
+  auto& conf = cryptonote::get_config(nettype());
+  cryptonote::account_public_address addr;
+  if (address) {
+    cryptonote::address_parse_info info;
+    if (!get_account_address_from_str(info, nettype(), *address))
+      return 0;
+    addr = std::move(info.address);
+  } else {
+    addr = get_address();
+  }
+  return addr.next_payout_height(get_blockchain_current_height(), conf.BATCHING_INTERVAL);
 }
 
 void wallet2::set_tx_note(const crypto::hash &txid, const std::string &note)

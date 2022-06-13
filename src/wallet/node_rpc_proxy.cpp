@@ -238,8 +238,19 @@ bool NodeRPCProxy::update_all_service_nodes_cache(uint64_t height) const {
   if (m_offline)
     return false;
 
+  rpc::GET_SERVICE_NODES::request req{};
+  req.fields = rpc::GET_SERVICE_NODES::requested_fields_t{};
+  auto& f = *req.fields;
+  f.active = true;
+  f.contributors = true;
+  f.funded = true;
+  f.registration_height = true;
+  f.requested_unlock_height = true;
+  f.service_node_pubkey = true;
+  f.staking_requirement = true;
+  f.total_reserved = true;
   try {
-    auto res = invoke_json_rpc<rpc::GET_SERVICE_NODES>({});
+    auto res = invoke_json_rpc<rpc::GET_SERVICE_NODES>(req);
     m_all_service_nodes_cached_height = height;
     m_all_service_nodes = std::move(res.service_node_states);
   } catch (...) { return false; }
