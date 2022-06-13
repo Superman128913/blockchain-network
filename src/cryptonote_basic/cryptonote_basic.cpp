@@ -152,7 +152,7 @@ uint64_t account_public_address::next_payout_height(uint64_t current_height, uin
 {
   auto pay_offset = modulus(interval);
   auto curr_offset = current_height % interval;
-  if (pay_offset <= curr_offset)
+  if (pay_offset < curr_offset)
     pay_offset += interval;
   return current_height + pay_offset - curr_offset;
 }
