@@ -609,6 +609,21 @@ struct Wallet
         return result;
     }
 
+    /**
+     * @brief accruedBalance - returns the accounts balance that has been batched and yet to be paid.
+     * @param address - the address to look up; if omitted, looks up the current primary wallet address.
+     * @return
+     */
+    virtual uint64_t accruedBalance(std::optional<std::string> address = std::nullopt) const = 0;
+
+    /**
+     * @brief nextBatchPayout - returns the height at which this wallet is next eligible to receive
+     * an accrued balance payment.
+     * @param address - the address to check; if omitted then look up the current primary wallet
+     * address.
+     */
+    virtual uint64_t nextAccruedPaymentHeight(std::optional<std::string> address = std::nullopt) const = 0;
+
     // Information returned about stakes in listCurrentStakes()
     struct stake_info {
         std::string sn_pubkey;

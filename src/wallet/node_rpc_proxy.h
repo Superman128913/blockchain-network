@@ -56,6 +56,8 @@ public:
   bool get_fee_quantization_mask(uint64_t &fee_quantization_mask) const;
   std::optional<cryptonote::hf> get_hardfork_version() const;
 
+  // Note that this service node responses only fills out fields that are used in wallet code, not
+  // the full service node records.  (see node_rpc_proxy.cpp for the precise list).
   std::pair<bool, std::vector<cryptonote::rpc::GET_SERVICE_NODES::response::entry>>             get_service_nodes(std::vector<std::string> pubkeys) const;
   std::pair<bool, std::vector<cryptonote::rpc::GET_SERVICE_NODES::response::entry>>             get_all_service_nodes() const;
   std::pair<bool, std::vector<cryptonote::rpc::GET_SERVICE_NODES::response::entry>>             get_contributed_service_nodes(const std::string& contributor) const;
