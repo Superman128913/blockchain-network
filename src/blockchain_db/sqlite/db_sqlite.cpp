@@ -240,8 +240,11 @@ namespace cryptonote {
 
     for (auto [addr, amt] : prepared_results<std::string, int64_t>(
           "SELECT address, amount FROM batched_payments_accrued")) {
-      addresses.push_back(std::move(addr));
-      amounts.push_back(static_cast<uint64_t>(amt / 1000));
+      auto amount = static_cast<uint64_t>(amt / 1000);
+      if (amount > 0) {
+        addresses.push_back(std::move(addr));
+        amounts.push_back(amount);
+      }
     }
 
     return result;
