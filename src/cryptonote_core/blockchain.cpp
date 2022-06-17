@@ -34,6 +34,7 @@
 #include <cstdio>
 #include <oxenc/endian.h>
 #include <sodium.h>
+#include <fmt/core.h>
 
 #include "common/rules.h"
 #include "common/hex.h"
@@ -330,12 +331,12 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
   if (total_blocks > 1)
     MGINFO("Loading blocks into oxen subsystems, scanning blockchain from height: " << start_height << " to: " << end_height << " (snl: " << snl_height << ", ons: " << ons_height << ", sqlite: " << sqlite_height << ")");
 
-  using clock                   = std::chrono::steady_clock;
-  using work_time               = std::chrono::duration<float>;
-  int64_t constexpr BLOCK_COUNT = 1000;
-  auto work_start               = clock::now();
-  auto scan_start               = work_start;
-  work_time ons_duration{}, snl_duration{}, sqlite_duration{}, ons_iteration_duration{}, snl_iteration_duration{}, sqlite_iteration_duration{};
+  using clock = std::chrono::steady_clock;
+  using dseconds = std::chrono::duration<double>;
+  int64_t constexpr BLOCK_COUNT = 500;
+  auto work_start = clock::now();
+  auto scan_start = work_start;
+  dseconds ons_duration{}, snl_duration{}, sqlite_duration{}, ons_iteration_duration{}, snl_iteration_duration{}, sqlite_iteration_duration{};
 
   std::vector<cryptonote::block> blocks;
   std::vector<cryptonote::transaction> txs;
@@ -346,11 +347,16 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
        block_count > 0;
        block_count -= BLOCK_COUNT, index++)
   {
-    if (index > 0 && (index % 10 == 0))
+    auto duration = dseconds{clock::now() - work_start};
+    if (duration >= 10s)
     {
       m_service_node_list.store();
-      auto duration = work_time{clock::now() - work_start};
-      MGINFO("... scanning height " << start_height + (index * BLOCK_COUNT) << " (" << duration.count() << "s) (snl: " << snl_iteration_duration.count() << "s; ons: " << ons_iteration_duration.count() << "s; sqlite: " << sqlite_iteration_duration.count() << "s)");
+      MGINFO(fmt::format("... scanning height {} ({:.3f}s) (snl: {:.3f}s, ons: {:.3f}s, batch: {:.3f}s)",
+            start_height + (index * BLOCK_COUNT),
+            duration.count(),
+            snl_iteration_duration.count(),
+            ons_iteration_duration.count(),
+            sqlite_iteration_duration.count()));
 #ifdef ENABLE_SYSTEMD
       // Tell systemd that we're doing something so that it should let us continue starting up
       // (giving us 120s until we have to send the next notification):
@@ -361,7 +367,9 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
       ons_duration += ons_iteration_duration;
       snl_duration += snl_iteration_duration;
       sqlite_duration += sqlite_iteration_duration;
-      ons_iteration_duration = snl_iteration_duration = {};
+      ons_iteration_duration = 0s;
+      snl_iteration_duration = 0s;
+      sqlite_iteration_duration = 0s;
     }
 
     blocks.clear();
@@ -427,8 +435,8 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
 
   if (total_blocks > 1)
   {
-    auto duration = work_time{clock::now() - scan_start};
-    MGINFO("Done recalculating oxen subsystems (" << duration.count() << "s) (snl: " << snl_duration.count() << "s; ons: " << ons_duration.count() << "s)" << "s; sqlite: " << sqlite_duration.count() << "s)");
+    MGINFO(fmt::format("Done recalculating oxen subsystems in {:.2f}s ({:.2f}s snl; {:.2f}s ons; {:.2f}s batch)",
+          dseconds{clock::now() - scan_start}.count(), snl_duration.count(), ons_duration.count(), sqlite_duration.count()));
   }
 
   if (total_blocks > 0)
