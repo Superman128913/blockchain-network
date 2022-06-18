@@ -39,8 +39,15 @@
 #include <sys/param.h>
 #endif
 
-#if defined(__ANDROID__)
-#include <byteswap.h>
+#if defined(__clang__) || defined(__GNUC__)
+#  define epee_int_utils_bswap_64(x) __builtin_bswap64(x)
+#  define epee_int_utils_bswap_32(x) __builtin_bswap32(x)
+#else
+#  if defined(__linux__) || defined(__ANDROID__)
+#    include <byteswap.h>
+#  endif
+#  define epee_int_utils_bswap_64(x) bswap_64(x)
+#  define epee_int_utils_bswap_32(x) bswap_32(x)
 #endif
 
 #if defined(__sun) && defined(__SVR4)
@@ -71,6 +78,7 @@ static inline uint64_t rol64(uint64_t x, int r) {
 
 #endif
 
+#ifndef __SIZEOF_INT128__
 static inline uint64_t hi_dword(uint64_t val) {
   return val >> 32;
 }
@@ -79,7 +87,27 @@ static inline uint64_t lo_dword(uint64_t val) {
   return val & 0xFFFFFFFF;
 }
 
+static inline uint64_t div_with_remainder(uint64_t dividend, uint32_t divisor, uint32_t* remainder) {
+  dividend |= ((uint64_t)*remainder) << 32;
+  *remainder = dividend % divisor;
+  return dividend / divisor;
+}
+
+static inline bool shl128(uint64_t* hi, uint64_t* lo) {
+  bool carry = ((*hi) >> 63);
+  *hi <<= 1;
+  *hi += ((*lo) >> 63);
+  *lo <<= 1;
+  return carry;
+}
+#endif
+
 static inline uint64_t mul128(uint64_t multiplier, uint64_t multiplicand, uint64_t* product_hi) {
+#ifdef __SIZEOF_INT128__
+  unsigned __int128 result = (unsigned __int128) multiplier * (unsigned __int128) multiplicand;
+  *product_hi = result >> 64;
+  return (uint64_t) result;
+#else
   // multiplier   = ab = a * 2^32 + b
   // multiplicand = cd = c * 2^32 + d
   // ab * cd = a * c * 2^64 + (a * d + b * c) * 2^32 + b * d
@@ -103,16 +131,16 @@ static inline uint64_t mul128(uint64_t multiplier, uint64_t multiplicand, uint64
   assert(ac <= *product_hi);
 
   return product_lo;
-}
-
-static inline uint64_t div_with_reminder(uint64_t dividend, uint32_t divisor, uint32_t* remainder) {
-  dividend |= ((uint64_t)*remainder) << 32;
-  *remainder = dividend % divisor;
-  return dividend / divisor;
+#endif
 }
 
 // Long division with 2^32 base
-static inline uint32_t div128_32(uint64_t dividend_hi, uint64_t dividend_lo, uint32_t divisor, uint64_t* quotient_hi, uint64_t* quotient_lo) {
+static inline void div128_32(uint64_t dividend_hi, uint64_t dividend_lo, uint32_t divisor, uint64_t* quotient_hi, uint64_t* quotient_lo) {
+#ifdef __SIZEOF_INT128__
+  unsigned __int128 result = (((unsigned __int128) dividend_hi) << 64 | ((unsigned __int128) dividend_lo)) / divisor;
+  *quotient_lo = (uint64_t) result;
+  *quotient_hi = (uint64_t)(result >> 64);
+#else
   uint64_t dividend_dwords[4];
   uint32_t remainder = 0;
 
@@ -121,24 +149,21 @@ static inline uint32_t div128_32(uint64_t dividend_hi, uint64_t dividend_lo, uin
   dividend_dwords[1] = hi_dword(dividend_lo);
   dividend_dwords[0] = lo_dword(dividend_lo);
 
-  *quotient_hi  = div_with_reminder(dividend_dwords[3], divisor, &remainder) << 32;
-  *quotient_hi |= div_with_reminder(dividend_dwords[2], divisor, &remainder);
-  *quotient_lo  = div_with_reminder(dividend_dwords[1], divisor, &remainder) << 32;
-  *quotient_lo |= div_with_reminder(dividend_dwords[0], divisor, &remainder);
-
-  return remainder;
+  *quotient_hi  = div_with_remainder(dividend_dwords[3], divisor, &remainder) << 32;
+  *quotient_hi |= div_with_remainder(dividend_dwords[2], divisor, &remainder);
+  *quotient_lo  = div_with_remainder(dividend_dwords[1], divisor, &remainder) << 32;
+  *quotient_lo |= div_with_remainder(dividend_dwords[0], divisor, &remainder);
+#endif
 }
 
-static inline bool shl128(uint64_t* hi, uint64_t* lo) {
-  bool carry = ((*hi) >> 63);
-  *hi <<= 1;
-  *hi += ((*lo) >> 63);
-  *lo <<= 1;
-  return carry;
-}
 
 // Long division with 2^64 base
-static inline uint64_t div128_64(uint64_t dividend_hi, uint64_t dividend_lo, uint64_t divisor, uint64_t* quotient_hi, uint64_t* quotient_lo) {
+static inline void div128_64(uint64_t dividend_hi, uint64_t dividend_lo, uint64_t divisor, uint64_t* quotient_hi, uint64_t* quotient_lo) {
+#ifdef __SIZEOF_INT128__
+  unsigned __int128 result = (((unsigned __int128) dividend_hi) << 64 | ((unsigned __int128) dividend_lo)) / divisor;
+  *quotient_lo = (uint64_t) result;
+  *quotient_hi = (uint64_t)(result >> 64);
+#else
   uint64_t remainder = 0;
   for (size_t i = 0; i < 128; i++) {
     bool carry = remainder >> 63;
@@ -152,125 +177,23 @@ static inline uint64_t div128_64(uint64_t dividend_hi, uint64_t dividend_lo, uin
   }
   *quotient_hi = dividend_hi;
   *quotient_lo = dividend_lo;
-  return remainder;
+#endif
 }
 
 // Calculates a*b/c, using 128-bit precision to avoid overflow.  This assumes that the result is
 // 64-bits, but only checks it (via assertion) in debug builds.  As such you should only call this
 // when this is true: for instance, when c is known to be greater than either a or b.
 static inline uint64_t mul128_div64(uint64_t a, uint64_t b, uint64_t c) {
+#ifdef __SIZEOF_INT128__
+  return (uint64_t) ((unsigned __int128) a) * ((unsigned __int128) b) / ((unsigned __int128) c);
+#else
   uint64_t hi;
   uint64_t lo = mul128(a, b, &hi);
   uint64_t resulthi, resultlo;
   div128_64(hi, lo, c, &resulthi, &resultlo);
   assert(resulthi == 0);
   return resultlo;
-}
-
-#define IDENT16(x) ((uint16_t) (x))
-#define IDENT32(x) ((uint32_t) (x))
-#define IDENT64(x) ((uint64_t) (x))
-
-#define SWAP16(x) ((((uint16_t) (x) & 0x00ff) << 8) | \
-  (((uint16_t) (x) & 0xff00) >> 8))
-#define SWAP32(x) ((((uint32_t) (x) & 0x000000ff) << 24) | \
-  (((uint32_t) (x) & 0x0000ff00) <<  8) | \
-  (((uint32_t) (x) & 0x00ff0000) >>  8) | \
-  (((uint32_t) (x) & 0xff000000) >> 24))
-#define SWAP64(x) ((((uint64_t) (x) & 0x00000000000000ff) << 56) | \
-  (((uint64_t) (x) & 0x000000000000ff00) << 40) | \
-  (((uint64_t) (x) & 0x0000000000ff0000) << 24) | \
-  (((uint64_t) (x) & 0x00000000ff000000) <<  8) | \
-  (((uint64_t) (x) & 0x000000ff00000000) >>  8) | \
-  (((uint64_t) (x) & 0x0000ff0000000000) >> 24) | \
-  (((uint64_t) (x) & 0x00ff000000000000) >> 40) | \
-  (((uint64_t) (x) & 0xff00000000000000) >> 56))
-
-static inline uint16_t ident16(uint16_t x) { return x; }
-static inline uint32_t ident32(uint32_t x) { return x; }
-static inline uint64_t ident64(uint64_t x) { return x; }
-
-#ifndef __OpenBSD__
-#  if defined(__ANDROID__) && defined(__swap16) && !defined(swap16)
-#      define swap16 __swap16
-#  elif !defined(swap16)
-static inline uint16_t swap16(uint16_t x) {
-  return ((x & 0x00ff) << 8) | ((x & 0xff00) >> 8);
-}
-#  endif
-#  if defined(__ANDROID__) && defined(__swap32) && !defined(swap32)
-#      define swap32 __swap32
-#  elif !defined(swap32)
-static inline uint32_t swap32(uint32_t x) {
-  x = ((x & 0x00ff00ff) << 8) | ((x & 0xff00ff00) >> 8);
-  return (x << 16) | (x >> 16);
-}
-#  endif
-#  if defined(__ANDROID__) && defined(__swap64) && !defined(swap64)
-#      define swap64 __swap64
-#  elif !defined(swap64)
-static inline uint64_t swap64(uint64_t x) {
-  x = ((x & 0x00ff00ff00ff00ff) <<  8) | ((x & 0xff00ff00ff00ff00) >>  8);
-  x = ((x & 0x0000ffff0000ffff) << 16) | ((x & 0xffff0000ffff0000) >> 16);
-  return (x << 32) | (x >> 32);
-}
-#  endif
-#endif /* __OpenBSD__ */
-
-#if defined(__GNUC__)
-#define UNUSED __attribute__((unused))
-#else
-#define UNUSED
 #endif
-static inline void mem_inplace_ident(void *mem UNUSED, size_t n UNUSED) { }
-#undef UNUSED
-
-static inline void mem_inplace_swap16(void *mem, size_t n) {
-  size_t i;
-  for (i = 0; i < n; i++) {
-    ((uint16_t *) mem)[i] = swap16(((const uint16_t *) mem)[i]);
-  }
-}
-static inline void mem_inplace_swap32(void *mem, size_t n) {
-  size_t i;
-  for (i = 0; i < n; i++) {
-    ((uint32_t *) mem)[i] = swap32(((const uint32_t *) mem)[i]);
-  }
-}
-static inline void mem_inplace_swap64(void *mem, size_t n) {
-  size_t i;
-  for (i = 0; i < n; i++) {
-    ((uint64_t *) mem)[i] = swap64(((const uint64_t *) mem)[i]);
-  }
-}
-
-static inline void memcpy_ident16(void *dst, const void *src, size_t n) {
-  memcpy(dst, src, 2 * n);
-}
-static inline void memcpy_ident32(void *dst, const void *src, size_t n) {
-  memcpy(dst, src, 4 * n);
-}
-static inline void memcpy_ident64(void *dst, const void *src, size_t n) {
-  memcpy(dst, src, 8 * n);
-}
-
-static inline void memcpy_swap16(void *dst, const void *src, size_t n) {
-  size_t i;
-  for (i = 0; i < n; i++) {
-    ((uint16_t *) dst)[i] = swap16(((const uint16_t *) src)[i]);
-  }
-}
-static inline void memcpy_swap32(void *dst, const void *src, size_t n) {
-  size_t i;
-  for (i = 0; i < n; i++) {
-    ((uint32_t *) dst)[i] = swap32(((const uint32_t *) src)[i]);
-  }
-}
-static inline void memcpy_swap64(void *dst, const void *src, size_t n) {
-  size_t i;
-  for (i = 0; i < n; i++) {
-    ((uint64_t *) dst)[i] = swap64(((const uint64_t *) src)[i]);
-  }
 }
 
 #ifdef _MSC_VER
@@ -284,55 +207,28 @@ static_assert(false, "BYTE_ORDER is undefined. Perhaps, GNU extensions are not e
 #endif
 
 #if BYTE_ORDER == LITTLE_ENDIAN
-#define SWAP16LE IDENT16
-#define SWAP16BE SWAP16
-#define swap16le ident16
-#define swap16be swap16
-#define mem_inplace_swap16le mem_inplace_ident
-#define mem_inplace_swap16be mem_inplace_swap16
-#define memcpy_swap16le memcpy_ident16
-#define memcpy_swap16be memcpy_swap16
-#define SWAP32LE IDENT32
-#define SWAP32BE SWAP32
-#define swap32le ident32
-#define swap32be swap32
-#define mem_inplace_swap32le mem_inplace_ident
-#define mem_inplace_swap32be mem_inplace_swap32
-#define memcpy_swap32le memcpy_ident32
-#define memcpy_swap32be memcpy_swap32
-#define SWAP64LE IDENT64
-#define SWAP64BE SWAP64
-#define swap64le ident64
-#define swap64be swap64
-#define mem_inplace_swap64le mem_inplace_ident
-#define mem_inplace_swap64be mem_inplace_swap64
-#define memcpy_swap64le memcpy_ident64
-#define memcpy_swap64be memcpy_swap64
-#endif
 
-#if BYTE_ORDER == BIG_ENDIAN
-#define SWAP16BE IDENT16
-#define SWAP16LE SWAP16
-#define swap16be ident16
-#define swap16le swap16
-#define mem_inplace_swap16be mem_inplace_ident
-#define mem_inplace_swap16le mem_inplace_swap16
-#define memcpy_swap16be memcpy_ident16
-#define memcpy_swap16le memcpy_swap16
-#define SWAP32BE IDENT32
-#define SWAP32LE SWAP32
-#define swap32be ident32
-#define swap32le swap32
-#define mem_inplace_swap32be mem_inplace_ident
-#define mem_inplace_swap32le mem_inplace_swap32
-#define memcpy_swap32be memcpy_ident32
-#define memcpy_swap32le memcpy_swap32
-#define SWAP64BE IDENT64
-#define SWAP64LE SWAP64
-#define swap64be ident64
-#define swap64le swap64
-#define mem_inplace_swap64be mem_inplace_ident
-#define mem_inplace_swap64le mem_inplace_swap64
-#define memcpy_swap64be memcpy_ident64
-#define memcpy_swap64le memcpy_swap64
+#define SWAP64LE(x) ((uint64_t) (x))
+#define SWAP64BE epee_int_utils_bswap_64
+#define SWAP32LE(x) ((uint32_t) (x))
+#define SWAP32BE(x) epee_int_utils_bswap_32
+
+static inline void memcpy_swap64le(void *dst, const void *src, size_t n) {
+  memcpy(dst, src, 8 * n);
+}
+
+#else
+
+#define SWAP64BE(x) ((uint64_t) (x))
+#define SWAP64LE epee_int_utils_bswap_64
+#define SWAP32BE(x) ((uint32_t) (x))
+#define SWAP32LE(x) epee_int_utils_bswap_32
+
+static inline void memcpy_swap64le(void *dst, const void *src, size_t n) {
+  size_t i;
+  for (i = 0; i < n; i++) {
+    ((uint64_t *) dst)[i] = swap64(((const uint64_t *) src)[i]);
+  }
+}
+
 #endif

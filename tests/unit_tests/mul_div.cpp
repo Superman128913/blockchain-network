@@ -118,12 +118,10 @@ namespace
 
   TEST(div128_32, handles_zero)
   {
-    uint32_t reminder;
     uint64_t hi;
     uint64_t lo;
 
-    reminder = div128_32(0, 0, 7, &hi, &lo);
-    ASSERT_EQ(reminder, 0);
+    div128_32(0, 0, 7, &hi, &lo);
     ASSERT_EQ(hi, 0);
     ASSERT_EQ(lo, 0);
 
@@ -132,73 +130,60 @@ namespace
 
   TEST(div128_32, handles_one)
   {
-    uint32_t reminder;
     uint64_t hi;
     uint64_t lo;
 
-    reminder = div128_32(0, 7, 1, &hi, &lo);
-    ASSERT_EQ(reminder, 0);
+    div128_32(0, 7, 1, &hi, &lo);
     ASSERT_EQ(hi, 0);
     ASSERT_EQ(lo, 7);
 
-    reminder = div128_32(7, 0, 1, &hi, &lo);
-    ASSERT_EQ(reminder, 0);
+    div128_32(7, 0, 1, &hi, &lo);
     ASSERT_EQ(hi, 7);
     ASSERT_EQ(lo, 0);
   }
 
   TEST(div128_32, handles_if_dividend_less_divider)
   {
-    uint32_t reminder;
     uint64_t hi;
     uint64_t lo;
 
-    reminder = div128_32(0, 1383746, 1645825, &hi, &lo);
-    ASSERT_EQ(reminder, 1383746);
+    div128_32(0, 1383746, 1645825, &hi, &lo);
     ASSERT_EQ(hi, 0);
     ASSERT_EQ(lo, 0);
   }
 
   TEST(div128_32, handles_if_dividend_dwords_less_divider)
   {
-    uint32_t reminder;
     uint64_t hi;
     uint64_t lo;
 
-    reminder = div128_32(0x5AD629E441074F28, 0x0DBCAB2B231081F1, 0xFE735CD6, &hi, &lo);
-    ASSERT_EQ(reminder, 0xB9C924E9);
+    div128_32(0x5AD629E441074F28, 0x0DBCAB2B231081F1, 0xFE735CD6, &hi, &lo);
     ASSERT_EQ(hi, 0x000000005B63C274);
     ASSERT_EQ(lo, 0x9084FC024383E48C);
   }
 
   TEST(div128_32, works_correctly)
   {
-    uint32_t reminder;
     uint64_t hi;
     uint64_t lo;
 
-    reminder = div128_32(2, 0, 2, &hi, &lo);
-    ASSERT_EQ(reminder, 0);
+    div128_32(2, 0, 2, &hi, &lo);
     ASSERT_EQ(hi, 1);
     ASSERT_EQ(lo, 0);
 
-    reminder = div128_32(0xffffffffffffffff, 0, 0xffffffff, &hi, &lo);
-    ASSERT_EQ(reminder, 0);
+    div128_32(0xffffffffffffffff, 0, 0xffffffff, &hi, &lo);
     ASSERT_EQ(hi, 0x0000000100000001);
     ASSERT_EQ(lo, 0);
 
-    reminder = div128_32(0xffffffffffffffff, 5846, 0xffffffff, &hi, &lo);
-    ASSERT_EQ(reminder, 5846);
+    div128_32(0xffffffffffffffff, 5846, 0xffffffff, &hi, &lo);
     ASSERT_EQ(hi, 0x0000000100000001);
     ASSERT_EQ(lo, 0);
 
-    reminder = div128_32(0xffffffffffffffff - 1, 0, 0xffffffff, &hi, &lo);
-    ASSERT_EQ(reminder, 0xfffffffe);
+    div128_32(0xffffffffffffffff - 1, 0, 0xffffffff, &hi, &lo);
     ASSERT_EQ(hi, 0x0000000100000000);
     ASSERT_EQ(lo, 0xfffffffefffffffe);
 
-    reminder = div128_32(0x2649372534875028, 0xaedbfedc5adbc739, 0x27826534, &hi, &lo);
-    ASSERT_EQ(reminder, 0x1a6dc2e5);
+    div128_32(0x2649372534875028, 0xaedbfedc5adbc739, 0x27826534, &hi, &lo);
     ASSERT_EQ(hi, 0x00000000f812c1f8);
     ASSERT_EQ(lo, 0xddf2fdb09bc2e2e9);
   }
