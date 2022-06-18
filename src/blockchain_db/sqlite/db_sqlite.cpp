@@ -315,8 +315,7 @@ namespace cryptonote {
     return result;
   }
 
-  std::vector<cryptonote::batch_sn_payment> BlockchainSQLite::calculate_rewards(hf hf_version, uint64_t distribution_amount, service_nodes::service_node_info sn_info) {
-
+  void BlockchainSQLite::calculate_rewards(hf hf_version, uint64_t distribution_amount, const service_nodes::service_node_info& sn_info, std::vector<cryptonote::batch_sn_payment>& payments) {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
 
     // Find out how much is due for the operator: fee_portions/PORTIONS * reward
@@ -325,7 +324,7 @@ namespace cryptonote {
 
     assert(operator_fee <= distribution_amount);
 
-    std::vector<cryptonote::batch_sn_payment> payments;
+    payments.clear();
     // Pay the operator fee to the operator
     if (operator_fee > 0)
       payments.emplace_back(sn_info.operator_address, operator_fee);
@@ -343,8 +342,6 @@ namespace cryptonote {
       if (c_reward > 0)
         payments.emplace_back(contributor.address, c_reward);
     }
-
-    return payments;
   }
 
   // Calculates block rewards, then invokes either `add_sn_rewards` (if `add`) or
@@ -367,6 +364,8 @@ namespace cryptonote {
     uint64_t block_reward = block.reward * BATCH_REWARD_FACTOR;
     uint64_t service_node_reward = cryptonote::service_node_reward_formula(0, block.major_version) * BATCH_REWARD_FACTOR;
 
+    std::vector<cryptonote::batch_sn_payment> payments;
+
     // Step 1: Pay out the block producer their tx fees (note that, unlike the below, this applies
     // even if the SN isn't currently payable).
     if (block_reward < service_node_reward && m_nettype != cryptonote::network_type::FAKECHAIN)
@@ -382,9 +381,9 @@ namespace cryptonote {
 
       if (auto service_node_winner = service_nodes_state.service_nodes_infos.find(block.service_node_winner_key);
           service_node_winner != service_nodes_state.service_nodes_infos.end()) {
-        auto tx_fee_payments = calculate_rewards(block.major_version, tx_fees, *service_node_winner->second);
+        calculate_rewards(block.major_version, tx_fees, *service_node_winner->second, payments);
         // Takes the block producer and adds its contributors to the batching database for the transaction fees
-        if (!(this->*add_or_subtract)(tx_fee_payments))
+        if (!(this->*add_or_subtract)(payments))
           return false;
       }
     }
@@ -398,23 +397,23 @@ namespace cryptonote {
       auto payable_service_node = service_nodes_state.service_nodes_infos.find(node_pubkey);
       if (payable_service_node == service_nodes_state.service_nodes_infos.end())
         continue;
-      auto snode_rewards = calculate_rewards(block.major_version, service_node_reward / total_service_nodes_payable, * payable_service_node -> second);
+      calculate_rewards(block.major_version, service_node_reward / total_service_nodes_payable, * payable_service_node -> second, payments);
       // Takes the node and adds its contributors to the batching database
-      if (!(this->*add_or_subtract)(snode_rewards))
+      if (!(this->*add_or_subtract)(payments))
         return false;
     }
 
     // Step 3: Add Governance reward to the list
     if (m_nettype != cryptonote::network_type::FAKECHAIN) {
-      std::vector<cryptonote::batch_sn_payment> governance_rewards;
       if (parsed_governance_addr.first != block.major_version) {
         cryptonote::get_account_address_from_str(parsed_governance_addr.second, m_nettype,
             cryptonote::get_config(m_nettype).governance_wallet_address(block.major_version));
         parsed_governance_addr.first = block.major_version;
       }
       uint64_t foundation_reward = cryptonote::governance_reward_formula(block.major_version) * BATCH_REWARD_FACTOR;
-      governance_rewards.emplace_back(parsed_governance_addr.second.address, foundation_reward);
-      if (!(this->*add_or_subtract)(governance_rewards))
+      payments.clear();
+      payments.emplace_back(parsed_governance_addr.second.address, foundation_reward);
+      if (!(this->*add_or_subtract)(payments))
         return false;
     }
 

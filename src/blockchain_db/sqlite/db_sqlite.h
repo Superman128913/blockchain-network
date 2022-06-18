@@ -89,11 +89,12 @@ public:
 
   // calculate_rewards -> takes the list of contributors from sn_info with their SN contribution
   // amounts and will calculate how much of the block rewards should be the allocated to the
-  // contributors. The function will return a list suitable for passing to add_sn_payments
+  // contributors. The function will set a list suitable for passing to add_sn_payments into the
+  // vector (any existing values will be cleared).
   //
   // Note that distribution_amount here is typically passed as milli-atomic OXEN for extra
   // precision.
-  std::vector<cryptonote::batch_sn_payment> calculate_rewards(hf hf_version, uint64_t distribution_amount, service_nodes::service_node_info sn_info);
+  void calculate_rewards(hf hf_version, uint64_t distribution_amount, const service_nodes::service_node_info& sn_info, std::vector<cryptonote::batch_sn_payment>& rewards);
 
   // add/pop_block -> takes a block that contains new block rewards to be batched and added to the database
   // and/or batching payments that need to be subtracted from the database, in addition it takes a reference to
