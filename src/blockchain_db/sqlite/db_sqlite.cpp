@@ -131,7 +131,7 @@ namespace cryptonote {
     }
 
     if (!have_offset) {
-      MGINFO("Adding payout_offset to batching db");
+      MINFO("Adding payout_offset to batching db");
       auto& netconf = get_config(m_nettype);
       SQLite::Transaction transaction{
         db,
