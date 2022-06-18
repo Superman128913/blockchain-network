@@ -70,6 +70,11 @@ private:
       const service_nodes::service_node_list::state_t& service_nodes_state,
       bool add);
 
+  std::unordered_map<account_public_address, std::string> address_str_cache;
+  std::pair<hf, cryptonote::address_parse_info> parsed_governance_addr = {hf::none, {}};
+  const std::string& get_address_str(const account_public_address& addr);
+  std::mutex address_str_cache_mutex;
+
 public:
 
   // get_accrued_earnings -> queries the database for the amount that has been accrued to `service_node_address` will return the atomic value in oxen that

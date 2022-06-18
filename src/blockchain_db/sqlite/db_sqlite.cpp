@@ -210,6 +210,16 @@ namespace cryptonote {
     update_height(height - 1);
   }
 
+  // Must be called with the address_str_cache_mutex held!
+  const std::string& BlockchainSQLite::get_address_str(const account_public_address& addr)
+  {
+    auto& address_str = address_str_cache[addr];
+    if (address_str.empty())
+      address_str = cryptonote::get_account_address_as_str(m_nettype, 0, addr);
+    return address_str;
+  }
+
+
   bool BlockchainSQLite::add_sn_rewards(const std::vector<cryptonote::batch_sn_payment>& payments) {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
     auto insert_payment = prepared_st(
@@ -221,6 +231,7 @@ namespace cryptonote {
     for (auto& payment: payments) {
       auto offset = static_cast<int>(payment.address_info.address.modulus(netconf.BATCHING_INTERVAL));
       auto amt = static_cast<int64_t>(payment.amount);
+      const auto& address_str = get_address_str(payment.address_info.address);
       MTRACE(fmt::format("Adding record for SN reward contributor {} to database with amount {}",
            address_str, amt));
       db::exec_query(insert_payment, address_str, offset, amt);
@@ -236,7 +247,7 @@ namespace cryptonote {
       "UPDATE batched_payments_accrued SET amount = (amount - ?) WHERE address = ?");
 
     for (auto& payment: payments) {
-      std::string address_str = cryptonote::get_account_address_as_str(m_nettype, 0, payment.address_info.address);
+      const auto& address_str = get_address_str(payment.address_info.address);
       auto result = db::exec_query(update_payment, static_cast<int64_t>(payment.amount), address_str);
       if (!result) {
         MERROR("tried to subtract payment from an address that doesn't exist: " << address_str);
@@ -259,7 +270,7 @@ namespace cryptonote {
 
     const auto& conf = get_config(m_nettype);
 
-    auto accrued_amounts = prepared_results<std::string, int64_t>(
+    auto accrued_amounts = prepared_results<std::string_view, int64_t>(
       "SELECT address, amount FROM batched_payments_accrued WHERE payout_offset = ? AND amount >= ? ORDER BY address ASC",
       static_cast<int>(block_height % conf.BATCHING_INTERVAL),
       static_cast<int64_t>(conf.MIN_BATCH_PAYMENT_AMOUNT * BATCH_REWARD_FACTOR));
@@ -267,19 +278,10 @@ namespace cryptonote {
     std::vector<cryptonote::batch_sn_payment> payments;
 
     for (auto [address, amount] : accrued_amounts) {
-      if (cryptonote::is_valid_address(address, m_nettype)) {
-        cryptonote::address_parse_info addr_info {};
-        cryptonote::get_account_address_from_str(addr_info, m_nettype, address);
-        uint64_t next_payout_height = addr_info.address.next_payout_height(block_height, conf.BATCHING_INTERVAL);
-        if (block_height == next_payout_height) {
-          payments.emplace_back(
-              std::move(address),
-              amount / BATCH_REWARD_FACTOR * BATCH_REWARD_FACTOR /* truncate to atomic OXEN */,
-              m_nettype);
-        }
-      } else {
-        MERROR("Invalid address returned from batching database: " << address);
-      }
+      auto& p = payments.emplace_back();
+      p.amount = amount / BATCH_REWARD_FACTOR * BATCH_REWARD_FACTOR; /* truncate to atomic OXEN */
+      [[maybe_unused]] bool addr_ok = cryptonote::get_account_address_from_str(p.address_info, m_nettype, address);
+      assert(addr_ok);
     }
 
     return payments;
@@ -326,7 +328,7 @@ namespace cryptonote {
     std::vector<cryptonote::batch_sn_payment> payments;
     // Pay the operator fee to the operator
     if (operator_fee > 0)
-      payments.emplace_back(sn_info.operator_address, operator_fee, m_nettype);
+      payments.emplace_back(sn_info.operator_address, operator_fee);
 
     // Pay the balance to all the contributors (including the operator again)
     uint64_t total_contributed_to_sn = std::accumulate(
@@ -339,7 +341,7 @@ namespace cryptonote {
       // This calculates (contributor.amount / total_contributed_to_winner_sn) * (distribution_amount - operator_fee) but using 128 bit integer math
       uint64_t c_reward = mul128_div64(contributor.amount, distribution_amount - operator_fee, total_contributed_to_sn);
       if (c_reward > 0)
-        payments.emplace_back(contributor.address, c_reward, m_nettype);
+        payments.emplace_back(contributor.address, c_reward);
     }
 
     return payments;
@@ -369,6 +371,8 @@ namespace cryptonote {
     // even if the SN isn't currently payable).
     if (block_reward < service_node_reward && m_nettype != cryptonote::network_type::FAKECHAIN)
       throw std::logic_error{"Invalid payment: block reward is too small"};
+
+    std::lock_guard a_s_lock{address_str_cache_mutex};
 
     if (uint64_t tx_fees = block_reward - service_node_reward;
         tx_fees > 0
@@ -403,11 +407,13 @@ namespace cryptonote {
     // Step 3: Add Governance reward to the list
     if (m_nettype != cryptonote::network_type::FAKECHAIN) {
       std::vector<cryptonote::batch_sn_payment> governance_rewards;
-      cryptonote::address_parse_info governance_wallet_address;
-      cryptonote::get_account_address_from_str(governance_wallet_address, m_nettype,
-          cryptonote::get_config(m_nettype).governance_wallet_address(block.major_version));
+      if (parsed_governance_addr.first != block.major_version) {
+        cryptonote::get_account_address_from_str(parsed_governance_addr.second, m_nettype,
+            cryptonote::get_config(m_nettype).governance_wallet_address(block.major_version));
+        parsed_governance_addr.first = block.major_version;
+      }
       uint64_t foundation_reward = cryptonote::governance_reward_formula(block.major_version) * BATCH_REWARD_FACTOR;
-      governance_rewards.emplace_back(governance_wallet_address.address, foundation_reward, m_nettype);
+      governance_rewards.emplace_back(parsed_governance_addr.second.address, foundation_reward);
       if (!(this->*add_or_subtract)(governance_rewards))
         return false;
     }
@@ -554,7 +560,7 @@ namespace cryptonote {
         return false;
       }
       total_oxen_payout_in_vouts += amount;
-      finalised_payments.emplace_back(from_db.address, amount, m_nettype);
+      finalised_payments.emplace_back(from_db.address_info, amount);
     }
     if (total_oxen_payout_in_vouts != total_oxen_payout_in_our_db) {
       MERROR(fmt::format("Total batched payout amount incorrect. Should be {}, not {}", total_oxen_payout_in_our_db, total_oxen_payout_in_vouts));
@@ -573,25 +579,28 @@ namespace cryptonote {
     auto update_paid = prepared_st(
       "INSERT INTO batched_payments_paid (address, amount, height_paid) VALUES (?,?,?)");
 
+    std::lock_guard a_s_lock{address_str_cache_mutex};
+
     for (const auto& payment: paid_amounts) {
-      if (auto maybe_amount = db::exec_and_maybe_get<int64_t>(select_sum, payment.address))
+      const auto& address_str = get_address_str(payment.address_info.address);
+      if (auto maybe_amount = db::exec_and_maybe_get<int64_t>(select_sum, address_str))
       {
         // Truncate the thousanths amount to an atomic OXEN:
         auto amount = static_cast<uint64_t>(*maybe_amount) / BATCH_REWARD_FACTOR * BATCH_REWARD_FACTOR;
 
         if (amount != payment.amount) {
           MERROR(fmt::format("Invalid amounts passed in to save payments for address {}: received {}, expected {} (truncated from {})",
-                payment.address, payment.amount, amount, *maybe_amount));
+                address_str, payment.amount, amount, *maybe_amount));
           return false;
         }
 
-        db::exec_query(update_paid, payment.address, static_cast<int64_t>(amount), static_cast<int64_t>(block_height));
+        db::exec_query(update_paid, address_str, static_cast<int64_t>(amount), static_cast<int64_t>(block_height));
         update_paid->reset();
       }
       else {
         // This shouldn't occur: we validate payout addresses much earlier in the block validation.
         MERROR(fmt::format("Internal error: Invalid amounts passed in to save payments for address {}: that address has no accrued rewards",
-              payment.address));
+              address_str));
         return false;
       }
 
@@ -604,12 +613,15 @@ namespace cryptonote {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__ << " Called with height: " << block_height);
 
     std::vector<cryptonote::batch_sn_payment> payments_at_height;
-    auto paid = prepared_results<std::string, int64_t>(
+    auto paid = prepared_results<std::string_view, int64_t>(
       "SELECT address, amount FROM batched_payments_paid WHERE height_paid = ? ORDER BY address",
       static_cast<int64_t>(block_height));
 
-    for (auto [addr, amt] : paid)
-      payments_at_height.emplace_back(std::move(addr), static_cast<uint64_t>(amt), m_nettype);
+    for (auto [addr, amt] : paid) {
+      auto& p = payments_at_height.emplace_back();
+      p.amount = static_cast<uint64_t>(amt);
+      cryptonote::get_account_address_from_str(p.address_info, m_nettype, addr);
+    }
 
     return payments_at_height;
   }

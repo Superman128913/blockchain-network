@@ -56,7 +56,7 @@ TEST(SQLITE, AddSNRewards)
 
   cryptonote::get_account_address_from_str(wallet_address, cryptonote::network_type::FAKECHAIN, "LCFxT37LAogDn1jLQKf4y7aAqfi21DjovX9qyijaLYQSdrxY1U5VGcnMJMjWrD9RhjeK5Lym67wZ73uh9AujXLQ1RKmXEyL");
 
-  t1.emplace_back(wallet_address.address, 16500000001'789/2, cryptonote::network_type::FAKECHAIN);
+  t1.emplace_back(wallet_address.address, 16500000001'789/2);
 
   bool success = false;
   success = sqliteDB.add_sn_rewards(t1);
@@ -78,12 +78,12 @@ TEST(SQLITE, AddSNRewards)
 
   // Pay an amount less than the database expects and test for failure
   std::vector<cryptonote::batch_sn_payment> t2;
-  t2.emplace_back(wallet_address.address, expected_amount - 1000, cryptonote::network_type::FAKECHAIN);
+  t2.emplace_back(wallet_address.address, expected_amount - 1000);
   EXPECT_FALSE(sqliteDB.save_payments(expected_payout, t2));
 
   // Pay the amount back out and expect the database to be empty
   std::vector<cryptonote::batch_sn_payment> t3;
-  t3.emplace_back(wallet_address.address, expected_amount, cryptonote::network_type::FAKECHAIN);
+  t3.emplace_back(wallet_address.address, expected_amount);
   success = sqliteDB.save_payments(expected_payout, t3);
   EXPECT_TRUE(success);
   EXPECT_EQ(sqliteDB.batching_count(), 0);
