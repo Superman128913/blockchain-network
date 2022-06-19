@@ -226,38 +226,29 @@ namespace cryptonote {
   uint64_t BlockchainSQLite::get_accrued_earnings(const std::string& address) {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
 
-    SQLite::Statement select_earnings {
-      db,
-      "SELECT amount FROM batched_payments_accrued WHERE address = ?;"
-    };
-    select_earnings.bind(1, address);
-
-    uint64_t amount{};
-    while (select_earnings.executeStep()) {
-      amount = static_cast<uint64_t>(select_earnings.getColumn(0).getInt64() / 1000);
-    }
-
-    return amount;
+    auto earnings = prepared_maybe_get<int64_t>(
+        "SELECT amount FROM batched_payments_accrued WHERE address = ?",
+        address);
+    return static_cast<uint64_t>(earnings.value_or(0) / 1000);
   }
 
   std::pair<std::vector<std::string>, std::vector<uint64_t>> BlockchainSQLite::get_all_accrued_earnings() {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__);
 
-    SQLite::Statement select_earnings {
-      db,
-      "SELECT address, amount FROM batched_payments_accrued;"
-    };
+    std::pair<std::vector<std::string>, std::vector<uint64_t>> result;
+    auto& [addresses, amounts] = result;
 
-    std::vector<uint64_t> amounts;
-    std::vector<std::string> addresses;
-    while (select_earnings.executeStep()) {
-      addresses.emplace_back(select_earnings.getColumn(0).getString());
-      amounts.emplace_back(static_cast<uint64_t>(select_earnings.getColumn(1).getInt64() / 1000));
+    for (auto [addr, amt] : prepared_results<std::string, int64_t>(
+          "SELECT address, amount FROM batched_payments_accrued")) {
+      auto amount = static_cast<uint64_t>(amt / 1000);
+      if (amount > 0) {
+        addresses.push_back(std::move(addr));
+        amounts.push_back(amount);
+      }
     }
 
-    return std::make_pair(addresses, amounts);
+    return result;
   }
-
 
   std::vector<cryptonote::batch_sn_payment> BlockchainSQLite::calculate_rewards(hf hf_version, uint64_t distribution_amount, service_nodes::service_node_info sn_info) {
 
