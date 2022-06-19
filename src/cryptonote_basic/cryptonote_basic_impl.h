@@ -67,13 +67,13 @@ namespace cryptonote {
   };
 
   struct batch_sn_payment {
-    std::string address;
     cryptonote::address_parse_info address_info;
     uint64_t amount;
     batch_sn_payment() = default;
-    batch_sn_payment(std::string addr, uint64_t amt, cryptonote::network_type nettype);
-    batch_sn_payment(cryptonote::address_parse_info& addr_info, uint64_t amt, cryptonote::network_type nettype);
-    batch_sn_payment(const cryptonote::account_public_address& addr, uint64_t amt, cryptonote::network_type nettype);
+    batch_sn_payment(const cryptonote::address_parse_info& addr_info, uint64_t amt)
+        : address_info{addr_info}, amount{amt} {}
+    batch_sn_payment(const cryptonote::account_public_address& addr, uint64_t amt)
+        : address_info{addr, 0}, amount{amt} {}
   };
 
   class ValidateMinerTxHook
