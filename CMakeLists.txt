@@ -480,7 +480,7 @@ endif()
 
 if(NOT BUILD_STATIC_DEPS)
   find_package(PkgConfig REQUIRED)
-  pkg_check_modules(SQLITE3 REQUIRED sqlite3 IMPORTED_TARGET GLOBAL)
+  pkg_check_modules(SQLITE3 REQUIRED sqlite3>=3.24.0 IMPORTED_TARGET GLOBAL)
   message(STATUS "Found sqlite3 ${SQLITE3_VERSION}")
   add_library(SQLite::SQLite3 ALIAS PkgConfig::SQLITE3)
 endif()
