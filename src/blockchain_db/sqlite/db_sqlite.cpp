@@ -207,7 +207,7 @@ namespace cryptonote {
       if (cryptonote::is_valid_address(address, m_nettype)) {
         cryptonote::address_parse_info addr_info {};
         cryptonote::get_account_address_from_str(addr_info, m_nettype, address);
-        uint64_t next_payout_height = addr_info.address.next_payout_height(block_height - 1, conf.BATCHING_INTERVAL);
+        uint64_t next_payout_height = addr_info.address.next_payout_height(block_height, conf.BATCHING_INTERVAL);
         if (block_height == next_payout_height) {
           payments.emplace_back(
               std::move(address),

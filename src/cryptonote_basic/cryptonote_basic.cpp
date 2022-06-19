@@ -150,10 +150,11 @@ uint64_t account_public_address::modulus(uint64_t interval) const
 
 uint64_t account_public_address::next_payout_height(uint64_t current_height, uint64_t interval) const
 {
-  uint64_t next_payout_height = current_height + (modulus(interval) - current_height % interval);
-  if (next_payout_height <= current_height)
-    next_payout_height += interval;
-  return next_payout_height;
+  auto pay_offset = modulus(interval);
+  auto curr_offset = current_height % interval;
+  if (pay_offset < curr_offset)
+    pay_offset += interval;
+  return current_height + pay_offset - curr_offset;
 }
 
 }
