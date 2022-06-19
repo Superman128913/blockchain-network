@@ -1827,7 +1827,6 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
   if (!tx.is_transfer() || tx.version <= txversion::v1)
     return;
 
-  MERROR("PROC NEW TX " << txid);
   PERF_TIMER(process_new_transaction);
   // In this function, tx (probably) only contains the base information
   // (that is, the prunable stuff may or may not be included)
@@ -2123,7 +2122,6 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
                                   error::wallet_internal_error,
                                   "Sanity check failed: An output replacing a unmined blink output must not be from the pool.");
 
-        LOG_ERROR(+transfer.m_spent << " || " << transfer.amount() << " >= " << tx_scan_info[o].amount);
         if (transfer.m_spent || transfer.amount() >= tx_scan_info[o].amount)
         {
           if (transfer.amount() > tx_scan_info[o].amount)
