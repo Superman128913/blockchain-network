@@ -710,7 +710,6 @@ void Blockchain::pop_blocks(uint64_t nblocks)
         MGINFO("... popping blocks " << (++progress * PERCENT_PER_PROGRESS_UPDATE) << "% completed, height: " << (blockchain_height - i) << " (" << timer.seconds() << "s)");
         timer.reset();
       }
-
       pop_block_from_blockchain();
     }
   }

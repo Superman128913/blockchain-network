@@ -1715,10 +1715,25 @@ namespace service_nodes
 
   bool service_node_list::process_batching_rewards(const cryptonote::block& block)
   {
+    uint64_t block_height = cryptonote::get_block_height(block);
+    if (m_blockchain.nettype() != cryptonote::network_type::FAKECHAIN && block.major_version >= hf::hf19_reward_batching && height() != block_height)
+    {
+      MERROR("Service node list out of sync with the batching database, adding block will fail because the service node list is at height: " << height() << " and the batching database is at height: " << m_blockchain.sqlite_db()->height+1);
+      return false;
+    }
     return m_blockchain.sqlite_db()->add_block(block, m_state);
   }
   bool service_node_list::pop_batching_rewards_block(const cryptonote::block& block)
   {
+    bool reinitialise = false;
+    uint64_t block_height = cryptonote::get_block_height(block);
+    if (m_blockchain.nettype() != cryptonote::network_type::FAKECHAIN && block.major_version >= hf::hf19_reward_batching && height() != block_height)
+    {
+      if (auto it = m_transient.state_history.find(block_height); it != m_transient.state_history.end())
+        return m_blockchain.sqlite_db()->pop_block(block, *it);
+      m_blockchain.sqlite_db()->reset_database();
+      return false;
+    }
     return m_blockchain.sqlite_db()->pop_block(block, m_state);
   }
 
