@@ -1713,6 +1713,18 @@ namespace service_nodes
     return result;
   }
 
+  void service_node_list::reset_batching_to_latest_height()
+  {
+    m_blockchain.sqlite_db()->reset_database();
+    m_blockchain.sqlite_db()->update_height(0);
+  }
+
+  bool service_node_list::state_history_exists(uint64_t height)
+  {
+    auto it = m_transient.state_history.find(height);
+    return it != m_transient.state_history.end();
+  }
+
   bool service_node_list::process_batching_rewards(const cryptonote::block& block)
   {
     uint64_t block_height = cryptonote::get_block_height(block);
@@ -1725,7 +1737,6 @@ namespace service_nodes
   }
   bool service_node_list::pop_batching_rewards_block(const cryptonote::block& block)
   {
-    bool reinitialise = false;
     uint64_t block_height = cryptonote::get_block_height(block);
     if (m_blockchain.nettype() != cryptonote::network_type::FAKECHAIN && block.major_version >= hf::hf19_reward_batching && height() != block_height)
     {
