@@ -37,6 +37,7 @@
 
 #include "common/string_util.h"
 #include "oxen_economy.h"
+#include <algorithm>
 #include <chrono>
 #ifdef _WIN32
  #define __STDC_FORMAT_MACROS // NOTE(oxen): Explicitly define the PRIu64 macro on Mingw
@@ -255,7 +256,7 @@ namespace
   const char* USAGE_REGISTER_SERVICE_NODE("register_service_node [index=<N1>[,<N2>,...]] [<priority>] <operator cut> <address1> <fraction1> [<address2> <fraction2> [...]] <expiration timestamp> <pubkey> <signature>");
   const char* USAGE_STAKE("stake [index=<N1>[,<N2>,...]] [<priority>] <service node pubkey> <amount|percent%>");
   const char* USAGE_REQUEST_STAKE_UNLOCK("request_stake_unlock <service_node_pubkey>");
-  const char* USAGE_PRINT_LOCKED_STAKES("print_locked_stakes");
+  const char* USAGE_PRINT_LOCKED_STAKES("print_locked_stakes [+key_images]");
 
   const char* USAGE_ONS_BUY_MAPPING("ons_buy_mapping [index=<N1>[,<N2>,...]] [<priority>] [type=session|lokinet|lokinet_2y|lokinet_5y|lokinet_10y] [owner=<value>] [backup_owner=<value>] <name> <value>");
   const char* USAGE_ONS_RENEW_MAPPING("ons_renew_mapping [index=<N1>[,<N2>,...]] [<priority>] [type=lokinet|lokinet_2y|lokinet_5y|lokinet_10y] <name>");
@@ -6280,140 +6281,229 @@ bool simple_wallet::request_stake_unlock(const std::vector<std::string> &args_)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::query_locked_stakes(bool print_result)
+bool simple_wallet::query_locked_stakes(bool print_details, bool print_key_images)
 {
   if (!try_connect_to_daemon())
     return false;
 
   bool has_locked_stakes = false;
-  std::string msg_buf;
+  std::string msg;
+  auto my_addr = m_wallet->get_address_as_str();
+
+  auto sum_contr = [](const auto& locked) {
+    uint64_t total = 0;
+    for (auto& c : locked)
+      total += c.amount;
+    return total;
+  };
+
+  auto sns = m_wallet->get_staked_service_nodes();
+
+  // Sort the list by pubkey, and partition into unlocking and not-unlocking:
+  std::stable_sort(sns.begin(), sns.end(), [](const auto& a, const auto& b) {
+    return a.service_node_pubkey < b.service_node_pubkey; });
+  std::stable_partition(sns.begin(), sns.end(), [](const auto& a) {
+    return a.requested_unlock_height != service_nodes::KEY_IMAGE_AWAITING_UNLOCK_HEIGHT; });
+
+  for (auto& node_info : sns)
   {
-    using namespace cryptonote;
+    auto& contributors = node_info.contributors;
+    // Filter out any contributor rows without any actual contributions (i.e. from unfilled reserved
+    // contributions):
+    contributors.erase(
+        std::remove_if(contributors.begin(), contributors.end(),
+          [&sum_contr](const auto& c) { return sum_contr(c.locked_contributions) == 0; }),
+        contributors.end());
 
-    for (const auto &node_info : m_wallet->get_staked_service_nodes())
+    // Reorder contributors to put this wallet's contribution(s) first:
+    std::stable_partition(contributors.begin(), contributors.end(),
+        [&my_addr](const auto& x) { return x.address == my_addr; });
+
+    if (contributors.empty() || contributors[0].address != my_addr)
+      continue; // We filtered out ourself
+    auto& me = contributors.front();
+
+    has_locked_stakes = true;
+    if (!print_details)
+      continue;
+
+    uint64_t total = 0;
+    for (const auto& c : contributors)
+      total += sum_contr(c.locked_contributions);
+
+    // Formatting: first 1-2 lines of general info:
+    //
+    //     Service Node: abcdef123456...
+    //     Unlock Height: 1234567         (omitted if not unlocking)
+    //
+    // If there are other contributors then we print a total line such as:
+    //
+    //     Total Contributions: 15000 OXEN of 15000 OXEN required
+    //
+    // For our own contribution, when we have a single contribution, we use one of:
+    //
+    //     Your Contribution: 5000 OXEN (Key image: abcdef123...)
+    //     Your Contribution: 5000 OXEN of 15000 OXEN required (Key image: abcdef123...)
+    //
+    // (the second one applies if we are the only contributor so far).
+    //
+    // If we made multiple contributions then:
+    //
+    //     Your Contributions: 5000 OXEN in 2 contributions:
+    //     Your Contributions: 5000 OXEN of 15000 OXEN required in 2 contributions:
+    //
+    // (the second one if we are the only contributor so far).
+    //
+    // This is followed by the individual contributions:
+    //
+    //         ‣ 4000.5 OXEN (Key image: abcdef123...)
+    //         ‣ 999.5 OXEN (Key image: 789cba456...)
+    //
+    // If there are other contributors then we also print:
+    //
+    //     Other contributions: 10000 OXEN from 2 contributors:
+    //         • 1234.565 OXEN (T6U7YGUcPJffbaF5p8NLC3VidwJyHSdMaGmSxTBV645v33CmLq2ZvMqBdY9AVB2z8uhbHPCZSuZbv68hE6NBXBc51Gg9MGUGr)
+    //           Key image 123456789...
+    //         • 8765.435 OXEN (T6Tpop5RZdwE39iBvoP5xpJVoMpYPUwQpef9zS2tLL8yVgbppBbtGnzZxzkSp53Coi88wbsTHiokr7k8MQU94mGF1zzERqELK)
+    //           ‣ 7530 OXEN (Key image: 23456789a...)
+    //           ‣ 1235.435 OXEN (Key image: 3456789ab...)
+    //
+    // If we aren't showing key images then all the key image details get omitted.
+
+    msg += fmt::format("Service Node: {}\n", node_info.service_node_pubkey);
+    if (node_info.requested_unlock_height != service_nodes::KEY_IMAGE_AWAITING_UNLOCK_HEIGHT)
+      msg += fmt::format("Unlock height: {}\n", node_info.requested_unlock_height);
+
+    bool just_me = contributors.size() == 1;
+
+    auto required = fmt::format(" of {} required", cryptonote::format_money(node_info.staking_requirement));
+    if (!just_me) {
+      msg += fmt::format("Total Contributions: {}{}\n", cryptonote::format_money(total), required);
+      required.clear();
+    }
+
+    auto my_total = sum_contr(me.locked_contributions);
+    if (me.locked_contributions.size() == 1)
+      msg += "Your Contribution: ";
+    else
     {
-      bool only_once = true;
-      for (const auto& contributor : node_info.contributors)
+      msg += fmt::format("Your Contributions: {}{} in {} contributions:\n    ‣ ",
+          cryptonote::format_money(my_total),
+          required,
+          me.locked_contributions.size());
+      required.clear();
+    }
+
+    for (size_t i = 0; i < me.locked_contributions.size(); i++)
+    {
+      auto& c = me.locked_contributions[i];
+      if (i > 0) msg += "    ‣ ";
+      msg += cryptonote::format_money(c.amount);
+      if (!required.empty())
       {
-        for (size_t i = 0; i < contributor.locked_contributions.size(); ++i)
+        msg += required;
+        required.clear();
+      }
+      if (print_key_images)
+        msg += fmt::format(" (Key image: {})", c.key_image);
+      msg += '\n';
+    }
+
+    if (contributors.size() > 1)
+    {
+      msg += fmt::format("Other Contributions: {} from {} contributor{}:\n",
+          cryptonote::format_money(total - my_total),
+          contributors.size() - 1,
+          contributors.size() == 2 ? "" : "s");
+      for (size_t i = 1; i < contributors.size(); i++)
+      {
+        const auto& contributor = contributors[i];
+        const auto& locked = contributor.locked_contributions;
+        msg += fmt::format("    • {} ({})\n",
+            cryptonote::format_money(sum_contr(locked)), contributor.address);
+        if (locked.size() == 1)
         {
-          const auto& contribution = contributor.locked_contributions[i];
-          has_locked_stakes = true;
-
-          if (!print_result)
-            continue;
-
-          msg_buf.reserve(512);
-          if (only_once)
+          if (print_key_images)
+            msg += fmt::format("      Key image: {}\n", locked[0].key_image);
+        }
+        else
+        {
+          for (auto& c : locked)
           {
-            only_once = false;
-            msg_buf.append("Service Node: ");
-            msg_buf.append(node_info.service_node_pubkey);
-            msg_buf.append("\n");
-
-            msg_buf.append("Unlock Height: ");
-            if (node_info.requested_unlock_height == service_nodes::KEY_IMAGE_AWAITING_UNLOCK_HEIGHT)
-                msg_buf.append("Unlock not requested yet");
+            msg += "      ‣ ";
+            msg += cryptonote::format_money(c.amount);
+            if (print_key_images)
+              msg += fmt::format(" (Key image: {})\n", c.key_image);
             else
-                msg_buf.append(std::to_string(node_info.requested_unlock_height));
-            msg_buf.append("\n");
-
-            msg_buf.append("Total Locked: ");
-            msg_buf.append(cryptonote::print_money(contributor.amount));
-            msg_buf.append("\n");
-
-            msg_buf.append("Amount/Key Image: ");
-          }
-
-          msg_buf.append(cryptonote::print_money(contribution.amount));
-          msg_buf.append("/");
-          msg_buf.append(contribution.key_image);
-          msg_buf.append("\n");
-
-          if (i < (contributor.locked_contributions.size() - 1))
-          {
-            msg_buf.append("                  ");
-          }
-          else
-          {
-            msg_buf.append("\n");
+              msg += '\n';
           }
         }
       }
     }
+    msg += "\n";
   }
 
+  // Find blacklisted key images (i.e. locked contributions from deregistered SNs) that belong to
+  // this wallet.  If there are any, output will be:
+  //
+  //     Locked Stakes due to Service Node Deregistration:
+  //         ‣ 234.567 OXEN (Unlock height 1234567; Key image: abcfed999...)
+  //         ‣ 5000 OXEN (Unlock height 123333; Key image: cbcfef989...)
+  //
+  // where the "; Key image: ..." part is omitted if not printing key images.
+
+  auto [success, blacklisted] = m_wallet->get_service_node_blacklisted_key_images();
+  if (!success)
   {
-    auto [success, response] = m_wallet->get_service_node_blacklisted_key_images();
-    if (!success)
-    {
-      fail_msg_writer() << "Connection to daemon failed when retrieving blacklisted key images";
-      return has_locked_stakes;
-    }
-
-    bool once_only = true;
-    bool first = true;
-    crypto::key_image key_image;
-    for (const auto& entry : response)
-    {
-      if (!tools::hex_to_type(entry.key_image, key_image))
-      {
-        fail_msg_writer() << tr("Failed to parse hex representation of key image: ") << entry.key_image;
-        continue;
-      }
-
-      if (!m_wallet->contains_key_image(key_image))
-        continue;
-
-      if (first)
-        first = false;
-      else
-        msg_buf += "\n";
-
-      has_locked_stakes = true;
-      if (!print_result)
-        continue;
-
-      msg_buf.reserve(512);
-      if (once_only)
-      {
-        msg_buf.append("Blacklisted Stakes\n");
-        once_only = false;
-      }
-
-      msg_buf.append("  Unlock Height/Key Image: ");
-      msg_buf.append(std::to_string(entry.unlock_height));
-      msg_buf.append("/");
-      msg_buf.append(entry.key_image);
-      msg_buf.append("\n");
-      if (entry.amount > 0) {
-        // version >= service_nodes::key_image_blacklist_entry::version_1_serialize_amount
-        msg_buf.append("  Total Locked: ");
-        msg_buf.append(cryptonote::print_money(entry.amount));
-        msg_buf.append("\n");
-      }
-    }
+    fail_msg_writer() << "Connection to daemon failed when retrieving blacklisted key images";
+    return has_locked_stakes;
   }
 
-  if (print_result)
+  // Filter out key images that aren't ours:
+  blacklisted.erase(std::remove_if(blacklisted.begin(), blacklisted.end(),
+      [this](const auto& black) {
+        if (crypto::key_image ki; tools::hex_to_type(black.key_image, ki))
+          return !m_wallet->contains_key_image(ki);
+        fail_msg_writer() << "Failed to parse key image hex: " << black.key_image;
+        return true;
+      }),
+      blacklisted.end());
+
+  if (!blacklisted.empty())
   {
-    if (has_locked_stakes)
+    has_locked_stakes = true;
+    if (print_details)
     {
-      tools::msg_writer() << msg_buf;
-    }
-    else
-    {
-      tools::msg_writer() << "No locked stakes known for this wallet on the network";
+      msg += "Locked Stakes due to Service Node Deregistration:\n";
+
+      // Sort by unlock time (earliest first):
+      std::stable_sort(blacklisted.begin(), blacklisted.end(),
+          [](const auto& a, const auto& b) { return a.unlock_height < b.unlock_height; });
+
+      for (const auto& black : blacklisted)
+      {
+        msg += fmt::format("    • {} (Unlock height {}", cryptonote::format_money(black.amount), black.unlock_height);
+        if (print_key_images)
+          msg += fmt::format("; Key image: {})\n", black.key_image);
+        else
+          msg += ")\n";
+      }
     }
   }
+
+  if (msg.empty() && print_details)
+    msg = "No locked stakes known for this wallet on the network";
+  if (!msg.empty())
+    tools::msg_writer() << msg;
 
   return has_locked_stakes;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::print_locked_stakes(const std::vector<std::string>& /*args*/)
+bool simple_wallet::print_locked_stakes(const std::vector<std::string>& args)
 {
   SCOPED_WALLET_UNLOCK();
-  query_locked_stakes(true/*print_result*/);
+  bool print_kis = std::find(args.begin(), args.end(), "+key_images") != args.end();
+  query_locked_stakes(/*print_details=*/ true, print_kis);
   return true;
 }
 
