@@ -56,6 +56,7 @@ target_link_libraries(cryptonote_core
     nlohmann_json::nlohmann_json
   PRIVATE
     Boost::program_options
+    SQLiteCpp
     systemd
     extra)
 

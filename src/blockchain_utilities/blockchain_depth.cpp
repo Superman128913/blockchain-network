@@ -28,6 +28,7 @@
 
 #include "common/command_line.h"
 #include "common/varint.h"
+#include "common/median.h"
 #include "cryptonote_core/cryptonote_core.h"
 #include "blockchain_objects.h"
 #include "blockchain_db/blockchain_db.h"
@@ -99,7 +100,7 @@ int main(int argc, char* argv[])
 
   bool opt_testnet = command_line::get_arg(vm, cryptonote::arg_testnet_on);
   bool opt_devnet = command_line::get_arg(vm, cryptonote::arg_devnet_on);
-  network_type net_type = opt_testnet ? TESTNET : opt_devnet ? DEVNET : MAINNET;
+  network_type net_type = opt_testnet ? network_type::TESTNET : opt_devnet ? network_type::DEVNET : network_type::MAINNET;
   std::string opt_txid_string = command_line::get_arg(vm, arg_txid);
   uint64_t opt_height = command_line::get_arg(vm, arg_height);
   bool opt_include_coinbase = command_line::get_arg(vm, arg_include_coinbase);
@@ -142,7 +143,7 @@ int main(int argc, char* argv[])
     LOG_PRINT_L0("Error opening database: " << e.what());
     return 1;
   }
-  r = core_storage->init(db, nullptr /*ons_db*/, net_type);
+  r = core_storage->init(db, nullptr /*ons_db*/, nullptr, net_type);
 
   CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize source blockchain storage");
   LOG_PRINT_L0("Source blockchain storage initialized OK");
@@ -154,7 +155,7 @@ int main(int argc, char* argv[])
   }
   else
   {
-    const cryptonote::blobdata bd = db->get_block_blob_from_height(opt_height);
+    const std::string bd = db->get_block_blob_from_height(opt_height);
     cryptonote::block b;
     if (!cryptonote::parse_and_validate_block_from_blob(bd, b))
     {
@@ -187,7 +188,7 @@ int main(int argc, char* argv[])
       std::vector<crypto::hash> new_txids;
       for (const crypto::hash &txid: txids)
       {
-        cryptonote::blobdata bd;
+        std::string bd;
         if (!db->get_pruned_tx_blob(txid, bd))
         {
           LOG_PRINT_L0("Failed to get txid " << txid << " from db");
@@ -305,7 +306,7 @@ done:
   for (uint64_t depth: depths)
     cumulative_depth += depth;
   LOG_PRINT_L0("Average min depth for " << start_txids.size() << " transaction(s): " << cumulative_depth/(float)depths.size());
-  LOG_PRINT_L0("Median min depth for " << start_txids.size() << " transaction(s): " << epee::misc_utils::median(depths));
+  LOG_PRINT_L0("Median min depth for " << start_txids.size() << " transaction(s): " << tools::median(std::move(depths)));
 
   core_storage->deinit();
   return 0;

@@ -37,7 +37,7 @@ target_link_libraries(core_proxy
     version
     epee
     Boost::program_options
-    miniupnpc
+    SQLiteCpp
     extra)
 set_property(TARGET core_proxy
   PROPERTY

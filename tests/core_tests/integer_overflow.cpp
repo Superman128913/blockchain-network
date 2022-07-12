@@ -111,9 +111,12 @@ bool gen_uint_overflow_1::generate(std::vector<test_event_entry>& events) const
   // Problem 1. Miner tx outputs overflow
   {
     oxen_blockchain_entry entry       = gen.create_next_block();
-    cryptonote::transaction &miner_tx = entry.block.miner_tx;
-    split_miner_tx_outs(miner_tx, MONEY_SUPPLY);
-    gen.add_block(entry, false /*can_be_added_to_blockchain*/, "We purposely overflow miner tx by MONEY_SUPPLY in the miner tx");
+    if ( entry.block.major_version < cryptonote::hf::hf19_reward_batching)
+    {
+      cryptonote::transaction &miner_tx = entry.block.miner_tx;
+      split_miner_tx_outs(miner_tx, oxen::MONEY_SUPPLY);
+      gen.add_block(entry, false /*can_be_added_to_blockchain*/, "We purposely overflow miner tx by MONEY_SUPPLY in the miner tx");
+    }
   }
 
   // Problem 2. block_reward overflow
@@ -124,9 +127,12 @@ bool gen_uint_overflow_1::generate(std::vector<test_event_entry>& events) const
       txs.push_back(gen.create_and_add_tx(gen.first_miner_, alice.get_keys().m_account_address, MK_COINS(1), MK_COINS(100) /*fee*/, false /*kept_by_block*/));
 
       oxen_blockchain_entry entry       = gen.create_next_block(txs);
-      cryptonote::transaction &miner_tx = entry.block.miner_tx;
-      miner_tx.vout[0].amount           = 0; // Take partial block reward, fee > block_reward so ordinarly it would overflow. This should be disallowed
-      gen.add_block(entry, false /*can_be_added_to_blockchain*/, "We should not be able to add TX because the fee is greater than the base miner reward");
+      if ( entry.block.major_version < cryptonote::hf::hf19_reward_batching)
+      {
+        cryptonote::transaction &miner_tx = entry.block.miner_tx;
+        miner_tx.vout[0].amount           = 0; // Take partial block reward, fee > block_reward so ordinarly it would overflow. This should be disallowed
+        gen.add_block(entry, false /*can_be_added_to_blockchain*/, "We should not be able to add TX because the fee is greater than the base miner reward");
+      }
     }
 
     {
@@ -135,9 +141,12 @@ bool gen_uint_overflow_1::generate(std::vector<test_event_entry>& events) const
       txs.push_back(gen.create_and_add_tx(gen.first_miner_, alice.get_keys().m_account_address, MK_COINS(1), MK_COINS(100) /*fee*/, true /*kept_by_block*/));
 
       oxen_blockchain_entry entry       = gen.create_next_block(txs);
-      cryptonote::transaction &miner_tx = entry.block.miner_tx;
-      miner_tx.vout[0].amount           = 0; // Take partial block reward, fee > block_reward so ordinarly it would overflow. This should be disallowed
-      gen.add_block(entry, false /*can_be_added_to_blockchain*/, "We should not be able to add TX because the fee is greater than the base miner reward even if kept_by_block is true");
+      if ( entry.block.major_version < cryptonote::hf::hf19_reward_batching)
+      {
+        cryptonote::transaction &miner_tx = entry.block.miner_tx;
+        miner_tx.vout[0].amount           = 0; // Take partial block reward, fee > block_reward so ordinarly it would overflow. This should be disallowed
+        gen.add_block(entry, false /*can_be_added_to_blockchain*/, "We should not be able to add TX because the fee is greater than the base miner reward even if kept_by_block is true");
+      }
     }
   }
   return true;
@@ -173,10 +182,10 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
 
   std::vector<cryptonote::tx_destination_entry> destinations;
   const account_public_address& bob_addr = bob_account.get_keys().m_account_address;
-  destinations.push_back(tx_destination_entry(MONEY_SUPPLY, bob_addr, false));
-  destinations.push_back(tx_destination_entry(MONEY_SUPPLY - 1, bob_addr, false));
+  destinations.push_back(tx_destination_entry(oxen::MONEY_SUPPLY, bob_addr, false));
+  destinations.push_back(tx_destination_entry(oxen::MONEY_SUPPLY - 1, bob_addr, false));
   // sources.front().amount = destinations[0].amount + destinations[2].amount + destinations[3].amount + TESTS_DEFAULT_FEE
-  destinations.push_back(tx_destination_entry(sources.front().amount - MONEY_SUPPLY - MONEY_SUPPLY + 1 - TESTS_DEFAULT_FEE, bob_addr, false));
+  destinations.push_back(tx_destination_entry(sources.front().amount - oxen::MONEY_SUPPLY - oxen::MONEY_SUPPLY + 1 - TESTS_DEFAULT_FEE, bob_addr, false));
 
   cryptonote::transaction tx_1;
   if (!construct_tx(miner_account.get_keys(), sources, destinations, std::nullopt, std::vector<uint8_t>(), tx_1, 0))
@@ -191,7 +200,7 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
   for (size_t i = 0; i < tx_1.vout.size(); ++i)
   {
     auto& tx_1_out = tx_1.vout[i];
-    if (tx_1_out.amount < MONEY_SUPPLY - 1)
+    if (tx_1_out.amount < oxen::MONEY_SUPPLY - 1)
       continue;
 
     append_tx_source_entry(sources, tx_1, i);
@@ -200,7 +209,7 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
   destinations.clear();
   cryptonote::tx_destination_entry de;
   de.addr = alice_account.get_keys().m_account_address;
-  de.amount = MONEY_SUPPLY - TESTS_DEFAULT_FEE;
+  de.amount = oxen::MONEY_SUPPLY - TESTS_DEFAULT_FEE;
   destinations.push_back(de);
   destinations.push_back(de);
 

@@ -260,11 +260,6 @@ private:
       AskPasswordToDecrypt = 2,
     };
 
-    enum ExportFormat {
-      Binary = 0,
-      Ascii,
-    };
-
     static const char* tr(const char* str);
     static const char *ERR_MSG_NETWORK_VERSION_QUERY_FAILED;
     static const char *ERR_MSG_NETWORK_HEIGHT_QUERY_FAILED;
@@ -310,9 +305,9 @@ private:
         const std::function<std::optional<password_container>(const char *, bool)> &password_prompter);
 
     static bool verify_password(const fs::path& keys_file_name, const epee::wipeable_string& password, bool no_spend_key, hw::device &hwdev, uint64_t kdf_rounds);
-    static bool query_device(hw::device::device_type& device_type, const fs::path& keys_file_name, const epee::wipeable_string& password, uint64_t kdf_rounds = 1);
+    static bool query_device(hw::device::type& device_type, const fs::path& keys_file_name, const epee::wipeable_string& password, uint64_t kdf_rounds = 1);
 
-    wallet2(cryptonote::network_type nettype = cryptonote::MAINNET, uint64_t kdf_rounds = 1, bool unattended = false);
+    wallet2(cryptonote::network_type nettype = cryptonote::network_type::MAINNET, uint64_t kdf_rounds = 1, bool unattended = false);
     ~wallet2();
 
     struct tx_scan_info_t
@@ -376,21 +371,21 @@ private:
 
     struct confirmed_transfer_details
     {
-      uint64_t m_amount_in;
-      uint64_t m_amount_out;
-      uint64_t m_change;
-      uint64_t m_block_height;
+      uint64_t m_amount_in = 0;
+      uint64_t m_amount_out = 0;
+      uint64_t m_change = std::numeric_limits<std::uint64_t>::max();
+      uint64_t m_block_height = 0;
       std::vector<cryptonote::tx_destination_entry> m_dests;
-      crypto::hash m_payment_id;
-      uint64_t m_timestamp;
-      uint64_t m_unlock_time; // NOTE(oxen): Not used after TX v2.
+      crypto::hash m_payment_id = crypto::null_hash;
+      uint64_t m_timestamp = 0;
+      uint64_t m_unlock_time = 0; // NOTE(oxen): Not used after TX v2.
       std::vector<uint64_t> m_unlock_times;
-      uint32_t m_subaddr_account;   // subaddress account of your wallet to be used in this transfer
+      uint32_t m_subaddr_account = std::numeric_limits<uint32_t>::max(); // subaddress account of your wallet to be used in this transfer
       std::set<uint32_t> m_subaddr_indices;  // set of address indices used as inputs in this transfer
       std::vector<std::pair<crypto::key_image, std::vector<uint64_t>>> m_rings; // relative
       wallet::pay_type m_pay_type = wallet::pay_type::out;
 
-      confirmed_transfer_details(): m_amount_in(0), m_amount_out(0), m_change((uint64_t)-1), m_block_height(0), m_payment_id(crypto::null_hash), m_timestamp(0), m_unlock_time(0), m_subaddr_account((uint32_t)-1) {}
+      confirmed_transfer_details() = default;
       confirmed_transfer_details(const unconfirmed_transfer_details &utd, uint64_t height)
       : m_amount_in(utd.m_amount_in)
       , m_amount_out(utd.m_amount_out)
@@ -596,12 +591,12 @@ private:
      * Export multisig info
      * This will generate and remember new k values
      */
-    cryptonote::blobdata export_multisig();
+    std::string export_multisig();
     /*!
      * Import a set of multisig info from multisig partners
      * \return the number of inputs which were imported
      */
-    size_t import_multisig(std::vector<cryptonote::blobdata> info);
+    size_t import_multisig(std::vector<std::string> info);
     /*!
      * \brief Rewrites to the wallet file for wallet upgrade (doesn't generate key, assumes it's already there)
      * \param wallet_name Name of wallet file (should exist)
@@ -741,8 +736,8 @@ private:
     bool has_multisig_partial_key_images() const;
     bool has_unknown_key_images() const;
     bool get_multisig_seed(epee::wipeable_string& seed, const epee::wipeable_string &passphrase = std::string(), bool raw = true) const;
-    bool key_on_device() const { return get_device_type() != hw::device::device_type::SOFTWARE; }
-    hw::device::device_type get_device_type() const { return m_key_device_type; }
+    bool key_on_device() const { return get_device_type() != hw::device::type::SOFTWARE; }
+    hw::device::type get_device_type() const { return m_key_device_type; }
     bool reconnect_device();
 
     // locked & unlocked balance of given or current subaddress account
@@ -790,7 +785,7 @@ private:
     uint64_t cold_key_image_sync(uint64_t &spent, uint64_t &unspent);
     void device_show_address(uint32_t account_index, uint32_t address_index, const std::optional<crypto::hash8> &payment_id);
     bool parse_multisig_tx_from_str(std::string_view multisig_tx_st, multisig_tx_set &exported_txs) const;
-    bool load_multisig_tx(cryptonote::blobdata blob, multisig_tx_set &exported_txs, std::function<bool(const multisig_tx_set&)> accept_func = NULL);
+    bool load_multisig_tx(std::string blob, multisig_tx_set &exported_txs, std::function<bool(const multisig_tx_set&)> accept_func = NULL);
     bool load_multisig_tx_from_file(const fs::path& filename, multisig_tx_set &exported_txs, std::function<bool(const multisig_tx_set&)> accept_func = NULL);
     bool sign_multisig_tx_from_file(const fs::path& filename, std::vector<crypto::hash> &txids, std::function<bool(const multisig_tx_set&)> accept_func);
     bool sign_multisig_tx(multisig_tx_set &exported_txs, std::vector<crypto::hash> &txids);
@@ -816,7 +811,7 @@ private:
       bool coinbase = false;
       bool filter_by_height = false;
       uint64_t min_height = 0;
-      uint64_t max_height = CRYPTONOTE_MAX_BLOCK_NUMBER;
+      uint64_t max_height = cryptonote::MAX_BLOCK_NUMBER;
       std::set<uint32_t> subaddr_indices;
       uint32_t account_index;
       bool all_accounts;
@@ -1040,12 +1035,12 @@ private:
     void track_uses(bool value) { m_track_uses = value; }
     std::chrono::seconds inactivity_lock_timeout() const { return m_inactivity_lock_timeout; }
     void inactivity_lock_timeout(std::chrono::seconds seconds) { m_inactivity_lock_timeout = seconds; }
-    const std::string & device_name() const { return m_device_name; }
-    void device_name(const std::string & device_name) { m_device_name = device_name; }
+    const std::string& device_name() const { return m_device_name; }
+    const std::string& device_address() const { return m_device_address; }
+    void device_name(std::string device_name) { m_device_name = std::move(device_name); }
+    void device_address(std::string device_address) { m_device_address = std::move(device_address); }
     const std::string & device_derivation_path() const { return m_device_derivation_path; }
     void device_derivation_path(const std::string &device_derivation_path) { m_device_derivation_path = device_derivation_path; }
-    const ExportFormat & export_format() const { return m_export_format; }
-    void set_export_format(const ExportFormat& export_format) { m_export_format = export_format; }
 
     bool get_tx_key_cached(const crypto::hash &txid, crypto::secret_key &tx_key, std::vector<crypto::secret_key> &additional_tx_keys) const;
     void set_tx_key(const crypto::hash &txid, const crypto::secret_key &tx_key, const std::vector<crypto::secret_key> &additional_tx_keys);
@@ -1093,8 +1088,8 @@ private:
     const transfer_details &get_transfer_details(size_t idx) const;
 
     void get_hard_fork_info (uint8_t version, uint64_t &earliest_height) const;
-    std::optional<uint8_t> get_hard_fork_version() const { return m_node_rpc_proxy.get_hardfork_version(); }
-    bool use_fork_rules(uint8_t version, uint64_t early_blocks = 0) const;
+    std::optional<cryptonote::hf> get_hard_fork_version() const { return m_node_rpc_proxy.get_hardfork_version(); }
+    bool use_fork_rules(cryptonote::hf version, uint64_t early_blocks = 0) const;
 
     const fs::path& get_wallet_file() const;
     const fs::path& get_keys_file() const;
@@ -1251,7 +1246,7 @@ private:
 
     // params constructor, accumulates the burn amounts if the priority is
     // a blink and, or a ons tx. If it is a blink TX, ons_burn_type is ignored.
-    static cryptonote::oxen_construct_tx_params construct_params(uint8_t hf_version, cryptonote::txtype tx_type, uint32_t priority, uint64_t extra_burn = 0, ons::mapping_type ons_burn_type = static_cast<ons::mapping_type>(0));
+    static cryptonote::oxen_construct_tx_params construct_params(cryptonote::hf hf_version, cryptonote::txtype tx_type, uint32_t priority, uint64_t extra_burn = 0, ons::mapping_type ons_burn_type = static_cast<ons::mapping_type>(0));
 
     bool is_unattended() const { return m_unattended; }
 
@@ -1292,7 +1287,7 @@ private:
      */
     const char* const ATTRIBUTE_DESCRIPTION = "wallet2.description";
     void set_attribute(const std::string &key, const std::string &value);
-    bool get_attribute(const std::string &key, std::string &value) const;
+    std::optional<std::string> get_attribute(const std::string &key) const;
 
     crypto::public_key get_multisig_signer_public_key(const crypto::secret_key &spend_skey) const;
     crypto::public_key get_multisig_signer_public_key() const;
@@ -1399,7 +1394,7 @@ private:
       convert_registration_args_failed,
       registration_timestamp_expired,
       registration_timestamp_parse_fail,
-      validate_contributor_args_fail,
+      validate_registration_args_fail,
       service_node_key_parse_fail,
       service_node_signature_parse_fail,
       service_node_register_serialize_to_tx_extra_fail,
@@ -1454,9 +1449,6 @@ private:
     bool frozen(const crypto::key_image &ki) const;
     bool frozen(const transfer_details &td) const;
 
-    bool save_to_file(const fs::path& path_to_file, std::string_view binary, bool is_printable = false) const;
-    static bool load_from_file(const fs::path& path_to_file, std::string& target_str);
-
     uint64_t get_bytes_sent() const;
     uint64_t get_bytes_received() const;
 
@@ -1510,7 +1502,7 @@ private:
      */
     bool load_keys_buf(const std::string& keys_buf, const epee::wipeable_string& password);
     bool load_keys_buf(const std::string& keys_buf, const epee::wipeable_string& password, std::optional<crypto::chacha_key>& keys_to_encrypt);
-    void process_new_transaction(const crypto::hash &txid, const cryptonote::transaction& tx, const std::vector<uint64_t> &o_indices, uint64_t height, uint8_t block_version, uint64_t ts, bool miner_tx, bool pool, bool blink, bool double_spend_seen, const tx_cache_data &tx_cache_data, std::map<std::pair<uint64_t, uint64_t>, size_t> *output_tracker_cache = NULL);
+    void process_new_transaction(const crypto::hash &txid, const cryptonote::transaction& tx, const std::vector<uint64_t> &o_indices, uint64_t height, cryptonote::hf block_version, uint64_t ts, bool miner_tx, bool pool, bool blink, bool double_spend_seen, const tx_cache_data &tx_cache_data, std::map<std::pair<uint64_t, uint64_t>, size_t> *output_tracker_cache = NULL);
     bool should_skip_block(const cryptonote::block &b, uint64_t height) const;
     void process_new_blockchain_entry(const cryptonote::block& b, const cryptonote::block_complete_entry& bche, const parsed_block &parsed_block, const crypto::hash& bl_id, uint64_t height, const std::vector<tx_cache_data> &tx_cache_data, size_t tx_cache_data_offset, std::map<std::pair<uint64_t, uint64_t>, size_t> *output_tracker_cache = NULL);
     void detach_blockchain(uint64_t height, std::map<std::pair<uint64_t, uint64_t>, size_t> *output_tracker_cache = NULL);
@@ -1524,7 +1516,7 @@ private:
     void process_parsed_blocks(uint64_t start_height, const std::vector<cryptonote::block_complete_entry> &blocks, const std::vector<parsed_block> &parsed_blocks, uint64_t& blocks_added, std::map<std::pair<uint64_t, uint64_t>, size_t> *output_tracker_cache = NULL);
     uint64_t select_transfers(uint64_t needed_money, std::vector<size_t> unused_transfers_indices, std::vector<size_t>& selected_transfers) const;
     bool prepare_file_names(const fs::path& file_path);
-    void process_unconfirmed(const crypto::hash &txid, const cryptonote::transaction& tx, uint64_t height);
+    confirmed_transfer_details* process_unconfirmed(const crypto::hash &txid, const cryptonote::transaction& tx, uint64_t height);
     void process_outgoing(const crypto::hash &txid, const cryptonote::transaction& tx, uint64_t height, uint64_t ts, uint64_t spent, uint64_t received, uint32_t subaddr_account, const std::set<uint32_t>& subaddr_indices);
     void add_unconfirmed_tx(const cryptonote::transaction& tx, uint64_t amount_in, const std::vector<cryptonote::tx_destination_entry> &dests, const crypto::hash &payment_id, uint64_t change_amount, uint32_t subaddr_account, const std::set<uint32_t>& subaddr_indices);
     void generate_genesis(cryptonote::block& b) const;
@@ -1535,7 +1527,7 @@ private:
     void check_acc_out_precomp(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, tx_scan_info_t &tx_scan_info) const;
     void check_acc_out_precomp(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info) const;
     void check_acc_out_precomp_once(const cryptonote::tx_out &o, const crypto::key_derivation &derivation, const std::vector<crypto::key_derivation> &additional_derivations, size_t i, const is_out_data *is_out_data, tx_scan_info_t &tx_scan_info, bool &already_seen) const;
-    void parse_block_round(const cryptonote::blobdata &blob, cryptonote::block &bl, crypto::hash &bl_id, bool &error) const;
+    void parse_block_round(const std::string &blob, cryptonote::block &bl, crypto::hash &bl_id, bool &error) const;
     uint64_t get_upper_transaction_weight_limit() const;
     std::vector<uint64_t> get_unspent_amounts_vector(bool strict) const;
     cryptonote::byte_and_output_fees get_dynamic_base_fee_estimate() const;
@@ -1582,7 +1574,7 @@ private:
     void cache_tx_data(const cryptonote::transaction& tx, const crypto::hash &txid, tx_cache_data &tx_cache_data) const;
     std::shared_ptr<std::map<std::pair<uint64_t, uint64_t>, size_t>> create_output_tracker_cache() const;
 
-    void init_type(hw::device::device_type device_type);
+    void init_type(hw::device::type device_type);
     void setup_new_blockchain();
     void create_keys_file(const fs::path &wallet_, bool watch_only, const epee::wipeable_string &password, bool create_address_file);
 
@@ -1636,7 +1628,7 @@ private:
 
     bool m_trusted_daemon;
     i_wallet2_callback* m_callback;
-    hw::device::device_type m_key_device_type;
+    hw::device::type m_key_device_type;
     cryptonote::network_type m_nettype;
     uint64_t m_kdf_rounds;
     std::string seed_language; /*!< Language of the mnemonics (seed). */
@@ -1679,6 +1671,7 @@ private:
     std::unordered_set<crypto::hash> m_scanned_pool_txs[2];
     size_t m_subaddress_lookahead_major, m_subaddress_lookahead_minor;
     std::string m_device_name;
+    std::string m_device_address;
     std::string m_device_derivation_path;
     uint64_t m_device_last_key_image_sync;
     bool m_offline;
@@ -1731,8 +1724,6 @@ private:
 
     std::shared_ptr<tools::Notify> m_tx_notify;
     std::unique_ptr<wallet_device_callback> m_device_callback;
-
-    ExportFormat m_export_format;
 
     inline static std::mutex default_daemon_address_mutex;
     inline static std::string default_daemon_address;

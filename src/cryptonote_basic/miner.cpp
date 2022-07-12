@@ -31,14 +31,12 @@
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #include <numeric>
-#include <oxenmq/base64.h>
-#include "epee/misc_language.h"
+#include <oxenc/base64.h>
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "common/command_line.h"
 #include "common/util.h"
 #include "common/file.h"
 #include "common/string_util.h"
-#include "epee/string_coding.h"
 #include "epee/string_tools.h"
 #include "epee/storages/portable_storage_template_helper.h"
 
@@ -102,7 +100,13 @@ namespace cryptonote
     uint64_t height{};
     uint64_t expected_reward; //only used for RPC calls - could possibly be useful here too?
 
-    if(!m_phandler->create_next_miner_block_template(bl, m_mine_address, di, height, expected_reward, ""s))
+    std::string extra_nonce;
+    if(m_extra_messages.size() && m_config.current_extra_message_index < m_extra_messages.size())
+    {
+      extra_nonce = m_extra_messages[m_config.current_extra_message_index];
+    }
+
+    if(!m_phandler->create_next_miner_block_template(bl, m_mine_address, di, height, expected_reward, extra_nonce))
     {
       LOG_ERROR("Failed to get_block_template(), stopping mining");
       return false;
@@ -144,6 +148,41 @@ namespace cryptonote
   //-----------------------------------------------------------------------------------------------------
   bool miner::init(const boost::program_options::variables_map& vm, network_type nettype)
   {
+    if(command_line::has_arg(vm, arg_extra_messages))
+    {
+      std::string buff;
+      bool r = tools::slurp_file(fs::u8path(command_line::get_arg(vm, arg_extra_messages)), buff);
+      CHECK_AND_ASSERT_MES(r, false, "Failed to load file with extra messages: " << command_line::get_arg(vm, arg_extra_messages));
+      auto extra_vec = tools::split_any(buff, "\n"sv, true);
+      m_extra_messages.resize(extra_vec.size());
+      for(size_t i = 0; i != extra_vec.size(); i++)
+      {
+        tools::trim(extra_vec[i]);
+        if(!extra_vec[i].size())
+          continue;
+        if (!oxenc::is_base64(extra_vec[i]))
+        {
+          MWARNING("Invalid (non-base64) extra message `" << extra_vec[i] << "'");
+          continue;
+        }
+
+        std::string buff = oxenc::from_base64(extra_vec[i]);
+        if(buff != "0")
+          m_extra_messages[i] = buff;
+      }
+      m_config_dir = fs::u8path(command_line::get_arg(vm, arg_extra_messages)).parent_path();
+      m_config = {};
+      fs::path filename = m_config_dir / MINER_CONFIG_FILE_NAME;
+      if (std::string contents;
+          !tools::slurp_file(filename, contents) ||
+          !epee::serialization::load_t_from_json(m_config, contents))
+      {
+        MERROR("Failed to load data from " << filename);
+        return false;
+      }
+      MINFO("Loaded " << m_extra_messages.size() << " extra messages, current index " << m_config.current_extra_message_index);
+    }
+
     if(command_line::has_arg(vm, arg_start_mining))
     {
       address_parse_info info;
@@ -309,7 +348,7 @@ namespace cryptonote
     {
       if(m_pausers_count)//anti split workaround
       {
-        epee::misc_utils::sleep_no_w(100);
+        std::this_thread::sleep_for(100ms);
         continue;
       }
 
@@ -328,7 +367,7 @@ namespace cryptonote
       if(!local_template_ver)//no any set_block_template call
       {
         LOG_PRINT_L2("Block template not set yet");
-        epee::misc_utils::sleep_no_w(1000);
+        std::this_thread::sleep_for(1s);
         continue;
       }
 

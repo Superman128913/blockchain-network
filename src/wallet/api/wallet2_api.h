@@ -118,6 +118,8 @@ struct StakeUnlockResult
   virtual bool success() = 0;
   virtual std::string msg() = 0;
   virtual PendingTransaction* ptx() = 0;
+
+  virtual ~StakeUnlockResult() = default;
 };
 
 /**
@@ -177,6 +179,7 @@ struct TransactionInfo
     virtual ~TransactionInfo() = 0;
     virtual bool isServiceNodeReward() const = 0;
     virtual bool isMinerReward() const = 0;
+    virtual bool isStake() const = 0;
     virtual int  direction() const = 0;
     virtual bool isPending() const = 0;
     virtual bool isFailed() const = 0;
@@ -606,11 +609,20 @@ struct Wallet
         return result;
     }
 
+    // Information returned about stakes in listCurrentStakes()
+    struct stake_info {
+        std::string sn_pubkey;
+        uint64_t stake = 0;
+        std::optional<uint64_t> unlock_height;
+        bool awaiting = false;
+        bool decommissioned = false;
+    };
+
    /**
-    * @brief listCurrentStakes - returns a list of the wallets locked stakes, provides both service node address and the staked amount
+    * @brief listCurrentStakes - returns a list of the wallets locked stake info (see above).
     * @return
     */
-    virtual std::vector<std::pair<std::string, uint64_t>>* listCurrentStakes() const = 0;
+    virtual std::vector<stake_info>* listCurrentStakes() const = 0;
 
    /**
     * @brief watchOnly - checks if wallet is watch only
@@ -1210,9 +1222,6 @@ struct WalletManagerBase
 
     //! returns current block target
     virtual uint64_t blockTarget() = 0;
-
-    //! resolves an OpenAlias address to a monero address
-    virtual std::string resolveOpenAlias(const std::string &address, bool &dnssec_valid) const = 0;
 };
 
 struct WalletManagerFactory

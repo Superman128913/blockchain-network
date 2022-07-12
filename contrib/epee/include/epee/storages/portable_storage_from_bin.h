@@ -28,9 +28,9 @@
 
 #pragma once 
 
-#include "../misc_language.h"
 #include "portable_storage_base.h"
-#include <boost/endian/conversion.hpp>
+#include <oxenc/endian.h>
+#include <oxenc/variant.h>
 
 namespace epee
 {
@@ -111,7 +111,7 @@ namespace epee
       static_assert(std::is_integral_v<T>);
       read(&v, sizeof(T));
       if constexpr (sizeof(T) > 1)
-        boost::endian::little_to_native(v);
+        oxenc::little_to_host(v);
     }
 
     template <class T>

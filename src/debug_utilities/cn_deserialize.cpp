@@ -34,7 +34,7 @@
 #include "oxen_economy.h"
 #include "common/hex.h"
 #include "version.h"
-#include <oxenmq/hex.h>
+#include <oxenc/hex.h>
 
 #undef OXEN_DEFAULT_LOG_CATEGORY
 #define OXEN_DEFAULT_LOG_CATEGORY "debugtools.deserialize"
@@ -46,10 +46,10 @@ using namespace cryptonote;
 static std::string extra_nonce_to_string(const cryptonote::tx_extra_nonce &extra_nonce)
 {
   if (extra_nonce.nonce.size() == 9 && extra_nonce.nonce[0] == TX_EXTRA_NONCE_ENCRYPTED_PAYMENT_ID)
-    return "encrypted payment ID: " + oxenmq::to_hex(extra_nonce.nonce.begin() + 1, extra_nonce.nonce.end());
+    return "encrypted payment ID: " + oxenc::to_hex(extra_nonce.nonce.begin() + 1, extra_nonce.nonce.end());
   if (extra_nonce.nonce.size() == 33 && extra_nonce.nonce[0] == TX_EXTRA_NONCE_PAYMENT_ID)
-    return "plaintext payment ID: " + oxenmq::to_hex(extra_nonce.nonce.begin() + 1, extra_nonce.nonce.end());
-  return oxenmq::to_hex(extra_nonce.nonce);
+    return "plaintext payment ID: " + oxenc::to_hex(extra_nonce.nonce.begin() + 1, extra_nonce.nonce.end());
+  return oxenc::to_hex(extra_nonce.nonce);
 }
 
 struct extra_printer {
@@ -66,7 +66,7 @@ struct extra_printer {
       std::cout << pk;
     }
   }
-  void operator()(const tx_extra_mysterious_minergate& x) { std::cout << "minergate custom: " << oxenmq::to_hex(x.data); }
+  void operator()(const tx_extra_mysterious_minergate& x) { std::cout << "minergate custom: " << oxenc::to_hex(x.data); }
   void operator()(const tx_extra_service_node_winner& x) { std::cout << "SN reward winner: " << x.m_service_node_key; }
   void operator()(const tx_extra_service_node_register& x) { std::cout << "SN registration data"; } // TODO: could parse this further
   void operator()(const tx_extra_service_node_pubkey& x) { std::cout << "SN pubkey: " << x.m_service_node_key; }
@@ -117,6 +117,21 @@ static void print_extra_fields(const std::vector<cryptonote::tx_extra_field> &fi
     std::cout << "\n";
   }
 }
+
+constexpr static std::string_view network_type_str(network_type nettype)
+{
+  switch(nettype)
+  {
+    case network_type::MAINNET: return "Mainnet"sv;
+    case network_type::TESTNET: return "Testnet"sv;
+    case network_type::DEVNET: return "Devnet"sv;
+    case network_type::FAKECHAIN: return "Fakenet"sv;
+    case network_type::UNDEFINED: return "Undefined Net"sv;
+  }
+  return "Unhandled Net"sv;
+}
+
+
 
 int main(int argc, char* argv[])
 {
@@ -170,9 +185,9 @@ int main(int argc, char* argv[])
 
   mlog_configure("", true);
 
-  cryptonote::blobdata blob;
-  if (epee::string_tools::parse_hexstr_to_binbuff(input, blob))
+  if (oxenc::is_hex(input))
   {
+    auto blob = oxenc::from_hex(input);
     bool full;
     cryptonote::block block;
     cryptonote::transaction tx;
@@ -217,14 +232,14 @@ int main(int argc, char* argv[])
   else
   {
     bool addr_decoded = false;
-    for (uint8_t nettype = MAINNET; nettype < DEVNET + 1;  nettype++)
+    for (auto nettype : {network_type::MAINNET, network_type::TESTNET, network_type::DEVNET})
     {
       cryptonote::address_parse_info addr_info = {};
       if (cryptonote::get_account_address_from_str(addr_info, static_cast<cryptonote::network_type>(nettype), input))
       {
         addr_decoded = true;
         cryptonote::account_public_address const &address = addr_info.address;
-        std::cout << "Network Type: " << cryptonote::network_type_str(static_cast<cryptonote::network_type>(nettype)) << "\n";
+        std::cout << "Network Type: " << network_type_str(static_cast<cryptonote::network_type>(nettype)) << "\n";
         std::cout << "Address: " << input << "\n";
         std::cout << "Subaddress: " << (addr_info.is_subaddress ? "Yes" : "No") << "\n";
         std::cout << "Payment ID: " << (addr_info.has_payment_id ? tools::type_to_hex(addr_info.payment_id) : "(none)") << "\n";

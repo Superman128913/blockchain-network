@@ -35,10 +35,10 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
-#include <boost/endian/conversion.hpp>
+#include <oxenc/endian.h>
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/udp.hpp>
-#include <oxenmq/hex.h>
+#include <oxenc/hex.h>
 #include "common/apply_permutation.h"
 #include "common/string_util.h"
 #include "transport.hpp"
@@ -170,8 +170,8 @@ namespace trezor{
   }
 
   static void serialize_message_header(void * buff, uint16_t tag, uint32_t len){
-    uint16_t wire_tag = boost::endian::native_to_big(static_cast<uint16_t>(tag));
-    uint32_t wire_len = boost::endian::native_to_big(static_cast<uint32_t>(len));
+    uint16_t wire_tag = oxenc::host_to_big(static_cast<uint16_t>(tag));
+    uint32_t wire_len = oxenc::host_to_big(static_cast<uint32_t>(len));
     memcpy(buff, (void *) &wire_tag, 2);
     memcpy((uint8_t*)buff + 2, (void *) &wire_len, 4);
   }
@@ -182,8 +182,8 @@ namespace trezor{
     memcpy(&wire_tag, buff, 2);
     memcpy(&wire_len, (uint8_t*)buff + 2, 4);
 
-    tag = boost::endian::big_to_native(wire_tag);
-    len = boost::endian::big_to_native(wire_len);
+    tag = oxenc::big_to_host(wire_tag);
+    len = oxenc::big_to_host(wire_len);
   }
 
   static void serialize_message(const google::protobuf::Message &req, size_t msg_size, uint8_t * buff, size_t buff_size) {
@@ -458,7 +458,7 @@ namespace trezor{
     epee::wipeable_string res_hex;
     epee::wipeable_string req_hex;
     req_hex.reserve(buff_size * 2);
-    oxenmq::to_hex(req_buff_raw, req_buff_raw + buff_size, std::back_inserter(req_hex));
+    oxenc::to_hex(req_buff_raw, req_buff_raw + buff_size, std::back_inserter(req_hex));
 
     bool req_status = invoke_bridge_http(uri, req_hex, res_hex);
     if (!req_status){

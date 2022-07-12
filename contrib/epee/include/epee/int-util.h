@@ -155,6 +155,18 @@ static inline uint64_t div128_64(uint64_t dividend_hi, uint64_t dividend_lo, uin
   return remainder;
 }
 
+// Calculates a*b/c, using 128-bit precision to avoid overflow.  This assumes that the result is
+// 64-bits, but only checks it (via assertion) in debug builds.  As such you should only call this
+// when this is true: for instance, when c is known to be greater than either a or b.
+static inline uint64_t mul128_div64(uint64_t a, uint64_t b, uint64_t c) {
+  uint64_t hi;
+  uint64_t lo = mul128(a, b, &hi);
+  uint64_t resulthi, resultlo;
+  div128_64(hi, lo, c, &resulthi, &resultlo);
+  assert(resulthi == 0);
+  return resultlo;
+}
+
 #define IDENT16(x) ((uint16_t) (x))
 #define IDENT32(x) ((uint32_t) (x))
 #define IDENT64(x) ((uint64_t) (x))

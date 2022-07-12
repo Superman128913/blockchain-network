@@ -140,8 +140,11 @@ TEST(parse_and_validate_tx_extra, is_valid_tx_extra_parsed)
   cryptonote::transaction tx{};
   cryptonote::account_base acc;
   acc.generate();
-  cryptonote::blobdata b = "dsdsdfsdfsf";
-  ASSERT_TRUE(cryptonote::construct_miner_tx(0, 0, 10000000000000, 1000, TEST_FEE, tx, cryptonote::oxen_miner_tx_context::miner_block(cryptonote::FAKECHAIN, acc.get_keys().m_account_address), b));
+  std::string b = "dsdsdfsdfsf";
+  uint64_t block_rewards = 0;
+  bool r;
+  std::tie(r, block_rewards) = cryptonote::construct_miner_tx(0, 0, 10000000000000, 1000, TEST_FEE, tx, cryptonote::oxen_miner_tx_context::miner_block(cryptonote::network_type::FAKECHAIN, acc.get_keys().m_account_address), {}, b, cryptonote::hf::none);
+  ASSERT_TRUE(r);
   crypto::public_key tx_pub_key = cryptonote::get_tx_pub_key_from_extra(tx);
   ASSERT_NE(tx_pub_key, crypto::null_pkey);
 }
@@ -150,8 +153,11 @@ TEST(parse_and_validate_tx_extra, fails_on_big_extra_nonce)
   cryptonote::transaction tx{};
   cryptonote::account_base acc;
   acc.generate();
-  cryptonote::blobdata b(cryptonote::TX_EXTRA_NONCE_MAX_COUNT + 1, 0);
-  ASSERT_FALSE(cryptonote::construct_miner_tx(0, 0, 10000000000000, 1000, TEST_FEE, tx, cryptonote::oxen_miner_tx_context::miner_block(cryptonote::FAKECHAIN, acc.get_keys().m_account_address), b));
+  std::string b(cryptonote::TX_EXTRA_NONCE_MAX_COUNT + 1, 0);
+  uint64_t block_rewards = 0;
+  bool r;
+  std::tie(r,block_rewards) = cryptonote::construct_miner_tx(0, 0, 10000000000000, 1000, TEST_FEE, tx, cryptonote::oxen_miner_tx_context::miner_block(cryptonote::network_type::FAKECHAIN, acc.get_keys().m_account_address), {}, b, cryptonote::hf::none);
+  ASSERT_FALSE(r);
 }
 TEST(parse_and_validate_tx_extra, fails_on_wrong_size_in_extra_nonce)
 {
@@ -164,46 +170,45 @@ TEST(parse_and_validate_tx_extra, fails_on_wrong_size_in_extra_nonce)
 }
 TEST(validate_parse_amount_case, validate_parse_amount)
 {
-  uint64_t res = 0;
-  bool r = cryptonote::parse_amount(res, "0.0001");
-  ASSERT_TRUE(r);
-  ASSERT_EQ(res, 100000);
+  auto a = cryptonote::parse_amount("0.0001");
+  ASSERT_TRUE(a);
+  ASSERT_EQ(*a, 100000);
 
-  r = cryptonote::parse_amount(res, "100.0001");
-  ASSERT_TRUE(r);
-  ASSERT_EQ(res, 100000100000);
+  a = cryptonote::parse_amount("100.0001");
+  ASSERT_TRUE(a);
+  ASSERT_EQ(*a, 100000100000);
 
-  r = cryptonote::parse_amount(res, "000.0000");
-  ASSERT_TRUE(r);
-  ASSERT_EQ(res, 0);
+  a = cryptonote::parse_amount("000.0000");
+  ASSERT_TRUE(a);
+  ASSERT_EQ(*a, 0);
 
-  r = cryptonote::parse_amount(res, "0");
-  ASSERT_TRUE(r);
-  ASSERT_EQ(res, 0);
+  a = cryptonote::parse_amount("0");
+  ASSERT_TRUE(a);
+  ASSERT_EQ(*a, 0);
 
 
-  r = cryptonote::parse_amount(res, "   100.0001    ");
-  ASSERT_TRUE(r);
-  ASSERT_EQ(res, 100000100000);
+  a = cryptonote::parse_amount("   100.0001    ");
+  ASSERT_TRUE(a);
+  ASSERT_EQ(*a, 100000100000);
 
-  r = cryptonote::parse_amount(res, "   100.0000    ");
-  ASSERT_TRUE(r);
-  ASSERT_EQ(res, 100000000000);
+  a = cryptonote::parse_amount("   100.0000    ");
+  ASSERT_TRUE(a);
+  ASSERT_EQ(*a, 100000000000);
 
-  r = cryptonote::parse_amount(res, "   100. 0000    ");
-  ASSERT_FALSE(r);
+  a = cryptonote::parse_amount("   100. 0000    ");
+  ASSERT_FALSE(a);
 
-  r = cryptonote::parse_amount(res, "100. 0000");
-  ASSERT_FALSE(r);
+  a = cryptonote::parse_amount("100. 0000");
+  ASSERT_FALSE(a);
 
-  r = cryptonote::parse_amount(res, "100 . 0000");
-  ASSERT_FALSE(r);
+  a = cryptonote::parse_amount("100 . 0000");
+  ASSERT_FALSE(a);
 
-  r = cryptonote::parse_amount(res, "100.00 00");
-  ASSERT_FALSE(r);
+  a = cryptonote::parse_amount("100.00 00");
+  ASSERT_FALSE(a);
 
-  r = cryptonote::parse_amount(res, "1 00.00 00");
-  ASSERT_FALSE(r);
+  a = cryptonote::parse_amount("1 00.00 00");
+  ASSERT_FALSE(a);
 }
 
 TEST(sort_tx_extra, empty)

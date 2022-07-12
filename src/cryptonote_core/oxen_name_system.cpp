@@ -4,6 +4,7 @@
 #include <vector>
 #include <algorithm>
 #include "common/hex.h"
+#include "cryptonote_config.h"
 #include "oxen_name_system.h"
 
 #include "common/oxen.h"
@@ -16,9 +17,9 @@
 #include "cryptonote_core/blockchain.h"
 #include "oxen_economy.h"
 
-#include <oxenmq/hex.h>
-#include <oxenmq/base32z.h>
-#include <oxenmq/base64.h>
+#include <oxenc/hex.h>
+#include <oxenc/base32z.h>
+#include <oxenc/base64.h>
 
 #include <sqlite3.h>
 
@@ -35,6 +36,8 @@ extern "C"
 
 #undef OXEN_DEFAULT_LOG_CATEGORY
 #define OXEN_DEFAULT_LOG_CATEGORY "ons"
+
+using cryptonote::hf;
 
 namespace ons
 {
@@ -109,17 +112,17 @@ std::string ons::mapping_value::to_readable_value(cryptonote::network_type netty
   std::string result;
   if (is_lokinet_type(type))
   {
-    result = oxenmq::to_base32z(to_view()) + ".loki";
+    result = oxenc::to_base32z(to_view()) + ".loki";
   } else if (type == ons::mapping_type::wallet) {
     std::optional<cryptonote::address_parse_info> addr = get_wallet_address_info();
     if(addr)
     {
       result = cryptonote::get_account_address_as_str(nettype, (*addr).is_subaddress, (*addr).address);
     } else {
-      result = oxenmq::to_hex(to_view());
+      result = oxenc::to_hex(to_view());
     }
   } else {
-    result = oxenmq::to_hex(to_view());
+    result = oxenc::to_hex(to_view());
   }
 
   return result;
@@ -609,14 +612,14 @@ sqlite3 *init_oxen_name_system(const fs::path& file_path, bool read_only)
   return result;
 }
 
-std::vector<mapping_type> all_mapping_types(uint8_t hf_version) {
+std::vector<mapping_type> all_mapping_types(hf hf_version) {
   std::vector<mapping_type> result;
   result.reserve(2);
-  if (hf_version >= cryptonote::network_version_15_ons)
+  if (hf_version >= hf::hf15_ons)
     result.push_back(mapping_type::session);
-  if (hf_version >= cryptonote::network_version_16_pulse)
+  if (hf_version >= hf::hf16_pulse)
     result.push_back(mapping_type::lokinet);
-  if (hf_version >= cryptonote::network_version_18)
+  if (hf_version >= hf::hf18)
     result.push_back(mapping_type::wallet);
   return result;
 }
@@ -628,18 +631,19 @@ std::optional<uint64_t> expiry_blocks(cryptonote::network_type nettype, mapping_
   {
     // For testnet we shorten 1-, 2-, and 5-year renewals to 1/2/5 days with 1-day renewal, but
     // leave 10 years alone to allow long-term registrations on testnet.
-    const bool testnet_short = nettype == cryptonote::TESTNET && type != mapping_type::lokinet_10years;
+    const bool testnet_short = nettype == cryptonote::network_type::TESTNET && type != mapping_type::lokinet_10years;
 
-    if (type == mapping_type::lokinet)              result = BLOCKS_EXPECTED_IN_DAYS(1 * REGISTRATION_YEAR_DAYS);
-    else if (type == mapping_type::lokinet_2years)  result = BLOCKS_EXPECTED_IN_DAYS(2 * REGISTRATION_YEAR_DAYS);
-    else if (type == mapping_type::lokinet_5years)  result = BLOCKS_EXPECTED_IN_DAYS(5 * REGISTRATION_YEAR_DAYS);
-    else if (type == mapping_type::lokinet_10years) result = BLOCKS_EXPECTED_IN_DAYS(10 * REGISTRATION_YEAR_DAYS);
-    assert(result);
+    result = cryptonote::BLOCKS_PER_DAY * REGISTRATION_YEAR_DAYS * (
+        type == mapping_type::lokinet         ? 1 :
+        type == mapping_type::lokinet_2years  ? 2 :
+        type == mapping_type::lokinet_5years  ? 5 :
+        type == mapping_type::lokinet_10years ? 10 : 0);
+    assert(result && *result);
 
     if (testnet_short)
       *result /= REGISTRATION_YEAR_DAYS;
-    else if (nettype == cryptonote::FAKECHAIN) // For fakenet testing we shorten 1/2/5/10 years to 2/4/10/20 blocks
-      *result /= (BLOCKS_EXPECTED_IN_DAYS(REGISTRATION_YEAR_DAYS) / 2);
+    else if (nettype == cryptonote::network_type::FAKECHAIN) // For fakenet testing we shorten 1/2/5/10 years to 2/4/10/20 blocks
+      *result /= (cryptonote::BLOCKS_PER_DAY * REGISTRATION_YEAR_DAYS / 2);
   }
 
   return result;
@@ -707,9 +711,9 @@ bool parse_owner_to_generic_owner(cryptonote::network_type nettype, std::string_
   {
     result = ons::make_monero_owner(parsed_addr.address, parsed_addr.is_subaddress);
   }
-  else if (owner.size() == 2*sizeof(ed_owner.data) && oxenmq::is_hex(owner))
+  else if (owner.size() == 2*sizeof(ed_owner.data) && oxenc::is_hex(owner))
   {
-    oxenmq::from_hex(owner.begin(), owner.end(), ed_owner.data);
+    oxenc::from_hex(owner.begin(), owner.end(), ed_owner.data);
     result = ons::make_ed25519_owner(ed_owner);
   }
   else
@@ -864,7 +868,7 @@ bool validate_ons_name(mapping_type type, std::string name, std::string *reason)
 std::optional<cryptonote::address_parse_info> encrypted_wallet_value_to_info(std::string name, std::string encrypted_value, std::string nonce)
 {
   std::string lower_name = tools::lowercase_ascii_string(std::move(name));
-  mapping_value record(oxenmq::from_hex(encrypted_value), oxenmq::from_hex(nonce));
+  mapping_value record(oxenc::from_hex(encrypted_value), oxenc::from_hex(nonce));
   record.decrypt(lower_name, mapping_type::wallet);
   return record.get_wallet_address_info();
 }
@@ -884,7 +888,7 @@ static bool check_lengths(mapping_type type, std::string_view value, size_t max,
     {
       std::stringstream err_stream;
       err_stream << "ONS type=" << type << ", specifies mapping from name_hash->encrypted_value where the value's length=" << value.size() << ", does not equal the required length=" << max << ", given value=";
-      if (binary_val) err_stream << oxenmq::to_hex(value);
+      if (binary_val) err_stream << oxenc::to_hex(value);
       else            err_stream << value;
       *reason = err_stream.str();
     }
@@ -950,14 +954,14 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
     // We need a 52 char base32z string that decodes to a 32-byte value, which really means we need
     // 51 base32z chars (=255 bits) followed by a 1-bit value ('y'=0, or 'o'=0b10000); anything else
     // in the last spot isn't a valid lokinet address.
-    if (check_condition(value.size() != 57 || !tools::ends_with(value, ".loki") || !oxenmq::is_base32z(value.substr(0, 52)) || !(value[51] == 'y' || value[51] == 'o'),
+    if (check_condition(value.size() != 57 || !tools::ends_with(value, ".loki") || !oxenc::is_base32z(value.substr(0, 52)) || !(value[51] == 'y' || value[51] == 'o'),
                 reason, "'", value, "' is not a valid lokinet address"))
       return false;
 
     if (blob)
     {
       blob->len = sizeof(crypto::ed25519_public_key);
-      oxenmq::from_base32z(value.begin(), value.begin() + 52, blob->buffer.begin());
+      oxenc::from_base32z(value.begin(), value.begin() + 52, blob->buffer.begin());
     }
   }
   else
@@ -967,7 +971,7 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
     if (check_condition(value.size() != 2*SESSION_PUBLIC_KEY_BINARY_LENGTH, reason, "The value=", value, " is not the required ", 2*SESSION_PUBLIC_KEY_BINARY_LENGTH, "-character hex string session public key, length=", value.size()))
       return false;
 
-    if (check_condition(!oxenmq::is_hex(value), reason, ", specifies name -> value mapping where the value is not a hex string given value="))
+    if (check_condition(!oxenc::is_hex(value), reason, ", specifies name -> value mapping where the value is not a hex string given value="))
       return false;
 
     // NOTE: Session public keys are 33 bytes, with the first byte being 0x05 and the remaining 32 being the public key.
@@ -978,7 +982,7 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
     {
       blob->len = value.size() / 2;
       assert(blob->len <= blob->buffer.size());
-      oxenmq::from_hex(value.begin(), value.end(), blob->buffer.begin());
+      oxenc::from_hex(value.begin(), value.end(), blob->buffer.begin());
 
     }
   }
@@ -1048,17 +1052,17 @@ std::string name_hash_bytes_to_base64(std::string_view bytes)
 {
   if (bytes.size() != NAME_HASH_SIZE)
     throw std::runtime_error{"Invalid name hash: expected exactly 32 bytes"};
-  return oxenmq::to_base64(bytes);
+  return oxenc::to_base64(bytes);
 }
 
 std::optional<std::string> name_hash_input_to_base64(std::string_view input)
 {
   if (input.size() == NAME_HASH_SIZE)
     return name_hash_bytes_to_base64(input);
-  if (input.size() == 2*NAME_HASH_SIZE && oxenmq::is_hex(input))
-    return name_hash_bytes_to_base64(oxenmq::from_hex(input));
-  if (input.size() >= NAME_HASH_SIZE_B64_MIN && input.size() <= NAME_HASH_SIZE_B64_MAX && oxenmq::is_base64(input)) {
-    std::string tmp = oxenmq::from_base64(input);
+  if (input.size() == 2*NAME_HASH_SIZE && oxenc::is_hex(input))
+    return name_hash_bytes_to_base64(oxenc::from_hex(input));
+  if (input.size() >= NAME_HASH_SIZE_B64_MIN && input.size() <= NAME_HASH_SIZE_B64_MAX && oxenc::is_base64(input)) {
+    std::string tmp = oxenc::from_base64(input);
     if (tmp.size() == NAME_HASH_SIZE) // Could still be off from too much/too little padding
       return name_hash_bytes_to_base64(tmp);
   }
@@ -1182,7 +1186,7 @@ static bool validate_against_previous_mapping(ons::name_system_db &ons_db, uint6
 // Sanity check value to disallow the empty name hash
 static const crypto::hash null_name_hash = name_to_hash("");
 
-bool name_system_db::validate_ons_tx(uint8_t hf_version, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_oxen_name_system &ons_extra, std::string *reason)
+bool name_system_db::validate_ons_tx(hf hf_version, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_oxen_name_system &ons_extra, std::string *reason)
 {
   // -----------------------------------------------------------------------------------------------
   // Pull out ONS Extra from TX
@@ -1221,7 +1225,7 @@ bool name_system_db::validate_ons_tx(uint8_t hf_version, uint64_t blockchain_hei
     if (check_condition(ons_extra.version != 0, reason, tx, ", ", ons_extra_string(nettype, ons_extra), " unexpected version=", std::to_string(ons_extra.version), ", expected=0"))
       return false;
 
-    if (check_condition(!ons::mapping_type_allowed(hf_version, ons_extra.type), reason, tx, ", ", ons_extra_string(nettype, ons_extra), " specifying type=", ons_extra.type, " that is disallowed in hardfork ", hf_version))
+    if (check_condition(!ons::mapping_type_allowed(hf_version, ons_extra.type), reason, tx, ", ", ons_extra_string(nettype, ons_extra), " specifying type=", ons_extra.type, " is disallowed in HF", +static_cast<uint8_t>(hf_version)))
       return false;
 
     // -----------------------------------------------------------------------------------------------
@@ -1264,7 +1268,7 @@ bool name_system_db::validate_ons_tx(uint8_t hf_version, uint64_t blockchain_hei
   {
     uint64_t burn                = cryptonote::get_burned_amount_from_tx_extra(tx.extra);
     uint64_t const burn_required = (ons_extra.is_buying() || ons_extra.is_renewing()) ? burn_needed(hf_version, ons_extra.type) : 0;
-    if (hf_version == cryptonote::network_version_18 && burn > burn_required && blockchain_height < 524'000) {
+    if (hf_version == hf::hf18 && burn > burn_required && blockchain_height < 524'000) {
         // Testnet sync fix: PR #1433 merged that lowered fees for HF18 while testnet was already on
         // HF18, but broke syncing because earlier HF18 blocks have ONS txes at the higher fees, so
         // this allows them to pass by pretending the tx burned the right amount.
@@ -1282,13 +1286,13 @@ bool name_system_db::validate_ons_tx(uint8_t hf_version, uint64_t blockchain_hei
   return true;
 }
 
-bool validate_mapping_type(std::string_view mapping_type_str, uint8_t hf_version, ons_tx_type txtype, ons::mapping_type *mapping_type, std::string *reason)
+bool validate_mapping_type(std::string_view mapping_type_str, hf hf_version, ons_tx_type txtype, ons::mapping_type *mapping_type, std::string *reason)
 {
   std::string mapping = tools::lowercase_ascii_string(mapping_type_str);
   std::optional<ons::mapping_type> mapping_type_;
   if (txtype != ons_tx_type::renew && tools::string_iequal(mapping, "session"))
     mapping_type_ = ons::mapping_type::session;
-  else if (hf_version >= cryptonote::network_version_16_pulse)
+  else if (hf_version >= hf::hf16_pulse)
   {
     if (tools::string_iequal(mapping, "lokinet"))
       mapping_type_ = ons::mapping_type::lokinet;
@@ -1304,7 +1308,7 @@ bool validate_mapping_type(std::string_view mapping_type_str, uint8_t hf_version
         mapping_type_ = ons::mapping_type::lokinet_10years;
     }
   }
-  if (hf_version >= cryptonote::network_version_18)
+  if (hf_version >= hf::hf18)
   {
     if (tools::string_iequal(mapping, "wallet"))
       mapping_type_ = ons::mapping_type::wallet;
@@ -1536,7 +1540,7 @@ std::optional<cryptonote::address_parse_info> mapping_value::get_wallet_address_
   assert(!encrypted);
   if (encrypted) return std::nullopt;
 
-  cryptonote::address_parse_info addr_info{0};
+  cryptonote::address_parse_info addr_info{};
   auto* bufpos = &buffer[1];
   std::memcpy(&addr_info.address.m_spend_public_key.data, bufpos, 32);
   bufpos += 32;
@@ -1875,8 +1879,8 @@ AND NOT EXISTS   (SELECT * FROM mappings WHERE owner.id = mappings.backup_owner_
   {
     if (!blockchain)
     {
-      assert(nettype == cryptonote::FAKECHAIN);
-      return nettype == cryptonote::FAKECHAIN;
+      assert(nettype == cryptonote::network_type::FAKECHAIN);
+      return nettype == cryptonote::network_type::FAKECHAIN;
     }
 
     uint64_t ons_height   = 0;
@@ -2108,7 +2112,7 @@ bool name_system_db::add_block(const cryptonote::block &block, const std::vector
    return false;
 
   bool ons_parsed_from_block = false;
-  if (block.major_version >= cryptonote::network_version_15_ons)
+  if (block.major_version >= hf::hf15_ons)
   {
     for (cryptonote::transaction const &tx : txs)
     {
@@ -2267,7 +2271,7 @@ bool name_system_db::get_wallet_mapping(std::string str, uint64_t blockchain_hei
 
 mapping_record name_system_db::get_mapping(mapping_type type, std::string_view name_base64_hash, std::optional<uint64_t> blockchain_height)
 {
-  assert(name_base64_hash.size() == 44 && name_base64_hash.back() == '=' && oxenmq::is_base64(name_base64_hash));
+  assert(name_base64_hash.size() == 44 && name_base64_hash.back() == '=' && oxenc::is_base64(name_base64_hash));
   mapping_record result = {};
   result.loaded         = bind_and_run(ons_sql_type::get_mapping, get_mapping_sql, &result,
       db_mapping_type(type), name_base64_hash);
@@ -2278,7 +2282,7 @@ mapping_record name_system_db::get_mapping(mapping_type type, std::string_view n
 
 std::optional<mapping_value> name_system_db::resolve(mapping_type type, std::string_view name_hash_b64, uint64_t blockchain_height)
 {
-  assert(name_hash_b64.size() == 44 && name_hash_b64.back() == '=' && oxenmq::is_base64(name_hash_b64));
+  assert(name_hash_b64.size() == 44 && name_hash_b64.back() == '=' && oxenc::is_base64(name_hash_b64));
   std::optional<mapping_value> result;
   bind_all(resolve_sql, db_mapping_type(type), name_hash_b64, blockchain_height);
   if (step(resolve_sql) == SQLITE_ROW)
@@ -2299,7 +2303,7 @@ std::optional<mapping_value> name_system_db::resolve(mapping_type type, std::str
 
 std::vector<mapping_record> name_system_db::get_mappings(std::vector<mapping_type> const &types, std::string_view name_base64_hash, std::optional<uint64_t> blockchain_height)
 {
-  assert(name_base64_hash.size() == 44 && name_base64_hash.back() == '=' && oxenmq::is_base64(name_base64_hash));
+  assert(name_base64_hash.size() == 44 && name_base64_hash.back() == '=' && oxenc::is_base64(name_base64_hash));
   std::vector<mapping_record> result;
   if (types.empty())
     return result;

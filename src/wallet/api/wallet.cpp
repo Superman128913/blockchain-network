@@ -29,6 +29,7 @@
 //
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
+#include "crypto/crypto.h"
 #ifdef _WIN32
  #define __STDC_FORMAT_MACROS // NOTE(oxen): Explicitly define the PRIu64 macro on Mingw
 #endif
@@ -73,9 +74,9 @@ namespace {
       auto dir = tools::get_default_data_dir();
       // remove .oxen, replace with .shared-ringdb
       dir.replace_filename(".shared-ringdb");
-      if (nettype == cryptonote::TESTNET)
+      if (nettype == cryptonote::network_type::TESTNET)
         dir /= "testnet";
-      else if (nettype == cryptonote::DEVNET)
+      else if (nettype == cryptonote::network_type::DEVNET)
         dir /= "devnet";
       return dir;
     }
@@ -315,16 +316,14 @@ std::string Wallet::displayAmount(uint64_t amount)
 EXPORT
 uint64_t Wallet::amountFromString(const std::string &amount)
 {
-    uint64_t result = 0;
-    cryptonote::parse_amount(result, amount);
-    return result;
+    return cryptonote::parse_amount(amount).value_or(0);
 }
 
 EXPORT
 uint64_t Wallet::amountFromDouble(double amount)
 {
     std::stringstream ss;
-    ss << std::fixed << std::setprecision(CRYPTONOTE_DISPLAY_DECIMAL_POINT) << amount;
+    ss << std::fixed << std::setprecision(oxen::DISPLAY_DECIMAL_POINT) << amount;
     return amountFromString(ss.str());
 }
 
@@ -339,14 +338,14 @@ std::string Wallet::genPaymentId()
 EXPORT
 bool Wallet::paymentIdValid(const std::string &payment_id)
 {
-    return payment_id.size() == 16 && oxenmq::is_hex(payment_id);
+    return payment_id.size() == 16 && oxenc::is_hex(payment_id);
 }
 
 EXPORT
 bool Wallet::serviceNodePubkeyValid(const std::string &str)
 {
     crypto::public_key sn_key;
-    return str.size() == 64 && oxenmq::is_hex(str);
+    return str.size() == 64 && oxenc::is_hex(str);
 }
 
 EXPORT
@@ -364,14 +363,13 @@ bool Wallet::keyValid(const std::string &secret_key_string, const std::string &a
       error = tr("Failed to parse address");
       return false;
   }
-  
-  cryptonote::blobdata key_data;
-  if(!epee::string_tools::parse_hexstr_to_binbuff(secret_key_string, key_data) || key_data.size() != sizeof(crypto::secret_key))
+
+  crypto::secret_key key;
+  if (!tools::hex_to_type(secret_key_string, unwrap(unwrap(key))))
   {
       error = tr("Failed to parse key");
       return false;
   }
-  crypto::secret_key key = *reinterpret_cast<const crypto::secret_key*>(key_data.data());
 
   // check the key match the given address
   crypto::public_key pkey;
@@ -628,16 +626,11 @@ bool WalletImpl::recoverFromKeysWithPassword(std::string_view path_,
 
     // parse optional spend key
     crypto::secret_key spendkey;
-    bool has_spendkey = false;
-    if (!spendkey_string.empty()) {
-        cryptonote::blobdata spendkey_data;
-        if(!epee::string_tools::parse_hexstr_to_binbuff(spendkey_string, spendkey_data) || spendkey_data.size() != sizeof(crypto::secret_key))
-        {
-            setStatusError(tr("failed to parse secret spend key"));
-            return false;
-        }
-        has_spendkey = true;
-        spendkey = *reinterpret_cast<const crypto::secret_key*>(spendkey_data.data());
+    bool has_spendkey = !spendkey_string.empty();
+    if (has_spendkey && !tools::hex_to_type(spendkey_string, unwrap(unwrap(spendkey))))
+    {
+        setStatusError(tr("failed to parse secret spend key"));
+        return false;
     }
 
     // parse view secret key
@@ -653,13 +646,11 @@ bool WalletImpl::recoverFromKeysWithPassword(std::string_view path_,
         }
     }
     if(has_viewkey) {
-      cryptonote::blobdata viewkey_data;
-      if(!epee::string_tools::parse_hexstr_to_binbuff(viewkey_string, viewkey_data) || viewkey_data.size() != sizeof(crypto::secret_key))
+      if (!tools::hex_to_type(viewkey_string, unwrap(unwrap(viewkey))))
       {
           setStatusError(tr("failed to parse secret view key"));
           return false;
       }
-      viewkey = *reinterpret_cast<const crypto::secret_key*>(viewkey_data.data());
     }
     // check the spend and view keys match the given address
     crypto::public_key pkey;
@@ -1073,19 +1064,25 @@ uint64_t WalletImpl::unlockedBalance(uint32_t accountIndex) const
 }
 
 EXPORT
-std::vector<std::pair<std::string, uint64_t>>* WalletImpl::listCurrentStakes() const
+std::vector<Wallet::stake_info>* WalletImpl::listCurrentStakes() const
 {
-    std::vector<std::pair<std::string, uint64_t>>* stakes = new std::vector<std::pair<std::string, uint64_t>>;
+    auto* stakes = new std::vector<Wallet::stake_info>;
 
     auto response = wallet()->list_current_stakes();
+    auto main_addr = mainAddress();
 
-    for (rpc::GET_SERVICE_NODES::response::entry const &node_info : response)
-    {
+    for (const auto& node_info : response)
         for (const auto& contributor : node_info.contributors)
-        {
-            stakes->push_back(std::make_pair(node_info.service_node_pubkey, contributor.amount));
-        }
-    }
+            if (contributor.address == main_addr) {
+                auto& info = stakes->emplace_back();
+                info.sn_pubkey = node_info.service_node_pubkey;
+                info.stake = contributor.amount;
+                if (node_info.requested_unlock_height != 0)
+                    info.unlock_height = node_info.requested_unlock_height;
+                info.awaiting = !node_info.funded;
+                info.decommissioned = node_info.funded && !node_info.active;
+            }
+
     return stakes;
 }
 
@@ -1471,7 +1468,7 @@ bool WalletImpl::exportMultisigImages(std::string& images) {
         checkMultisigWalletReady(w);
 
         auto blob = w->export_multisig();
-        images = oxenmq::to_hex(blob);
+        images = oxenc::to_hex(blob);
         return true;
     } catch (const std::exception& e) {
         LOG_ERROR("Error on exporting multisig images: " << e.what());
@@ -1492,14 +1489,13 @@ size_t WalletImpl::importMultisigImages(const std::vector<std::string>& images) 
         blobs.reserve(images.size());
 
         for (const auto& image: images) {
-            std::string blob;
-            if (!epee::string_tools::parse_hexstr_to_binbuff(image, blob)) {
+            if (!oxenc::is_hex(image)) {
                 LOG_ERROR("Failed to parse imported multisig images");
                 setStatusError(tr("Failed to parse imported multisig images"));
                 return 0;
             }
 
-            blobs.emplace_back(std::move(blob));
+            blobs.push_back(oxenc::from_hex(image));
         }
 
         return w->import_multisig(blobs);
@@ -1534,12 +1530,11 @@ PendingTransaction* WalletImpl::restoreMultisigTransaction(const std::string& si
         auto w = wallet();
         checkMultisigWalletReady(w);
 
-        std::string binary;
-        if (!epee::string_tools::parse_hexstr_to_binbuff(signData, binary))
+        if (!oxenc::is_hex(signData))
             throw std::runtime_error("Failed to deserialize multisig transaction");
 
         tools::wallet2::multisig_tx_set txSet;
-        if (!w->load_multisig_tx(binary, txSet, {}))
+        if (!w->load_multisig_tx(oxenc::from_hex(signData), txSet, {}))
           throw std::runtime_error("couldn't parse multisig transaction data");
 
         auto ptx = new PendingTransactionImpl(*this);
@@ -1630,7 +1625,7 @@ PendingTransaction *WalletImpl::createTransactionMultDest(const std::vector<std:
             break;
         }
         try {
-            std::optional<uint8_t> hf_version = w->get_hard_fork_version();
+            auto hf_version = w->get_hard_fork_version();
             if (!hf_version)
             {
               setStatusError(tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED);
@@ -1640,12 +1635,12 @@ PendingTransaction *WalletImpl::createTransactionMultDest(const std::vector<std:
             if (amount) {
                 oxen_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, txtype::standard, priority);
                 transaction->m_pending_tx = w->create_transactions_2(
-                        dsts, CRYPTONOTE_DEFAULT_TX_MIXIN, 0 /* unlock_time */,
+                        dsts, cryptonote::TX_OUTPUT_DECOYS, 0 /* unlock_time */,
                         priority,
                         extra, subaddr_account, subaddr_indices, tx_params);
             } else {
                 transaction->m_pending_tx = w->create_transactions_all(
-                        0, info.address, info.is_subaddress, 1, CRYPTONOTE_DEFAULT_TX_MIXIN, 0 /* unlock_time */,
+                        0, info.address, info.is_subaddress, 1, cryptonote::TX_OUTPUT_DECOYS, 0 /* unlock_time */,
                         priority,
                         extra, subaddr_account, subaddr_indices);
             }
@@ -1871,18 +1866,15 @@ bool WalletImpl::setCacheAttribute(const std::string &key, const std::string &va
 EXPORT
 std::string WalletImpl::getCacheAttribute(const std::string &key) const
 {
-    std::string value;
-    wallet()->get_attribute(key, value);
-    return value;
+    return wallet()->get_attribute(key).value_or(""s);
 }
 
 EXPORT
 bool WalletImpl::setUserNote(const std::string &txid, const std::string &note)
 {
-    cryptonote::blobdata txid_data;
-    if(!epee::string_tools::parse_hexstr_to_binbuff(txid, txid_data) || txid_data.size() != sizeof(crypto::hash))
+    crypto::hash htxid;
+    if (!tools::hex_to_type(txid, htxid))
       return false;
-    const crypto::hash htxid = *reinterpret_cast<const crypto::hash*>(txid_data.data());
 
     wallet()->set_tx_note(htxid, note);
     return true;
@@ -1891,10 +1883,9 @@ bool WalletImpl::setUserNote(const std::string &txid, const std::string &note)
 EXPORT
 std::string WalletImpl::getUserNote(const std::string &txid) const
 {
-    cryptonote::blobdata txid_data;
-    if(!epee::string_tools::parse_hexstr_to_binbuff(txid, txid_data) || txid_data.size() != sizeof(crypto::hash))
+    crypto::hash htxid;
+    if (!tools::hex_to_type(txid, htxid))
       return "";
-    const crypto::hash htxid = *reinterpret_cast<const crypto::hash*>(txid_data.data());
 
     return wallet()->get_tx_note(htxid);
 }
@@ -2175,12 +2166,11 @@ bool WalletImpl::verifyMessageWithPublicKey(const std::string &message, const st
 {
     clearStatus();
 
-    cryptonote::blobdata pkeyData;
-    if(!epee::string_tools::parse_hexstr_to_binbuff(publicKey, pkeyData) || pkeyData.size() != sizeof(crypto::public_key))
+    crypto::public_key pkey;
+    if (!tools::hex_to_type(publicKey, pkey))
         return setStatusError(tr("Given string is not a key"));
 
     try {
-        crypto::public_key pkey = *reinterpret_cast<const crypto::public_key*>(pkeyData.data());
         return wallet()->verify_with_public_key(message, pkey, signature);
     } catch (const std::exception& e) {
         return setStatusError(e.what());
@@ -2475,13 +2465,16 @@ void WalletImpl::hardForkInfo(uint8_t &version, uint64_t &earliest_height) const
 EXPORT
 std::optional<uint8_t> WalletImpl::hardForkVersion() const
 {
-    return m_wallet_ptr->get_hard_fork_version();
+    auto v = m_wallet_ptr->get_hard_fork_version();
+    if (!v)
+      return std::nullopt;
+    return static_cast<uint8_t>(*v);
 }
 
 EXPORT
 bool WalletImpl::useForkRules(uint8_t version, int64_t early_blocks) const 
 {
-    return wallet()->use_fork_rules(version,early_blocks);
+    return wallet()->use_fork_rules(static_cast<hf>(version),early_blocks);
 }
 
 EXPORT

@@ -82,19 +82,19 @@ namespace epee
 
     //-------------------------------------------------------------------------------------------------------------------
     template<class t_type, class t_storage>
-    static bool serialize_t_val(const t_type& d, t_storage& stg, section* parent_section, const char* pname)
+    bool serialize_t_val(const t_type& d, t_storage& stg, section* parent_section, const char* pname)
     {
       return stg.set_value(pname, d, parent_section);
     }
     //-------------------------------------------------------------------------------------------------------------------
     template<class t_type, class t_storage>
-    static bool unserialize_t_val(t_type& d, t_storage& stg, section* parent_section, const char* pname)
+    bool unserialize_t_val(t_type& d, t_storage& stg, section* parent_section, const char* pname)
     {
       return stg.get_value(pname, d, parent_section);
     } 
     //-------------------------------------------------------------------------------------------------------------------
     template<class t_type, class t_storage>
-    static bool serialize_t_val_as_blob(const t_type& d, t_storage& stg, section* parent_section, const char* pname)
+    bool serialize_t_val_as_blob(const t_type& d, t_storage& stg, section* parent_section, const char* pname)
     {
       assert_blob_serializable<t_type>();
       std::string blob((const char *)&d, sizeof(d));
@@ -102,7 +102,7 @@ namespace epee
     }
     //-------------------------------------------------------------------------------------------------------------------
     template<class t_type, class t_storage>
-    static bool unserialize_t_val_as_blob(t_type& d, t_storage& stg, section* parent_section, const char* pname)
+    bool unserialize_t_val_as_blob(t_type& d, t_storage& stg, section* parent_section, const char* pname)
     {
       assert_blob_serializable<t_type>();
       std::string blob;
@@ -114,7 +114,7 @@ namespace epee
     } 
     //-------------------------------------------------------------------------------------------------------------------
     template<class serializible_type, class t_storage>
-    static bool serialize_t_obj(const serializible_type& obj, t_storage& stg, section* parent_section, const char* pname)
+    bool serialize_t_obj(const serializible_type& obj, t_storage& stg, section* parent_section, const char* pname)
     {
       section* child_section = stg.open_section(pname, parent_section, true);
       CHECK_AND_ASSERT_MES(child_section, false, "serialize_t_obj: failed to open/create section " << pname);
@@ -122,7 +122,7 @@ namespace epee
     }
     //-------------------------------------------------------------------------------------------------------------------
     template<class serializible_type, class t_storage>
-    static bool unserialize_t_obj(serializible_type& obj, t_storage& stg, section* parent_section, const char* pname)
+    bool unserialize_t_obj(serializible_type& obj, t_storage& stg, section* parent_section, const char* pname)
     {
       section* child_section = stg.open_section(pname, parent_section, false);
       if(!child_section) return false;
@@ -130,7 +130,7 @@ namespace epee
     }
     //-------------------------------------------------------------------------------------------------------------------
     template<class stl_container, class t_storage>
-    static bool serialize_stl_container_t_val(const stl_container& container, t_storage& stg, section* parent_section, const char* pname)
+    bool serialize_stl_container_t_val(const stl_container& container, t_storage& stg, section* parent_section, const char* pname)
     {
       using T = typename stl_container::value_type;
       if(!container.size()) return true;
@@ -142,7 +142,7 @@ namespace epee
     }
     //--------------------------------------------------------------------------------------------------------------------
     template<class stl_container, class t_storage>
-    static bool unserialize_stl_container_t_val(stl_container& container, t_storage& stg, section* parent_section, const char* pname)
+    bool unserialize_stl_container_t_val(stl_container& container, t_storage& stg, section* parent_section, const char* pname)
     {
       using T = typename stl_container::value_type;
       container.clear();
@@ -158,7 +158,7 @@ namespace epee
     }
     //--------------------------------------------------------------------------------------------------------------------
     template<typename T, size_t Size, class t_storage>
-    static bool unserialize_stl_container_t_val(std::array<T, Size>& array, t_storage& stg, section* parent_section, const char* pname)
+    bool unserialize_stl_container_t_val(std::array<T, Size>& array, t_storage& stg, section* parent_section, const char* pname)
     {
       static_assert(Size > 0, "cannot deserialize empty std::array");
       size_t next_i = 0;
@@ -171,7 +171,7 @@ namespace epee
     }
     //--------------------------------------------------------------------------------------------------------------------
     template<class stl_container, class t_storage>
-    static bool serialize_stl_container_pod_val_as_blob(const stl_container& container, t_storage& stg, section* parent_section, const char* pname)
+    bool serialize_stl_container_pod_val_as_blob(const stl_container& container, t_storage& stg, section* parent_section, const char* pname)
     {
       using T = typename stl_container::value_type;
       assert_blob_serializable<T>();
@@ -190,7 +190,7 @@ namespace epee
     }
     //--------------------------------------------------------------------------------------------------------------------
     template<class stl_container, class t_storage>
-    static bool unserialize_stl_container_pod_val_as_blob(stl_container& container, t_storage& stg, section* parent_section, const char* pname)
+    bool unserialize_stl_container_pod_val_as_blob(stl_container& container, t_storage& stg, section* parent_section, const char* pname)
     {
       using T = typename stl_container::value_type;
       assert_blob_serializable<T>();
@@ -220,7 +220,7 @@ namespace epee
     }
     //--------------------------------------------------------------------------------------------------------------------
     template<class stl_container, class t_storage>
-    static bool serialize_stl_container_t_obj(const stl_container& container, t_storage& stg, section* parent_section, const char* pname)
+    bool serialize_stl_container_t_obj(const stl_container& container, t_storage& stg, section* parent_section, const char* pname)
     {
       if (container.empty()) return true;
       auto* sec_array = stg.template make_array_t<section>(pname, parent_section);
@@ -233,7 +233,7 @@ namespace epee
     }
     //--------------------------------------------------------------------------------------------------------------------
     template<class stl_container, class t_storage>
-    static bool unserialize_stl_container_t_obj(stl_container& container, t_storage& stg, section* parent_section, const char* pname)
+    bool unserialize_stl_container_t_obj(stl_container& container, t_storage& stg, section* parent_section, const char* pname)
     {
       container.clear();
       auto* arr = stg.template get_array<section>(pname, parent_section);
@@ -245,7 +245,7 @@ namespace epee
     }
     //--------------------------------------------------------------------------------------------------------------------
     template<typename T, size_t Size, class t_storage>
-    static bool unserialize_stl_container_t_obj(std::array<T, Size>& out, t_storage& stg, section* parent_section, const char* pname)
+    bool unserialize_stl_container_t_obj(std::array<T, Size>& out, t_storage& stg, section* parent_section, const char* pname)
     {
       static_assert(Size > 0, "cannot deserialize empty std::array");
       auto* arr = stg.template get_array<section>(pname, parent_section);

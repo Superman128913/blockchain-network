@@ -27,7 +27,6 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "common/file.h"
-#include "cryptonote_basic/blobdatatype.h"
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "serialization/boost_std_variant.h"
@@ -37,7 +36,7 @@
 class ColdOutputsFuzzer: public Fuzzer
 {
 public:
-  ColdOutputsFuzzer(): wallet(cryptonote::TESTNET) {}
+  ColdOutputsFuzzer(): wallet(cryptonote::network_type::TESTNET) {}
   virtual int init();
   virtual int run(const std::string &filename);
 

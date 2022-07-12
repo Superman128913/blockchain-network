@@ -65,8 +65,8 @@ struct oxen_name_system_large_reorg                                             
 struct oxen_name_system_name_renewal                                                 : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_name_system_name_value_max_lengths                                       : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_name_system_update_mapping_after_expiry_fails                            : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
-struct oxen_name_system_update_mapping                                               : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); virtual uint8_t hf(); };
-struct oxen_name_system_update_mapping_argon2                                        : public oxen_name_system_update_mapping { uint8_t hf() override; };
+struct oxen_name_system_update_mapping                                               : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); virtual cryptonote::hf hf(); };
+struct oxen_name_system_update_mapping_argon2                                        : public oxen_name_system_update_mapping { cryptonote::hf hf() override; };
 struct oxen_name_system_update_mapping_multiple_owners                               : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_name_system_update_mapping_non_existent_name_fails                       : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_name_system_update_mapping_invalid_signature                             : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
@@ -77,6 +77,11 @@ struct oxen_service_nodes_alt_quorums                                           
 struct oxen_service_nodes_checkpoint_quorum_size                                     : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_service_nodes_gen_nodes                                                  : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_service_nodes_insufficient_contribution                                  : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
+struct oxen_service_nodes_insufficient_contribution_HF18                             : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
+struct oxen_service_nodes_sufficient_contribution_HF19                               : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
+struct oxen_service_nodes_small_contribution_early_withdrawal                        : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
+struct oxen_service_nodes_large_contribution_early_withdrawal                        : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
+struct oxen_service_nodes_insufficient_operator_contribution_HF19                    : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_service_nodes_test_rollback                                              : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_service_nodes_test_swarms_basic                                          : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_pulse_invalid_validator_bitset                                           : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
@@ -88,6 +93,10 @@ struct oxen_pulse_out_of_order_voters                                           
 struct oxen_pulse_reject_miner_block                                                 : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_pulse_generate_blocks                                                    : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 struct oxen_pulse_fallback_to_pow_and_back                                           : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
-struct oxen_pulse_chain_split                                                        : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
-struct oxen_pulse_chain_split_with_no_checkpoints                                    : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
+struct oxen_pulse_chain_split                                                        : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); }; struct oxen_pulse_chain_split_with_no_checkpoints                                    : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
+struct oxen_batch_sn_rewards                                                         : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
+struct oxen_batch_sn_rewards_bad_amount                                              : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
+struct oxen_batch_sn_rewards_bad_address                                             : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
+struct oxen_batch_sn_rewards_pop_blocks                                              : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
+struct oxen_batch_sn_rewards_pop_blocks_after_big_cycle                              : public test_chain_unit_base { bool generate(std::vector<test_event_entry>& events); };
 

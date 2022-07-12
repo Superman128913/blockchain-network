@@ -33,6 +33,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "common/util.h"
 #include "tx_pool.h"
 #include "cryptonote_tx_utils.h"
 #include "cryptonote_basic/cryptonote_boost_serialization.h"
@@ -44,8 +45,8 @@
 #include "common/boost_serialization_helper.h"
 #include "common/lock.h"
 #include "common/hex.h"
+#include "common/median.h"
 #include "epee/int-util.h"
-#include "epee/misc_language.h"
 #include "epee/warnings.h"
 #include "common/perf_timer.h"
 #include "crypto/hash.h"
@@ -79,23 +80,23 @@ namespace cryptonote
       return d;
     }
 
-    uint64_t get_transaction_weight_limit(uint8_t version)
+    uint64_t get_transaction_weight_limit(hf version)
     {
       // from v10, bulletproofs, limit a tx to 50% of the minimum block weight
-      if (version >= network_version_10_bulletproofs)
-        return get_min_block_weight(version) / 2 - CRYPTONOTE_COINBASE_BLOB_RESERVED_SIZE;
+      if (version >= hf::hf10_bulletproofs)
+        return get_min_block_weight(version) / 2 - COINBASE_BLOB_RESERVED_SIZE;
       else
-        return get_min_block_weight(version) - CRYPTONOTE_COINBASE_BLOB_RESERVED_SIZE;
+        return get_min_block_weight(version) - COINBASE_BLOB_RESERVED_SIZE;
     }
   }
   //---------------------------------------------------------------------------------
   // warning: bchs is passed here uninitialized, so don't do anything but store it
-  tx_memory_pool::tx_memory_pool(Blockchain& bchs): m_blockchain(bchs), m_txpool_max_weight(DEFAULT_TXPOOL_MAX_WEIGHT), m_txpool_weight(0), m_cookie(0)
+  tx_memory_pool::tx_memory_pool(Blockchain& bchs): m_blockchain(bchs), m_txpool_max_weight(DEFAULT_MEMPOOL_MAX_WEIGHT), m_txpool_weight(0), m_cookie(0)
   {
 
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::have_duplicated_non_standard_tx(transaction const &tx, uint8_t hard_fork_version) const
+  bool tx_memory_pool::have_duplicated_non_standard_tx(transaction const &tx, hf hard_fork_version) const
   {
     auto &service_node_list = m_blockchain.get_service_node_list();
     if (tx.type == txtype::state_change)
@@ -132,7 +133,7 @@ namespace cryptonote
           continue;
         }
 
-        if (hard_fork_version >= cryptonote::network_version_12_checkpointing)
+        if (hard_fork_version >= hf::hf12_checkpointing)
         {
           crypto::public_key service_node_to_change_in_the_pool;
           bool same_service_node = false;
@@ -235,7 +236,7 @@ namespace cryptonote
   // to set `do_not_relay` to false and starts relaying it (other quorum members do the same).
 
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::add_tx(transaction &tx, const crypto::hash &id, const cryptonote::blobdata &blob, size_t tx_weight, tx_verification_context& tvc, const tx_pool_options &opts, uint8_t hf_version,
+  bool tx_memory_pool::add_tx(transaction &tx, const crypto::hash &id, const std::string &blob, size_t tx_weight, tx_verification_context& tvc, const tx_pool_options &opts, hf hf_version,
       uint64_t *blink_rollback_height)
   {
     // this should already be called with that lock, but let's make it explicit for clarity
@@ -260,7 +261,7 @@ namespace cryptonote
       return false;
     }
 
-    if(!check_inputs_types_supported(tx))
+    if (!check_inputs_types_supported(tx))
     {
       tvc.m_verifivation_failed = true;
       tvc.m_invalid_input = true;
@@ -269,7 +270,7 @@ namespace cryptonote
 
     uint64_t fee, burned;
 
-    if (!get_tx_miner_fee(tx, fee, hf_version >= HF_VERSION_FEE_BURNING, &burned))
+    if (!get_tx_miner_fee(tx, fee, hf_version >= feature::FEE_BURNING, &burned))
     {
       // This code is a bit convoluted: the above sets `fee`, and returns false for a pre-ringct tx
       // with a too-low fee, but for ringct (v2+) txes it just sets `fee` but doesn't check it and
@@ -279,15 +280,18 @@ namespace cryptonote
       return false;
     }
 
-    if (!opts.kept_by_block && tx.is_transfer() && !m_blockchain.check_fee(tx_weight, tx.vout.size(), fee, burned, opts))
+    if (hf_version < hf::hf19_reward_batching)
     {
-      tvc.m_verifivation_failed = true;
-      tvc.m_fee_too_low = true;
-      return false;
+      if (!opts.kept_by_block && tx.is_transfer() && !m_blockchain.check_fee(tx_weight, tx.vout.size(), fee, burned, opts))
+      {
+        tvc.m_verifivation_failed = true;
+        tvc.m_fee_too_low = true;
+        return false;
+      }
     }
 
     size_t tx_weight_limit = get_transaction_weight_limit(hf_version);
-    if ((!opts.kept_by_block || hf_version >= HF_VERSION_PER_BYTE_FEE) && tx_weight > tx_weight_limit)
+    if ((!opts.kept_by_block || hf_version >= feature::PER_BYTE_FEE) && tx_weight > tx_weight_limit)
     {
       LOG_PRINT_L1("transaction is too heavy: " << tx_weight << " bytes, maximum weight: " << tx_weight_limit);
       tvc.m_verifivation_failed = true;
@@ -470,11 +474,11 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::add_tx(transaction &tx, tx_verification_context& tvc, const tx_pool_options &opts, uint8_t version)
+  bool tx_memory_pool::add_tx(transaction &tx, tx_verification_context& tvc, const tx_pool_options &opts, hf version)
   {
     crypto::hash h = null_hash;
     size_t blob_size = 0;
-    cryptonote::blobdata bl;
+    std::string bl;
     t_serializable_object_to_blob(tx, bl);
     if (bl.size() == 0 || !get_transaction_hash(tx, h))
       return false;
@@ -721,7 +725,7 @@ namespace cryptonote
       return false;
     }
 
-    cryptonote::blobdata tx_blob = m_blockchain.get_txpool_tx_blob(txid);
+    std::string tx_blob = m_blockchain.get_txpool_tx_blob(txid);
     cryptonote::transaction_prefix tx;
     if (!parse_and_validate_tx_prefix_from_blob(tx_blob, tx))
     {
@@ -795,7 +799,7 @@ namespace cryptonote
       }
     };
 
-    const auto unexpired = std::time(nullptr) - MEMPOOL_PRUNE_NON_STANDARD_TX_LIFETIME;
+    const auto unexpired = std::time(nullptr) - static_cast<time_t>(tools::to_seconds(MEMPOOL_PRUNE_NON_STANDARD_TX_LIFETIME));
     for (auto it = m_txs_by_fee_and_receive_time.begin(); it != m_txs_by_fee_and_receive_time.end(); )
     {
       const bool is_standard_tx = !std::get<0>(it->first);
@@ -882,7 +886,7 @@ namespace cryptonote
   }
 
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::take_tx(const crypto::hash &id, transaction &tx, cryptonote::blobdata &txblob, size_t& tx_weight, uint64_t& fee, bool &relayed, bool &do_not_relay, bool &double_spend_seen)
+  bool tx_memory_pool::take_tx(const crypto::hash &id, transaction &tx, std::string &txblob, size_t& tx_weight, uint64_t& fee, bool &relayed, bool &do_not_relay, bool &double_spend_seen)
   {
     auto locks = tools::unique_locks(m_transactions_lock, m_blockchain);
 
@@ -963,11 +967,11 @@ namespace cryptonote
     auto locks = tools::unique_locks(m_transactions_lock, m_blockchain);
 
     std::list<std::pair<crypto::hash, uint64_t>> remove;
-    m_blockchain.for_all_txpool_txes([this, &remove](const crypto::hash &txid, const txpool_tx_meta_t &meta, const cryptonote::blobdata*) {
+    m_blockchain.for_all_txpool_txes([this, &remove](const crypto::hash &txid, const txpool_tx_meta_t &meta, const std::string*) {
       uint64_t tx_age = time(nullptr) - meta.receive_time;
 
-      if((tx_age > CRYPTONOTE_MEMPOOL_TX_LIVETIME && !meta.kept_by_block) ||
-         (tx_age > CRYPTONOTE_MEMPOOL_TX_FROM_ALT_BLOCK_LIVETIME && meta.kept_by_block) )
+      if((tx_age > tools::to_seconds(MEMPOOL_TX_LIVETIME) && !meta.kept_by_block) ||
+         (tx_age > tools::to_seconds(MEMPOOL_TX_FROM_ALT_BLOCK_LIVETIME) && meta.kept_by_block) )
       {
         LOG_PRINT_L1("Tx " << txid << " removed from tx pool due to outdated, age: " << tx_age );
         auto sorted_it = find_tx_in_sorted_container(txid);
@@ -993,7 +997,7 @@ namespace cryptonote
         const crypto::hash &txid = entry.first;
         try
         {
-          cryptonote::blobdata bd = m_blockchain.get_txpool_tx_blob(txid);
+          std::string bd = m_blockchain.get_txpool_tx_blob(txid);
           cryptonote::transaction_prefix tx;
           if (!parse_and_validate_tx_prefix_from_blob(bd, tx))
           {
@@ -1021,24 +1025,24 @@ namespace cryptonote
   }
   //---------------------------------------------------------------------------------
   //TODO: investigate whether boolean return is appropriate
-  bool tx_memory_pool::get_relayable_transactions(std::vector<std::pair<crypto::hash, cryptonote::blobdata>> &txs) const
+  bool tx_memory_pool::get_relayable_transactions(std::vector<std::pair<crypto::hash, std::string>> &txs) const
   {
     auto locks = tools::unique_locks(m_transactions_lock, m_blockchain);
 
     const uint64_t now = time(NULL);
     txs.reserve(m_blockchain.get_txpool_tx_count());
-    m_blockchain.for_all_txpool_txes([this, now, &txs](const crypto::hash &txid, const txpool_tx_meta_t &meta, const cryptonote::blobdata *){
+    m_blockchain.for_all_txpool_txes([this, now, &txs](const crypto::hash &txid, const txpool_tx_meta_t &meta, const std::string *){
       if(!meta.do_not_relay && (!meta.relayed || now - meta.last_relayed_time > get_relay_delay(now, meta.receive_time)))
       {
         // if the tx is older than half the max lifetime, we don't re-relay it, to avoid a problem
         // mentioned by smooth where nodes would flush txes at slightly different times, causing
         // flushed txes to be re-added when received from a node which was just about to flush it
-        uint64_t max_age = meta.kept_by_block ? CRYPTONOTE_MEMPOOL_TX_FROM_ALT_BLOCK_LIVETIME : CRYPTONOTE_MEMPOOL_TX_LIVETIME;
+        uint64_t max_age = tools::to_seconds(meta.kept_by_block ? MEMPOOL_TX_FROM_ALT_BLOCK_LIVETIME : MEMPOOL_TX_LIVETIME);
         if (now - meta.receive_time <= max_age / 2)
         {
           try
           {
-            cryptonote::blobdata bd = m_blockchain.get_txpool_tx_blob(txid);
+            std::string bd = m_blockchain.get_txpool_tx_blob(txid);
             if (meta.fee == 0)
             {
               cryptonote::transaction tx;
@@ -1098,7 +1102,7 @@ namespace cryptonote
     return updated;
   }
   //---------------------------------------------------------------------------------
-  void tx_memory_pool::set_relayed(const std::vector<std::pair<crypto::hash, cryptonote::blobdata>> &txs)
+  void tx_memory_pool::set_relayed(const std::vector<std::pair<crypto::hash, std::string>> &txs)
   {
     auto locks = tools::unique_locks(m_transactions_lock, m_blockchain);
 
@@ -1136,7 +1140,7 @@ namespace cryptonote
     auto locks = tools::unique_locks(m_transactions_lock, m_blockchain);
 
     txs.reserve(m_blockchain.get_txpool_tx_count(include_unrelayed_txes));
-    m_blockchain.for_all_txpool_txes([&txs](const crypto::hash &txid, const txpool_tx_meta_t &meta, const cryptonote::blobdata *bd){
+    m_blockchain.for_all_txpool_txes([&txs](const crypto::hash &txid, const txpool_tx_meta_t &meta, const std::string *bd){
       transaction tx;
       if (!parse_and_validate_tx_from_blob(*bd, tx))
       {
@@ -1155,7 +1159,7 @@ namespace cryptonote
     auto locks = tools::unique_locks(m_transactions_lock, m_blockchain);
 
     txs.reserve(m_blockchain.get_txpool_tx_count(include_unrelayed_txes));
-    m_blockchain.for_all_txpool_txes([&txs, include_only_blinked, this](const crypto::hash &txid, const txpool_tx_meta_t &meta, const cryptonote::blobdata *bd){
+    m_blockchain.for_all_txpool_txes([&txs, include_only_blinked, this](const crypto::hash &txid, const txpool_tx_meta_t &meta, const std::string *bd){
       bool include_tx = true;
       if (include_only_blinked) include_tx = has_blink(txid);
       if (include_tx) txs.push_back(txid);
@@ -1173,7 +1177,7 @@ namespace cryptonote
     stats.txs_total = m_blockchain.get_txpool_tx_count(include_unrelayed_txes);
     std::vector<uint32_t> weights;
     weights.reserve(stats.txs_total);
-    m_blockchain.for_all_txpool_txes([&stats, &weights, now, &agebytes](const crypto::hash &txid, const txpool_tx_meta_t &meta, const cryptonote::blobdata *bd){
+    m_blockchain.for_all_txpool_txes([&stats, &weights, now, &agebytes](const crypto::hash &txid, const txpool_tx_meta_t &meta, const std::string *bd){
       weights.push_back(meta.weight);
       stats.bytes_total += meta.weight;
       if (!stats.bytes_min || meta.weight < stats.bytes_min)
@@ -1197,7 +1201,7 @@ namespace cryptonote
         ++stats.num_double_spends;
       return true;
     }, false, include_unrelayed_txes);
-    stats.bytes_med = epee::misc_utils::median(weights);
+    stats.bytes_med = tools::median(std::move(weights));
     if (stats.txs_total > 1)
     {
       stats.histo.resize(10);
@@ -1268,7 +1272,7 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------------------------
-  int tx_memory_pool::find_transactions(const std::unordered_set<crypto::hash>& tx_hashes, std::vector<cryptonote::blobdata>& txblobs) const
+  int tx_memory_pool::find_transactions(const std::unordered_set<crypto::hash>& tx_hashes, std::vector<std::string>& txblobs) const
   {
     if (tx_hashes.empty())
       return 0;
@@ -1280,7 +1284,7 @@ namespace cryptonote
     {
       try
       {
-        cryptonote::blobdata txblob;
+        std::string txblob;
         m_blockchain.get_txpool_tx_blob(id, txblob);
         txblobs.push_back(std::move(txblob));
         ++added;
@@ -1290,9 +1294,9 @@ namespace cryptonote
     return added;
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::get_transaction(const crypto::hash& id, cryptonote::blobdata& txblob) const
+  bool tx_memory_pool::get_transaction(const crypto::hash& id, std::string& txblob) const
   {
-    std::vector<cryptonote::blobdata> found;
+    std::vector<std::string> found;
     find_transactions({{id}}, found);
     if (found.empty())
       return false;
@@ -1366,7 +1370,7 @@ namespace cryptonote
               !service_node_array[0].info->can_transition_to_state(blk.major_version, state_change.block_height, state_change.state))
           {
             transaction tx;
-            cryptonote::blobdata blob;
+            std::string blob;
             size_t tx_weight;
             uint64_t fee;
             bool relayed, do_not_relay, double_spend_seen;
@@ -1528,11 +1532,11 @@ end:
     return ret;
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::is_transaction_ready_to_go(txpool_tx_meta_t& txd, const crypto::hash &txid, const cryptonote::blobdata &txblob, transaction &tx) const
+  bool tx_memory_pool::is_transaction_ready_to_go(txpool_tx_meta_t& txd, const crypto::hash &txid, const std::string &txblob, transaction &tx) const
   {
     struct transction_parser
     {
-      transction_parser(const cryptonote::blobdata &txblob, const crypto::hash &txid, transaction &tx): txblob(txblob), txid(txid), tx(tx), parsed(false) {}
+      transction_parser(const std::string &txblob, const crypto::hash &txid, transaction &tx): txblob(txblob), txid(txid), tx(tx), parsed(false) {}
       cryptonote::transaction &operator()()
       {
         if (!parsed)
@@ -1544,7 +1548,7 @@ end:
         }
         return tx;
       }
-      const cryptonote::blobdata &txblob;
+      const std::string &txblob;
       const crypto::hash &txid;
       transaction &tx;
       bool parsed;
@@ -1679,7 +1683,7 @@ end:
   }
   //---------------------------------------------------------------------------------
   //TODO: investigate whether boolean return is appropriate
-  bool tx_memory_pool::fill_block_template(block &bl, size_t median_weight, uint64_t already_generated_coins, size_t &total_weight, uint64_t &raw_fee, uint64_t &expected_reward, uint8_t version, uint64_t height)
+  bool tx_memory_pool::fill_block_template(block &bl, size_t median_weight, uint64_t already_generated_coins, size_t &total_weight, uint64_t &raw_fee, uint64_t &expected_reward, hf version, uint64_t height)
   {
     auto locks = tools::unique_locks(m_transactions_lock, m_blockchain);
 
@@ -1698,10 +1702,10 @@ end:
         return false;
       }
 
-      best_reward = version >= cryptonote::network_version_16_pulse ? 0 /*Empty block, starts with 0 fee*/ : reward_parts.base_miner;
+      best_reward = version >= hf::hf16_pulse ? 0 /*Empty block, starts with 0 fee*/ : reward_parts.base_miner;
     }
 
-    size_t const max_total_weight = 2 * median_weight - CRYPTONOTE_COINBASE_BLOB_RESERVED_SIZE;
+    size_t const max_total_weight = 2 * median_weight - COINBASE_BLOB_RESERVED_SIZE;
     std::unordered_set<crypto::key_image> k_images;
 
     LOG_PRINT_L2("Filling block template, median weight " << median_weight << ", " << m_txs_by_fee_and_receive_time.size() << " txes in the pool");
@@ -1743,7 +1747,7 @@ end:
       // NOTE: Use the net fee for comparison (after penalty is applied).
       // After HF16, penalty is applied on the miner fee. Before, penalty is
       // applied on the base reward.
-      if (version >= cryptonote::network_version_16_pulse)
+      if (version >= hf::hf16_pulse)
       {
         next_reward = next_reward_parts.miner_fee;
       }
@@ -1760,7 +1764,7 @@ end:
         continue;
       }
 
-      cryptonote::blobdata txblob = m_blockchain.get_txpool_tx_blob(sorted_it.second);
+      std::string txblob = m_blockchain.get_txpool_tx_blob(sorted_it.second);
       cryptonote::transaction tx;
 
       // Skip transactions that are not ready to be
@@ -1817,7 +1821,7 @@ end:
     return true;
   }
   //---------------------------------------------------------------------------------
-  size_t tx_memory_pool::validate(uint8_t version)
+  size_t tx_memory_pool::validate(hf version)
   {
     auto locks = tools::unique_locks(m_transactions_lock, m_blockchain);
 
@@ -1825,7 +1829,7 @@ end:
     std::unordered_set<crypto::hash> remove;
 
     m_txpool_weight = 0;
-    m_blockchain.for_all_txpool_txes([this, &remove, tx_weight_limit](const crypto::hash &txid, const txpool_tx_meta_t &meta, const cryptonote::blobdata*) {
+    m_blockchain.for_all_txpool_txes([this, &remove, tx_weight_limit](const crypto::hash &txid, const txpool_tx_meta_t &meta, const std::string*) {
       m_txpool_weight += meta.weight;
       if (meta.weight > tx_weight_limit) {
         LOG_PRINT_L1("Transaction " << txid << " is too big (" << meta.weight << " bytes), removing it from pool");
@@ -1846,7 +1850,7 @@ end:
       {
         try
         {
-          cryptonote::blobdata txblob = m_blockchain.get_txpool_tx_blob(txid);
+          std::string txblob = m_blockchain.get_txpool_tx_blob(txid);
           cryptonote::transaction tx;
           if (!parse_and_validate_tx_from_blob(txblob, tx))
           {
@@ -1885,7 +1889,7 @@ end:
   {
     auto locks = tools::unique_locks(m_transactions_lock, m_blockchain);
 
-    m_txpool_max_weight = max_txpool_weight ? max_txpool_weight : DEFAULT_TXPOOL_MAX_WEIGHT;
+    m_txpool_max_weight = max_txpool_weight ? max_txpool_weight : DEFAULT_MEMPOOL_MAX_WEIGHT;
     m_txs_by_fee_and_receive_time.clear();
     m_spent_key_images.clear();
     m_txpool_weight = 0;
@@ -1896,7 +1900,7 @@ end:
     for (int pass = 0; pass < 2; ++pass)
     {
       const bool kept = pass == 1;
-      bool r = m_blockchain.for_all_txpool_txes([this, &remove, kept](const crypto::hash &txid, const txpool_tx_meta_t &meta, const cryptonote::blobdata *bd) {
+      bool r = m_blockchain.for_all_txpool_txes([this, &remove, kept](const crypto::hash &txid, const txpool_tx_meta_t &meta, const std::string *bd) {
         if (kept != (bool)meta.kept_by_block)
           return true;
         cryptonote::transaction_prefix tx;

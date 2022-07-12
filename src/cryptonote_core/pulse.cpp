@@ -723,9 +723,9 @@ void pulse::handle_message(void *quorumnet_state, pulse::message const &msg)
 }
 
 // TODO(doyle): Update pulse::perpare_for_round with this function after the hard fork and sanity check it on testnet.
-bool pulse::convert_time_to_round(pulse::time_point const &time, pulse::time_point const &r0_timestamp, uint8_t *round)
+bool pulse::convert_time_to_round(pulse::time_point const& time, pulse::time_point const& r0_timestamp, uint8_t* round)
 {
-  auto const time_since_round_started = time <= r0_timestamp ? std::chrono::seconds(0) : (time - r0_timestamp);
+  const auto time_since_round_started = time <= r0_timestamp ? 0s : (time - r0_timestamp);
   size_t result_usize                 = time_since_round_started / service_nodes::PULSE_ROUND_TIME;
   if (round) *round = static_cast<uint8_t>(result_usize);
   return result_usize <= 255;
@@ -734,7 +734,7 @@ bool pulse::convert_time_to_round(pulse::time_point const &time, pulse::time_poi
 bool pulse::get_round_timings(cryptonote::Blockchain const &blockchain, uint64_t block_height, uint64_t prev_timestamp, pulse::timings &times)
 {
   times = {};
-  auto hf16 = hard_fork_begins(blockchain.nettype(), cryptonote::network_version_16_pulse);
+  auto hf16 = hard_fork_begins(blockchain.nettype(), cryptonote::hf::hf16_pulse);
   if (!hf16 || blockchain.get_current_blockchain_height() < *hf16)
     return false;
 
@@ -746,7 +746,7 @@ bool pulse::get_round_timings(cryptonote::Blockchain const &blockchain, uint64_t
   times.genesis_timestamp     = pulse::time_point(std::chrono::seconds(genesis_block.timestamp));
 
   times.prev_timestamp  = pulse::time_point(std::chrono::seconds(prev_timestamp));
-  times.ideal_timestamp = pulse::time_point(times.genesis_timestamp + (TARGET_BLOCK_TIME * delta_height));
+  times.ideal_timestamp = pulse::time_point(times.genesis_timestamp + (cryptonote::TARGET_BLOCK_TIME * delta_height));
 
 #if 1
   times.r0_timestamp    = std::clamp(times.ideal_timestamp,
@@ -1144,7 +1144,7 @@ round_state prepare_for_round(round_context &context, service_nodes::service_nod
       return goto_wait_for_next_block_and_clear_round_data(context);
     }
 
-    uint8_t curr_round = static_cast<uint8_t>(round_usize);
+    auto curr_round = static_cast<uint8_t>(round_usize);
     if (curr_round > context.prepare_for_round.round)
       context.prepare_for_round.round = curr_round;
   }
@@ -1162,8 +1162,8 @@ round_state prepare_for_round(round_context &context, service_nodes::service_nod
 
   std::vector<crypto::hash> const entropy = service_nodes::get_pulse_entropy_for_next_block(blockchain.get_db(), context.wait_for_next_block.top_hash, context.prepare_for_round.round);
   auto const active_node_list             = blockchain.get_service_node_list().active_service_nodes_infos();
-  uint8_t const hf_version                = blockchain.get_network_version();
-  crypto::public_key const &block_leader  = blockchain.get_service_node_list().get_block_leader().key;
+  auto hf_version = blockchain.get_network_version();
+  crypto::public_key const &block_leader = blockchain.get_service_node_list().get_block_leader().key;
 
   context.prepare_for_round.quorum =
       service_nodes::generate_pulse_quorum(blockchain.nettype(),
@@ -1424,7 +1424,7 @@ round_state send_block_template(round_context &context, void *quorumnet_state, s
   cryptonote::block block = {};
   {
     uint64_t height                              = 0;
-    service_nodes::payout block_producer_payouts = service_nodes::service_node_info_to_payout(key.pub, *info);
+    service_nodes::payout block_producer_payouts = service_nodes::service_node_payout_portions(key.pub, *info);
     if (!blockchain.create_next_pulse_block_template(block,
                                                      block_producer_payouts,
                                                      context.prepare_for_round.round,
@@ -1565,7 +1565,7 @@ round_state send_and_wait_for_random_value(round_context &context, service_nodes
       {
         if (auto &random_value = quorum[index]; random_value)
         {
-          epee::wipeable_string string = oxenmq::to_hex(tools::view_guts(random_value->data));
+          epee::wipeable_string string = oxenc::to_hex(tools::view_guts(random_value->data));
 
 #if defined(NDEBUG)
           // Mask the random value generated incase someone is snooping logs
@@ -1596,7 +1596,7 @@ round_state send_and_wait_for_random_value(round_context &context, service_nodes
     crypto::hash const &final_block_hash = cryptonote::get_block_hash(final_block);
     crypto::generate_signature(final_block_hash, key.pub, key.key, context.transient.signed_block.send.data);
 
-    MINFO(log_prefix(context) << "Block final random value " << oxenmq::to_hex(tools::view_guts(final_block.pulse.random_value.data)) << " generated from validators " << bitset_view16(stage.bitset));
+    MINFO(log_prefix(context) << "Block final random value " << oxenc::to_hex(tools::view_guts(final_block.pulse.random_value.data)) << " generated from validators " << bitset_view16(stage.bitset));
     return round_state::send_and_wait_for_signed_blocks;
   }
 
@@ -1682,7 +1682,7 @@ void pulse::main(void *quorumnet_state, cryptonote::core &core)
   //
   // NOTE: Early exit if too early
   //
-  auto hf16 = hard_fork_begins(core.get_nettype(), cryptonote::network_version_16_pulse);
+  auto hf16 = hard_fork_begins(core.get_nettype(), cryptonote::hf::hf16_pulse);
   if (!hf16)
   {
     for (static bool once = true; once; once = !once)

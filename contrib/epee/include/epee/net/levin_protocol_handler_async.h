@@ -36,6 +36,7 @@
 #include "levin_base.h"
 #include "buffer.h"
 #include "../misc_language.h"
+#include "../scope_leaver.h"
 #include "../int-util.h"
 
 #include <random>
@@ -323,7 +324,7 @@ public:
 
     for (size_t i = 0; i < 60 * 1000 / 100 && 0 != m_wait_count; ++i)
     {
-      misc_utils::sleep_no_w(100);
+      std::this_thread::sleep_for(100ms);
     }
     CHECK_AND_ASSERT_MES_NO_RET(0 == m_wait_count, "Failed to wait for operation completion. m_wait_count = " << m_wait_count);
 
@@ -385,7 +386,7 @@ public:
 
   void request_callback()
   {
-    misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler(
+    auto scope_exit_handler = misc_utils::create_scope_leave_handler(
       [this] { return finish_outer_call(); });
 
     m_pservice_endpoint->request_callback();
@@ -616,7 +617,7 @@ public:
   template<class callback_t>
   bool async_invoke(int command, const epee::span<const uint8_t> in_buff, const callback_t &cb, std::chrono::nanoseconds timeout = 0ns)
   {
-    misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler(
+    auto scope_exit_handler = misc_utils::create_scope_leave_handler(
       [this] { return finish_outer_call(); });
 
     if(timeout == 0ns)
@@ -671,7 +672,7 @@ public:
 
   int invoke(int command, const epee::span<const uint8_t> in_buff, std::string& buff_out)
   {
-    misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler(
+    auto scope_exit_handler = misc_utils::create_scope_leave_handler(
       [this] { return finish_outer_call(); });
 
     if(m_deletion_initiated)
@@ -722,7 +723,7 @@ public:
 
   int notify(int command, const epee::span<const uint8_t> in_buff)
   {
-    misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler(
+    auto scope_exit_handler = misc_utils::create_scope_leave_handler(
       [this] { return finish_outer_call(); });
 
     if(m_deletion_initiated)
@@ -750,7 +751,7 @@ public:
       \return 1 on success */
   int send(shared_sv message)
   {
-    const misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler(
+    auto scope_exit_handler = misc_utils::create_scope_leave_handler(
       [this] { return finish_outer_call(); });
 
     if(m_deletion_initiated)

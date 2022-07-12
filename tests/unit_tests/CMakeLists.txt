@@ -29,7 +29,6 @@
 add_executable(unit_tests
   account.cpp
   apply_permutation.cpp
-  address_from_url.cpp
   base58.cpp
   blockchain_db.cpp
   block_queue.cpp
@@ -40,7 +39,6 @@ add_executable(unit_tests
   command_line.cpp
   crypto.cpp
   device.cpp
-  dns_resolver.cpp
   epee_boosted_tcp_server.cpp
   epee_levin_protocol_handler_async.cpp
   epee_utils.cpp
@@ -55,6 +53,7 @@ add_executable(unit_tests
   long_term_block_weight.cpp
   lmdb.cpp
   main.cpp
+  median.cpp
   memwipe.cpp
   mlocker.cpp
   mnemonics.cpp
@@ -74,6 +73,7 @@ add_executable(unit_tests
   service_nodes.cpp
   service_nodes_swarm.cpp
   sha256.cpp
+  sqlite.cpp
   string_util.cpp
   subaddress.cpp
   test_tx_utils.cpp
@@ -102,8 +102,8 @@ target_link_libraries(unit_tests
     wallet
     p2p
     version
+    SQLiteCpp
     Boost::thread
-    miniupnpc
     gtest
     extra)
 set_property(TARGET unit_tests

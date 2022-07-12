@@ -32,7 +32,6 @@
 
 #include <atomic>
 #include <thread>
-#include "cryptonote_basic/blobdatatype.h"
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/verification_context.h"
 #include "cryptonote_basic/difficulty.h"
@@ -51,7 +50,7 @@ namespace cryptonote
   struct i_miner_handler
   {
     virtual bool handle_block_found(block& b, block_verification_context &bvc) = 0;
-    virtual bool create_next_miner_block_template(block& b, const account_public_address& adr, difficulty_type& diffic, uint64_t& height, uint64_t& expected_reward, const blobdata& ex_nonce) = 0;
+    virtual bool create_next_miner_block_template(block& b, const account_public_address& adr, difficulty_type& diffic, uint64_t& height, uint64_t& expected_reward, const std::string& ex_nonce) = 0;
   protected:
     ~i_miner_handler(){};
   };
@@ -118,14 +117,20 @@ namespace cryptonote
     get_block_hash_t m_gbh;
     account_public_address m_mine_address;
     tools::periodic_task m_update_block_template_interval{5s};
-    tools::periodic_task m_update_hashrate_interval{2s};
-
-    mutable std::mutex m_hashrate_mutex;
-    std::optional<std::chrono::steady_clock::time_point> m_last_hr_update;
-    std::atomic<uint64_t> m_hashes = 0;
-    double m_current_hash_rate = 0.0;
-
-    bool m_do_mining = false;
-    std::atomic<uint64_t> m_block_reward = 0;
+    tools::periodic_task m_update_merge_hr_interval{2s};
+    tools::periodic_task m_autodetect_interval{1s};
+    std::vector<std::string> m_extra_messages;
+    miner_config m_config;
+    fs::path m_config_dir;
+    std::atomic<uint64_t> m_last_hr_merge_time;
+    std::atomic<uint64_t> m_hashes;
+    std::atomic<uint64_t> m_total_hashes;
+    std::atomic<uint64_t> m_current_hash_rate;
+    std::mutex m_last_hash_rates_lock;
+    std::list<uint64_t> m_last_hash_rates;
+    bool m_do_print_hashrate;
+    bool m_do_mining;
+    std::vector<std::pair<uint64_t, uint64_t>> m_threads_autodetect;
+    std::atomic<uint64_t> m_block_reward;
   };
 }

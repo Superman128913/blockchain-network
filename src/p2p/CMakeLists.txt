@@ -40,8 +40,8 @@ target_link_libraries(p2p
   PRIVATE
     version
     net
-    miniupnpc
     Boost::program_options
     filesystem
     Boost::serialization
+    SQLiteCpp
     extra)

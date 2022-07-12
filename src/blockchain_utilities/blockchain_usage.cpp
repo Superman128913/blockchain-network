@@ -132,7 +132,7 @@ int main(int argc, char* argv[])
 
   bool opt_testnet = command_line::get_arg(vm, cryptonote::arg_testnet_on);
   bool opt_devnet = command_line::get_arg(vm, cryptonote::arg_devnet_on);
-  network_type net_type = opt_testnet ? TESTNET : opt_devnet ? DEVNET : MAINNET;
+  network_type net_type = opt_testnet ? network_type::TESTNET : opt_devnet ? network_type::DEVNET : network_type::MAINNET;
   bool opt_rct_only = command_line::get_arg(vm, arg_rct_only);
 
   // If we wanted to use the memory pool, we would set up a fake_core.
@@ -172,7 +172,7 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-  r = core_storage->init(db, nullptr /*ons_db*/, net_type);
+  r = core_storage->init(db, nullptr /*ons_db*/, nullptr, net_type);
 
   CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize source blockchain storage");
   LOG_PRINT_L0("Source blockchain storage initialized OK");

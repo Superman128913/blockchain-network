@@ -40,7 +40,10 @@
 #include <fstream>
 
 #include "common/string_util.h"
+#include "common/hex.h"
 #include "common/varint.h"
+#include "common/median.h"
+#include "cryptonote_core/service_node_list.h"
 #include "epee/console_handler.h"
 #include "common/rules.h"
 
@@ -50,6 +53,7 @@
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "cryptonote_basic/miner.h"
+#include "cryptonote_basic/tx_extra.h"
 #include "cryptonote_core/uptime_proof.h"
 #include "oxen_economy.h"
 #include "ringct/rctSigs.h"
@@ -72,16 +76,16 @@ void oxen_register_callback(std::vector<test_event_entry> &events,
 }
 
 std::vector<cryptonote::hard_fork>
-oxen_generate_hard_fork_table(uint8_t hf_version, uint64_t pos_delay)
+oxen_generate_hard_fork_table(hf hf_version, uint64_t pos_delay)
 {
-  assert(hf_version < cryptonote::network_version_count);
+  assert(hf_version <= cryptonote::hf_max);
   // We always need block 0 == v7 for the genesis block:
-  std::vector<cryptonote::hard_fork> result{{cryptonote::network_version_7, 0, 0}};
+  std::vector<cryptonote::hard_fork> result{{hf::hf7, 0, 0}};
   uint64_t version_height = 1;
   // HF15 reduces and HF16+ eliminates miner block rewards, so we need to ensure we have enough
   // HF14 blocks to generate enough LOKI for tests:
-  if (hf_version > cryptonote::network_version_14_blink) {
-      result.push_back({cryptonote::network_version_14_blink, 0, version_height});
+  if (hf_version > hf::hf14_blink) {
+      result.push_back({hf::hf14_blink, 0, version_height});
       version_height += pos_delay;
   }
 
@@ -163,14 +167,22 @@ std::vector<cryptonote::block> oxen_chain_generator_db::get_blocks_range(const u
   return result;
 }
 
-oxen_chain_generator::oxen_chain_generator(std::vector<test_event_entry> &events, const std::vector<cryptonote::hard_fork>& hard_forks)
+oxen_chain_generator::oxen_chain_generator(std::vector<test_event_entry>& events, const std::vector<cryptonote::hard_fork>& hard_forks, std::string first_miner_seed)
 : events_(events)
 , hard_forks_(hard_forks)
+, sqlite_db_(std::make_unique<test::BlockchainSQLiteTest>(cryptonote::network_type::FAKECHAIN, ":memory:"))
 {
-  bool init = ons_db_->init(nullptr, cryptonote::FAKECHAIN, ons::init_oxen_name_system("", false /*read_only*/));
+  bool init = ons_db_->init(nullptr, cryptonote::network_type::FAKECHAIN, ons::init_oxen_name_system("", false /*read_only*/));
   assert(init);
 
-  first_miner_.generate();
+  if (first_miner_seed == "") {
+    first_miner_.generate();
+  } else {
+    crypto::secret_key seeded_secret_key;
+    tools::hex_to_type<crypto::secret_key>(first_miner_seed, seeded_secret_key);
+    first_miner_.generate(seeded_secret_key, true);
+  }
+
   oxen_blockchain_entry genesis = oxen_chain_generator::create_genesis_block(first_miner_, 1338224400);
   events_.push_back(genesis.block);
   db_.blocks.push_back(genesis);
@@ -235,10 +247,12 @@ oxen_blockchain_entry &oxen_chain_generator::add_block(oxen_blockchain_entry con
     db_.tx_table[tx_hash] = tx;
   }
 
-  if (can_be_added_to_blockchain && entry.block.major_version >= cryptonote::network_version_15_ons)
+  if (can_be_added_to_blockchain && entry.block.major_version >= hf::hf15_ons)
   {
     ons_db_->add_block(entry.block, entry.txs);
   }
+
+  sqlite_db_->add_block(entry.block, entry.service_node_state);
 
   // TODO(oxen): State history culling and alt states
   state_history_.emplace_hint(state_history_.end(), result.service_node_state);
@@ -256,6 +270,9 @@ oxen_blockchain_entry &oxen_chain_generator::add_block(oxen_blockchain_entry con
     events_.push_back(oxen_blockchain_addable<cryptonote::block>(result.block, can_be_added_to_blockchain, fail_msg));
   }
 
+  cryptonote::block sopthing = entry.block;
+
+
   return result;
 }
 
@@ -267,7 +284,7 @@ cryptonote::account_base oxen_chain_generator::add_account()
   return account;
 }
 
-void oxen_chain_generator::add_blocks_until_version(uint8_t hf_version)
+void oxen_chain_generator::add_blocks_until_version(hf hf_version)
 {
   assert(hard_forks_.size());
   assert(hf_version_ <= hard_forks_.back().version);
@@ -314,12 +331,12 @@ void oxen_chain_generator::add_service_node_checkpoint(uint64_t block_height, si
 
 void oxen_chain_generator::add_mined_money_unlock_blocks()
 {
-  add_n_blocks(CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW);
+  add_n_blocks(cryptonote::MINED_MONEY_UNLOCK_WINDOW);
 }
 
 void oxen_chain_generator::add_transfer_unlock_blocks()
 {
-  add_n_blocks(CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE);
+  add_n_blocks(cryptonote::DEFAULT_TX_SPENDABLE_AGE);
 }
 
 void oxen_chain_generator::add_tx(cryptonote::transaction const &tx, bool can_be_added_to_blockchain, std::string const &fail_msg, bool kept_by_block)
@@ -329,7 +346,7 @@ void oxen_chain_generator::add_tx(cryptonote::transaction const &tx, bool can_be
 
 cryptonote::transaction
 oxen_chain_generator::create_and_add_oxen_name_system_tx(cryptonote::account_base const &src,
-                                                         uint8_t hf_version,
+                                                         hf hf_version,
                                                          ons::mapping_type type,
                                                          std::string const &name,
                                                          ons::mapping_value const &value,
@@ -344,7 +361,7 @@ oxen_chain_generator::create_and_add_oxen_name_system_tx(cryptonote::account_bas
 
 cryptonote::transaction
 oxen_chain_generator::create_and_add_oxen_name_system_tx_update(cryptonote::account_base const &src,
-                                                                uint8_t hf_version,
+                                                                hf hf_version,
                                                                 ons::mapping_type type,
                                                                 std::string const &name,
                                                                 ons::mapping_value const *value,
@@ -360,7 +377,7 @@ oxen_chain_generator::create_and_add_oxen_name_system_tx_update(cryptonote::acco
 
 cryptonote::transaction
 oxen_chain_generator::create_and_add_oxen_name_system_tx_renew(cryptonote::account_base const &src,
-                                                               uint8_t hf_version,
+                                                               hf hf_version,
                                                                ons::mapping_type type,
                                                                std::string const &name,
                                                                bool kept_by_block)
@@ -418,6 +435,13 @@ cryptonote::transaction oxen_chain_generator::create_and_add_staking_tx(const cr
   return result;
 }
 
+cryptonote::transaction oxen_chain_generator::create_and_add_unlock_stake_tx(const crypto::public_key& pub_key, const cryptonote::account_base& src, const cryptonote::transaction& staking_tx, bool kept_by_block)
+{
+  cryptonote::transaction result = create_unlock_stake_tx(pub_key, staking_tx, src);
+  add_tx(result, true /*can_be_added_to_blockchain*/, "" /*fail_msg*/, kept_by_block);
+  return result;
+}
+
 oxen_blockchain_entry &oxen_chain_generator::create_and_add_next_block(const std::vector<cryptonote::transaction>& txs, cryptonote::checkpoint_t const *checkpoint, bool can_be_added_to_blockchain, std::string const &fail_msg)
 {
   oxen_blockchain_entry entry   = create_next_block(txs, checkpoint);
@@ -436,60 +460,69 @@ cryptonote::transaction oxen_chain_generator::create_tx(const cryptonote::accoun
 }
 
 cryptonote::transaction
-oxen_chain_generator::create_registration_tx(const cryptonote::account_base &src,
-                                             const cryptonote::keypair &service_node_keys,
-                                             uint64_t src_portions,
-                                             uint64_t src_operator_cut,
-                                             std::array<oxen_service_node_contribution, 3> const &contributions,
-                                             int num_contributors) const
+oxen_chain_generator::create_registration_tx(const cryptonote::account_base& src,
+                                             const cryptonote::keypair& service_node_keys,
+                                             uint64_t operator_stake,
+                                             uint64_t fee,
+                                             const std::vector<service_nodes::contribution>& contributors
+                                             ) const
 {
-  cryptonote::transaction result = {};
-  {
-    std::vector<cryptonote::account_public_address> contributors;
-    std::vector<uint64_t> portions;
+  uint64_t new_height = get_block_height(top().block) + 1;
+  auto new_hf_version = get_hf_version_at(new_height);
 
-    contributors.reserve(1 + num_contributors);
-    portions.reserve    (1 + num_contributors);
+  service_nodes::registration_details reg{};
+  reg.fee = fee;
+  reg.reserved.reserve(1 + contributors.size());
+  reg.reserved.emplace_back(src.get_keys().m_account_address, operator_stake);
+  reg.reserved.insert(reg.reserved.end(), contributors.begin(), contributors.end());
 
-    contributors.push_back(src.get_keys().m_account_address);
-    portions.push_back(src_portions);
-    for (int i = 0; i < num_contributors; i++)
-    {
-      oxen_service_node_contribution const &entry = contributions[i];
-      contributors.push_back(entry.contributor);
-      portions.push_back    (entry.portions);
+  if (new_hf_version >= hf::hf19_reward_batching) {
+    assert(reg.reserved.size() <= oxen::MAX_CONTRIBUTORS_HF19);
+    reg.hf = static_cast<uint8_t>(new_hf_version);
+  } else {
+    assert(reg.reserved.size() <= oxen::MAX_CONTRIBUTORS_V1);
+    reg.uses_portions = true;
+    reg.hf = time(nullptr) + tools::to_seconds(cryptonote::old::STAKING_AUTHORIZATION_EXPIRATION_WINDOW);
+    assert(reg.fee <= cryptonote::STAKING_FEE_BASIS);
+    reg.fee = mul128_div64(reg.fee, cryptonote::old::STAKING_PORTIONS, cryptonote::STAKING_FEE_BASIS);
+    uint64_t total = 0;
+    for (auto& [contrib, amount] : reg.reserved) {
+      assert(amount <= oxen::STAKING_REQUIREMENT_TESTNET);
+      amount = mul128_div64(amount, cryptonote::old::STAKING_PORTIONS, oxen::STAKING_REQUIREMENT_TESTNET);
+      total += amount;
     }
 
-    uint64_t new_height    = get_block_height(top().block) + 1;
-    uint8_t new_hf_version = get_hf_version_at(new_height);
-    const auto staking_requirement = service_nodes::get_staking_requirement(cryptonote::FAKECHAIN, new_height);
-    uint64_t amount                = service_nodes::portions_to_amount(portions[0], staking_requirement);
+    assert(total <= cryptonote::old::STAKING_PORTIONS);
 
-    uint64_t unlock_time = 0;
-    if (new_hf_version < cryptonote::network_version_11_infinite_staking)
-      unlock_time = new_height + service_nodes::staking_num_lock_blocks(cryptonote::FAKECHAIN);
-
-    std::vector<uint8_t> extra;
-    cryptonote::add_service_node_pubkey_to_tx_extra(extra, service_node_keys.pub);
-    const uint64_t exp_timestamp = time(nullptr) + STAKING_AUTHORIZATION_EXPIRATION_WINDOW;
-
-    crypto::hash hash;
-    if (!cryptonote::get_registration_hash(contributors, src_operator_cut, portions, exp_timestamp, hash))
-    {
-      MERROR("Could not make registration hash from addresses and portions");
-      return {};
-    }
-
-    crypto::signature signature;
-    crypto::generate_signature(hash, service_node_keys.pub, service_node_keys.sec, signature);
-    add_service_node_register_to_tx_extra(extra, contributors, src_operator_cut, portions, exp_timestamp, signature);
-    add_service_node_contributor_to_tx_extra(extra, contributors.at(0));
-    oxen_tx_builder(events_, result, top().block, src /*from*/, src.get_keys().m_account_address /*to*/, amount, new_hf_version)
-        .with_tx_type(cryptonote::txtype::stake)
-        .with_unlock_time(unlock_time)
-        .with_extra(extra)
-        .build();
+    uint64_t dust = cryptonote::old::STAKING_PORTIONS - total;
+    if (dust <= reg.reserved.size())
+      for (size_t i = 0; i < dust; i++)
+        reg.reserved[i].second++;
   }
+
+  uint64_t unlock_time = 0;
+  if (new_hf_version < hf::hf11_infinite_staking)
+    unlock_time = new_height + service_nodes::staking_num_lock_blocks(cryptonote::network_type::FAKECHAIN);
+
+  std::vector<uint8_t> extra;
+  cryptonote::add_service_node_pubkey_to_tx_extra(extra, service_node_keys.pub);
+
+  auto hash = service_nodes::get_registration_hash(reg);
+
+  auto block_ts = static_cast<uint64_t>(std::time(nullptr));
+  const auto staking_requirement = service_nodes::get_staking_requirement(cryptonote::network_type::FAKECHAIN, new_height);
+  reg.service_node_pubkey = service_node_keys.pub;
+  crypto::generate_signature(hash, service_node_keys.pub, service_node_keys.sec, reg.signature);
+
+  cryptonote::add_service_node_registration_to_tx_extra(extra, reg);
+  add_service_node_contributor_to_tx_extra(extra, reg.reserved[0].first);
+
+  cryptonote::transaction result{};
+  oxen_tx_builder(events_, result, top().block, src /*from*/, src.get_keys().m_account_address /*to*/, operator_stake, new_hf_version)
+      .with_tx_type(cryptonote::txtype::stake)
+      .with_unlock_time(unlock_time)
+      .with_extra(extra)
+      .build();
 
   service_node_keys_[service_node_keys.pub] = service_node_keys.sec; // NOTE: Save generated key for reuse later if we need to interact with the node again
   return result;
@@ -503,17 +536,60 @@ cryptonote::transaction oxen_chain_generator::create_staking_tx(const crypto::pu
   cryptonote::add_service_node_contributor_to_tx_extra(extra, src.get_keys().m_account_address);
 
   uint64_t new_height    = get_block_height(top().block) + 1;
-  uint8_t new_hf_version = get_hf_version_at(new_height);
+  auto new_hf_version = get_hf_version_at(new_height);
 
   uint64_t unlock_time = 0;
-  if (new_hf_version < cryptonote::network_version_11_infinite_staking)
-    unlock_time = new_height + service_nodes::staking_num_lock_blocks(cryptonote::FAKECHAIN);
+  if (new_hf_version < hf::hf11_infinite_staking)
+    unlock_time = new_height + service_nodes::staking_num_lock_blocks(cryptonote::network_type::FAKECHAIN);
 
   oxen_tx_builder(events_, result, top().block, src /*from*/, src.get_keys().m_account_address /*to*/, amount, new_hf_version)
       .with_tx_type(cryptonote::txtype::stake)
       .with_unlock_time(unlock_time)
       .with_extra(extra)
       .build();
+  return result;
+}
+
+cryptonote::transaction oxen_chain_generator::create_unlock_stake_tx(const crypto::public_key& pub_key, const cryptonote::transaction& staking_tx, const cryptonote::account_base& src) const
+{
+  cryptonote::transaction result = {};
+  cryptonote::tx_extra_tx_key_image_unlock unlock = {};
+  unlock.nonce = cryptonote::tx_extra_tx_key_image_unlock::FAKE_NONCE;
+
+  crypto::secret_key tx_secret_key{};
+  crypto::public_key tx_public_key{};
+  cryptonote::tx_extra_tx_key_image_proofs key_image_proofs;
+  if (!cryptonote::get_field_from_tx_extra(staking_tx.extra, key_image_proofs))
+    throw("TX: Didn't have key image proofs in the tx_extra, rejected for tx");
+
+  if (!cryptonote::get_tx_secret_key_from_tx_extra(staking_tx.extra, tx_secret_key))
+    throw("TX: Failed to get tx secret key from contribution");
+  crypto::secret_key_to_public_key(tx_secret_key, tx_public_key);
+
+  crypto::key_derivation recv_derivation{};
+  crypto::generate_key_derivation(tx_public_key, src.get_keys().m_view_secret_key, recv_derivation);
+  crypto::secret_key output_secret_key{};
+  crypto::public_key output_public_key{};
+  for (size_t i = 0; i <= 1; i++)
+  {
+    crypto::derive_secret_key(recv_derivation, i, src.get_keys().m_spend_secret_key, output_secret_key);
+    crypto::secret_key_to_public_key(output_secret_key, output_public_key);
+
+    crypto::generate_signature(cryptonote::tx_extra_tx_key_image_unlock::HASH, output_public_key, output_secret_key, unlock.signature);
+    crypto::generate_key_image(output_public_key, output_secret_key, unlock.key_image);
+
+    if (unlock.key_image == key_image_proofs.proofs[0].key_image)
+    {
+      cryptonote::add_service_node_pubkey_to_tx_extra(result.extra, pub_key);
+      cryptonote::add_tx_key_image_unlock_to_tx_extra(result.extra, unlock);
+    }
+  }
+
+  uint64_t new_height    = get_block_height(top().block) + 1;
+  const auto new_hf_version = get_hf_version_at(new_height);
+
+  result.type    = cryptonote::txtype::key_image_unlock;
+  result.version = cryptonote::transaction::get_max_version_for_hf(new_hf_version);
   return result;
 }
 
@@ -538,7 +614,7 @@ cryptonote::transaction oxen_chain_generator::create_state_change_tx(service_nod
 
   using scver = cryptonote::tx_extra_service_node_state_change::version_t;
   cryptonote::tx_extra_service_node_state_change state_change_extra(
-          hf_version >= cryptonote::network_version_18 ? scver::v4_reasons : scver::v0,
+          hf_version >= hf::hf18 ? scver::v4_reasons : scver::v0,
           state, height, worker_index, reasons_all, reasons_any, {});
   if (voters.size())
   {
@@ -584,7 +660,9 @@ cryptonote::transaction oxen_chain_generator::create_state_change_tx(service_nod
 cryptonote::checkpoint_t oxen_chain_generator::create_service_node_checkpoint(uint64_t block_height, size_t num_votes) const
 {
   service_nodes::quorum const &quorum = *get_quorum(service_nodes::quorum_type::checkpointing, block_height);
-  assert(num_votes < quorum.validators.size());
+  if (num_votes >= quorum.validators.size())
+      throw std::logic_error{"cannot create checkpoint with " + std::to_string(num_votes) +
+          " votes with only " + std::to_string(quorum.validators.size()) + " validators"};
 
   oxen_blockchain_entry const &entry = db_.blocks[block_height];
   crypto::hash const block_hash      = cryptonote::get_block_hash(entry.block);
@@ -601,7 +679,7 @@ cryptonote::checkpoint_t oxen_chain_generator::create_service_node_checkpoint(ui
 }
 
 cryptonote::transaction oxen_chain_generator::create_oxen_name_system_tx(cryptonote::account_base const &src,
-                                                                         uint8_t hf_version,
+                                                                         hf hf_version,
                                                                          ons::mapping_type type,
                                                                          std::string const &name,
                                                                          ons::mapping_value const &value,
@@ -621,7 +699,7 @@ cryptonote::transaction oxen_chain_generator::create_oxen_name_system_tx(crypton
 
   cryptonote::block const &head = top().block;
   uint64_t new_height           = get_block_height(top().block) + 1;
-  uint8_t new_hf_version        = get_hf_version_at(new_height);
+  auto new_hf_version = get_hf_version_at(new_height);
   uint64_t burn = burn_override.value_or(ons::burn_needed(new_hf_version, type));
 
   auto lcname = tools::lowercase_ascii_string(name);
@@ -632,7 +710,7 @@ cryptonote::transaction oxen_chain_generator::create_oxen_name_system_tx(crypton
     prev_txid = mapping.txid;
 
   ons::mapping_value encrypted_value = value;
-  bool encrypted = encrypted_value.encrypt(lcname, &name_hash, hf_version <= cryptonote::network_version_15_ons);
+  bool encrypted = encrypted_value.encrypt(lcname, &name_hash, hf_version <= hf::hf15_ons);
   assert(encrypted);
 
   std::vector<uint8_t> extra;
@@ -650,7 +728,7 @@ cryptonote::transaction oxen_chain_generator::create_oxen_name_system_tx(crypton
 }
 
 cryptonote::transaction oxen_chain_generator::create_oxen_name_system_tx_update(cryptonote::account_base const &src,
-                                                                                uint8_t hf_version,
+                                                                                hf hf_version,
                                                                                 ons::mapping_type type,
                                                                                 std::string const &name,
                                                                                 ons::mapping_value const *value,
@@ -676,7 +754,7 @@ cryptonote::transaction oxen_chain_generator::create_oxen_name_system_tx_update(
     if (!encrypted_value.encrypted)
     {
       assert(!signature); // Can't specify a signature with an unencrypted value because encrypting generates a new nonce and would invalidate it
-      bool encrypted = encrypted_value.encrypt(lcname, &name_hash, hf_version <= cryptonote::network_version_15_ons);
+      bool encrypted = encrypted_value.encrypt(lcname, &name_hash, hf_version <= hf::hf15_ons);
       if (use_asserts) assert(encrypted);
     }
   }
@@ -699,7 +777,7 @@ cryptonote::transaction oxen_chain_generator::create_oxen_name_system_tx_update(
 
   cryptonote::block const &head = top().block;
   uint64_t new_height           = get_block_height(top().block) + 1;
-  uint8_t new_hf_version        = get_hf_version_at(new_height);
+  auto new_hf_version = get_hf_version_at(new_height);
 
   cryptonote::transaction result = {};
   oxen_tx_builder(events_, result, head, src /*from*/, src.get_keys().m_account_address, 0 /*amount*/, new_hf_version)
@@ -712,14 +790,14 @@ cryptonote::transaction oxen_chain_generator::create_oxen_name_system_tx_update(
 }
 
 cryptonote::transaction
-oxen_chain_generator::create_oxen_name_system_tx_update_w_extra(cryptonote::account_base const &src, uint8_t hf_version, cryptonote::tx_extra_oxen_name_system const &ons_extra) const
+oxen_chain_generator::create_oxen_name_system_tx_update_w_extra(cryptonote::account_base const &src, hf hf_version, cryptonote::tx_extra_oxen_name_system const &ons_extra) const
 {
   std::vector<uint8_t> extra;
   cryptonote::add_oxen_name_system_to_tx_extra(extra, ons_extra);
 
   cryptonote::block const &head = top().block;
   uint64_t new_height           = get_block_height(top().block) + 1;
-  uint8_t new_hf_version        = get_hf_version_at(new_height);
+  auto new_hf_version = get_hf_version_at(new_height);
 
   cryptonote::transaction result = {};
   oxen_tx_builder(events_, result, head, src /*from*/, src.get_keys().m_account_address, 0 /*amount*/, new_hf_version)
@@ -731,7 +809,7 @@ oxen_chain_generator::create_oxen_name_system_tx_update_w_extra(cryptonote::acco
 }
 
 cryptonote::transaction oxen_chain_generator::create_oxen_name_system_tx_renew(cryptonote::account_base const &src,
-                                                                               uint8_t hf_version,
+                                                                               hf hf_version,
                                                                                ons::mapping_type type,
                                                                                std::string const &name,
                                                                                std::optional<uint64_t> burn_override) const
@@ -745,7 +823,7 @@ cryptonote::transaction oxen_chain_generator::create_oxen_name_system_tx_renew(c
     prev_txid = mapping.txid;
   }
 
-  uint8_t new_hf_version = get_hf_version_at(get_block_height(top().block) + 1);
+  auto new_hf_version = get_hf_version_at(get_block_height(top().block) + 1);
   uint64_t burn = burn_override.value_or(ons::burn_needed(new_hf_version, type));
 
   std::vector<uint8_t> extra;
@@ -768,7 +846,7 @@ cryptonote::transaction oxen_chain_generator::create_oxen_name_system_tx_renew(c
 static void fill_nonce_with_test_generator(test_generator *generator, cryptonote::block& blk, const cryptonote::difficulty_type& diffic, uint64_t height)
 {
   cryptonote::randomx_longhash_context randomx_context = {};
-  if (generator->m_hf_version >= cryptonote::network_version_12_checkpointing)
+  if (generator->m_hf_version >= hf::hf12_checkpointing)
   {
     randomx_context.seed_height = crypto::rx_seedheight(height);
     cryptonote::block prev      = blk;
@@ -784,7 +862,7 @@ static void fill_nonce_with_test_generator(test_generator *generator, cryptonote
 
   blk.nonce = 0;
   auto get_block_hash = [&randomx_context](const cryptonote::block &b, uint64_t height, unsigned int threads, crypto::hash &hash) {
-    hash = cryptonote::get_block_longhash(cryptonote::FAKECHAIN, randomx_context, b, height, threads);
+    hash = cryptonote::get_block_longhash(cryptonote::network_type::FAKECHAIN, randomx_context, b, height, threads);
     return true;
   };
 
@@ -795,7 +873,7 @@ static void fill_nonce_with_test_generator(test_generator *generator, cryptonote
 void fill_nonce_with_oxen_generator(oxen_chain_generator const *generator, cryptonote::block& blk, const cryptonote::difficulty_type& diffic, uint64_t height)
 {
   cryptonote::randomx_longhash_context randomx_context = {};
-  if (generator->blocks().size() && generator->hardfork() >= cryptonote::network_version_12_checkpointing)
+  if (generator->blocks().size() && generator->hardfork() >= hf::hf12_checkpointing)
   {
     randomx_context.seed_height = crypto::rx_seedheight(height);
     randomx_context.seed_block_hash = cryptonote::get_block_hash(generator->blocks()[randomx_context.seed_height].block);
@@ -804,7 +882,7 @@ void fill_nonce_with_oxen_generator(oxen_chain_generator const *generator, crypt
 
   blk.nonce = 0;
   auto get_block_hash = [&randomx_context](const cryptonote::block &blk, uint64_t height, unsigned int threads, crypto::hash &hash) {
-    hash = cryptonote::get_block_longhash(cryptonote::FAKECHAIN, randomx_context, blk, height, threads);
+    hash = cryptonote::get_block_longhash(cryptonote::network_type::FAKECHAIN, randomx_context, blk, height, threads);
     return true;
   };
 
@@ -818,7 +896,7 @@ oxen_blockchain_entry oxen_chain_generator::create_genesis_block(const cryptonot
   oxen_blockchain_entry result = {};
   cryptonote::block &blk       = result.block;
   blk.major_version            = hf_version_;
-  blk.minor_version            = hf_version_;
+  blk.minor_version            = static_cast<uint8_t>(hf_version_);
   blk.timestamp                = timestamp;
   blk.prev_id                  = crypto::null_hash;
 
@@ -827,14 +905,15 @@ oxen_blockchain_entry oxen_chain_generator::create_genesis_block(const cryptonot
 
   while (true)
   {
-    bool constructed = construct_miner_tx(height,
+    auto [constructed, block_rewards] = construct_miner_tx(height,
                                           0 /*median_weight*/,
                                           0 /*already_generated_coins*/,
                                           target_block_weight,
                                           0 /*total_fee*/,
                                           blk.miner_tx,
-                                          cryptonote::oxen_miner_tx_context::miner_block(cryptonote::FAKECHAIN, miner.get_keys().m_account_address),
-                                          cryptonote::blobdata(),
+                                          cryptonote::oxen_miner_tx_context::miner_block(cryptonote::network_type::FAKECHAIN, miner.get_keys().m_account_address),
+                                          {},
+                                          std::string(),
                                           hf_version_);
     assert(constructed);
 
@@ -891,7 +970,8 @@ bool oxen_chain_generator::block_begin(oxen_blockchain_entry &entry, oxen_create
   entry                    = {};
   cryptonote::block &blk   = entry.block;
   blk.major_version        = params.hf_version;
-  blk.minor_version        = params.hf_version;
+  blk.minor_version        = static_cast<uint8_t>(params.hf_version);
+  blk.height               = height;
   blk.timestamp            = params.timestamp;
   blk.prev_id              = get_block_hash(params.prev.block);
 
@@ -903,7 +983,7 @@ bool oxen_chain_generator::block_begin(oxen_blockchain_entry &entry, oxen_create
   {
     blk.tx_hashes.push_back(get_transaction_hash(tx));
     uint64_t fee = 0;
-    bool r       = get_tx_miner_fee(tx, fee, blk.major_version >= HF_VERSION_FEE_BURNING);
+    bool r       = get_tx_miner_fee(tx, fee, blk.major_version >= cryptonote::feature::FEE_BURNING);
     CHECK_AND_ASSERT_MES(r, false, "wrong transaction passed to construct_block");
     txs_weight  += get_transaction_weight(tx);
     if (calc_total_fee) total_fee += fee;
@@ -915,7 +995,7 @@ bool oxen_chain_generator::block_begin(oxen_blockchain_entry &entry, oxen_create
   std::vector<service_nodes::pubkey_and_sninfo> active_snode_list =
       params.prev.service_node_state.active_service_nodes_infos();
 
-  bool pulse_block_is_possible = blk.major_version >= cryptonote::network_version_16_pulse && active_snode_list.size() >= service_nodes::pulse_min_service_nodes(cryptonote::FAKECHAIN);
+  bool pulse_block_is_possible = blk.major_version >= hf::hf16_pulse && active_snode_list.size() >= service_nodes::pulse_min_service_nodes(cryptonote::network_type::FAKECHAIN);
   bool make_pulse_block        = (params.type == oxen_create_block_type::automatic && pulse_block_is_possible) || params.type == oxen_create_block_type::pulse;
 
   if (make_pulse_block)
@@ -928,7 +1008,7 @@ bool oxen_chain_generator::block_begin(oxen_blockchain_entry &entry, oxen_create
 
     // NOTE: Get Pulse Quorum necessary for this block
     std::vector<crypto::hash> entropy = service_nodes::get_pulse_entropy_for_next_block(db_, params.prev.block, blk.pulse.round);
-    pulse_quorum = service_nodes::generate_pulse_quorum(cryptonote::FAKECHAIN, params.block_leader.key, blk.major_version, active_snode_list, entropy, blk.pulse.round);
+    pulse_quorum = service_nodes::generate_pulse_quorum(cryptonote::network_type::FAKECHAIN, params.block_leader.key, blk.major_version, active_snode_list, entropy, blk.pulse.round);
     assert(pulse_quorum.validators.size() == service_nodes::PULSE_QUORUM_NUM_VALIDATORS);
     assert(pulse_quorum.workers.size() == 1);
 
@@ -942,30 +1022,30 @@ bool oxen_chain_generator::block_begin(oxen_blockchain_entry &entry, oxen_create
       crypto::public_key block_producer_key = pulse_quorum.workers[0];
       auto it = params.prev.service_node_state.service_nodes_infos.find(block_producer_key);
       assert(it != params.prev.service_node_state.service_nodes_infos.end());
-      block_producer = service_nodes::service_node_info_to_payout(block_producer_key, *(it->second));
+      block_producer = service_nodes::service_node_payout_portions(block_producer_key, *(it->second));
     }
 
-    miner_tx_context = cryptonote::oxen_miner_tx_context::pulse_block(cryptonote::FAKECHAIN, block_producer, params.block_leader);
+    miner_tx_context = cryptonote::oxen_miner_tx_context::pulse_block(cryptonote::network_type::FAKECHAIN, block_producer, params.block_leader);
+    blk.service_node_winner_key = miner_tx_context.pulse_block_producer.key;
   }
   else
   {
-    miner_tx_context = cryptonote::oxen_miner_tx_context::miner_block(cryptonote::FAKECHAIN, params.miner_acc.get_keys().m_account_address, params.block_leader);
+    miner_tx_context = cryptonote::oxen_miner_tx_context::miner_block(cryptonote::network_type::FAKECHAIN, params.miner_acc.get_keys().m_account_address, params.block_leader);
+    blk.service_node_winner_key = miner_tx_context.block_leader.key;
   }
 
-  if (blk.major_version >= cryptonote::network_version_10_bulletproofs &&
-      cryptonote::height_has_governance_output(cryptonote::FAKECHAIN, blk.major_version, height))
+  if (blk.major_version >= hf::hf10_bulletproofs &&
+      cryptonote::height_has_governance_output(cryptonote::network_type::FAKECHAIN, blk.major_version, height))
   {
-    constexpr uint64_t num_blocks       = cryptonote::get_config(cryptonote::FAKECHAIN).GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS;
+    constexpr uint64_t num_blocks       = cryptonote::get_config(cryptonote::network_type::FAKECHAIN).GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS;
     uint64_t start_height               = height - num_blocks;
 
-    static_assert(cryptonote::network_version_count == cryptonote::network_version_19 + 1,
-            "The code below needs to be updated to support higher hard fork versions");
-    if (blk.major_version == cryptonote::network_version_15_ons)
-      miner_tx_context.batched_governance = FOUNDATION_REWARD_HF15 * num_blocks;
-    else if (blk.major_version == cryptonote::network_version_16_pulse)
-      miner_tx_context.batched_governance = (FOUNDATION_REWARD_HF15 + CHAINFLIP_LIQUIDITY_HF16) * num_blocks;
-    else if (blk.major_version >= cryptonote::network_version_17 && blk.major_version <= cryptonote::network_version_19)
-      miner_tx_context.batched_governance = FOUNDATION_REWARD_HF17 * num_blocks;
+    if (blk.major_version == hf::hf15_ons)
+      miner_tx_context.batched_governance = oxen::FOUNDATION_REWARD_HF15 * num_blocks;
+    else if (blk.major_version == hf::hf16_pulse)
+      miner_tx_context.batched_governance = (oxen::FOUNDATION_REWARD_HF15 + oxen::CHAINFLIP_LIQUIDITY_HF16) * num_blocks;
+    else if (blk.major_version >= hf::hf17)
+      miner_tx_context.batched_governance = oxen::FOUNDATION_REWARD_HF17 * num_blocks;
     else
     {
       for (int i = (int)get_block_height(params.prev.block), count = 0;
@@ -973,25 +1053,32 @@ bool oxen_chain_generator::block_begin(oxen_blockchain_entry &entry, oxen_create
            i--, count++)
       {
         oxen_blockchain_entry const &historical_entry = db_.blocks[i];
-        if (historical_entry.block.major_version < cryptonote::network_version_10_bulletproofs) break;
-        miner_tx_context.batched_governance += cryptonote::derive_governance_from_block_reward(cryptonote::FAKECHAIN, historical_entry.block, blk.major_version);
+        if (historical_entry.block.major_version < hf::hf10_bulletproofs) break;
+        miner_tx_context.batched_governance += cryptonote::derive_governance_from_block_reward(cryptonote::network_type::FAKECHAIN, historical_entry.block, blk.major_version);
       }
     }
   }
 
   size_t target_block_weight = txs_weight + get_transaction_weight(blk.miner_tx);
+  auto sn_rwds = sqlite_db_->get_sn_payments(height);
+  if (hf_version_ < hf::hf19_reward_batching)
+    CHECK_AND_ASSERT_MES(sn_rwds.empty(), false, "batch payments should be empty before hf19");
+  uint64_t block_rewards = 0;
+  bool r;
   while (true)
   {
-    if (!construct_miner_tx(height,
-                            epee::misc_utils::median(params.block_weights),
-                            params.prev.already_generated_coins,
-                            target_block_weight,
-                            total_fee,
-                            blk.miner_tx,
-                            miner_tx_context,
-                            cryptonote::blobdata(),
-                            blk.major_version
-                            ))
+    std::tie(r, block_rewards) = construct_miner_tx(height,
+                                    tools::median(params.block_weights.begin(), params.block_weights.end()),
+                                    params.prev.already_generated_coins,
+                                    target_block_weight,
+                                    total_fee,
+                                    blk.miner_tx,
+                                    miner_tx_context,
+                                    sn_rwds,
+                                    std::string(),
+                                    blk.major_version
+                                    );
+    if (!r)
       return false;
 
     entry.block_weight = txs_weight + get_transaction_weight(blk.miner_tx);
@@ -1032,9 +1119,10 @@ bool oxen_chain_generator::block_begin(oxen_blockchain_entry &entry, oxen_create
     }
   }
 
+  blk.reward = block_rewards;
   entry.txs = tx_list;
   uint64_t block_reward, block_reward_unpenalized;
-  cryptonote::get_base_block_reward(epee::misc_utils::median(params.block_weights), entry.block_weight, params.prev.already_generated_coins, block_reward, block_reward_unpenalized, params.hf_version, height);
+  cryptonote::get_base_block_reward(tools::median(params.block_weights.begin(), params.block_weights.end()), entry.block_weight, params.prev.already_generated_coins, block_reward, block_reward_unpenalized, params.hf_version, height);
   entry.already_generated_coins = block_reward + params.prev.already_generated_coins;
 
   // NOTE: This relies on the block hash, so must be done after
@@ -1062,7 +1150,12 @@ bool oxen_chain_generator::block_begin(oxen_blockchain_entry &entry, oxen_create
 void oxen_chain_generator::block_end(oxen_blockchain_entry &entry, oxen_create_block_params const &params) const
 {
   entry.service_node_state = params.prev.service_node_state;
-  entry.service_node_state.update_from_block(db_, cryptonote::FAKECHAIN, state_history_, {} /*state_archive*/, {} /*alt_states*/, entry.block, entry.txs, nullptr);
+  entry.service_node_state.update_from_block(db_, cryptonote::network_type::FAKECHAIN, state_history_, {} /*state_archive*/, {} /*alt_states*/, entry.block, entry.txs, nullptr);
+}
+
+bool oxen_chain_generator::process_registration_tx(cryptonote::transaction& tx, uint64_t block_height, hf hf_version)
+{
+  return (bool) service_nodes::reg_tx_extract_fields(tx);
 }
 
 bool oxen_chain_generator::create_block(oxen_blockchain_entry &entry,
@@ -1087,8 +1180,8 @@ oxen_create_block_params oxen_chain_generator::next_block_params() const
   oxen_create_block_params result = {};
   result.prev                     = prev;
   result.miner_acc                = first_miner_;
-  result.timestamp                = prev.block.timestamp + tools::to_seconds(TARGET_BLOCK_TIME);
-  result.block_weights            = last_n_block_weights(height(), CRYPTONOTE_REWARD_BLOCKS_WINDOW);
+  result.timestamp                = prev.block.timestamp + tools::to_seconds(cryptonote::TARGET_BLOCK_TIME);
+  result.block_weights            = last_n_block_weights(height(), cryptonote::REWARD_BLOCKS_WINDOW);
   result.hf_version               = get_hf_version_at(next_height);
   result.block_leader             = prev.service_node_state.get_block_leader();
   result.total_fee                = 0; // Request chain generator to calculate the fee
@@ -1110,16 +1203,16 @@ oxen_blockchain_entry oxen_chain_generator::create_next_block(const std::vector<
   return result;
 }
 
-uint8_t oxen_chain_generator::get_hf_version_at(uint64_t height) const {
+hf oxen_chain_generator::get_hf_version_at(uint64_t height) const {
 
-  uint8_t cur_hf_ver = 0;
+  hf cur_hf_ver = hf::none;
   for (auto i = 0u; i < hard_forks_.size(); ++i)
   {
     if (height < hard_forks_[i].height) break;
     cur_hf_ver = hard_forks_[i].version;
   }
 
-  assert(cur_hf_ver != 0);
+  assert(cur_hf_ver != hf::none);
   return cur_hf_ver;
 }
 
@@ -1209,26 +1302,26 @@ void test_generator::add_block(const cryptonote::block& blk, size_t txs_weight, 
 {
   const size_t block_weight = txs_weight + get_transaction_weight(blk.miner_tx);
   uint64_t block_reward, block_reward_unpenalized;
-  cryptonote::get_base_block_reward(epee::misc_utils::median(block_weights), block_weight, already_generated_coins, block_reward, block_reward_unpenalized, m_hf_version, 0);
+  cryptonote::get_base_block_reward(tools::median(block_weights.begin(), block_weights.end()), block_weight, already_generated_coins, block_reward, block_reward_unpenalized, m_hf_version, 0);
   m_blocks_info.insert({get_block_hash(blk), block_info(blk.prev_id, already_generated_coins + block_reward, block_weight, blk)});
 }
 
 static void manual_calc_batched_governance(const test_generator &generator,
                                            const crypto::hash &head,
                                            cryptonote::oxen_miner_tx_context &miner_tx_context,
-                                           int hard_fork_version,
+                                           hf hard_fork_version,
                                            uint64_t height)
 {
   miner_tx_context.batched_governance = 0;
-  if (hard_fork_version >= cryptonote::network_version_10_bulletproofs &&
-      cryptonote::height_has_governance_output(cryptonote::FAKECHAIN, hard_fork_version, height))
+  if (hard_fork_version >= hf::hf10_bulletproofs &&
+      cryptonote::height_has_governance_output(cryptonote::network_type::FAKECHAIN, hard_fork_version, height))
   {
-    uint64_t num_blocks                 = cryptonote::get_config(cryptonote::FAKECHAIN).GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS;
+    uint64_t num_blocks                 = cryptonote::get_config(cryptonote::network_type::FAKECHAIN).GOVERNANCE_REWARD_INTERVAL_IN_BLOCKS;
     uint64_t start_height               = height - num_blocks;
 
-    if (hard_fork_version >= cryptonote::network_version_15_ons)
+    if (hard_fork_version >= hf::hf15_ons)
     {
-      miner_tx_context.batched_governance = num_blocks * cryptonote::governance_reward_formula(0, hard_fork_version);
+      miner_tx_context.batched_governance = num_blocks * cryptonote::governance_reward_formula(hard_fork_version);
       return;
     }
 
@@ -1248,8 +1341,8 @@ static void manual_calc_batched_governance(const test_generator &generator,
       if (block_height < start_height)
         continue;
 
-      if (entry.major_version >= cryptonote::network_version_10_bulletproofs)
-        miner_tx_context.batched_governance += cryptonote::derive_governance_from_block_reward(cryptonote::FAKECHAIN, entry, hard_fork_version);
+      if (entry.major_version >= hf::hf10_bulletproofs)
+        miner_tx_context.batched_governance += cryptonote::derive_governance_from_block_reward(cryptonote::network_type::FAKECHAIN, entry, hard_fork_version);
     }
   }
 }
@@ -1266,7 +1359,7 @@ bool test_generator::construct_block(cryptonote::block &blk,
 {
   /// a temporary workaround
   blk.major_version = m_hf_version;
-  blk.minor_version = m_hf_version;
+  blk.minor_version = static_cast<uint8_t>(m_hf_version);
 
   blk.timestamp = timestamp;
   blk.prev_id = prev_id;
@@ -1284,28 +1377,30 @@ bool test_generator::construct_block(cryptonote::block &blk,
   for (auto& tx : tx_list)
   {
     uint64_t fee = 0;
-    bool r = get_tx_miner_fee(tx, fee, blk.major_version >= HF_VERSION_FEE_BURNING);
+    bool r = get_tx_miner_fee(tx, fee, blk.major_version >= cryptonote::feature::FEE_BURNING);
     CHECK_AND_ASSERT_MES(r, false, "wrong transaction passed to construct_block");
     total_fee += fee;
     txs_weight += get_transaction_weight(tx);
   }
 
-  auto miner_tx_context = cryptonote::oxen_miner_tx_context::miner_block(cryptonote::FAKECHAIN, miner_acc.get_keys().m_account_address, block_leader);
+  auto miner_tx_context = cryptonote::oxen_miner_tx_context::miner_block(cryptonote::network_type::FAKECHAIN, miner_acc.get_keys().m_account_address, block_leader);
   blk.miner_tx = {};
   size_t target_block_weight = txs_weight + get_transaction_weight(blk.miner_tx);
   manual_calc_batched_governance(*this, prev_id, miner_tx_context, m_hf_version, height);
 
   while (true)
   {
-    if (!construct_miner_tx(height,
-                            epee::misc_utils::median(block_weights),
-                            already_generated_coins,
-                            target_block_weight,
-                            total_fee,
-                            blk.miner_tx,
-                            miner_tx_context,
-                            cryptonote::blobdata(),
-                            m_hf_version))
+    auto [r, block_rewards] = construct_miner_tx(height,
+                                  tools::median(block_weights.begin(), block_weights.end()),
+                                  already_generated_coins,
+                                  target_block_weight,
+                                  total_fee,
+                                  blk.miner_tx,
+                                  miner_tx_context,
+                                  {},
+                                  std::string(),
+                                  m_hf_version);
+    if (!r)
       return false;
 
     size_t actual_block_weight = txs_weight + get_transaction_weight(blk.miner_tx);
@@ -1371,10 +1466,10 @@ bool test_generator::construct_block(cryptonote::block &blk,
   uint64_t height = var::get<cryptonote::txin_gen>(blk_prev.miner_tx.vin.front()).height + 1;
   crypto::hash prev_id = get_block_hash(blk_prev);
   // Keep difficulty unchanged
-  uint64_t timestamp = blk_prev.timestamp + tools::to_seconds(TARGET_BLOCK_TIME);
+  uint64_t timestamp = blk_prev.timestamp + tools::to_seconds(cryptonote::TARGET_BLOCK_TIME);
   uint64_t already_generated_coins = get_already_generated_coins(prev_id);
   std::vector<uint64_t> block_weights;
-  get_last_n_block_weights(block_weights, prev_id, CRYPTONOTE_REWARD_BLOCKS_WINDOW);
+  get_last_n_block_weights(block_weights, prev_id, cryptonote::REWARD_BLOCKS_WINDOW);
 
   return construct_block(blk, height, prev_id, miner_acc, timestamp, already_generated_coins, block_weights, tx_list, block_leader);
 }
@@ -1384,7 +1479,7 @@ bool test_generator::construct_block_manually(
     const cryptonote::block &prev_block,
     const cryptonote::account_base &miner_acc,
     int actual_params /* = bf_none*/,
-    uint8_t major_ver /* = 0*/,
+    hf major_ver /* = hf::none*/,
     uint8_t minor_ver /* = 0*/,
     uint64_t timestamp /* = 0*/,
     const crypto::hash &prev_id /* = crypto::hash()*/,
@@ -1394,29 +1489,31 @@ bool test_generator::construct_block_manually(
     size_t txs_weight /* = 0*/,
     size_t miner_fee /*= 0*/)
 {
-  blk.major_version = actual_params & bf_major_ver ? major_ver : static_cast<uint8_t>(cryptonote::network_version_7);
-  blk.minor_version = actual_params & bf_minor_ver ? minor_ver : static_cast<uint8_t>(cryptonote::network_version_7);
-  blk.timestamp     = actual_params & bf_timestamp ? timestamp : prev_block.timestamp + tools::to_seconds(TARGET_BLOCK_TIME); // Keep difficulty unchanged
+  blk.major_version = actual_params & bf_major_ver ? major_ver : hf::hf7;
+  blk.minor_version = actual_params & bf_minor_ver ? minor_ver : static_cast<uint8_t>(hf::hf7);
+  blk.timestamp     = actual_params & bf_timestamp ? timestamp : prev_block.timestamp + tools::to_seconds(cryptonote::TARGET_BLOCK_TIME); // Keep difficulty unchanged
   blk.prev_id       = actual_params & bf_prev_id   ? prev_id   : get_block_hash(prev_block);
   blk.tx_hashes     = actual_params & bf_tx_hashes ? tx_hashes : std::vector<crypto::hash>();
 
   size_t height = get_block_height(prev_block) + 1;
+  blk.height = height;
   uint64_t already_generated_coins = get_already_generated_coins(prev_block);
   std::vector<uint64_t> block_weights;
-  get_last_n_block_weights(block_weights, get_block_hash(prev_block), CRYPTONOTE_REWARD_BLOCKS_WINDOW);
+  get_last_n_block_weights(block_weights, get_block_hash(prev_block), cryptonote::REWARD_BLOCKS_WINDOW);
   if (actual_params & bf_miner_tx)
   {
     blk.miner_tx = miner_tx;
   }
   else
   {
-    // TODO: This will work, until size of constructed block is less then CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE
+    // TODO: This will work, until size of constructed block is less then BLOCK_GRANTED_FULL_REWARD_ZONE
     cryptonote::oxen_miner_tx_context miner_tx_context = {};
-    miner_tx_context.nettype                           = cryptonote::FAKECHAIN;
+    miner_tx_context.nettype                           = cryptonote::network_type::FAKECHAIN;
     manual_calc_batched_governance(*this, prev_id, miner_tx_context, m_hf_version, height);
 
     size_t current_block_weight = txs_weight + get_transaction_weight(blk.miner_tx);
-    if (!construct_miner_tx(height, epee::misc_utils::median(block_weights), already_generated_coins, current_block_weight, miner_fee, blk.miner_tx, cryptonote::oxen_miner_tx_context::miner_block(cryptonote::FAKECHAIN, miner_acc.get_keys().m_account_address), cryptonote::blobdata(), m_hf_version))
+    auto [r, block_rewards] = construct_miner_tx(height, tools::median(block_weights.begin(), block_weights.end()), already_generated_coins, current_block_weight, miner_fee, blk.miner_tx, cryptonote::oxen_miner_tx_context::miner_block(cryptonote::network_type::FAKECHAIN, miner_acc.get_keys().m_account_address), {}, std::string(), m_hf_version);
+    if (!r)
       return false;
   }
 
@@ -1434,7 +1531,7 @@ bool test_generator::construct_block_manually_tx(cryptonote::block& blk, const c
                                                  const cryptonote::account_base& miner_acc,
                                                  const std::vector<crypto::hash>& tx_hashes, size_t txs_weight)
 {
-  return construct_block_manually(blk, prev_block, miner_acc, bf_tx_hashes, 0, 0, 0, crypto::hash(), 0, cryptonote::transaction(), tx_hashes, txs_weight, 0);
+  return construct_block_manually(blk, prev_block, miner_acc, bf_tx_hashes, hf::none, 0, 0, crypto::hash(), 0, cryptonote::transaction(), tx_hashes, txs_weight, 0);
 }
 
 cryptonote::transaction make_registration_tx(std::vector<test_event_entry>& events,
@@ -1444,35 +1541,33 @@ cryptonote::transaction make_registration_tx(std::vector<test_event_entry>& even
                                              const std::vector<cryptonote::account_public_address>& contributors,
                                              const std::vector<uint64_t>& portions,
                                              const cryptonote::block& head,
-                                             uint8_t hf_version)
+                                             hf hf_version)
 {
   const auto new_height          = cryptonote::get_block_height(head) + 1;
-  const auto staking_requirement = service_nodes::get_staking_requirement(cryptonote::FAKECHAIN, new_height);
+  const auto staking_requirement = service_nodes::get_staking_requirement(cryptonote::network_type::FAKECHAIN, new_height);
   uint64_t amount                = service_nodes::portions_to_amount(portions[0], staking_requirement);
+
+  service_nodes::registration_details reg{};
+  reg.uses_portions = true;
+  reg.fee = operator_cut;
+  reg.hf = time(nullptr) + tools::to_seconds(cryptonote::old::STAKING_AUTHORIZATION_EXPIRATION_WINDOW);
+  reg.service_node_pubkey = service_node_keys.pub;
 
   cryptonote::transaction tx;
   uint64_t unlock_time = 0;
-  if (hf_version < cryptonote::network_version_11_infinite_staking)
-    unlock_time = new_height + service_nodes::staking_num_lock_blocks(cryptonote::FAKECHAIN);
+  if (hf_version < hf::hf11_infinite_staking)
+    unlock_time = new_height + service_nodes::staking_num_lock_blocks(cryptonote::network_type::FAKECHAIN);
 
   std::vector<uint8_t> extra;
   cryptonote::add_service_node_pubkey_to_tx_extra(extra, service_node_keys.pub);
-  const uint64_t exp_timestamp = time(nullptr) + STAKING_AUTHORIZATION_EXPIRATION_WINDOW;
 
-  crypto::hash hash;
-  if (!cryptonote::get_registration_hash(contributors, operator_cut, portions, exp_timestamp, hash))
-  {
-    MERROR("Could not make registration hash from addresses and portions");
-    return {};
-  }
-
-  crypto::signature signature;
-  crypto::generate_signature(hash, service_node_keys.pub, service_node_keys.sec, signature);
-  add_service_node_register_to_tx_extra(extra, contributors, operator_cut, portions, exp_timestamp, signature);
+  auto hash = service_nodes::get_registration_hash(reg);
+  crypto::generate_signature(hash, service_node_keys.pub, service_node_keys.sec, reg.signature);
+  cryptonote::add_service_node_registration_to_tx_extra(extra, reg);
   add_service_node_contributor_to_tx_extra(extra, contributors.at(0));
 
   cryptonote::txtype tx_type = cryptonote::txtype::standard;
-  if (hf_version >= cryptonote::network_version_15_ons) tx_type = cryptonote::txtype::stake; // NOTE: txtype stake was not introduced until HF14
+  if (hf_version >= hf::hf15_ons) tx_type = cryptonote::txtype::stake; // NOTE: txtype stake was not introduced until HF14
   oxen_tx_builder(events, tx, head, account, account.get_keys().m_account_address, amount, hf_version).with_tx_type(tx_type).with_extra(extra).with_unlock_time(unlock_time).build();
   events.push_back(tx);
   return tx;
@@ -1780,6 +1875,7 @@ void fill_tx_sources_and_multi_destinations(const std::vector<test_event_entry>&
                                             bool always_add_change_ouput,
                                             uint64_t *change_amount)
 {
+
   sources.clear();
   destinations.clear();
 
@@ -2216,7 +2312,7 @@ cryptonote::transaction construct_tx_with_fee(std::vector<test_event_entry> &eve
                                               uint64_t fee)
 {
   cryptonote::transaction tx;
-  oxen_tx_builder(events, tx, blk_head, acc_from, acc_to.get_keys().m_account_address, amount, cryptonote::network_version_7).with_fee(fee).build();
+  oxen_tx_builder(events, tx, blk_head, acc_from, acc_to.get_keys().m_account_address, amount, hf::hf7).with_fee(fee).build();
   events.push_back(tx);
   return tx;
 }

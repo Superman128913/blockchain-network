@@ -152,6 +152,7 @@ void TransactionHistoryImpl::refresh()
         ti->m_confirmations = (wallet_height > pd.m_block_height) ? wallet_height - pd.m_block_height : 0;
         ti->m_unlock_time = pd.m_unlock_time;
         ti->m_reward_type = from_pay_type(pd.m_type);
+        ti->m_is_stake = pd.m_type == wallet::pay_type::stake;
         m_history.push_back(ti);
 
     }
@@ -194,6 +195,7 @@ void TransactionHistoryImpl::refresh()
         ti->m_label = pd.m_subaddr_indices.size() == 1 ? w->get_subaddress_label({pd.m_subaddr_account, *pd.m_subaddr_indices.begin()}) : "";
         ti->m_timestamp = pd.m_timestamp;
         ti->m_confirmations = (wallet_height > pd.m_block_height) ? wallet_height - pd.m_block_height : 0;
+        ti->m_is_stake = pd.m_pay_type == wallet::pay_type::stake;
 
         // single output transaction might contain multiple transfers
         for (const auto &d: pd.m_dests) {
@@ -228,6 +230,7 @@ void TransactionHistoryImpl::refresh()
         ti->m_label = pd.m_subaddr_indices.size() == 1 ? w->get_subaddress_label({pd.m_subaddr_account, *pd.m_subaddr_indices.begin()}) : "";
         ti->m_timestamp = pd.m_timestamp;
         ti->m_confirmations = 0;
+        ti->m_is_stake = pd.m_pay_type == wallet::pay_type::stake;
         m_history.push_back(ti);
     }
     
@@ -253,6 +256,7 @@ void TransactionHistoryImpl::refresh()
         ti->m_timestamp = pd.m_timestamp;
         ti->m_confirmations = 0;
         ti->m_reward_type = from_pay_type(pd.m_type);
+        ti->m_is_stake = pd.m_type == wallet::pay_type::stake;
         m_history.push_back(ti);
         
         LOG_PRINT_L1(__FUNCTION__ << ": Unconfirmed payment found " << pd.m_amount);

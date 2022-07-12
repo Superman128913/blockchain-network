@@ -6,7 +6,7 @@
 #include "epee/span.h"
 #include "cryptonote_basic/tx_extra.h"
 #include "common/fs.h"
-#include <oxenmq/hex.h>
+#include <oxenc/hex.h>
 
 #include <cassert>
 #include <string>
@@ -115,7 +115,7 @@ struct mapping_value
   mapping_value();
   mapping_value(std::string encrypted_value, std::string nonce);
 };
-inline std::ostream &operator<<(std::ostream &os, mapping_value const &v) { return os << oxenmq::to_hex(v.to_view()); }
+inline std::ostream &operator<<(std::ostream &os, mapping_value const &v) { return os << oxenc::to_hex(v.to_view()); }
 
 inline std::string_view mapping_type_str(mapping_type type)
 {
@@ -132,16 +132,16 @@ inline std::string_view mapping_type_str(mapping_type type)
 }
 inline std::ostream &operator<<(std::ostream &os, mapping_type type) { return os << mapping_type_str(type); }
 
-constexpr bool mapping_type_allowed(uint8_t hf_version, mapping_type type) {
-  return (type == mapping_type::session && hf_version >= cryptonote::network_version_15_ons)
-      || (is_lokinet_type(type) && hf_version >= cryptonote::network_version_16_pulse)
-      || (type == mapping_type::wallet && hf_version >= cryptonote::network_version_18);
+constexpr bool mapping_type_allowed(cryptonote::hf hf_version, mapping_type type) {
+  return (type == mapping_type::session && hf_version >= cryptonote::hf::hf15_ons)
+      || (is_lokinet_type(type) && hf_version >= cryptonote::hf::hf16_pulse)
+      || (type == mapping_type::wallet && hf_version >= cryptonote::hf::hf18);
 }
 
 // Returns all mapping types supported for lookup as of the given hardfork.  (Note that this does
 // not return the dedicated length types such as mapping_type::lokinet_5years as those are only
 // relevant within a ONS buy tx).
-std::vector<mapping_type> all_mapping_types(uint8_t hf_version);
+std::vector<mapping_type> all_mapping_types(cryptonote::hf hf_version);
 
 sqlite3 *init_oxen_name_system(const fs::path& file_path, bool read_only);
 
@@ -187,7 +187,7 @@ enum struct ons_tx_type { lookup, buy, update, renew };
 // Currently accepts "session" or "lokinet" for lookups, buys, updates, and renewals; for buys and renewals also accepts "lokinet_Ny[ear]" for N=2,5,10
 // Lookups are implied by none of buy/update/renew.
 // mapping_type: (optional) if function returns true, the uint16_t value of the 'type' will be set
-bool         validate_mapping_type(std::string_view type, uint8_t hf_version, ons_tx_type txtype, mapping_type *mapping_type, std::string *reason);
+bool         validate_mapping_type(std::string_view type, cryptonote::hf hf_version, ons_tx_type txtype, mapping_type *mapping_type, std::string *reason);
 
 // Hashes an ONS name.  The name must already be lower-case (but this is only checked in debug builds).
 crypto::hash name_to_hash(std::string_view name, const std::optional<crypto::hash>& key = std::nullopt); // Takes a human readable name and hashes it.  Takes an optional value to use as a key to produce a keyed hash.
@@ -314,7 +314,7 @@ struct name_system_db
 
   // Validates an ONS transaction.  If the function returns true then entry will be populated with
   // the ONS details.  On a false return, `reason` is instead populated with the failure reason.
-  bool validate_ons_tx(uint8_t hf_version, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_oxen_name_system &entry, std::string *reason);
+  bool validate_ons_tx(cryptonote::hf hf_version, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_oxen_name_system &entry, std::string *reason);
 
   // Destructor; closes the sqlite3 database if one is open
   ~name_system_db();
