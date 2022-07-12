@@ -318,8 +318,8 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
   // If the batching database falls behind it NEEDS the service node list information at that point in time
   if (sqlite_height < snl_height)
   {
-    m_service_node_list.blockchain_detached(sqlite_height + 1, true);
-    snl_height = std::min(sqlite_height, m_service_node_list.height() + 1);
+    m_service_node_list.blockchain_detached(sqlite_height, true);
+    snl_height = std::min(sqlite_height, m_service_node_list.height()) + 1;
   }
   start_height_options.push_back(snl_height);
   uint64_t const end_height = m_db->height();
@@ -693,6 +693,7 @@ void Blockchain::pop_blocks(uint64_t nblocks)
 
   bool stop_batch = m_db->batch_start();
 
+  bool pop_batching_rewards;
   try
   {
     const uint64_t blockchain_height = m_db->height();
@@ -703,6 +704,7 @@ void Blockchain::pop_blocks(uint64_t nblocks)
     uint64_t const blocks_per_update               = (nblocks / PERCENT_PER_PROGRESS_UPDATE);
 
     tools::PerformanceTimer timer;
+    pop_batching_rewards = m_service_node_list.state_history_exists(blockchain_height - nblocks);
     for (int progress = 0; i < nblocks; ++i)
     {
       if (nblocks >= BLOCKS_PER_DAY && (i != 0 && (i % blocks_per_update == 0)))
@@ -710,8 +712,7 @@ void Blockchain::pop_blocks(uint64_t nblocks)
         MGINFO("... popping blocks " << (++progress * PERCENT_PER_PROGRESS_UPDATE) << "% completed, height: " << (blockchain_height - i) << " (" << timer.seconds() << "s)");
         timer.reset();
       }
-
-      pop_block_from_blockchain();
+      pop_block_from_blockchain(pop_batching_rewards);
     }
   }
   catch (const std::exception& e)
@@ -725,6 +726,8 @@ void Blockchain::pop_blocks(uint64_t nblocks)
   auto split_height = m_db->height();
   for (BlockchainDetachedHook* hook : m_blockchain_detached_hooks)
     hook->blockchain_detached(split_height, true /*by_pop_blocks*/);
+  if (!pop_batching_rewards)
+    m_service_node_list.reset_batching_to_latest_height();
   load_missing_blocks_into_oxen_subsystems();
 
   if (stop_batch)
@@ -734,7 +737,7 @@ void Blockchain::pop_blocks(uint64_t nblocks)
 // This function tells BlockchainDB to remove the top block from the
 // blockchain and then returns all transactions (except the miner tx, of course)
 // from it to the tx_pool
-block Blockchain::pop_block_from_blockchain()
+block Blockchain::pop_block_from_blockchain(bool pop_batching_rewards = true)
 {
   LOG_PRINT_L3("Blockchain::" << __func__);
   std::unique_lock lock{*this};
@@ -763,7 +766,8 @@ block Blockchain::pop_block_from_blockchain()
     LOG_ERROR("Error popping block from blockchain, throwing!");
     throw;
   }
-  if (!m_service_node_list.pop_batching_rewards_block(popped_block))
+
+  if (pop_batching_rewards && !m_service_node_list.pop_batching_rewards_block(popped_block))
   {
     LOG_ERROR("Failed to pop to batch rewards DB. throwing");
     throw;
