@@ -63,10 +63,6 @@ system_or_submodule(OXENC oxenc liboxenc>=1.0.3 oxen-encoding)
 system_or_submodule(OXENMQ oxenmq liboxenmq>=1.2.12 oxen-mq)
 system_or_submodule(FMT fmt fmt>=8.0.0 fmt)
 
-system_or_submodule(OXENC oxenc liboxenc>=1.0.3 oxen-encoding)
-system_or_submodule(OXENMQ oxenmq liboxenmq>=1.2.12 oxen-mq)
-system_or_submodule(FMT fmt fmt>=8.0.0 fmt)
-
 add_subdirectory(db_drivers)
 add_subdirectory(easylogging++ easyloggingpp)
 add_subdirectory(randomx EXCLUDE_FROM_ALL)
