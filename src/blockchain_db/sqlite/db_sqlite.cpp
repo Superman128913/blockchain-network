@@ -143,7 +143,7 @@ namespace cryptonote {
 
         CREATE INDEX batched_payments_accrued_payout_offset_idx ON batched_payments_accrued(payout_offset);
 
-        DROP TRIGGER rollback_payment;
+        DROP TRIGGER IF EXISTS rollback_payment;
         CREATE TRIGGER rollback_payment INSTEAD OF DELETE ON batched_payments_paid
         FOR EACH ROW BEGIN
             DELETE FROM batched_payments_raw WHERE address = OLD.address AND height_paid = OLD.height_paid;
