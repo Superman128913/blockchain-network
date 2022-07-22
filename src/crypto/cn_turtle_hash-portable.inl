@@ -95,7 +95,7 @@ void cn_turtle_hash(const void *data, size_t length, char *hash, int light, int 
   uint8_t d[AES_BLOCK_SIZE];
   size_t i, j;
   uint8_t aes_key[AES_KEY_SIZE];
-  oaes_ctx *aes_ctx;
+  uint8_t expandedKey[AES_EXPANDED_KEY_SIZE];
 
   if (prehashed) {
     memcpy(&state.hs, data, length);
@@ -104,15 +104,14 @@ void cn_turtle_hash(const void *data, size_t length, char *hash, int light, int 
   }
   memcpy(text, state.init, INIT_SIZE_BYTE);
   memcpy(aes_key, state.hs.b, AES_KEY_SIZE);
-  aes_ctx = (oaes_ctx *) oaes_alloc();
 
   VARIANT1_PORTABLE_INIT();
   VARIANT2_PORTABLE_INIT();
 
-  oaes_key_import_data(aes_ctx, aes_key, AES_KEY_SIZE);
+  oaes_expand_key_256(aes_key, expandedKey);
   for (i = 0; i < init_rounds; i++) {
     for (j = 0; j < INIT_SIZE_BLK; j++) {
-      aesb_pseudo_round(&text[AES_BLOCK_SIZE * j], &text[AES_BLOCK_SIZE * j], aes_ctx->key->exp_data);
+      aesb_pseudo_round(&text[AES_BLOCK_SIZE * j], &text[AES_BLOCK_SIZE * j], expandedKey);
     }
     memcpy(&long_state[i * INIT_SIZE_BYTE], text, INIT_SIZE_BYTE);
   }
@@ -160,18 +159,17 @@ void cn_turtle_hash(const void *data, size_t length, char *hash, int light, int 
   }
 
   memcpy(text, state.init, INIT_SIZE_BYTE);
-  oaes_key_import_data(aes_ctx, &state.hs.b[32], AES_KEY_SIZE);
+  oaes_expand_key_256(&state.hs.b[32], expandedKey);
   for (i = 0; i < init_rounds; i++) {
     for (j = 0; j < INIT_SIZE_BLK; j++) {
       xor_blocks(&text[j * AES_BLOCK_SIZE], &long_state[i * INIT_SIZE_BYTE + j * AES_BLOCK_SIZE]);
-      aesb_pseudo_round(&text[AES_BLOCK_SIZE * j], &text[AES_BLOCK_SIZE * j], aes_ctx->key->exp_data);
+      aesb_pseudo_round(&text[AES_BLOCK_SIZE * j], &text[AES_BLOCK_SIZE * j], expandedKey);
     }
   }
   memcpy(state.init, text, INIT_SIZE_BYTE);
   hash_permutation(&state.hs);
   /*memcpy(hash, &state, 32);*/
   extra_hashes[state.hs.b[0] & 3](&state, 200, hash);
-  oaes_free((OAES_CTX **) &aes_ctx);
 
 #ifdef FORCE_USE_HEAP
   free(long_state);
