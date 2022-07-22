@@ -31,7 +31,7 @@
 #include <string.h>
 #include <assert.h>
 
-#include "oaes_lib.h"
+#include "oaes_lib_expand.h"
 
 #define OAES_RKEY_LEN 4
 #define OAES_COL_LEN 4

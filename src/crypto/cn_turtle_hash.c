@@ -13,7 +13,7 @@
 
 #include "epee/int-util.h"
 #include "hash-ops.h"
-#include "oaes_lib.h"
+#include "oaes_lib_expand.h"
 #include "variant2_int_sqrt.h"
 
 // Standard Crypto Definitions

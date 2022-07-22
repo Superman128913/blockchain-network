@@ -43,7 +43,7 @@ add_library(cncrypto
   hmac-keccak.c
   jh.c
   keccak.c
-  oaes_lib.c
+  oaes_lib_expand.c
   random.c
   skein.c
   cn_heavy_hash_hard_arm.cpp
