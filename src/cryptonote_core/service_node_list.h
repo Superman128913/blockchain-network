@@ -726,6 +726,8 @@ namespace service_nodes
           const cryptonote::transaction& tx,
           const service_node_keys *my_keys);
       bool process_key_image_unlock_tx(cryptonote::network_type nettype, cryptonote::hf hf_version, uint64_t block_height, const cryptonote::transaction &tx);
+      //TODO oxen delete this function after HF20
+      bool is_premature_unlock(cryptonote::network_type nettype, cryptonote::hf hf_version, uint64_t block_height, const cryptonote::transaction &tx) const;
       payout get_block_leader() const;
       payout get_block_producer(uint8_t pulse_round) const;
     };
@@ -734,6 +736,9 @@ namespace service_nodes
     bool debug_allow_local_ips = false;
     void record_timestamp_participation(crypto::public_key const &pubkey, bool participated);
     void record_timesync_status(crypto::public_key const &pubkey, bool synced);
+
+    //TODO oxen delete this function after HF20
+    bool is_premature_unlock(cryptonote::network_type nettype, cryptonote::hf hf_version, uint64_t block_height, const cryptonote::transaction &tx) const {return m_state.is_premature_unlock(nettype, hf_version, block_height, tx);}
 
   private:
     // Note(maxim): private methods don't have to be protected the mutex

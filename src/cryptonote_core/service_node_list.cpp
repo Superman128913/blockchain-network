@@ -906,6 +906,10 @@ namespace service_nodes
     }
 
     uint64_t unlock_height = get_locked_key_image_unlock_height(nettype, node_info.registration_height, block_height);
+    uint64_t small_contributor_amount_threshold = mul128_div64(
+      service_nodes::get_staking_requirement(nettype, unlock_height),
+      service_nodes::SMALL_CONTRIBUTOR_THRESHOLD::num,
+      service_nodes::SMALL_CONTRIBUTOR_THRESHOLD::den);
     for (const auto &contributor : node_info.contributors)
     {
       auto cit = std::find_if(contributor.locked_contributions.begin(),
@@ -915,9 +919,22 @@ namespace service_nodes
                               });
       if (cit != contributor.locked_contributions.end())
       {
-        if (hf_version >= hf::hf19_reward_batching)
+        if (hf_version >= hf::hf20)
         {
-          if (cit->amount < service_nodes::SMALL_CONTRIBUTOR_THRESHOLD && (block_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
+          if (cit->amount < small_contributor_amount_threshold && (block_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
+          {
+            LOG_PRINT_L1("Unlock TX: small contributor trying to unlock node before "
+                << std::to_string(service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
+                << " blocks have passed, rejected on height: "
+                << block_height << " for tx: "
+                << get_transaction_hash(tx));
+            return false;
+          }
+        }
+        //TODO oxen remove this whole if block after HF20 has occurred
+        if (hf_version == hf::hf19_reward_batching)
+        {
+          if (cit->amount < 3749 && (block_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
           {
             LOG_PRINT_L1("Unlock TX: small contributor trying to unlock node before "
                 << std::to_string(service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
@@ -943,6 +960,47 @@ namespace service_nodes
       }
     }
 
+    return false;
+  }
+
+  //------------------------------------------------------------------
+  //TODO oxen remove this whole function after HF20 has occurred
+  bool service_node_list::state_t::is_premature_unlock(cryptonote::network_type nettype, cryptonote::hf hf_version, uint64_t block_height, const cryptonote::transaction &tx) const
+  {
+    if (hf_version != hf::hf19_reward_batching)
+      return false;
+    crypto::public_key snode_key;
+    if (!cryptonote::get_service_node_pubkey_from_tx_extra(tx.extra, snode_key))
+      return false;
+
+    auto it = service_nodes_infos.find(snode_key);
+    if (it == service_nodes_infos.end())
+      return false;
+
+    const service_node_info &node_info = *it->second;
+
+    cryptonote::tx_extra_tx_key_image_unlock unlock;
+    if (!cryptonote::get_field_from_tx_extra(tx.extra, unlock))
+      return false;
+
+    uint64_t unlock_height = get_locked_key_image_unlock_height(nettype, node_info.registration_height, block_height);
+    uint64_t small_contributor_amount_threshold = mul128_div64(
+      service_nodes::get_staking_requirement(nettype, block_height),
+      service_nodes::SMALL_CONTRIBUTOR_THRESHOLD::num,
+      service_nodes::SMALL_CONTRIBUTOR_THRESHOLD::den);
+    for (const auto &contributor : node_info.contributors)
+    {
+      auto cit = std::find_if(contributor.locked_contributions.begin(),
+                              contributor.locked_contributions.end(),
+                              [&unlock](const service_node_info::contribution_t &contribution) {
+                                return unlock.key_image == contribution.key_image;
+                              });
+      if (cit == contributor.locked_contributions.end())
+        return false;
+
+      if (cit->amount < small_contributor_amount_threshold && (block_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
+        return true;
+    }
     return false;
   }
 

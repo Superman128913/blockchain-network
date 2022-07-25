@@ -201,6 +201,7 @@ enum class hf : uint8_t
     hf17,
     hf18,
     hf19_reward_batching,
+    hf20,
 
     _next,
     none = 0
@@ -214,8 +215,8 @@ constexpr auto hf_prev(hf x) {
 }
 
 // This is here to make sure the numeric value of the top hf enum value is correct (i.e.
-// hf19_reward_batching == 19 numerically); bump this when adding a new hf.
-static_assert(static_cast<uint8_t>(hf_max) == 19);
+// hf20 == 20 numerically); bump this when adding a new hf.
+static_assert(static_cast<uint8_t>(hf_max) == 20);
 
 // Constants for which hardfork activates various features:
 namespace feature {

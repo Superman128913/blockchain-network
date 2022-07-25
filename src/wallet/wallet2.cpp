@@ -8569,7 +8569,11 @@ wallet2::request_stake_unlock_result wallet2::can_request_stake_unlock(const cry
         return result;
       }
 
-      if (contribution.amount < service_nodes::SMALL_CONTRIBUTOR_THRESHOLD && (curr_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
+      uint64_t small_contributor_amount_threshold = mul128_div64(
+        service_nodes::get_staking_requirement(nettype(), curr_height),
+        service_nodes::SMALL_CONTRIBUTOR_THRESHOLD::num,
+        service_nodes::SMALL_CONTRIBUTOR_THRESHOLD::den);
+      if (contribution.amount < small_contributor_amount_threshold && (curr_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
       {
         result.msg.append("You are requesting to unlock a stake of: ");
         result.msg.append(cryptonote::print_money(contribution.amount));

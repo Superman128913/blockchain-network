@@ -1676,6 +1676,7 @@ end:
       return false;
     }
 
+
     //transaction is ok.
     return true;
   }
@@ -1856,6 +1857,11 @@ end:
       try
       {
         ready = is_transaction_ready_to_go(meta, sorted_it.second, txblob, tx);
+        // TODO oxen delete this after HF20 has occurred
+        // after here
+        if (ready)
+          ready = !m_blockchain.get_service_node_list().is_premature_unlock(m_blockchain.nettype(), version, height, tx);
+        // before here
       }
       catch (const std::exception &e)
       {
