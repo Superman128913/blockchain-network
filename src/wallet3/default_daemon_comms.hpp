@@ -84,8 +84,8 @@ namespace wallet
     bool syncing = false;
     int64_t max_sync_blocks = DEFAULT_MAX_SYNC_BLOCKS;
 
-    int64_t fee_per_byte = FEE_PER_BYTE_V13;
-    int64_t fee_per_output = FEE_PER_OUTPUT_V18;
+    int64_t fee_per_byte = cryptonote::FEE_PER_BYTE_V13;
+    int64_t fee_per_output = cryptonote::FEE_PER_OUTPUT_V18;
   };
 
 }  // namespace wallet

@@ -29,7 +29,7 @@ namespace wallet
     Keyring() {}
 
     virtual crypto::secret_key
-    generate_tx_key(uint8_t hf_version);
+    generate_tx_key(cryptonote::hf hf_version);
 
     // Derivation = a*R where
     //      `a` is the private view key of the recipient

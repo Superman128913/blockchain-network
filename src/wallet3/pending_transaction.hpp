@@ -32,9 +32,9 @@ namespace wallet
     uint64_t change_unlock_time = 0;
 
     int64_t fee = 0;
-    uint64_t fee_per_byte = FEE_PER_BYTE_V13;
-    uint64_t fee_per_output = FEE_PER_OUTPUT_V18;
-    size_t mixin_count = CRYPTONOTE_DEFAULT_TX_MIXIN;
+    uint64_t fee_per_byte = cryptonote::FEE_PER_BYTE_V13;
+    uint64_t fee_per_output = cryptonote::FEE_PER_OUTPUT_V18;
+    size_t mixin_count = cryptonote::TX_OUTPUT_DECOYS;
     size_t extra_size() const {return 0;};
 
     PendingTransaction() = default;

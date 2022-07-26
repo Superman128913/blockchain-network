@@ -881,7 +881,14 @@ bool get_pruned_tx(const nlohmann::json& entry, cryptonote::transaction &tx, cry
   // easy case if we have the whole tx
   if (entry["as_hex"] || (entry["prunable"] && entry["pruned"]))
   {
-    CHECK_AND_ASSERT_MES(oxenc::from_hex(entry["as_hex"] ? entry["as_hex"].get<std::string>() : entry["pruned"].get<std::string>() + entry["prunable"].get<std::string>(), bd), false, "Failed to parse tx data");
+    std::string hex_blob;
+    if (entry["as_hex"])
+      hex_blob = entry["as_hex"].get<std::string>();
+    else
+      hex_blob = entry["pruned"].get<std::string>() + entry["prunable"].get<std::string>();
+
+    CHECK_AND_ASSERT_MES(oxenc::is_hex(hex_blob), false, "Invalid tx data");
+    bd = oxenc::from_hex(hex_blob);
     CHECK_AND_ASSERT_MES(cryptonote::parse_and_validate_tx_from_blob(bd, tx), false, "Invalid tx data");
     tx_hash = cryptonote::get_transaction_hash(tx);
     // if the hash was given, check it matches
@@ -894,7 +901,8 @@ bool get_pruned_tx(const nlohmann::json& entry, cryptonote::transaction &tx, cry
   {
     crypto::hash ph;
     CHECK_AND_ASSERT_MES(tools::hex_to_type(entry["prunable_hash"].get<std::string>(), ph), false, "Failed to parse prunable hash");
-    CHECK_AND_ASSERT_MES(oxenc::from_hex(entry["pruned"].get<std::string>(), bd), false, "Failed to parse pruned data");
+    CHECK_AND_ASSERT_MES(oxenc::is_hex(entry["pruned"].get<std::string>()), false, "Invalid pruned tx entry");
+    bd = oxenc::from_hex(entry["pruned"].get<std::string>());
     CHECK_AND_ASSERT_MES(parse_and_validate_tx_base_from_blob(bd, tx), false, "Invalid base tx data");
     // only v2 txes can calculate their txid after pruned
     if (bd[0] > 1)
@@ -8554,6 +8562,7 @@ wallet2::request_stake_unlock_result wallet2::can_request_stake_unlock(const cry
 
       found = true;
       contributions = contributor["locked_contributions"];
+      break;
     }
 
     if (!found)
@@ -8595,15 +8604,15 @@ wallet2::request_stake_unlock_result wallet2::can_request_stake_unlock(const cry
         return result;
       }
 
-      if (contribution.amount < service_nodes::SMALL_CONTRIBUTOR_THRESHOLD && (curr_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
+      if (contribution["amount"] < service_nodes::SMALL_CONTRIBUTOR_THRESHOLD && (curr_height - node_info["registration_height"].get<uint64_t>()) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
       {
         result.msg.append("You are requesting to unlock a stake of: ");
-        result.msg.append(cryptonote::print_money(contribution.amount));
+        result.msg.append(cryptonote::print_money(contribution["amount"]));
         result.msg.append(" Oxen which is a small contributor stake.\nSmall contributors need to wait ");
         result.msg.append(std::to_string(service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER));
         result.msg.append(" blocks before being allowed to unlock.");
         result.msg.append("You will need to wait: ");
-        result.msg.append(std::to_string(service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER - (curr_height - node_info.registration_height)));
+        result.msg.append(std::to_string(service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER - (curr_height - node_info["registration_height"].get<uint64_t>())));
         result.msg.append(" more blocks.");
         return result;
       }
@@ -12045,8 +12054,9 @@ bool wallet2::get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key, s
     std::string tx_data;
     crypto::hash tx_prefix_hash{};
     const auto& res_tx = res["txs"].front();
-    bool valid_hex = oxenc::from_hex(res_tx["pruned"].get<std::string>() + (res_tx["prunable"] ? res_tx["prunable"].get<std::string>() : ""s), tx_data);
-    THROW_WALLET_EXCEPTION_IF(!valid_hex, error::wallet_internal_error, "Failed to parse transaction from daemon");
+    std::string tx_blob_hex = res_tx["pruned"].get<std::string>() + (res_tx["prunable"] ? res_tx["prunable"].get<std::string>() : ""s);
+    THROW_WALLET_EXCEPTION_IF(not oxenc::is_hex(tx_blob_hex), error::wallet_internal_error, "Failed to parse transaction from daemon");
+    tx_data = oxenc::from_hex(tx_blob_hex);
     THROW_WALLET_EXCEPTION_IF(!cryptonote::parse_and_validate_tx_from_blob(tx_data, tx, tx_hash, tx_prefix_hash),
                               error::wallet_internal_error, "Failed to validate transaction from daemon");
     THROW_WALLET_EXCEPTION_IF(tx_hash != txid, error::wallet_internal_error,

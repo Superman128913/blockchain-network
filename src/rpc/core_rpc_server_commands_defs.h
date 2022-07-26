@@ -1873,6 +1873,7 @@ namespace cryptonote::rpc {
       std::array<uint16_t, 3> version; // Storage server version
       uint16_t https_port; // Storage server https port to include in uptime proofs
       uint16_t omq_port; // Storage Server oxenmq port to include in uptime proofs
+      std::string ed25519_pubkey; // Service node Ed25519 pubkey for verifying that storage server is using the right one
     } request;
   };
 
@@ -1895,6 +1896,7 @@ namespace cryptonote::rpc {
     struct request_parameters
     {
       std::array<uint16_t, 3> version; // Lokinet version
+      std::string ed25519_pubkey; // Service node Ed25519 pubkey for verifying that lokinet is using the right one
     } request;
   };
 

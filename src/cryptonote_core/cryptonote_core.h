@@ -494,7 +494,7 @@ namespace cryptonote
       *
       * @note see Blockchain::get_blocks(const t_ids_container&, t_blocks_container&, t_missed_container&) const
       */
-     bool get_blocks(const std::vector<crypto::hash>& block_ids, std::vector<std::pair<cryptonote::blobdata, block>> blocks, std::unordered_set<crypto::hash>* missed_bs = nullptr) const;
+     bool get_blocks(const std::vector<crypto::hash>& block_ids, std::vector<std::pair<std::string, block>> blocks, std::unordered_set<crypto::hash>* missed_bs = nullptr) const;
 
      /**
       * @copydoc Blockchain::get_block_id_by_height

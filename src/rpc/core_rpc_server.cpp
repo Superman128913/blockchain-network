@@ -205,7 +205,7 @@ namespace cryptonote::rpc {
     info.response_hex["top_block_hash"] = top_hash;
     info.response["target_height"] = m_core.get_target_blockchain_height();
 
-    res.hard_fork = m_core.get_blockchain_storage().get_network_version();
+    info.response["hard_fork"] = m_core.get_blockchain_storage().get_network_version();
 
     bool next_block_is_pulse = false;
     if (pulse::timings t;
@@ -600,19 +600,20 @@ namespace cryptonote::rpc {
           new_reg["expiry"] = x.hf_or_expiration;
           new_reg["fee"] = microportion(x.fee);
         }
+        hf reg_hf = new_reg["hardfork"];
 
         new_reg["contributors"] = json::array();
         for (size_t i = 0; i < x.amounts.size(); i++) {
           auto wallet = get_account_address_as_str(nettype, false, {x.public_spend_keys[i], x.public_view_keys[i]});
           uint64_t amount;
           uint32_t portion;
-          if (reg.hardfork >= hf::hf19_reward_batching) {
+          if (reg_hf >= hf::hf19_reward_batching) {
             amount = x.amounts[i];
             // We aren't given info on whether this is testnet/mainnet, but we can guess by looking
             // at the operator amount, which has to be <= 100 on testnet, but >= 3750 on mainnet.
             auto nettype = x.amounts[0] > oxen::STAKING_REQUIREMENT_TESTNET
               ? network_type::MAINNET : network_type::TESTNET;
-            portion = std::lround(amount / (double) service_nodes::get_staking_requirement(nettype, reg.hardfork) * 1'000'000.0);
+            portion = std::lround(amount / (double) service_nodes::get_staking_requirement(nettype, reg_hf) * 1'000'000.0);
           } else {
             amount = 0;
             portion = microportion(x.amounts[i]);
@@ -743,7 +744,7 @@ namespace cryptonote::rpc {
 
     bc.for_all_txpool_txes(
         [&tx_infos, &pool]
-        (const crypto::hash& txid, const txpool_tx_meta_t& meta, const cryptonote::blobdata* bd) {
+        (const crypto::hash& txid, const txpool_tx_meta_t& meta, const std::string* bd) {
       transaction tx;
       if (!parse_and_validate_tx_from_blob(*bd, tx))
       {
@@ -943,7 +944,7 @@ namespace cryptonote::rpc {
       auto height = std::numeric_limits<uint64_t>::max();
 
       auto hf_version = get_network_version(nettype(), in_pool ? m_core.get_current_blockchain_height() : height);
-      if (uint64_t fee, burned; get_tx_miner_fee(tx, fee, hf_version >= HF_VERSION_FEE_BURNING, &burned)) {
+      if (uint64_t fee, burned; get_tx_miner_fee(tx, fee, hf_version >= feature::FEE_BURNING, &burned)) {
         e["fee"] = fee;
         e["burned"] = burned;
       }
@@ -1038,7 +1039,6 @@ namespace cryptonote::rpc {
       tx.response["status"] = STATUS_BUSY;
       return;
     }
-    auto tx_blob = oxenc::from_hex(req.tx_as_hex);
 
     if (tx.request.blink)
     {
@@ -1606,9 +1606,9 @@ namespace cryptonote::rpc {
     PERF_TIMER(on_hard_fork_info);
 
     const auto& blockchain = m_core.get_blockchain_storage();
-    uint8_t version =
-      hfinfo.request.version > 0 ? hfinfo.request.version :
-      hfinfo.request.height > 0 ? static_cast<uint8_t>(blockchain.get_network_version(hfinfo.request.height)) :
+    auto version =
+      hfinfo.request.version > 0 ? static_cast<hf>(hfinfo.request.version) :
+      hfinfo.request.height > 0 ? blockchain.get_network_version(hfinfo.request.height) :
       blockchain.get_network_version();
     hfinfo.response["version"] = version;
     hfinfo.response["enabled"] = blockchain.get_network_version() >= version;
@@ -2747,14 +2747,14 @@ namespace cryptonote::rpc {
             std::string_view name,
             std::atomic<std::time_t>& update,
             std::chrono::seconds lifetime,
-            SuccessCallback success)
+            Success success)
     {
       std::string status{};
       std::string our_ed25519_pubkey = tools::type_to_hex(core.get_service_keys().pub_ed25519);
       if (cur_version < required) {
-        std::ostringstream os;
-        os << "Outdated " << name << ". Current: " << version_printer{cur_version} << " Required: " << version_printer{required};
-        status = os.str();
+        status = fmt::format("Outdated {}. Current: {}.{}.{} Required: {}.{}.{}", name,
+            cur_version[0], cur_version[1], cur_version[2],
+            required[0], required[1], required[2]);
         MERROR(status);
       } else if (!ed25519_pubkey.empty() // TODO: once lokinet & ss are always sending this we can remove this empty bypass
           && ed25519_pubkey != our_ed25519_pubkey) {
@@ -2780,9 +2780,9 @@ namespace cryptonote::rpc {
   void core_rpc_server::invoke(STORAGE_SERVER_PING& storage_server_ping, rpc_context context)
   {
     m_core.ss_version = storage_server_ping.request.version;
-    storage_server_ping.response["status"] = handle_ping(
+    storage_server_ping.response["status"] = handle_ping(m_core,
       storage_server_ping.request.version, service_nodes::MIN_STORAGE_SERVER_VERSION,
-      req.ed25519_pubkey,
+      storage_server_ping.request.ed25519_pubkey,
       "Storage Server", m_core.m_last_storage_server_ping, m_core.get_net_config().UPTIME_PROOF_FREQUENCY,
       [this, &storage_server_ping](bool significant) {
         m_core.m_storage_https_port = storage_server_ping.request.https_port;
@@ -2795,9 +2795,9 @@ namespace cryptonote::rpc {
   void core_rpc_server::invoke(LOKINET_PING& lokinet_ping, rpc_context context)
   {
     m_core.lokinet_version = lokinet_ping.request.version;
-    lokinet_ping.response["status"] = handle_ping(
+    lokinet_ping.response["status"] = handle_ping(m_core,
       lokinet_ping.request.version, service_nodes::MIN_LOKINET_VERSION,
-      req.ed25519_pubkey,
+      lokinet_ping.request.ed25519_pubkey,
       "Lokinet", m_core.m_last_lokinet_ping, m_core.get_net_config().UPTIME_PROOF_FREQUENCY,
       [this](bool significant) { if (significant) m_core.reset_proof_interval(); });
   }

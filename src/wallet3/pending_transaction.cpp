@@ -59,9 +59,9 @@ namespace wallet
     int64_t fixed_fee = 0;
     // TODO sean add this 
     int64_t burn_pct = 0;
-    int64_t fee_percent = BLINK_BURN_TX_FEE_PERCENT_V18; // 100%
+    int64_t fee_percent = oxen::BLINK_BURN_TX_FEE_PERCENT_V18; // 100%
     if (blink)
-      fee_percent = BLINK_MINER_TX_FEE_PERCENT + BLINK_BURN_TX_FEE_PERCENT_V18 + burn_pct; // Blink ends up being 300%
+      fee_percent = oxen::BLINK_MINER_TX_FEE_PERCENT + oxen::BLINK_BURN_TX_FEE_PERCENT_V18 + burn_pct; // Blink ends up being 300%
 
     int64_t fee = (get_tx_weight(n_inputs) * fee_per_byte + (recipients.size() + 1) * fee_per_output) * fee_percent / 100;
     // Add fixed amount to the fee for items such as burning. This is defined in the pending transactions

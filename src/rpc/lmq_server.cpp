@@ -420,7 +420,7 @@ void omq_rpc::on_get_blocks(oxenmq::Message& m)
     block_bt["height"] = i;
     block_bt["timestamp"] = b.timestamp;
 
-    std::vector<cryptonote::blobdata> txs;
+    std::vector<std::string> txs;
     core_.get_transactions(b.tx_hashes, txs);
     if (txs.size() != b.tx_hashes.size())
     {

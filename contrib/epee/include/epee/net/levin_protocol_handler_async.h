@@ -35,7 +35,6 @@
 
 #include "levin_base.h"
 #include "buffer.h"
-#include "../misc_language.h"
 #include "../scope_leaver.h"
 #include "../int-util.h"
 

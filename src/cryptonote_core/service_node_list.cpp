@@ -3914,17 +3914,6 @@ namespace service_nodes
             tools::type_to_hex(reg.service_node_pubkey),
             tools::type_to_hex(reg.signature));
 
-    if (make_friendly && reg.uses_portions)
-    {
-      std::tm tm;
-      epee::misc_utils::get_gmt_time(reg.hf, tm);
-
-      cmd += "\n\n";
-      cmd += fmt::format(tr("This registration expires at {:%Y-%m-%d %I:%M:%S %p} UTC.\n"), tm);
-      cmd += tr("This should be about 2 weeks from now; if it isn't, check this computer's clock.\n");
-      cmd += tr("Please submit your registration into the blockchain before this time or it will be invalid.");
-    }
-
     return true;
   }
 

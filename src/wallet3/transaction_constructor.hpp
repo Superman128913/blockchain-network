@@ -34,8 +34,8 @@ namespace wallet
     PendingTransaction
     create_transaction(const std::vector<cryptonote::tx_destination_entry>& recipients);
 
-    uint64_t fee_per_byte = FEE_PER_BYTE_V13;
-    uint64_t fee_per_output = FEE_PER_OUTPUT_V18;
+    uint64_t fee_per_byte = cryptonote::FEE_PER_BYTE_V13;
+    uint64_t fee_per_output = cryptonote::FEE_PER_OUTPUT_V18;
 
     std::unique_ptr<DecoySelector> decoy_selector;
 

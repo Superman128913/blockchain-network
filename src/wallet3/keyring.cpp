@@ -14,7 +14,7 @@
 namespace wallet
 {
   crypto::secret_key
-  Keyring::generate_tx_key(uint8_t hf_version)
+  Keyring::generate_tx_key(cryptonote::hf hf_version)
   {
     // TODO sean make sure this is zero
     crypto::secret_key tx_key{};
@@ -207,7 +207,7 @@ namespace wallet
   void
   Keyring::sign_transaction(PendingTransaction& ptx)
   {
-    uint8_t hf_version = cryptonote::network_version_19;
+    auto hf_version = cryptonote::hf::hf19_reward_batching;
     auto tx_key = generate_tx_key(hf_version);
 
     rct::ctkeyV inSk;

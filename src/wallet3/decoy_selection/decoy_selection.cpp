@@ -1,12 +1,12 @@
 #include "decoy_selection.hpp"
-#include <cryptonote_config.h> // for ring size (CRYPTONOTE_DEFAULT_TX_MIXIN)
+#include <cryptonote_config.h> // for ring size (cryptonote::TX_OUTPUT_DECOYS)
 
 namespace wallet
 {
   std::vector<int64_t>
   DecoySelector::operator()(const Output& selected_output)
   {
-    const size_t n_decoys = CRYPTONOTE_DEFAULT_TX_MIXIN;
+    const size_t n_decoys = cryptonote::TX_OUTPUT_DECOYS;
 
     // Select some random outputs according to gamma distribution
     std::random_device rd;

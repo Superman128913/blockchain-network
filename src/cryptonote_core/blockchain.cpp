@@ -37,11 +37,8 @@
 
 #include "common/rules.h"
 #include "common/hex.h"
-<<<<<<< HEAD
 #include "common/string_util.h"
-=======
 #include "common/median.h"
->>>>>>> upstream/dev
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 #include "cryptonote_basic/hardfork.h"

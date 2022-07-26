@@ -183,7 +183,7 @@ std::optional<cryptonote::hf> NodeRPCProxy::get_hardfork_version() const
 
   try {
     auto res = m_http_client.json_rpc("hard_fork_info", {});
-    return res["version"].get<uint8_t>();
+    return res["version"].get<cryptonote::hf>();
   } catch (...) {}
 
   return std::nullopt;

@@ -692,7 +692,7 @@ namespace nodetool
     {
       zone.second.m_net_server.get_config_object().set_handler(this);
       zone.second.m_net_server.get_config_object().m_invoke_timeout
-          = std::chrono::milliseconds{cryptonote::p2p::DEFAULT_INVOKE_TIMEOUT}.count();
+          = std::chrono::milliseconds{cryptonote::p2p::DEFAULT_INVOKE_TIMEOUT};
 
       if (!zone.second.m_bind_ip.empty())
       {
@@ -925,7 +925,7 @@ namespace nodetool
         LOG_DEBUG_CC(context, " COMMAND_HANDSHAKE(AND CLOSE) INVOKED OK");
       }
       context_ = context;
-    }, std::chrono::milliseconds{cryptonote::p2p::DEFAULT_HANDSHAKE_INVOKE_TIMEOUT}.count());
+    }, std::chrono::milliseconds{cryptonote::p2p::DEFAULT_HANDSHAKE_INVOKE_TIMEOUT});
 
     if(r)
     {
