@@ -2292,7 +2292,7 @@ namespace service_nodes
     m_state.update_from_block(m_blockchain.get_db(), nettype, m_transient.state_history, m_transient.state_archive, {}, block, txs, m_service_node_keys);
   }
 
-  void service_node_list::blockchain_detached(uint64_t height, bool /*by_pop_blocks*/)
+  void service_node_list::blockchain_detached(uint64_t height)
   {
     std::lock_guard lock(m_sn_mutex);
 
@@ -2492,8 +2492,11 @@ namespace service_nodes
     return true;
   }
 
-  bool service_node_list::validate_miner_tx(const cryptonote::block& block, const cryptonote::block_reward_parts& reward_parts, const std::optional<std::vector<cryptonote::batch_sn_payment>>& batched_sn_payments) const
+  bool service_node_list::validate_miner_tx(const cryptonote::miner_tx_info& info) const
   {
+    const auto& block = info.block;
+    const auto& reward_parts = info.reward_parts;
+    const auto& batched_sn_payments = info.batched_sn_payments;
     const auto hf_version = block.major_version;
     if (hf_version < hf::hf9_service_nodes)
       return true;
@@ -2578,7 +2581,7 @@ namespace service_nodes
     size_t expected_vouts_size;
     switch (mode) {
       case verify_mode::batched_sn_rewards:
-        expected_vouts_size = batched_sn_payments ? batched_sn_payments->size() : 0;
+        expected_vouts_size = batched_sn_payments.size();
         break;
       case verify_mode::pulse_block_leader_is_producer:
       case verify_mode::pulse_different_block_producer:
@@ -2709,18 +2712,18 @@ namespace service_nodes
       case verify_mode::batched_sn_rewards:
       {
         // NB: this amount is in milli-atomics, not atomics
-        uint64_t total_payout_in_our_db = batched_sn_payments ? std::accumulate(
-                batched_sn_payments->begin(),
-                batched_sn_payments->end(),
+        uint64_t total_payout_in_our_db = std::accumulate(
+                batched_sn_payments.begin(),
+                batched_sn_payments.end(),
                 uint64_t{0},
-                [](auto&& a, auto&& b) { return a + b.amount; }) : 0;
+                [](auto&& a, auto&& b) { return a + b.amount; });
 
         uint64_t total_payout_in_vouts = 0;
         const auto deterministic_keypair = cryptonote::get_deterministic_keypair_from_height(height);
         for (size_t vout_index = 0; vout_index < block.miner_tx.vout.size(); vout_index++)
         {
           const auto& vout = block.miner_tx.vout[vout_index];
-          const auto& batch_payment = (*batched_sn_payments)[vout_index];
+          const auto& batch_payment = batched_sn_payments[vout_index];
 
           if (!std::holds_alternative<cryptonote::txout_to_key>(vout.target))
           {
@@ -2768,7 +2771,7 @@ namespace service_nodes
     return true;
   }
 
-  bool service_node_list::alt_block_added(cryptonote::block const &block, std::vector<cryptonote::transaction> const &txs, cryptonote::checkpoint_t const *checkpoint)
+  bool service_node_list::alt_block_added(const cryptonote::block_added_info& info)
   {
     // NOTE: The premise is to search the main list and the alternative list for
     // the parent of the block we just received, generate the new Service Node
@@ -2779,6 +2782,7 @@ namespace service_nodes
     // store into the alt-chain until it gathers enough blocks to cause
     // a reorganization (more checkpoints/PoW than the main chain).
 
+    auto& block = info.block;
     if (block.major_version < hf::hf9_service_nodes)
       return true;
 
@@ -2819,14 +2823,14 @@ namespace service_nodes
 
     // NOTE: Generate the next Service Node list state from this Alt block.
     state_t alt_state = *starting_state;
-    alt_state.update_from_block(m_blockchain.get_db(), m_blockchain.nettype(), m_transient.state_history, m_transient.state_archive, m_transient.alt_state, block, txs, m_service_node_keys);
+    alt_state.update_from_block(m_blockchain.get_db(), m_blockchain.nettype(), m_transient.state_history, m_transient.state_archive, m_transient.alt_state, block, info.txs, m_service_node_keys);
     auto alt_it = m_transient.alt_state.find(block_hash);
     if (alt_it != m_transient.alt_state.end())
       alt_it->second = std::move(alt_state);
     else
       m_transient.alt_state.emplace(block_hash, std::move(alt_state));
 
-    return verify_block(block, true /*alt_block*/, checkpoint);
+    return verify_block(block, true /*alt_block*/, info.checkpoint);
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
