@@ -1667,7 +1667,7 @@ namespace service_nodes
           block_type, height)};
   }
 
-  void service_node_list::block_added(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs, cryptonote::checkpoint_t const *checkpoint)
+  void service_node_list::block_add(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs, cryptonote::checkpoint_t const *checkpoint)
   {
     if (block.major_version < hf::hf9_service_nodes)
       return;
@@ -2710,7 +2710,7 @@ namespace service_nodes
     }
   }
 
-  void service_node_list::alt_block_added(const cryptonote::block_added_info& info)
+  void service_node_list::alt_block_add(const cryptonote::block_add_info& info)
   {
     // NOTE: The premise is to search the main list and the alternative list for
     // the parent of the block we just received, generate the new Service Node

@@ -980,7 +980,7 @@ namespace cryptonote
     /**
      * @brief add a hook called during new block handling; should throw to abort adding the block.
      */
-    void hook_block_added(BlockAddedHook hook) { m_block_added_hooks.push_back(std::move(hook)); }
+    void hook_block_add(BlockAddHook hook) { m_block_add_hooks.push_back(std::move(hook)); }
     /**
      * @brief add a hook called when blocks are removed from the chain.
      */
@@ -997,7 +997,7 @@ namespace cryptonote
     /**
      * @brief add a hook to be called when adding an alt-chain block; should throw to abort adding.
      */
-    void hook_alt_block_added(BlockAddedHook hook) { m_alt_block_added_hooks.push_back(std::move(hook)); }
+    void hook_alt_block_add(BlockAddHook hook) { m_alt_block_add_hooks.push_back(std::move(hook)); }
 
     /**
      * @brief returns the timestamps of the last N blocks
@@ -1130,8 +1130,8 @@ namespace cryptonote
     // some invalid blocks
     std::set<crypto::hash> m_invalid_blocks;
 
-    std::vector<BlockAddedHook> m_block_added_hooks;
-    std::vector<BlockAddedHook> m_alt_block_added_hooks;
+    std::vector<BlockAddHook> m_block_add_hooks;
+    std::vector<BlockAddHook> m_alt_block_add_hooks;
     std::vector<BlockchainDetachedHook> m_blockchain_detached_hooks;
     std::vector<InitHook> m_init_hooks;
     std::vector<ValidateMinerTxHook> m_validate_miner_tx_hooks;
