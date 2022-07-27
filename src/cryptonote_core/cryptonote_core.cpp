@@ -226,16 +226,6 @@ namespace cryptonote
     "replaced by the number of new blocks in the new chain"
   , ""
   };
-  static const command_line::arg_descriptor<std::string> arg_block_rate_notify = {
-    "block-rate-notify"
-  , "Run a program when the block rate undergoes large fluctuations. This might "
-    "be a sign of large amounts of hash rate going on and off the Loki network, "
-    "or could be a sign that oxend is not properly synchronizing with the network. %t will be replaced "
-    "by the number of minutes for the observation window, %b by the number of "
-    "blocks observed within that window, and %e by the number of blocks that was "
-    "expected in that window."
-  , ""
-  };
   static const command_line::arg_descriptor<bool> arg_keep_alt_blocks  = {
     "keep-alt-blocks"
   , "Keep alternative blocks on restart"
@@ -351,7 +341,6 @@ namespace cryptonote
     command_line::add_arg(desc, arg_prune_blockchain);
 #endif
     command_line::add_arg(desc, arg_reorg_notify);
-    command_line::add_arg(desc, arg_block_rate_notify);
     command_line::add_arg(desc, arg_keep_alt_blocks);
 
     command_line::add_arg(desc, arg_store_quorum_history);
@@ -724,20 +713,22 @@ namespace cryptonote
     m_blockchain_storage.set_user_options(blocks_threads,
         sync_on_blocks, sync_threshold, sync_mode, fast_sync);
 
-    try
-    {
-      if (!command_line::is_arg_defaulted(vm, arg_block_notify))
-        m_blockchain_storage.set_block_notify(std::shared_ptr<tools::Notify>(new tools::Notify(command_line::get_arg(vm, arg_block_notify).c_str())));
-    }
-    catch (const std::exception &e)
-    {
-      MERROR("Failed to parse block notify spec");
-    }
-
+    // We need this hook to get added before the block hook below, so that it fires first and
+    // catches the start of a reorg before the block hook fires for the block in the reorg.
     try
     {
       if (!command_line::is_arg_defaulted(vm, arg_reorg_notify))
-        m_blockchain_storage.set_reorg_notify(std::shared_ptr<tools::Notify>(new tools::Notify(command_line::get_arg(vm, arg_reorg_notify).c_str())));
+        m_blockchain_storage.hook_block_post_add(
+            [this, notify=tools::Notify(command_line::get_arg(vm, arg_reorg_notify))]
+            (const auto& info) {
+              if (!info.reorg)
+                return;
+              auto h = get_current_blockchain_height();
+              notify.notify(
+                  "%s", info.split_height,
+                  "%h", h,
+                  "%n", h - info.split_height);
+            });
     }
     catch (const std::exception &e)
     {
@@ -746,14 +737,17 @@ namespace cryptonote
 
     try
     {
-      if (!command_line::is_arg_defaulted(vm, arg_block_rate_notify))
-        m_block_rate_notify.reset(new tools::Notify(command_line::get_arg(vm, arg_block_rate_notify).c_str()));
+      if (!command_line::is_arg_defaulted(vm, arg_block_notify))
+        m_blockchain_storage.hook_block_post_add(
+            [notify=tools::Notify(command_line::get_arg(vm, arg_block_notify))]
+            (const auto& info) {
+              notify.notify("%s", tools::type_to_hex(get_block_hash(info.block)));
+            });
     }
     catch (const std::exception &e)
     {
-      MERROR("Failed to parse block rate notify spec");
+      MERROR("Failed to parse block notify spec");
     }
-
     
     cryptonote::test_options regtest_test_options{};
     for (auto [it, end] = get_hard_forks(network_type::MAINNET);
@@ -2446,14 +2440,6 @@ namespace cryptonote
       if (p < threshold)
       {
         MWARNING("There were " << b << (b == max_blocks_checked ? " or more" : "") << " blocks in the last " << seconds[n] / 60 << " minutes, there might be large hash rate changes, or we might be partitioned, cut off from the Loki network or under attack, or your computer's time is off. Or it could be just sheer bad luck.");
-
-        std::shared_ptr<tools::Notify> block_rate_notify = m_block_rate_notify;
-        if (block_rate_notify)
-        {
-          auto expected = seconds[n] / tools::to_seconds(TARGET_BLOCK_TIME);
-          block_rate_notify->notify("%t", std::to_string(seconds[n] / 60).c_str(), "%b", std::to_string(b).c_str(), "%e", std::to_string(expected).c_str(), NULL);
-        }
-
         break; // no need to look further
       }
     }
