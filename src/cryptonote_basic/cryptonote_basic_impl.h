@@ -42,7 +42,7 @@ namespace cryptonote {
     const std::vector<transaction>& txs;
     const checkpoint_t* const checkpoint;
   };
-  using BlockAddedHook = std::function<bool(const block_added_info& info)>;
+  using BlockAddedHook = std::function<void(const block_added_info& info)>;
   struct detached_info {
     uint64_t height;
     bool by_pop_blocks;
@@ -56,7 +56,7 @@ namespace cryptonote {
     const block_reward_parts& reward_parts;
     const std::vector<cryptonote::batch_sn_payment>& batched_sn_payments;
   };
-  using ValidateMinerTxHook = std::function<bool(const miner_tx_info& info)>;
+  using ValidateMinerTxHook = std::function<void(const miner_tx_info& info)>;
 
   struct address_parse_info
   {

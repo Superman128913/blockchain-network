@@ -510,7 +510,7 @@ namespace service_nodes
     }
   }
 
-  bool quorum_cop::block_added(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs)
+  void quorum_cop::block_added(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs)
   {
     process_quorums(block);
     uint64_t const height = cryptonote::get_block_height(block) + 1; // chain height = new top block height + 1
@@ -520,8 +520,6 @@ namespace service_nodes
     // These feels out of place here because the hook system sucks: TODO replace it with
     // std::function hooks instead.
     m_core.update_omq_sns();
-
-    return true;
   }
 
   static bool handle_obligations_vote(cryptonote::core &core, const quorum_vote_t& vote, const std::vector<pool_vote_entry>& votes, const quorum& quorum)
