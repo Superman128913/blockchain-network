@@ -6,6 +6,7 @@
 #include <common/hex.h>
 #include <cryptonote_basic/cryptonote_basic.h>
 
+#include <fmt/core.h>
 #include <iostream>
 
 namespace wallet
@@ -14,12 +15,21 @@ namespace wallet
   {
   }
 
-  // FIXME: BLOB or TEXT for binary data below?
   void
-  WalletDB::create_schema()
+  WalletDB::create_schema(cryptonote::network_type nettype)
   {
     if (db.tableExists("outputs"))
+    {
+      if (auto stored_nettype = this->network_type(); stored_nettype != nettype)
+      {
+        std::string err = fmt::format("Loaded wallet on network type \"{}\" but db has network type \"{}\"",
+            cryptonote::network_type_to_string(nettype),
+            cryptonote::network_type_to_string(stored_nettype));
+        //TODO: log error as well
+        throw std::invalid_argument(err);
+      }
       return;
+    }
 
     SQLite::Transaction db_tx(db);
 
@@ -31,6 +41,7 @@ namespace wallet
           CREATE TABLE metadata (
             id INTEGER NOT NULL PRIMARY KEY CHECK (id = 0),
             db_version INTEGER NOT NULL DEFAULT 0,
+            nettype TEXT NOT NULL DEFAULT "testnet",
             balance INTEGER NOT NULL DEFAULT 0,
             unlocked_balance INTEGER NOT NULL DEFAULT 0,
             last_scan_height INTEGER NOT NULL DEFAULT -1,
@@ -40,7 +51,7 @@ namespace wallet
           );
 
           -- insert metadata row as default
-          INSERT INTO metadata VALUES (0,0,0,0,-1,"",0,0);
+          INSERT INTO metadata VALUES (0,0,"testnet",0,0,-1,"",0,0);
 
           CREATE TABLE blocks (
             height INTEGER NOT NULL PRIMARY KEY,
@@ -164,7 +175,15 @@ namespace wallet
 
         )");
 
+    prepared_exec("UPDATE metadata SET nettype = ? WHERE id = 0;", std::string(cryptonote::network_type_to_string(nettype)));
+
     db_tx.commit();
+  }
+
+  cryptonote::network_type
+  WalletDB::network_type()
+  {
+    return cryptonote::network_type_from_string(prepared_get<std::string>("SELECT nettype FROM metadata WHERE id=0;"));
   }
 
   void

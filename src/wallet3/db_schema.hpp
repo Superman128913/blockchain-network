@@ -35,7 +35,10 @@ namespace wallet
     // Create the database schema for the current version of the wallet db.
     // Migration code will live elsewhere.
     void
-    create_schema();
+    create_schema(cryptonote::network_type nettype = cryptonote::network_type::TESTNET);
+
+    cryptonote::network_type
+    network_type();
 
     void
     store_block(const Block& block);

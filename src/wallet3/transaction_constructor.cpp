@@ -5,6 +5,10 @@
 #include "decoy_selection/decoy_selection.hpp"
 #include "db_schema.hpp"
 
+#include <cryptonote_basic/hardfork.h>
+
+//TODO: nettype-based tx construction parameters
+
 namespace wallet
 {
   // create_transaction will create a vanilla spend transaction without any special features.
@@ -13,8 +17,8 @@ namespace wallet
       const std::vector<cryptonote::tx_destination_entry>& recipients)
   {
     PendingTransaction new_tx(recipients);
-    cryptonote::oxen_construct_tx_params tx_params{}; // TODO: params; defaults are fine for now
-                                          //
+    auto [hf, hf_uint8] = cryptonote::get_ideal_block_version(db->network_type(), db->scan_target_height());
+    cryptonote::oxen_construct_tx_params tx_params{hf, cryptonote::txtype::standard, 0, 0};
     new_tx.tx.version = cryptonote::transaction::get_max_version_for_hf(tx_params.hf_version);
     new_tx.tx.type = tx_params.tx_type;
 std::cout << "create_transaction, transaction version = " << cryptonote::transaction_prefix::version_to_string(new_tx.tx.version) << "\n";

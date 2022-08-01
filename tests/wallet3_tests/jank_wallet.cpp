@@ -33,7 +33,7 @@ int main(void)
   auto oxenmq = std::make_shared<oxenmq::OxenMQ>();
   auto comms = std::make_shared<wallet::DefaultDaemonComms>(oxenmq);
   cryptonote::address_parse_info senders_address{};
-  cryptonote::get_account_address_from_str(senders_address, cryptonote::TESTNET, wallet_addr);
+  cryptonote::get_account_address_from_str(senders_address, cryptonote::network_type::TESTNET, wallet_addr);
   auto wallet = wallet::Wallet::create(oxenmq, keyring, nullptr, comms, "test.sqlite", "");
 
   std::this_thread::sleep_for(1s);
@@ -41,7 +41,6 @@ int main(void)
 
   std::cout << "chain height: " << chain_height << "\n";
 
-  int64_t old_height = -1;
   int64_t scan_height = 0;
 
   std::atomic<bool> done = false;
@@ -52,11 +51,12 @@ int main(void)
       done = true;
       });
 
-  while (old_height != scan_height)
+  while (chain_height == 0 or (scan_height != chain_height and chain_height != 0))
   {
     using namespace std::chrono_literals;
 
-    old_height = scan_height;
+    chain_height = comms->get_height();
+    std::cout << "chain height: " << chain_height << "\n";
     scan_height = wallet->last_scan_height;
     std::this_thread::sleep_for(2s);
     std::cout << "after block " << scan_height << ", balance is: " << wallet->get_balance() << "\n";
