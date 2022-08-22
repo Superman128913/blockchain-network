@@ -248,7 +248,7 @@ namespace service_nodes {
 
   // Small Stake prevented from unlocking stake until a certain number of blocks have passed
   constexpr uint64_t SMALL_CONTRIBUTOR_UNLOCK_TIMER = cryptonote::BLOCKS_PER_DAY * 30;
-  constexpr uint64_t SMALL_CONTRIBUTOR_THRESHOLD = 3749;
+  using SMALL_CONTRIBUTOR_THRESHOLD = std::ratio<2499, 10000>;
 
 static_assert(cryptonote::old::STAKING_PORTIONS != UINT64_MAX, "UINT64_MAX is used as the invalid value for failing to calculate the min_node_contribution");
 // return: UINT64_MAX if (num_contributions > the max number of contributions), otherwise the amount in oxen atomic units
