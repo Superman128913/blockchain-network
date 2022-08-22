@@ -1850,6 +1850,26 @@ namespace cryptonote::rpc {
     static constexpr auto names() { return NAMES("get_service_node_status"); }
   };
 
+  /// Retrieve the current "balance" of accrued service node rewards for
+  /// the given addresses.
+  ///
+  /// Inputs:
+  ///
+  ///  - \p addresses a set of addresses about which to query
+  ///
+  /// Outputs:
+  ///
+  ///  - \p balances a dict of {address: balance}
+  struct GET_ACCRUED_BATCHED_EARNINGS : RPC_COMMAND
+  {
+    static constexpr auto names() { return NAMES("get_accrued_batched_earnings"); }
+
+    struct request_parameters
+    {
+      std::vector<std::string> addresses;
+    } request;
+  };
+
   /// Endpoint to receive an uptime ping from the connected storage server. This is used
   /// to record whether the storage server is ready before the service node starts
   /// sending uptime proofs. This is usually called internally from the storage server
@@ -2253,7 +2273,8 @@ namespace cryptonote::rpc {
     TEST_TRIGGER_P2P_RESYNC,
     TEST_TRIGGER_UPTIME_PROOF,
     REPORT_PEER_STATUS,
-    FLUSH_CACHE
+    FLUSH_CACHE,
+    GET_ACCRUED_BATCHED_EARNINGS
   >;
 
   using FIXME_old_rpc_types = tools::type_list<
@@ -2279,7 +2300,6 @@ namespace cryptonote::rpc {
     GET_CHECKPOINTS,
     ONS_NAMES_TO_OWNERS,
     ONS_OWNERS_TO_NAMES
-    //MERGEFIX: add/convert GET_ACCRUED_BATCHED_EARNINGS to new RPC
   >;
 
 } // namespace cryptonote::rpc

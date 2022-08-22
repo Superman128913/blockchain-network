@@ -2579,17 +2579,15 @@ skip:
   template<class t_core>
   bool t_cryptonote_protocol_handler<t_core>::relay_transactions(NOTIFY_NEW_TRANSACTIONS::request& arg, cryptonote_connection_context& exclude_context)
   {
-    for(auto& tx_blob : arg.txs)
-      m_core.on_transaction_relayed(tx_blob);
-
     // no check for success, so tell core they're relayed unconditionally and snag a copy of the
     // hash so that we can look up any associated blink data we should include.
     std::vector<crypto::hash> relayed_txes;
     relayed_txes.reserve(arg.txs.size());
     for (auto &tx_blob : arg.txs)
-      relayed_txes.push_back(
-          m_core.on_transaction_relayed(tx_blob)
-      );
+    {
+      if (auto hash = m_core.on_transaction_relayed(tx_blob))
+        relayed_txes.push_back(hash);
+    }
 
     // Rebuild arg.blinks from blink data that we have because we don't necessarily have the same
     // blink data that got sent to us (we may have additional blink info, or may have rejected some

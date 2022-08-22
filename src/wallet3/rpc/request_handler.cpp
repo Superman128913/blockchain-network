@@ -4,7 +4,7 @@
 #include "command_parser.h"
 #include <wallet3/wallet.hpp>
 #include <wallet3/db_schema.hpp>
-#include <wallet3/version.hpp>
+#include <version.h>
 
 #include <cryptonote_core/cryptonote_tx_utils.h>
 
@@ -68,6 +68,8 @@ void RequestHandler::invoke(GET_BALANCE& command, rpc_context context) {
 }
 
 void RequestHandler::invoke(GET_ADDRESS& command, rpc_context context) {
+  //TODO: implement fetching address/subaddress from db/keyring
+  /*
   if (auto w = wallet.lock())
   {
     auto& addresses = (command.response["addresses"] = json::array());
@@ -75,7 +77,7 @@ void RequestHandler::invoke(GET_ADDRESS& command, rpc_context context) {
     {
       auto address = w->get_subaddress(command.request.account_index, 0);
       addresses.push_back(json{
-        {"address", address.as_str(cryptonote::MAINNET)},
+        {"address", address.as_str(cryptonote::network_type::MAINNET)},
         {"label", ""},
         {"address_index", command.request.address_index},
         {"used", true}
@@ -85,7 +87,7 @@ void RequestHandler::invoke(GET_ADDRESS& command, rpc_context context) {
       {
         auto address = w->get_subaddress(command.request.account_index, address_index);
         addresses.push_back(json{
-          {"address", address.as_str(cryptonote::MAINNET)},
+          {"address", address.as_str(cryptonote::network_type::MAINNET)},
           {"label", ""},
           {"address_index", command.request.address_index},
           {"used", true}
@@ -93,6 +95,8 @@ void RequestHandler::invoke(GET_ADDRESS& command, rpc_context context) {
       }
     }
   }
+  */
+  
 }
 
 void RequestHandler::invoke(GET_ADDRESS_INDEX& command, rpc_context context) {
@@ -405,7 +409,7 @@ void RequestHandler::invoke(SUBMIT_MULTISIG& command, rpc_context context) {
 void RequestHandler::invoke(GET_VERSION& command, rpc_context context) {
   if (auto w = wallet.lock())
   {
-    command.response["version"] = VERSION_STR;
+    command.response["version"] = OXEN_VERSION_STR;
   }
 }
 

@@ -358,7 +358,7 @@ namespace cryptonote
 
         if (hard_fork_version >= hf::hf19_reward_batching) {
           for (size_t i = 0; i < p_payouts.size(); i++)
-            batched_rewards.emplace_back(p_payouts[i].address, split_rewards[i], nettype);
+            batched_rewards.emplace_back(p_payouts[i].address, split_rewards[i]);
         } else {
           for (size_t i = 0; i < p_payouts.size(); i++)
             rewards.push_back({reward_type::snode, p_payouts[i].address, split_rewards[i]});
@@ -369,7 +369,7 @@ namespace cryptonote
       if (hard_fork_version >= hf::hf19_reward_batching)
       {
         for (size_t i = 0; i < leader.payouts.size(); i++)
-          batched_rewards.emplace_back(leader.payouts[i].address, split_rewards[i], nettype);
+          batched_rewards.emplace_back(leader.payouts[i].address, split_rewards[i]);
       }
       else
       {
@@ -386,7 +386,7 @@ namespace cryptonote
       if (uint64_t miner_amount = reward_parts.base_miner + reward_parts.miner_fee; miner_amount)
       {
         if (hard_fork_version >= hf::hf19_reward_batching) {
-          batched_rewards.emplace_back(miner_tx_context.miner_block_producer, miner_amount, nettype);
+          batched_rewards.emplace_back(miner_tx_context.miner_block_producer, miner_amount);
         } else {
           rewards.push_back({reward_type::miner, miner_tx_context.miner_block_producer, miner_amount});
         }
@@ -399,7 +399,7 @@ namespace cryptonote
                                           hard_fork_version >= hf::hf16_pulse /*distribute_remainder*/);
         if (hard_fork_version >= hf::hf19_reward_batching) {
           for (size_t i = 0; i < leader.payouts.size(); i++)
-            batched_rewards.emplace_back(leader.payouts[i].address, split_rewards[i], nettype);
+            batched_rewards.emplace_back(leader.payouts[i].address, split_rewards[i]);
         } else {
           for (size_t i = 0; i < leader.payouts.size(); i++)
             rewards.push_back({reward_type::snode, leader.payouts[i].address, split_rewards[i]});

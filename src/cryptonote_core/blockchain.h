@@ -1243,7 +1243,7 @@ namespace cryptonote
      *
      * @return the block removed
      */
-    block pop_block_from_blockchain();
+    block pop_block_from_blockchain(bool pop_batching_rewards);
 
     /**
      * @brief validate and add a new block to the end of the blockchain

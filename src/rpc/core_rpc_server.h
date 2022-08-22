@@ -182,6 +182,7 @@ namespace cryptonote::rpc {
     void invoke(GET_ALTERNATE_CHAINS& get_alternate_chains, rpc_context context);
     void invoke(GET_OUTPUT_HISTOGRAM& get_output_histogram, rpc_context context);
     void invoke(ONS_OWNERS_TO_NAMES& ons_owners_to_names, rpc_context context);
+    void invoke(GET_ACCRUED_BATCHED_EARNINGS& get_accrued_batched_earnings, rpc_context context);
 
     // Deprecated Monero NIH binary endpoints:
     GET_ALT_BLOCKS_HASHES_BIN::response         invoke(GET_ALT_BLOCKS_HASHES_BIN::request&& req, rpc_context context);

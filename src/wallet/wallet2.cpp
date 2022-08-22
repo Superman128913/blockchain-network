@@ -1859,7 +1859,6 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
   if (!tx.is_transfer() || tx.version <= txversion::v1)
     return;
 
-  MERROR("PROC NEW TX " << txid);
   PERF_TIMER(process_new_transaction);
   // In this function, tx (probably) only contains the base information
   // (that is, the prunable stuff may or may not be included)
@@ -2155,7 +2154,6 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
                                   error::wallet_internal_error,
                                   "Sanity check failed: An output replacing a unmined blink output must not be from the pool.");
 
-        LOG_ERROR(+transfer.m_spent << " || " << transfer.amount() << " >= " << tx_scan_info[o].amount);
         if (transfer.m_spent || transfer.amount() >= tx_scan_info[o].amount)
         {
           if (transfer.amount() > tx_scan_info[o].amount)
@@ -3649,6 +3647,8 @@ void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blo
   {
     LOG_PRINT_L1("Failed to check pending transactions");
   }
+
+  refresh_batching_cache();
 
   m_first_refresh_done = true;
 
@@ -13002,11 +13002,10 @@ uint64_t wallet2::get_approximate_blockchain_height() const
   return approx_blockchain_height;
 }
 
-nlohmann::json wallet2::list_current_stakes()
+nlohmann::json wallet2::get_staked_service_nodes()
 {
-  auto [success, service_node_states] = this->get_all_service_nodes();
-
-  return service_node_states;
+  auto [success, contributed_nodes] = m_node_rpc_proxy.get_contributed_service_nodes(get_address_as_str());
+  return std::move(contributed_nodes);
 }
 
 void wallet2::set_ons_cache_record(wallet2::ons_detail detail)
@@ -13022,6 +13021,44 @@ void wallet2::delete_ons_cache_record(const std::string& hashed_name)
 std::unordered_map<std::string, wallet2::ons_detail> wallet2::get_ons_cache()
 {
   return ons_records_cache;
+}
+
+void wallet2::refresh_batching_cache()
+{
+  nlohmann::json req_params{
+    {"addresses", std::vector<std::string>{}}
+  };
+  auto res = m_http_client.json_rpc("get_accrued_batched_earnings", req_params);
+  THROW_WALLET_EXCEPTION_IF(res["status"] == rpc::STATUS_BUSY, error::daemon_busy, "get_output_histogram");
+  THROW_WALLET_EXCEPTION_IF(res["status"] != rpc::STATUS_OK, error::get_accrued_batched_earnings_error, res["status"]);
+
+  auto records = res["balances"].get<std::unordered_map<std::string, uint64_t> >();
+  batching_records_cache.clear();
+  batching_records_cache = std::move(records);
+}
+
+uint64_t wallet2::get_batched_amount(std::optional<std::string> address) const
+{
+  if (!address)
+      address = get_address_as_str();
+  if (auto i = batching_records_cache.find(*address); i != batching_records_cache.end())
+    return i->second;
+  return 0;
+}
+
+uint64_t wallet2::get_next_batch_payout(std::optional<std::string> address) const
+{
+  auto& conf = cryptonote::get_config(nettype());
+  cryptonote::account_public_address addr;
+  if (address) {
+    cryptonote::address_parse_info info;
+    if (!get_account_address_from_str(info, nettype(), *address))
+      return 0;
+    addr = std::move(info.address);
+  } else {
+    addr = get_address();
+  }
+  return addr.next_payout_height(get_blockchain_current_height(), conf.BATCHING_INTERVAL);
 }
 
 void wallet2::set_tx_note(const crypto::hash &txid, const std::string &note)

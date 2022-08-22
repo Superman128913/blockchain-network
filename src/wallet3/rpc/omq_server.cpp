@@ -2,6 +2,7 @@
 
 #include "request_handler.h"
 #include "commands.h"
+#include <wallet3/config/config.hpp>
 
 #include <oxenmq/oxenmq.h>
 #include <oxenmq/auth.h>
@@ -28,12 +29,12 @@ using namespace cryptonote::rpc;
 using oxenmq::AuthLevel;
 
 void
-OmqServer::set_omq(std::shared_ptr<oxenmq::OxenMQ> omq_in)
+OmqServer::set_omq(std::shared_ptr<oxenmq::OxenMQ> omq_in, wallet::rpc::Config config)
 {
   omq = omq_in;
 
   //TODO: parametrize listening address(es) and auth
-  omq->listen_plain("ipc://./rpc.sock");
+  omq->listen_plain(std::string("ipc://./") + config.sockname);
 
   omq->add_category("rpc", AuthLevel::none, 0 /*no reserved threads*/, 100 /*max queued requests*/);
   // TODO: actually make restricted category require auth

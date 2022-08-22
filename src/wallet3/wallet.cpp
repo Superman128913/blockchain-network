@@ -27,7 +27,8 @@ namespace wallet
       std::shared_ptr<TransactionConstructor> tx_constructor,
       std::shared_ptr<DaemonComms> daemon_comms,
       std::string_view dbFilename,
-      std::string_view dbPassword)
+      std::string_view dbPassword,
+      wallet::Config config_in)
       : omq(omq)
       , db{std::make_shared<WalletDB>(std::filesystem::path(dbFilename), dbPassword)}
       , keys{keys}
@@ -35,7 +36,7 @@ namespace wallet
       , tx_constructor{tx_constructor}
       , daemon_comms{daemon_comms}
       , omq_server{request_handler}
-      , config()
+      , config(config_in)
   {
     if (not omq)
     {
@@ -47,7 +48,7 @@ namespace wallet
     if (not tx_constructor)
       this->tx_constructor = std::make_shared<TransactionConstructor>(db, daemon_comms); // TODO sean fix the input that is blank
 
-    omq_server.set_omq(this->omq);
+    omq_server.set_omq(this->omq, config.omq_rpc);
 
     db->create_schema();
     last_scan_height = db->last_scan_height();
@@ -79,6 +80,12 @@ namespace wallet
   Wallet::get_balance()
   {
     return db->overall_balance();
+  }
+
+  uint64_t
+  Wallet::get_unlocked_balance()
+  {
+    return 0; // TODO: this
   }
 
   cryptonote::account_keys

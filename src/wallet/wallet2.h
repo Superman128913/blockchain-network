@@ -833,10 +833,11 @@ private:
     auto get_all_service_nodes()                                    const { return m_node_rpc_proxy.get_all_service_nodes(); }
     auto get_service_nodes(std::vector<std::string> const &pubkeys) const { return m_node_rpc_proxy.get_service_nodes(pubkeys); }
     auto get_service_node_blacklisted_key_images()                  const { return m_node_rpc_proxy.get_service_node_blacklisted_key_images(); }
+    // List of service nodes this wallet has a stake in:
+    nlohmann::json get_staked_service_nodes();
     auto ons_owners_to_names(nlohmann::json const &request) const { return m_node_rpc_proxy.ons_owners_to_names(request); }
     auto ons_names_to_owners(nlohmann::json const &request) const { return m_node_rpc_proxy.ons_names_to_owners(request); }
     auto resolve(nlohmann::json const &request) const { return m_node_rpc_proxy.ons_resolve(request); }
-    nlohmann::json list_current_stakes();
 
     struct ons_detail
     {
@@ -851,6 +852,14 @@ private:
     void delete_ons_cache_record(const std::string& name);
 
     std::unordered_map<std::string, ons_detail> get_ons_cache();
+
+    std::unordered_map<std::string, uint64_t> batching_records_cache;
+
+    void refresh_batching_cache();
+    // Returns the batched amount for the given address, or main address if empty.
+    uint64_t get_batched_amount(std::optional<std::string> address = std::nullopt) const;
+    // Calculates the next batching height for the given address, or main address if nullopt
+    uint64_t get_next_batch_payout(std::optional<std::string> address = std::nullopt) const;
 
     // Returns the current height up to which the wallet has synchronized the blockchain.  Thread
     // safe (though the value may be behind if another thread is in the middle of adding blocks).

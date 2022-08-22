@@ -34,6 +34,7 @@
 #include <cstdio>
 #include <oxenc/endian.h>
 #include <sodium.h>
+#include <fmt/core.h>
 
 #include "common/rules.h"
 #include "common/hex.h"
@@ -303,8 +304,7 @@ uint64_t Blockchain::get_current_blockchain_height(bool lock) const
 bool Blockchain::load_missing_blocks_into_oxen_subsystems()
 {
   std::vector<uint64_t> start_height_options;
-  uint64_t const snl_height = std::max(hard_fork_begins(m_nettype, hf::hf9_service_nodes).value_or(0), m_service_node_list.height() + 1);
-  start_height_options.push_back(snl_height);
+  uint64_t snl_height = std::max(hard_fork_begins(m_nettype, hf::hf9_service_nodes).value_or(0), m_service_node_list.height() + 1);
   uint64_t const ons_height = std::max(hard_fork_begins(m_nettype, hf::hf15_ons).value_or(0), m_ons_db.height() + 1);
   start_height_options.push_back(ons_height);
   uint64_t sqlite_height = 0;
@@ -316,6 +316,13 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
     if (m_nettype != network_type::FAKECHAIN)
       throw std::logic_error("Blockchain missing SQLite Database");
   }
+  // If the batching database falls behind it NEEDS the service node list information at that point in time
+  if (sqlite_height < snl_height)
+  {
+    m_service_node_list.blockchain_detached(sqlite_height, true);
+    snl_height = std::min(sqlite_height, m_service_node_list.height()) + 1;
+  }
+  start_height_options.push_back(snl_height);
   uint64_t const end_height = m_db->height();
   start_height_options.push_back(end_height);
   uint64_t const start_height = *std::min_element(start_height_options.begin(), start_height_options.end());
@@ -325,23 +332,28 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
   if (total_blocks > 1)
     MGINFO("Loading blocks into oxen subsystems, scanning blockchain from height: " << start_height << " to: " << end_height << " (snl: " << snl_height << ", ons: " << ons_height << ", sqlite: " << sqlite_height << ")");
 
-  using clock                   = std::chrono::steady_clock;
-  using work_time               = std::chrono::duration<float>;
-  constexpr int64_t BLOCK_COUNT = 1000;
-  auto work_start               = clock::now();
-  auto scan_start               = work_start;
-  work_time ons_duration{}, snl_duration{}, sqlite_duration{}, ons_iteration_duration{}, snl_iteration_duration{}, sqlite_iteration_duration{};
+  using clock = std::chrono::steady_clock;
+  using dseconds = std::chrono::duration<double>;
+  int64_t constexpr BLOCK_COUNT = 500;
+  auto work_start = clock::now();
+  auto scan_start = work_start;
+  dseconds ons_duration{}, snl_duration{}, sqlite_duration{}, ons_iteration_duration{}, snl_iteration_duration{}, sqlite_iteration_duration{};
 
   for (int64_t block_count = total_blocks,
                index       = 0;
        block_count > 0;
        block_count -= BLOCK_COUNT, index++)
   {
-    if (index > 0 && (index % 10 == 0))
+    auto duration = dseconds{clock::now() - work_start};
+    if (duration >= 10s)
     {
       m_service_node_list.store();
-      auto duration = work_time{clock::now() - work_start};
-      MGINFO("... scanning height " << start_height + (index * BLOCK_COUNT) << " (" << duration.count() << "s) (snl: " << snl_iteration_duration.count() << "s; ons: " << ons_iteration_duration.count() << "s; sqlite: " << sqlite_iteration_duration.count() << "s)");
+      MGINFO(fmt::format("... scanning height {} ({:.3f}s) (snl: {:.3f}s, ons: {:.3f}s, batch: {:.3f}s)",
+            start_height + (index * BLOCK_COUNT),
+            duration.count(),
+            snl_iteration_duration.count(),
+            ons_iteration_duration.count(),
+            sqlite_iteration_duration.count()));
 #ifdef ENABLE_SYSTEMD
       // Tell systemd that we're doing something so that it should let us continue starting up
       // (giving us 120s until we have to send the next notification):
@@ -352,7 +364,9 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
       ons_duration += ons_iteration_duration;
       snl_duration += snl_iteration_duration;
       sqlite_duration += sqlite_iteration_duration;
-      ons_iteration_duration = snl_iteration_duration = {};
+      ons_iteration_duration = 0s;
+      snl_iteration_duration = 0s;
+      sqlite_iteration_duration = 0s;
     }
 
     std::vector<cryptonote::block> blocks;
@@ -417,8 +431,8 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
 
   if (total_blocks > 1)
   {
-    auto duration = work_time{clock::now() - scan_start};
-    MGINFO("Done recalculating oxen subsystems (" << duration.count() << "s) (snl: " << snl_duration.count() << "s; ons: " << ons_duration.count() << "s)" << "s; sqlite: " << sqlite_duration.count() << "s)");
+    MGINFO(fmt::format("Done recalculating oxen subsystems in {:.2f}s ({:.2f}s snl; {:.2f}s ons; {:.2f}s batch)",
+          dseconds{clock::now() - scan_start}.count(), snl_duration.count(), ons_duration.count(), sqlite_duration.count()));
   }
 
   if (total_blocks > 0)
@@ -674,6 +688,7 @@ void Blockchain::pop_blocks(uint64_t nblocks)
 
   bool stop_batch = m_db->batch_start();
 
+  bool pop_batching_rewards;
   try
   {
     const uint64_t blockchain_height = m_db->height();
@@ -684,6 +699,7 @@ void Blockchain::pop_blocks(uint64_t nblocks)
     uint64_t const blocks_per_update               = (nblocks / PERCENT_PER_PROGRESS_UPDATE);
 
     tools::PerformanceTimer timer;
+    pop_batching_rewards = m_service_node_list.state_history_exists(blockchain_height - nblocks);
     for (int progress = 0; i < nblocks; ++i)
     {
       if (nblocks >= BLOCKS_PER_DAY && (i != 0 && (i % blocks_per_update == 0)))
@@ -691,8 +707,7 @@ void Blockchain::pop_blocks(uint64_t nblocks)
         MGINFO("... popping blocks " << (++progress * PERCENT_PER_PROGRESS_UPDATE) << "% completed, height: " << (blockchain_height - i) << " (" << tools::friendly_duration(timer.value()) << "s)");
         timer.reset();
       }
-
-      pop_block_from_blockchain();
+      pop_block_from_blockchain(pop_batching_rewards);
     }
   }
   catch (const std::exception& e)
@@ -706,6 +721,8 @@ void Blockchain::pop_blocks(uint64_t nblocks)
   auto split_height = m_db->height();
   for (BlockchainDetachedHook* hook : m_blockchain_detached_hooks)
     hook->blockchain_detached(split_height, true /*by_pop_blocks*/);
+  if (!pop_batching_rewards)
+    m_service_node_list.reset_batching_to_latest_height();
   load_missing_blocks_into_oxen_subsystems();
 
   if (stop_batch)
@@ -715,7 +732,7 @@ void Blockchain::pop_blocks(uint64_t nblocks)
 // This function tells BlockchainDB to remove the top block from the
 // blockchain and then returns all transactions (except the miner tx, of course)
 // from it to the tx_pool
-block Blockchain::pop_block_from_blockchain()
+block Blockchain::pop_block_from_blockchain(bool pop_batching_rewards = true)
 {
   LOG_PRINT_L3("Blockchain::" << __func__);
   std::unique_lock lock{*this};
@@ -744,7 +761,8 @@ block Blockchain::pop_block_from_blockchain()
     LOG_ERROR("Error popping block from blockchain, throwing!");
     throw;
   }
-  if (!m_service_node_list.pop_batching_rewards_block(popped_block))
+
+  if (pop_batching_rewards && !m_service_node_list.pop_batching_rewards_block(popped_block))
   {
     LOG_ERROR("Failed to pop to batch rewards DB. throwing");
     throw;

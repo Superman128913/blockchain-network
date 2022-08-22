@@ -179,7 +179,7 @@ namespace cryptonote
     bool register_service_node(const std::vector<std::string> &args_);
     bool request_stake_unlock(const std::vector<std::string> &args_);
     bool print_locked_stakes(const std::vector<std::string>& /*args*/);
-    bool query_locked_stakes(bool print_result);
+    bool query_locked_stakes(bool print_details, bool print_key_images = false);
     bool ons_buy_mapping(std::vector<std::string> args);
     bool ons_renew_mapping(std::vector<std::string> args);
     bool ons_update_mapping(std::vector<std::string> args);

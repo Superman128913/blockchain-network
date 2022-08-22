@@ -14,8 +14,17 @@ namespace wallet
     bool ssl_allow_any_cert;          // Make HTTPS insecure: disable HTTPS certificate verification when using an https:// address.
   };
 
+  namespace rpc
+  {
+    struct Config
+    {
+      std::string sockname = "wallet.sock";
+    };
+  }
+
   struct Config
   {
     DaemonCommsConfig daemon;
+    wallet::rpc::Config omq_rpc;
   };
 }

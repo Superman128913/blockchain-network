@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string_view>
 
 namespace oxenmq { class OxenMQ; }
 
@@ -8,6 +9,7 @@ namespace wallet::rpc
 {
 
 class RequestHandler;
+struct Config;
 
 class OmqServer
 {
@@ -21,7 +23,7 @@ public:
   {}
 
   void
-  set_omq(std::shared_ptr<oxenmq::OxenMQ> omq);
+  set_omq(std::shared_ptr<oxenmq::OxenMQ> omq, wallet::rpc::Config config);
 };
 
 

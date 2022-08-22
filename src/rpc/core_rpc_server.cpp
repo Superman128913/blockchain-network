@@ -2209,45 +2209,6 @@ namespace cryptonote::rpc {
   }
 
 
-/* MERGEFIX: convert to new RPC
-  //------------------------------------------------------------------------------------------------------------------------------
-  GET_ACCRUED_BATCHED_EARNINGS::response core_rpc_server::invoke(GET_ACCRUED_BATCHED_EARNINGS::request&& req, rpc_context context)
-  {
-    GET_ACCRUED_BATCHED_EARNINGS::response res{};
-
-    PERF_TIMER(on_get_accrued_batched_earnings);
-
-    auto& blockchain = m_core.get_blockchain_storage();
-    bool at_least_one_succeeded = false;
-
-    if (req.addresses.size() > 0)
-    {
-      for (const auto& address : req.addresses)
-      {
-        res.addresses.emplace_back(address);
-        if (cryptonote::is_valid_address(address, nettype()))
-        {
-          uint64_t amount = blockchain.sqlite_db()->get_accrued_earnings(address);
-          res.amounts.emplace_back(amount);
-          at_least_one_succeeded = true;
-        } else {
-          res.amounts.emplace_back(0);
-        }
-      }
-    } else {
-        auto [addresses, amounts] = blockchain.sqlite_db()->get_all_accrued_earnings();
-        res.addresses = std::move(addresses);
-        res.amounts = std::move(amounts);
-        at_least_one_succeeded = true;
-    }
-
-    if (!at_least_one_succeeded)
-      throw rpc_error{ERROR_WRONG_PARAM, "Failed to query any service nodes batched amounts at all"};
-
-    res.status = STATUS_OK;
-    return res;
-  }
-*/
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_QUORUM_STATE& get_quorum_state, rpc_context context)
   {
@@ -3128,6 +3089,38 @@ namespace cryptonote::rpc {
       if (val.size() < mapping->to_view().size())
         resolve.response_hex["nonce"] = nonce;
     }
+  }
+
+  void core_rpc_server::invoke(GET_ACCRUED_BATCHED_EARNINGS& get_accrued_batched_earnings, rpc_context context)
+  {
+    auto& blockchain = m_core.get_blockchain_storage();
+    bool at_least_one_succeeded = false;
+
+    auto& balances = get_accrued_batched_earnings.response["balances"];
+    auto& req = get_accrued_batched_earnings.request;
+    if (req.addresses.size() > 0)
+    {
+      for (const auto& address : req.addresses)
+      {
+        uint64_t amount = 0;
+        if (cryptonote::is_valid_address(address, nettype()))
+        {
+          amount = blockchain.sqlite_db()->get_accrued_earnings(address);
+          at_least_one_succeeded = true;
+        }
+        balances[address] = amount;
+      }
+    } else {
+        auto [addresses, amounts] = blockchain.sqlite_db()->get_all_accrued_earnings();
+        for (size_t i = 0; i < addresses.size(); i++)
+        {
+          balances[addresses[i]] = amounts[i];
+        }
+        at_least_one_succeeded = true;
+    }
+
+    if (!at_least_one_succeeded)
+      throw rpc_error{ERROR_WRONG_PARAM, "Failed to query any service nodes batched amounts at all"};
   }
 
 }  // namespace cryptonote::rpc

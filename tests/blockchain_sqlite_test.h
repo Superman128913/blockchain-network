@@ -15,8 +15,8 @@ public:
 
   BlockchainSQLiteTest(BlockchainSQLiteTest &other)
     : BlockchainSQLiteTest(other.m_nettype, check_if_copy_filename(other.filename)) {
-    auto all_payments_accrued = db::get_all<std::string, int64_t>(
-            other.prepared_st("SELECT address, amount FROM batched_payments_accrued"));
+    auto all_payments_accrued = db::get_all<std::string, int, int64_t>(
+            other.prepared_st("SELECT address, payout_offset, amount FROM batched_payments_accrued"));
     auto all_payments_paid = db::get_all<std::string, int64_t, int64_t>(
             other.prepared_st("SELECT address, amount, height_paid FROM batched_payments_raw"));
 
@@ -34,10 +34,10 @@ public:
     }
 
     auto insert_payment_accrued = prepared_st(
-      "INSERT INTO batched_payments_accrued (address, amount) VALUES (?, ?)");
+      "INSERT INTO batched_payments_accrued (address, payout_offset, amount) VALUES (?, ?, ?)");
 
-    for (auto& [address, amount]: all_payments_accrued) {
-      db::exec_query(insert_payment_accrued, address, amount);
+    for (auto& [address, offset, amount]: all_payments_accrued) {
+      db::exec_query(insert_payment_accrued, address, offset, amount);
       insert_payment_accrued->reset();
     }
 

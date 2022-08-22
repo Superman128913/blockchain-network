@@ -36,7 +36,8 @@ namespace wallet
         std::shared_ptr<TransactionConstructor> tx_constructor,
         std::shared_ptr<DaemonComms> daemon_comms,
         std::string_view dbFilename,
-        std::string_view dbPassword);
+        std::string_view dbPassword,
+        wallet::Config config_in = {});
 
     void
     init();
@@ -63,15 +64,8 @@ namespace wallet
     uint64_t
     get_unlocked_balance();
 
-    cryptonote::address_parse_info
-    get_address();
-
     cryptonote::account_keys
     export_keys();
-
-    // FIXME: argument nomenclature
-    cryptonote::address_parse_info
-    get_subaddress(int32_t account, int32_t index);
 
     // TODO: error types to throw
     PendingTransaction

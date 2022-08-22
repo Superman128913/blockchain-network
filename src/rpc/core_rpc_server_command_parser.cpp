@@ -320,4 +320,8 @@ namespace cryptonote::rpc {
     get_values(in, "unlocked", get_output_histogram.request.unlocked);
     get_values(in, "recent_cutoff", get_output_histogram.request.recent_cutoff);
   }
+
+  void parse_request(GET_ACCRUED_BATCHED_EARNINGS& get_accrued_batched_earnings, rpc_input in) {
+    get_values(in, "addresses", get_accrued_batched_earnings.request.addresses);
+  }
 }
