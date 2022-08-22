@@ -995,11 +995,8 @@ namespace service_nodes
                               [&unlock](const service_node_info::contribution_t &contribution) {
                                 return unlock.key_image == contribution.key_image;
                               });
-      if (cit == contributor.locked_contributions.end())
-        return false;
-
-      if (cit->amount < small_contributor_amount_threshold && (block_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
-        return true;
+      if (cit != contributor.locked_contributions.end())
+        return cit->amount < small_contributor_amount_threshold && (block_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER;
     }
     return false;
   }
