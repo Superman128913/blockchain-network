@@ -175,6 +175,7 @@ namespace wallet
             throw std::runtime_error("bad response from rpc.get_height, key 'height' missing");
           new_height = dc.consume_integer<int64_t>();
 
+          bool got_new = (new_height > (top_block_height + 1));
           top_block_hash = new_hash;
 
           // RPC response is chain length, not top height
@@ -184,6 +185,13 @@ namespace wallet
                 wallet->update_top_block_info(top_block_height, top_block_hash);
                 });
               }, sync_thread);
+
+          if (got_new)
+          {
+            omq->job([this](){
+                if (not syncing) start_syncing();
+                }, sync_thread);
+          }
         }, "de");
 
     omq->request(conn, "rpc.get_fee_estimate",
@@ -517,7 +525,7 @@ namespace wallet
   void
   DefaultDaemonComms::start_syncing()
   {
-    if ((not syncing and sync_from_height < top_block_height) or (top_block_height == 0))
+    if ((not syncing and sync_from_height <= top_block_height) or (top_block_height == 0))
     {
       syncing = true;
       get_blocks();

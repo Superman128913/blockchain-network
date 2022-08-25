@@ -8,6 +8,7 @@
 
 #include <cryptonote_core/cryptonote_core.h>
 #include <common/hex.h>
+#include <common/string_util.h>
 #include <oxenmq/oxenmq.h>
 
 #include <atomic>
@@ -62,15 +63,62 @@ int main(int argc, char** argv)
 
   std::atomic<bool> done = false;
 
-  std::thread exit_thread([&](){
-      std::string foo;
-      std::cin >> foo;
-      done = true;
-      });
 
   oxenmq::address remote{std::string("ipc://") + wallet_name + ".sock"};
   oxenmq::ConnectionID conn;
   conn = oxenmq->connect_remote(remote, [](auto){}, [](auto,auto){});
+
+  auto send_func = [&](std::string_view dest, std::string_view amount){
+    oxenmq::bt_dict req;
+    oxenmq::bt_list dests;
+    oxenmq::bt_dict d;
+    d["address"] = dest;
+    uint64_t amount_int = stoi(std::string(amount));
+    d["amount"] = amount_int;
+    dests.push_back(std::move(d));
+    req["destinations"] = std::move(dests);
+
+    std::promise<bool> p;
+    auto f = p.get_future();
+
+    auto req_cb = [&p](bool ok, std::vector<std::string> response) mutable
+        {
+          std::cout << "transfer response, bool ok = " << std::boolalpha << ok << "\n";
+          size_t n = 0;
+          for (const auto& s : response)
+          {
+            std::cout << "response string " << n++ << ": " << s << "\n";
+          }
+          p.set_value(ok);
+        };
+
+    oxenmq->request(conn, "restricted.transfer", req_cb, oxenmq::bt_serialize(req));
+
+    f.wait();
+  };
+
+  std::thread exit_thread([&](){
+      while (not done)
+      {
+        std::string foo;
+        std::getline(std::cin, foo);
+        if (foo == "stop" or foo.empty())
+        {
+          done = true;
+          break;
+        }
+        auto args = tools::split(foo, " ", true);
+        if (args[0] == "send")
+        {
+          std::cout << "Send command: \"" << foo << "\"\n";
+          std::cout << "Send command parsed as: [";
+          for (const auto& s : args)
+            std::cout << s << ", ";
+          std::cout << "]\n";
+          send_func(args[1], args[2]);
+        }
+      }
+      });
 
   while (not done)
   {
@@ -80,37 +128,10 @@ int main(int argc, char** argv)
     std::cout << "chain height: " << chain_height << "\n";
     scan_height = wallet->last_scan_height;
     std::cout << "after block " << scan_height << ", " << wallet_name << " balance is: " << wallet->get_balance() << "\n";
-    std::this_thread::sleep_for(2s);
+    std::this_thread::sleep_for(5s);
   }
 
-  /*
-  oxenmq::bt_dict req;
-  oxenmq::bt_list dests;
-  oxenmq::bt_dict d;
-  d["address"] = wallet_addr2;
-  d["amount"] = 4206980085;
-  dests.push_back(std::move(d));
-  req["destinations"] = std::move(dests);
-
-  std::promise<bool> p;
-  auto f = p.get_future();
-  auto req_cb = [&p](bool ok, std::vector<std::string> response) mutable
-      {
-        std::cout << "transfer response, bool ok = " << std::boolalpha << ok << "\n";
-        size_t n = 0;
-        for (const auto& s : response)
-        {
-          std::cout << "response string " << n++ << ": " << s << "\n";
-        }
-        p.set_value(ok);
-      };
-
-  //oxenmq->request(conn, "rpc.get_height", req_cb, "de");
-  oxenmq->request(conn, "restricted.transfer", req_cb, oxenmq::bt_serialize(req));
-
-  f.wait();
   exit_thread.join();
-  */
 
   std::cout << "scanning appears finished, " << wallet_name << " scan height = " << wallet->last_scan_height << ", daemon comms height = " << comms->get_height() << "\n";
 
