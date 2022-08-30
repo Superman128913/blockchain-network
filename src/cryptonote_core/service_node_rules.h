@@ -301,6 +301,6 @@ uint64_t get_portions_to_make_amount(uint64_t staking_requirement, uint64_t amou
 
 std::optional<double> parse_fee_percent(std::string_view fee);
 
-uint64_t percent_to_basis_points(std::string percent_string);
+uint16_t percent_to_basis_points(std::string percent_string);
 
 }

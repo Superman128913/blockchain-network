@@ -256,7 +256,7 @@ std::optional<double> parse_fee_percent(std::string_view fee)
   return percent;
 }
 
-uint64_t percent_to_basis_points(std::string percent_string) {
+uint16_t percent_to_basis_points(std::string percent_string) {
   const auto percent = parse_fee_percent(percent_string);
   if (!percent)
     throw invalid_registration{"could not parse fee percent"};

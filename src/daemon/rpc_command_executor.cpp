@@ -2209,14 +2209,12 @@ Enter the operator fee as a percentage [0.00-100.00])");
           if (check_cancel_back(result))
             break;
 
-          auto pct = service_nodes::parse_fee_percent(operator_fee_str);
-          if (pct)
-          {
-            state.operator_fee = static_cast<uint16_t>(std::lround(*pct / 100.0 * cryptonote::STAKING_FEE_BASIS));
+          try {
+            state.operator_fee = service_nodes::percent_to_basis_points(operator_fee_str);
             next_step(register_step::summary_info);
-          }
-          else
+          } catch(const std::exception &e) {
             tools::fail_msg_writer() << "Invalid value: " << operator_fee_str << ". Fee must be between 0 and 100%" << std::endl;
+          }
         }
         break;
       }
