@@ -51,6 +51,7 @@ namespace wallet
     omq_server.set_omq(this->omq, config.omq_rpc);
 
     db->create_schema();
+    db->add_address(0, 0, keys->get_main_address());
     last_scan_height = db->last_scan_height();
     scan_target_height = db->scan_target_height();
   }

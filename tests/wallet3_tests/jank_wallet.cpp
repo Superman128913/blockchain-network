@@ -44,7 +44,7 @@ int main(int argc, char** argv)
 
   std::cout << "Loading wallet \"" << wallet_name << "\" with address " << wallet_addr << "\n";
 
-  auto keyring = std::make_shared<wallet::Keyring>(spend_priv, spend_pub, view_priv, view_pub);
+  auto keyring = std::make_shared<wallet::Keyring>(spend_priv, spend_pub, view_priv, view_pub, cryptonote::network_type::TESTNET);
 
   wallet::Config config;
   auto& comms_config = config.daemon;
@@ -55,11 +55,6 @@ int main(int argc, char** argv)
   auto wallet = wallet::Wallet::create(oxenmq, keyring, nullptr, comms, wallet_name + ".sqlite", "", config);
 
   std::this_thread::sleep_for(1s);
-  auto chain_height = comms->get_height();
-
-  std::cout << "chain height: " << chain_height << "\n";
-
-  int64_t scan_height = -1;
 
   std::atomic<bool> done = false;
 
@@ -102,38 +97,55 @@ int main(int argc, char** argv)
       {
         std::string foo;
         std::getline(std::cin, foo);
-        if (foo == "stop" or foo.empty())
+        if (foo == "stop" or foo == "quit" or foo == "exit" or foo.empty())
         {
           done = true;
           break;
         }
+
+        auto chain_height = comms->get_height();
+        auto scan_height = wallet->last_scan_height;
+
         auto args = tools::split(foo, " ", true);
         if (args[0] == "send")
         {
-          std::cout << "Send command: \"" << foo << "\"\n";
-          std::cout << "Send command parsed as: [";
-          for (const auto& s : args)
-            std::cout << s << ", ";
-          std::cout << "]\n";
-          send_func(args[1], args[2]);
+          if (args.size() != 3)
+            std::cout << "malformed send command.  Use \"send address amount\"\n";
+          else
+            send_func(args[1], args[2]);
+        }
+        else if (args[0] == "balance")
+        {
+          std::cout << "after block " << scan_height << ", " << wallet_name << " balance is: " << wallet->get_balance() << "\n";
+        }
+        else if (args[0] == "height")
+        {
+          std::cout << "chain height: " << chain_height << "\n";
         }
       }
       });
+
+  auto current_chain_height = comms->get_height();
+  int64_t last_scan_height = -1;
+  bool printed_synced = false;
 
   while (not done)
   {
     using namespace std::chrono_literals;
 
-    chain_height = comms->get_height();
-    std::cout << "chain height: " << chain_height << "\n";
-    scan_height = wallet->last_scan_height;
-    std::cout << "after block " << scan_height << ", " << wallet_name << " balance is: " << wallet->get_balance() << "\n";
-    std::this_thread::sleep_for(5s);
+    last_scan_height = wallet->last_scan_height;
+    current_chain_height = comms->get_height();
+    if ((not printed_synced) and current_chain_height > 0 and last_scan_height == current_chain_height)
+    {
+      std::cout << "syncing appears finished, " << wallet_name << "height = " << last_scan_height << ", balance = " << wallet->get_balance() << "\n";
+      printed_synced = true;
+    }
+
+    std::this_thread::sleep_for(1s);
   }
 
   exit_thread.join();
 
-  std::cout << "scanning appears finished, " << wallet_name << " scan height = " << wallet->last_scan_height << ", daemon comms height = " << comms->get_height() << "\n";
 
   wallet->deregister();
 }

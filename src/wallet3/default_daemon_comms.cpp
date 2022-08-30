@@ -408,12 +408,12 @@ namespace wallet
       else
       {
         oxenmq::bt_dict_consumer dc{response[1]};
-        if (not dc.skip_until("reason"))
+        if (dc.skip_until("reason"))
         {
-          p->set_value("Invalid response from daemon");
+          auto reason = dc.consume_string();
+          p->set_value(std::string("Submit Transaction rejected, reason: ") + reason);
           return;
         }
-        auto reason = dc.consume_string();
 
         if (not dc.skip_until("status"))
         {
@@ -426,7 +426,7 @@ namespace wallet
         if (status == "OK")
           p->set_value("OK");
         else
-          p->set_value(std::string("Something getting wrong.") + reason);
+          p->set_value(std::string("Something getting wrong.") + status);
       }
     };
 

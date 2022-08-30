@@ -13,6 +13,13 @@
 
 namespace wallet
 {
+  std::string
+  Keyring::get_main_address()
+  {
+    cryptonote::account_public_address addr{spend_public_key, view_public_key};
+    return get_account_address_as_str(nettype, false, addr);
+  }
+
   crypto::secret_key
   Keyring::generate_tx_key(cryptonote::hf hf_version)
   {

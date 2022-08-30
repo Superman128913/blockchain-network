@@ -41,6 +41,12 @@ namespace wallet
     network_type();
 
     void
+    add_address(int32_t major_index, int32_t minor_index, const std::string& address);
+
+    std::string
+    get_address(int32_t major_index, int32_t minor_index);
+
+    void
     store_block(const Block& block);
 
     void

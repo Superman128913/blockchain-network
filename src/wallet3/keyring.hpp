@@ -19,14 +19,19 @@ namespace wallet
         crypto::secret_key _spend_private_key,
         crypto::public_key _spend_public_key,
         crypto::secret_key _view_private_key,
-        crypto::public_key _view_public_key)
+        crypto::public_key _view_public_key,
+        cryptonote::network_type _nettype)
         : spend_private_key(_spend_private_key)
         , spend_public_key(_spend_public_key)
         , view_private_key(_view_private_key)
         , view_public_key(_view_public_key)
+        , nettype(_nettype)
     {}
 
     Keyring() {}
+
+    virtual std::string
+    get_main_address();
 
     virtual crypto::secret_key
     generate_tx_key(cryptonote::hf hf_version);
@@ -113,6 +118,8 @@ namespace wallet
 
     crypto::secret_key view_private_key;
     crypto::public_key view_public_key;
+
+    cryptonote::network_type nettype;
 
     hw::core::device_default key_device;
   };

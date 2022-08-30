@@ -88,12 +88,13 @@ namespace wallet
           CREATE TABLE subaddresses (
             major_index INTEGER NOT NULL,
             minor_index INTEGER NOT NULL,
+            address TEXT NOT NULL,
             used BOOLEAN NOT NULL DEFAULT FALSE,
             PRIMARY KEY(major_index, minor_index)
           );
 
           -- default "main" subaddress
-          INSERT INTO subaddresses VALUES (0,0,TRUE);
+          INSERT INTO subaddresses VALUES (0,0,"",TRUE);
 
           CREATE TABLE key_images (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -184,6 +185,57 @@ namespace wallet
   WalletDB::network_type()
   {
     return cryptonote::network_type_from_string(prepared_get<std::string>("SELECT nettype FROM metadata WHERE id=0;"));
+  }
+
+
+  void
+  WalletDB::add_address(int32_t major_index, int32_t minor_index, const std::string& address)
+  {
+    auto exists = prepared_get<int64_t>("SELECT COUNT(*) FROM subaddresses WHERE major_index = ? AND minor_index = ?;",
+        major_index,
+        minor_index);
+
+    if (exists)
+    {
+      auto existing_addr = prepared_get<std::string>("SELECT address FROM subaddresses WHERE major_index = ? AND minor_index = ?;",
+          major_index,
+          minor_index);
+
+      if (major_index == 0 and minor_index == 0 and existing_addr == "")
+      {
+        prepared_exec("UPDATE subaddresses SET address = ? WHERE major_index = ? AND minor_index = ?;",
+            address,
+            major_index,
+            minor_index);
+        return;
+      }
+
+      //FIXME: better error type
+      if (existing_addr != address)
+        throw std::invalid_argument("WalletDB address insertion, new address mismatch with existing address.");
+    }
+    else
+    {
+      prepared_exec("INSERT INTO subaddresses(major_index, minor_index, address, used) VALUES(?,?,?);",
+          major_index,
+          minor_index,
+          address,
+          true);
+    }
+  }
+
+  std::string
+  WalletDB::get_address(int32_t major_index, int32_t minor_index)
+  {
+    auto addr = prepared_maybe_get<std::string>("SELECT address FROM subaddresses WHERE major_index = ? AND minor_index = ?;",
+        major_index,
+        minor_index);
+
+    if (addr)
+      return *addr;
+    
+    throw std::invalid_argument("WalletDB address fetch, address for subaddress indices not found in database.");
+    return ""; // compilers can be dumb
   }
 
   void

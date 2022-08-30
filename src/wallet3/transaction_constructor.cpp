@@ -14,21 +14,18 @@ namespace wallet
   // create_transaction will create a vanilla spend transaction without any special features.
   PendingTransaction
   TransactionConstructor::create_transaction(
-      const std::vector<cryptonote::tx_destination_entry>& recipients)
+      const std::vector<cryptonote::tx_destination_entry>& recipients,
+      cryptonote::tx_destination_entry change_recipient)
   {
     PendingTransaction new_tx(recipients);
     auto [hf, hf_uint8] = cryptonote::get_ideal_block_version(db->network_type(), db->scan_target_height());
     cryptonote::oxen_construct_tx_params tx_params{hf, cryptonote::txtype::standard, 0, 0};
     new_tx.tx.version = cryptonote::transaction::get_max_version_for_hf(tx_params.hf_version);
     new_tx.tx.type = tx_params.tx_type;
-std::cout << "create_transaction, transaction version = " << cryptonote::transaction_prefix::version_to_string(new_tx.tx.version) << "\n";
-std::cout << "create_transaction, transaction type = " << cryptonote::transaction_prefix::type_to_string(new_tx.tx.type) << "\n";
     new_tx.fee_per_byte = fee_per_byte;
     new_tx.fee_per_output = fee_per_output;
-    new_tx.change = cryptonote::tx_destination_entry(0, senders_address.address, senders_address.is_subaddress);
+    new_tx.change = std::move(change_recipient);
     select_inputs_and_finalise(new_tx);
-std::cout << "create_transaction returning, transaction version = " << cryptonote::transaction_prefix::version_to_string(new_tx.tx.version) << "\n";
-std::cout << "create_transaction returning, transaction type = " << cryptonote::transaction_prefix::type_to_string(new_tx.tx.type) << "\n";
     return new_tx;
   }
 
