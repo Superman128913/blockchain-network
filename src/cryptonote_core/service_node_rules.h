@@ -301,7 +301,6 @@ uint64_t get_portions_to_make_amount(uint64_t staking_requirement, uint64_t amou
 
 std::optional<double> parse_fee_percent(std::string_view fee);
 
-bool get_portions_from_percent_str(std::string cut_str, uint64_t& portions);
 uint64_t percent_to_basis_points(std::string percent_string);
 
 }

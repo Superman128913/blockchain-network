@@ -238,22 +238,6 @@ uint64_t get_portions_to_make_amount(uint64_t staking_requirement, uint64_t amou
   return resultlo;
 }
 
-static bool get_portions_from_percent(double cur_percent, uint64_t& portions) {
-  if(cur_percent < 0.0 || cur_percent > 100.0) return false;
-
-  // Fix for truncation issue when operator cut = 100 for a pool Service Node.
-  if (cur_percent == 100.0)
-  {
-    portions = cryptonote::old::STAKING_PORTIONS;
-  }
-  else
-  {
-    portions = (cur_percent / 100.0) * (double)cryptonote::old::STAKING_PORTIONS;
-  }
-
-  return true;
-}
-
 std::optional<double> parse_fee_percent(std::string_view fee)
 {
   if (tools::ends_with(fee, "%"))
@@ -270,14 +254,6 @@ std::optional<double> parse_fee_percent(std::string_view fee)
     return std::nullopt;
 
   return percent;
-}
-
-bool get_portions_from_percent_str(std::string cut_str, uint64_t& portions) {
-
-  if (auto pct = parse_fee_percent(cut_str))
-    return get_portions_from_percent(*pct, portions);
-
-  return false;
 }
 
 uint64_t percent_to_basis_points(std::string percent_string) {
