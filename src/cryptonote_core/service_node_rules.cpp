@@ -280,4 +280,18 @@ bool get_portions_from_percent_str(std::string cut_str, uint64_t& portions) {
   return false;
 }
 
+uint64_t percent_to_basis_points(std::string percent_string) {
+  const auto percent = parse_fee_percent(percent_string);
+  if (!percent)
+    throw invalid_registration{"could not parse fee percent"};
+
+  if(*percent < 0.0 || *percent > 100.0)
+    throw invalid_registration{"fee percent out of bounds"};
+
+  auto basis_points = static_cast<uint16_t>(std::lround(*percent / 100.0 * cryptonote::STAKING_FEE_BASIS));
+  if (*percent == 100.0)
+    basis_points = cryptonote::STAKING_FEE_BASIS;
+
+  return basis_points;
+}
 } // namespace service_nodes
