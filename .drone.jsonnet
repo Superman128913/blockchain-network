@@ -51,6 +51,7 @@ local debian_pipeline(name,
                       extra_cmds=[],
                       extra_steps=[],
                       jobs=6,
+                      kitware_cmake_distro='',
                       allow_fail=false) = {
   kind: 'pipeline',
   type: 'docker',
@@ -69,6 +70,15 @@ local debian_pipeline(name,
         apt_get_quiet + ' update',
         apt_get_quiet + ' install -y eatmydata',
         'eatmydata ' + apt_get_quiet + ' dist-upgrade -y',
+      ] + (
+        if kitware_cmake_distro != '' then
+          [
+            'eatmydata ' + apt_get_quiet + ' install --no-install-recommends -y curl ca-certificates',
+            'curl https://apt.kitware.com/keys/kitware-archive-latest.asc | gpg --dearmor - >/etc/apt/trusted.gpg.d/kitware.gpg',
+            'echo deb https://apt.kitware.com/ubuntu/ ' + kitware_cmake_distro + ' main >/etc/apt/sources.list.d/kitware.list',
+            apt_get_quiet + ' update',
+          ] else []
+      ) + [
         'eatmydata ' + apt_get_quiet + ' install -y --no-install-recommends cmake git ninja-build ccache '
         + (if test_oxend then 'gdb ' else '') + std.join(' ', deps),
         'mkdir build',
@@ -252,6 +262,7 @@ local gui_wallet_step_darwin = {
     build_tests=false,
     lto=true,
     extra_cmds=static_check_and_upload,
+    kitware_cmake_distro='bionic',
     /*extra_steps=[gui_wallet_step('ubuntu:bionic')]*/
   ),
 
