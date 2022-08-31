@@ -224,7 +224,7 @@ void cn_turtle_hash(const void *data, size_t length, char *hash, int light, int 
   uint32_t aes_rounds = (iterations / 2);
   size_t lightFlag = (light ? 2: 1);
 
-  RDATA_ALIGN16 uint8_t expandedKey[240];
+  RDATA_ALIGN16 uint8_t expandedKey[AES_EXPANDED_KEY_SIZE];
 
 #ifndef FORCE_USE_HEAP
   RDATA_ALIGN16 uint8_t hp_state[CN_TURTLE_PAGE_SIZE];
@@ -458,7 +458,6 @@ void cn_turtle_hash(const void *data, size_t length, char *hash, int light, int 
 
   size_t i, j;
   uint8_t *p = NULL;
-  oaes_ctx *aes_ctx;
   static void (*const extra_hashes[4])(const void *, size_t, char *) =
   {
       hash_extra_blake, hash_extra_groestl, hash_extra_jh, hash_extra_skein
@@ -478,14 +477,10 @@ void cn_turtle_hash(const void *data, size_t length, char *hash, int light, int 
   }
   memcpy(text, state.init, INIT_SIZE_BYTE);
 
-  aes_ctx = (oaes_ctx *) oaes_alloc();
-  oaes_key_import_data(aes_ctx, state.hs.b, AES_KEY_SIZE);
-
   VARIANT1_INIT64();
   VARIANT2_INIT64();
 
-  // use aligned data
-  memcpy(expandedKey, aes_ctx->key->exp_data, aes_ctx->key->exp_data_len);
+  oaes_expand_key_256(state.hs.b, expandedKey);
   for(i = 0; i < init_rounds; i++)
   {
       for(j = 0; j < INIT_SIZE_BLK; j++)
@@ -535,8 +530,7 @@ void cn_turtle_hash(const void *data, size_t length, char *hash, int light, int 
   }
 
   memcpy(text, state.init, INIT_SIZE_BYTE);
-  oaes_key_import_data(aes_ctx, &state.hs.b[32], AES_KEY_SIZE);
-  memcpy(expandedKey, aes_ctx->key->exp_data, aes_ctx->key->exp_data_len);
+  oaes_expand_key_256(&state.hs.b[32], expandedKey);
   for(i = 0; i < init_rounds; i++)
   {
       for(j = 0; j < INIT_SIZE_BLK; j++)
@@ -546,7 +540,6 @@ void cn_turtle_hash(const void *data, size_t length, char *hash, int light, int 
       }
   }
 
-  oaes_free((OAES_CTX **) &aes_ctx);
   memcpy(state.init, text, INIT_SIZE_BYTE);
   hash_permutation(&state.hs);
   extra_hashes[state.hs.b[0] & 3](&state, 200, hash);

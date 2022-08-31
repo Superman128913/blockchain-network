@@ -448,11 +448,6 @@ namespace service_nodes
   };
 
   class service_node_list
-    : public cryptonote::BlockAddedHook,
-      public cryptonote::BlockchainDetachedHook,
-      public cryptonote::InitHook,
-      public cryptonote::ValidateMinerTxHook,
-      public cryptonote::AltBlockAddedHook
   {
   public:
     explicit service_node_list(cryptonote::Blockchain& blockchain);
@@ -460,15 +455,15 @@ namespace service_nodes
     service_node_list(const service_node_list &) = delete;
     service_node_list &operator=(const service_node_list &) = delete;
 
-    bool block_added(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs, cryptonote::checkpoint_t const *checkpoint) override;
+    void block_add(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs, const cryptonote::checkpoint_t* checkpoint);
     void reset_batching_to_latest_height();
     bool state_history_exists(uint64_t height);
     bool process_batching_rewards(const cryptonote::block& block);
     bool pop_batching_rewards_block(const cryptonote::block& block);
-    void blockchain_detached(uint64_t height, bool by_pop_blocks) override;
-    void init() override;
-    bool validate_miner_tx(const cryptonote::block& block, const cryptonote::block_reward_parts& base_reward, const std::optional<std::vector<cryptonote::batch_sn_payment>>& batched_sn_payments) const override;
-    bool alt_block_added(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs, cryptonote::checkpoint_t const *checkpoint) override;
+    void blockchain_detached(uint64_t height);
+    void init();
+    void validate_miner_tx(const cryptonote::miner_tx_info& info) const;
+    void alt_block_add(const cryptonote::block_add_info& info);
     payout get_block_leader() const { std::lock_guard lock{m_sn_mutex}; return m_state.get_block_leader(); }
     bool is_service_node(const crypto::public_key& pubkey, bool require_active = true) const;
     bool is_key_image_locked(crypto::key_image const &check_image, uint64_t *unlock_height = nullptr, service_node_info::contribution_t *the_locked_contribution = nullptr) const;
@@ -728,6 +723,8 @@ namespace service_nodes
           const cryptonote::transaction& tx,
           const service_node_keys *my_keys);
       bool process_key_image_unlock_tx(cryptonote::network_type nettype, cryptonote::hf hf_version, uint64_t block_height, const cryptonote::transaction &tx);
+      //TODO oxen delete this function after HF20
+      bool is_premature_unlock(cryptonote::network_type nettype, cryptonote::hf hf_version, uint64_t block_height, const cryptonote::transaction &tx) const;
       payout get_block_leader() const;
       payout get_block_producer(uint8_t pulse_round) const;
     };
@@ -737,6 +734,9 @@ namespace service_nodes
     void record_timestamp_participation(crypto::public_key const &pubkey, bool participated);
     void record_timesync_status(crypto::public_key const &pubkey, bool synced);
 
+    //TODO oxen delete this function after HF20
+    bool is_premature_unlock(cryptonote::network_type nettype, cryptonote::hf hf_version, uint64_t block_height, const cryptonote::transaction &tx) const {return m_state.is_premature_unlock(nettype, hf_version, block_height, tx);}
+
   private:
     // Note(maxim): private methods don't have to be protected the mutex
     bool m_rescanning = false; /* set to true when doing a rescan so we know not to reset proofs */
@@ -744,7 +744,7 @@ namespace service_nodes
     void record_pulse_participation(crypto::public_key const &pubkey, uint64_t height, uint8_t round, bool participated);
 
     // Verify block against Service Node state that has just been called with 'state.update_from_block(block)'.
-    bool verify_block(const cryptonote::block& block, bool alt_block, cryptonote::checkpoint_t const *checkpoint);
+    void verify_block(const cryptonote::block& block, bool alt_block, cryptonote::checkpoint_t const *checkpoint);
 
     void reset(bool delete_db_entry = false);
     bool load(uint64_t current_height);
@@ -817,8 +817,6 @@ namespace service_nodes
   std::optional<registration_details> reg_tx_extract_fields(const cryptonote::transaction& tx);
   uint64_t offset_testing_quorum_height(quorum_type type, uint64_t height);
 
-  // validate_registration* and convert_registration_args functions throws this on error:
-  struct invalid_registration : std::invalid_argument { using std::invalid_argument::invalid_argument; };
 
   // Converts string input values into a partially filled `registration_details`; pubkey and
   // signature will be defaulted.  Throws invalid_registration on any invalid input.

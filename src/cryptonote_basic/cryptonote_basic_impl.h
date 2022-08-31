@@ -36,23 +36,33 @@
 
 
 namespace cryptonote {
-  class BlockAddedHook
-  {
-  public:
-    virtual bool block_added(const block& block, const std::vector<transaction>& txs, struct checkpoint_t const *checkpoint) = 0;
+  struct checkpoint_t;
+  struct block_add_info {
+    const cryptonote::block& block;
+    const std::vector<transaction>& txs;
+    const checkpoint_t* const checkpoint;
   };
-
-  class BlockchainDetachedHook
-  {
-  public:
-    virtual void blockchain_detached(uint64_t height, bool by_pop_blocks) = 0;
+  using BlockAddHook = std::function<void(const block_add_info& info)>;
+  struct block_post_add_info {
+    const cryptonote::block& block;
+    bool reorg;
+    uint64_t split_height; // Only set when reorg is true
   };
-
-  class InitHook
-  {
-  public:
-    virtual void init() = 0;
+  using BlockPostAddHook = std::function<void(const block_post_add_info& info)>;
+  struct detached_info {
+    uint64_t height;
+    bool by_pop_blocks;
   };
+  using BlockchainDetachedHook = std::function<void(const detached_info& info)>;
+  using InitHook = std::function<void()>;
+  struct batch_sn_payment;
+  struct block_reward_parts;
+  struct miner_tx_info {
+    const cryptonote::block& block;
+    const block_reward_parts& reward_parts;
+    const std::vector<cryptonote::batch_sn_payment>& batched_sn_payments;
+  };
+  using ValidateMinerTxHook = std::function<void(const miner_tx_info& info)>;
 
   struct address_parse_info
   {
@@ -74,18 +84,6 @@ namespace cryptonote {
         : address_info{addr_info}, amount{amt} {}
     batch_sn_payment(const cryptonote::account_public_address& addr, uint64_t amt)
         : address_info{addr, 0}, amount{amt} {}
-  };
-
-  class ValidateMinerTxHook
-  {
-  public:
-    virtual bool validate_miner_tx(cryptonote::block const &block, struct block_reward_parts const &reward_parts, std::optional<std::vector<cryptonote::batch_sn_payment>> const &batched_sn_payments) const = 0;
-  };
-
-  class AltBlockAddedHook
-  {
-  public:
-    virtual bool alt_block_added(const block &block, const std::vector<transaction>& txs, struct checkpoint_t const *checkpoint) = 0;
   };
 
 #pragma pack(push, 1)

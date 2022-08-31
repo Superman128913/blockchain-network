@@ -7,6 +7,10 @@
 #include <chrono>
 
 namespace service_nodes {
+
+  // validate_registration* and convert_registration_args functions throws this on error:
+  struct invalid_registration : std::invalid_argument { using std::invalid_argument::invalid_argument; };
+
   inline constexpr size_t PULSE_QUORUM_ENTROPY_LAG    = 21; // How many blocks back from the tip of the Blockchain to source entropy for the Pulse quorums.
   inline constexpr auto PULSE_ROUND_TIME                                   = 60s;
   inline constexpr auto PULSE_WAIT_FOR_HANDSHAKES_DURATION                 = 10s;
@@ -188,7 +192,7 @@ namespace service_nodes {
   // blocks out of sync and sending something that it thinks is legit.
   inline constexpr uint64_t VOTE_OR_TX_VERIFY_HEIGHT_BUFFER    = 5;
 
-  inline constexpr std::array<uint16_t, 3> MIN_STORAGE_SERVER_VERSION{{2, 3, 0}};
+  inline constexpr std::array<uint16_t, 3> MIN_STORAGE_SERVER_VERSION{{2, 4, 0}};
   inline constexpr std::array<uint16_t, 3> MIN_LOKINET_VERSION{{0, 9, 9}};
 
   // The minimum accepted version number, broadcasted by Service Nodes via uptime proofs for each hardfork
@@ -201,9 +205,8 @@ namespace service_nodes {
   };
 
   inline constexpr std::array MIN_UPTIME_PROOF_VERSIONS = {
+    proof_version{{cryptonote::hf::hf19_reward_batching, 2}, {10,2,0}, {0,9,9}, {2,4,0}},
     proof_version{{cryptonote::hf::hf19_reward_batching, 0}, {10,0,0}, {0,9,9}, {2,3,0}},
-    proof_version{{cryptonote::hf::hf18, 1}, {9,2,0}, {0,9,5}, {2,2,0}},
-    proof_version{{cryptonote::hf::hf18, 0}, {9,1,0}, {0,9,0}, {2,1,0}},
   };
 
   using swarm_id_t = uint64_t;
@@ -248,7 +251,7 @@ namespace service_nodes {
 
   // Small Stake prevented from unlocking stake until a certain number of blocks have passed
   constexpr uint64_t SMALL_CONTRIBUTOR_UNLOCK_TIMER = cryptonote::BLOCKS_PER_DAY * 30;
-  constexpr uint64_t SMALL_CONTRIBUTOR_THRESHOLD = 3749;
+  using SMALL_CONTRIBUTOR_THRESHOLD = std::ratio<2499, 10000>;
 
 static_assert(cryptonote::old::STAKING_PORTIONS != UINT64_MAX, "UINT64_MAX is used as the invalid value for failing to calculate the min_node_contribution");
 // return: UINT64_MAX if (num_contributions > the max number of contributions), otherwise the amount in oxen atomic units
@@ -297,6 +300,6 @@ uint64_t get_portions_to_make_amount(uint64_t staking_requirement, uint64_t amou
 
 std::optional<double> parse_fee_percent(std::string_view fee);
 
-bool get_portions_from_percent_str(std::string cut_str, uint64_t& portions);
+uint16_t percent_to_basis_points(std::string percent_string);
 
 }

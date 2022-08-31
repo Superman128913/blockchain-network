@@ -440,7 +440,7 @@ std::unique_ptr<tools::wallet2> make_basic(const boost::program_options::variabl
   try
   {
     if (!command_line::is_arg_defaulted(vm, opts.tx_notify))
-      wallet->set_tx_notify(std::shared_ptr<tools::Notify>(new tools::Notify(command_line::get_arg(vm, opts.tx_notify).c_str())));
+      wallet->set_tx_notify(std::make_shared<tools::Notify>(command_line::get_arg(vm, opts.tx_notify)));
   }
   catch (const std::exception &e)
   {
@@ -2540,9 +2540,8 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
 
   if (notify)
   {
-    std::shared_ptr<tools::Notify> tx_notify = m_tx_notify;
-    if (tx_notify)
-      tx_notify->notify("%s", tools::type_to_hex(txid).c_str(), nullptr);
+    if (auto tx_notify = m_tx_notify)
+      tx_notify->notify("%s", tools::type_to_hex(txid));
   }
 }
 //----------------------------------------------------------------------------------------------------
@@ -4963,12 +4962,11 @@ void wallet2::restore_from_device(const fs::path& wallet_, const epee::wipeable_
     m_subaddress_lookahead_major = 5;
     m_subaddress_lookahead_minor = 20;
   }
-  if (hwdev_label) {
-    fs::path hwdev_txt = m_wallet_file;
-    hwdev_txt += ".hwdev.txt";
-    if (!tools::dump_file(hwdev_txt, *hwdev_label))
-      MERROR("failed to write .hwdev.txt comment file");
-  }
+  fs::path hwdev_filename = m_wallet_file;
+  hwdev_filename += ".hwdev.txt";
+  std::string hwdev_text = hwdev_label.value_or("");
+  if (!tools::dump_file(hwdev_filename, hwdev_text))
+    MERROR("failed to write .hwdev.txt comment file");
   if (progress_callback)
     progress_callback(tr("Setting up account and subaddresses"));
   setup_new_blockchain();
@@ -8569,7 +8567,11 @@ wallet2::request_stake_unlock_result wallet2::can_request_stake_unlock(const cry
         return result;
       }
 
-      if (contribution.amount < service_nodes::SMALL_CONTRIBUTOR_THRESHOLD && (curr_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
+      uint64_t small_contributor_amount_threshold = mul128_div64(
+        service_nodes::get_staking_requirement(nettype(), curr_height),
+        service_nodes::SMALL_CONTRIBUTOR_THRESHOLD::num,
+        service_nodes::SMALL_CONTRIBUTOR_THRESHOLD::den);
+      if (contribution.amount < small_contributor_amount_threshold && (curr_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
       {
         result.msg.append("You are requesting to unlock a stake of: ");
         result.msg.append(cryptonote::print_money(contribution.amount));

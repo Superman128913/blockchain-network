@@ -906,6 +906,10 @@ namespace service_nodes
     }
 
     uint64_t unlock_height = get_locked_key_image_unlock_height(nettype, node_info.registration_height, block_height);
+    uint64_t small_contributor_amount_threshold = mul128_div64(
+      service_nodes::get_staking_requirement(nettype, unlock_height),
+      service_nodes::SMALL_CONTRIBUTOR_THRESHOLD::num,
+      service_nodes::SMALL_CONTRIBUTOR_THRESHOLD::den);
     for (const auto &contributor : node_info.contributors)
     {
       auto cit = std::find_if(contributor.locked_contributions.begin(),
@@ -915,9 +919,22 @@ namespace service_nodes
                               });
       if (cit != contributor.locked_contributions.end())
       {
-        if (hf_version >= hf::hf19_reward_batching)
+        if (hf_version >= hf::hf20)
         {
-          if (cit->amount < service_nodes::SMALL_CONTRIBUTOR_THRESHOLD && (block_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
+          if (cit->amount < small_contributor_amount_threshold && (block_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
+          {
+            LOG_PRINT_L1("Unlock TX: small contributor trying to unlock node before "
+                << std::to_string(service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
+                << " blocks have passed, rejected on height: "
+                << block_height << " for tx: "
+                << get_transaction_hash(tx));
+            return false;
+          }
+        }
+        //TODO oxen remove this whole if block after HF20 has occurred
+        if (hf_version == hf::hf19_reward_batching)
+        {
+          if (cit->amount < 3749 && (block_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
           {
             LOG_PRINT_L1("Unlock TX: small contributor trying to unlock node before "
                 << std::to_string(service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
@@ -943,6 +960,44 @@ namespace service_nodes
       }
     }
 
+    return false;
+  }
+
+  //------------------------------------------------------------------
+  //TODO oxen remove this whole function after HF20 has occurred
+  bool service_node_list::state_t::is_premature_unlock(cryptonote::network_type nettype, cryptonote::hf hf_version, uint64_t block_height, const cryptonote::transaction &tx) const
+  {
+    if (hf_version != hf::hf19_reward_batching)
+      return false;
+    crypto::public_key snode_key;
+    if (!cryptonote::get_service_node_pubkey_from_tx_extra(tx.extra, snode_key))
+      return false;
+
+    auto it = service_nodes_infos.find(snode_key);
+    if (it == service_nodes_infos.end())
+      return false;
+
+    const service_node_info &node_info = *it->second;
+
+    cryptonote::tx_extra_tx_key_image_unlock unlock;
+    if (!cryptonote::get_field_from_tx_extra(tx.extra, unlock))
+      return false;
+
+    uint64_t unlock_height = get_locked_key_image_unlock_height(nettype, node_info.registration_height, block_height);
+    uint64_t small_contributor_amount_threshold = mul128_div64(
+      service_nodes::get_staking_requirement(nettype, block_height),
+      service_nodes::SMALL_CONTRIBUTOR_THRESHOLD::num,
+      service_nodes::SMALL_CONTRIBUTOR_THRESHOLD::den);
+    for (const auto &contributor : node_info.contributors)
+    {
+      auto cit = std::find_if(contributor.locked_contributions.begin(),
+                              contributor.locked_contributions.end(),
+                              [&unlock](const service_node_info::contribution_t &contribution) {
+                                return unlock.key_image == contribution.key_image;
+                              });
+      if (cit != contributor.locked_contributions.end())
+        return cit->amount < small_contributor_amount_threshold && (block_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER;
+    }
     return false;
   }
 
@@ -1542,12 +1597,12 @@ namespace service_nodes
   }
 
 
-  bool service_node_list::verify_block(const cryptonote::block &block, bool alt_block, cryptonote::checkpoint_t const *checkpoint)
+  void service_node_list::verify_block(const cryptonote::block &block, bool alt_block, cryptonote::checkpoint_t const *checkpoint)
   {
     if (block.major_version < hf::hf9_service_nodes)
-      return true;
+      return;
 
-    std::string_view block_type = alt_block ? "alt block "sv : "block "sv;
+    std::string_view block_type = alt_block ? "alt block"sv : "block"sv;
 
     //
     // NOTE: Verify the checkpoint given on this height that locks in a block in the past.
@@ -1558,10 +1613,7 @@ namespace service_nodes
       std::shared_ptr<const quorum> quorum = get_quorum(quorum_type::checkpointing, checkpoint->height, false, alt_block ? &alt_quorums : nullptr);
 
       if (!quorum)
-      {
-        MGINFO("Failed to get testing quorum checkpoint for " << block_type << cryptonote::get_block_hash(block));
-        return false;
-      }
+        throw std::runtime_error{fmt::format("Failed to get testing quorum checkpoint for {} {}", block_type, cryptonote::get_block_hash(block))};
 
       bool failed_checkpoint_verify = !service_nodes::verify_checkpoint(block.major_version, *checkpoint, *quorum);
       if (alt_block && failed_checkpoint_verify)
@@ -1577,10 +1629,7 @@ namespace service_nodes
       }
 
       if (failed_checkpoint_verify)
-      {
-        MGINFO("Service node checkpoint failed verification for " << block_type << cryptonote::get_block_hash(block));
-        return false;
-      }
+        throw std::runtime_error{fmt::format("Service node checkpoint failed verification for {} {}", block_type, cryptonote::get_block_hash(block))};
     }
 
     //
@@ -1595,10 +1644,9 @@ namespace service_nodes
       {
         cryptonote::block prev_block;
         if (!find_block_in_db(m_blockchain.get_db(), block.prev_id, prev_block))
-        {
-          MGINFO("Alt block " << cryptonote::get_block_hash(block) << " references previous block " << block.prev_id << " not available in DB.");
-          return false;
-        }
+          throw std::runtime_error{fmt::format(
+              "Alt block {} references previous block {} not available in DB.",
+              cryptonote::get_block_hash(block), block.prev_id)};
 
         prev_timestamp = prev_block.timestamp;
       }
@@ -1609,10 +1657,9 @@ namespace service_nodes
       }
 
       if (!pulse::get_round_timings(m_blockchain, height, prev_timestamp, timings))
-      {
-        MGINFO("Failed to query the block data for Pulse timings to validate incoming " << block_type << "at height " << height);
-        return false;
-      }
+        throw std::runtime_error{fmt::format(
+            "Failed to query the block data for Pulse timings to validate incoming {} at height {}",
+            block_type, height)};
     }
 
     //
@@ -1670,18 +1717,20 @@ namespace service_nodes
                                        alt_pulse_quorums);
     }
 
-    return result;
+    if (!result)
+      throw std::runtime_error{fmt::format("Failed to verify block components for incoming {} at height {}",
+          block_type, height)};
   }
 
-  bool service_node_list::block_added(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs, cryptonote::checkpoint_t const *checkpoint)
+  void service_node_list::block_add(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs, cryptonote::checkpoint_t const *checkpoint)
   {
     if (block.major_version < hf::hf9_service_nodes)
-      return true;
+      return;
 
     std::lock_guard lock(m_sn_mutex);
     process_block(block, txs);
-    bool result = verify_block(block, false /*alt_block*/, checkpoint);
-    if (result && cryptonote::block_has_pulse_components(block))
+    verify_block(block, false /*alt_block*/, checkpoint);
+    if (cryptonote::block_has_pulse_components(block))
     {
       // NOTE: Only record participation if its a block we recently received.
       // Otherwise processing blocks in retrospect/re-loading on restart seeds
@@ -1697,10 +1746,8 @@ namespace service_nodes
       {
         std::shared_ptr<const quorum> quorum = get_quorum(quorum_type::pulse, block_height, false, nullptr);
         if (!quorum || quorum->validators.empty())
-        {
-          MFATAL("Unexpected Pulse error " << (quorum ? " quorum was not generated" : " quorum was empty"));
-          return false;
-        }
+          throw std::runtime_error{fmt::format(
+              "Unexpected Pulse error: {}", quorum ? " quorum was not generated" : " quorum was empty")};
 
         for (size_t validator_index = 0; validator_index < service_nodes::PULSE_QUORUM_NUM_VALIDATORS; validator_index++)
         {
@@ -1710,7 +1757,6 @@ namespace service_nodes
         }
       }
     }
-    return result;
   }
 
   void service_node_list::reset_batching_to_latest_height()
@@ -2292,7 +2338,7 @@ namespace service_nodes
     m_state.update_from_block(m_blockchain.get_db(), nettype, m_transient.state_history, m_transient.state_archive, {}, block, txs, m_service_node_keys);
   }
 
-  void service_node_list::blockchain_detached(uint64_t height, bool /*by_pop_blocks*/)
+  void service_node_list::blockchain_detached(uint64_t height)
   {
     std::lock_guard lock(m_sn_mutex);
 
@@ -2442,17 +2488,15 @@ namespace service_nodes
   }
 
   // NOTE: Verify queued service node coinbase or pulse block producer rewards
-  static bool verify_coinbase_tx_output(cryptonote::transaction const &miner_tx,
+  static void verify_coinbase_tx_output(cryptonote::transaction const &miner_tx,
                                         uint64_t height,
                                         size_t output_index,
                                         cryptonote::account_public_address const &receiver,
                                         uint64_t reward)
   {
     if (output_index >= miner_tx.vout.size())
-    {
-      MGINFO_RED("Output Index: " << output_index << ", indexes out of bounds in vout array with size: " << miner_tx.vout.size());
-      return false;
-    }
+      throw std::out_of_range{fmt::format("Output Index: {} , indexes out of bounds in vout array with size: ",
+        output_index, miner_tx.vout.size())};
 
     cryptonote::tx_out const &output = miner_tx.vout[output_index];
 
@@ -2461,16 +2505,10 @@ namespace service_nodes
     // 1 ULP difference in the reward calculations.
     // TODO(oxen): eliminate all FP math from reward calculations
     if (!within_one(output.amount, reward))
-    {
-      MGINFO_RED("Service node reward amount incorrect. Should be " << cryptonote::print_money(reward) << ", is: " << cryptonote::print_money(output.amount));
-      return false;
-    }
+      throw std::runtime_error{fmt::format("Service node reward amount incorrect. Should be {}, is: {}", cryptonote::print_money(reward), cryptonote::print_money(output.amount))};
 
     if (!std::holds_alternative<cryptonote::txout_to_key>(output.target))
-    {
-      MGINFO_RED("Service node output target type should be txout_to_key");
-      return false;
-    }
+      throw std::runtime_error{"Service node output target type should be txout_to_key"};
 
     // NOTE: Loki uses the governance key in the one-time ephemeral key
     // derivation for both Pulse Block Producer/Queued Service Node Winner rewards
@@ -2478,25 +2516,23 @@ namespace service_nodes
     crypto::public_key out_eph_public_key{};
     cryptonote::keypair gov_key = cryptonote::get_deterministic_keypair_from_height(height);
 
-    bool r = crypto::generate_key_derivation(receiver.m_view_public_key, gov_key.sec, derivation);
-    CHECK_AND_ASSERT_MES(r, false, "while creating outs: failed to generate_key_derivation(" << receiver.m_view_public_key << ", " << gov_key.sec << ")");
-    r = crypto::derive_public_key(derivation, output_index, receiver.m_spend_public_key, out_eph_public_key);
-    CHECK_AND_ASSERT_MES(r, false, "while creating outs: failed to derive_public_key(" << derivation << ", " << output_index << ", "<< receiver.m_spend_public_key << ")");
+    if (!crypto::generate_key_derivation(receiver.m_view_public_key, gov_key.sec, derivation))
+      throw std::runtime_error{"Failed to generate key derivation"};
+    if (!crypto::derive_public_key(derivation, output_index, receiver.m_spend_public_key, out_eph_public_key))
+      throw std::runtime_error{"Failed derive public key"};
 
     if (var::get<cryptonote::txout_to_key>(output.target).key != out_eph_public_key)
-    {
-      MGINFO_RED("Invalid service node reward at output: " << output_index << ", output key, specifies wrong key");
-      return false;
-    }
-
-    return true;
+      throw std::runtime_error{fmt::format("Invalid service node reward at output: {}, output key, specifies wrong key", output_index)};
   }
 
-  bool service_node_list::validate_miner_tx(const cryptonote::block& block, const cryptonote::block_reward_parts& reward_parts, const std::optional<std::vector<cryptonote::batch_sn_payment>>& batched_sn_payments) const
+  void service_node_list::validate_miner_tx(const cryptonote::miner_tx_info& info) const
   {
+    const auto& block = info.block;
+    const auto& reward_parts = info.reward_parts;
+    const auto& batched_sn_payments = info.batched_sn_payments;
     const auto hf_version = block.major_version;
     if (hf_version < hf::hf9_service_nodes)
-      return true;
+      return;
 
     std::lock_guard lock(m_sn_mutex);
     uint64_t const height                   = cryptonote::get_block_height(block);
@@ -2511,10 +2547,7 @@ namespace service_nodes
     {
       auto const check_block_leader_pubkey = cryptonote::get_service_node_winner_from_tx_extra(miner_tx.extra);
       if (block_leader.key != check_block_leader_pubkey)
-      {
-        MGINFO_RED("Service node reward winner is incorrect! Expected " << block_leader.key << ", block has " << check_block_leader_pubkey);
-        return false;
-      }
+        throw std::runtime_error{fmt::format("Service node reward winner is incorrect! Expected {}, block has {}", block_leader.key, check_block_leader_pubkey)};
     }
 
     enum struct verify_mode
@@ -2536,20 +2569,14 @@ namespace service_nodes
       std::vector<crypto::hash> entropy = get_pulse_entropy_for_next_block(m_blockchain.get_db(), block.prev_id, block.pulse.round);
       quorum pulse_quorum = generate_pulse_quorum(m_blockchain.nettype(), block_leader.key, hf_version, m_state.active_service_nodes_infos(), entropy, block.pulse.round);
       if (!verify_pulse_quorum_sizes(pulse_quorum))
-      {
-        MGINFO_RED("Pulse block received but Pulse has insufficient nodes for quorum, block hash " << cryptonote::get_block_hash(block) << ", height " << height);
-        return false;
-      }
+        throw std::runtime_error{fmt::format("Pulse block received but Pulse has insufficient nodes for quorum, block hash {}, height {}", cryptonote::get_block_hash(block), height)};
 
       block_producer_key = pulse_quorum.workers[0];
       mode               = (block_producer_key == block_leader.key) ? verify_mode::pulse_block_leader_is_producer
                                                                     : verify_mode::pulse_different_block_producer;
 
       if (block.pulse.round == 0 && (mode == verify_mode::pulse_different_block_producer))
-      {
-        MGINFO_RED("The block producer in pulse round 0 should be the same node as the block leader: " << block_leader.key << ", actual producer: " << block_producer_key);
-        return false;
-      }
+        throw std::runtime_error{fmt::format("The block producer in pulse round 0 should be the same node as the block leader: {}, actual producer: {}", block_leader.key, block_producer_key)};
     }
 
     // NOTE: Verify miner tx vout composition
@@ -2578,17 +2605,14 @@ namespace service_nodes
     size_t expected_vouts_size;
     switch (mode) {
       case verify_mode::batched_sn_rewards:
-        expected_vouts_size = batched_sn_payments ? batched_sn_payments->size() : 0;
+        expected_vouts_size = batched_sn_payments.size();
         break;
       case verify_mode::pulse_block_leader_is_producer:
       case verify_mode::pulse_different_block_producer:
         {
           auto info_it = m_state.service_nodes_infos.find(block_producer_key);
           if (info_it == m_state.service_nodes_infos.end())
-          {
-            MGINFO_RED("The pulse block producer for round: " << +block.pulse.round << " is not currently a Service Node: " << block_producer_key);
-            return false;
-          }
+            throw std::runtime_error{fmt::format("The pulse block producer for round {:d} is not current a Service Node: {}", block.pulse.round, block_producer_key)};
 
           block_producer = info_it->second;
           expected_vouts_size = mode == verify_mode::pulse_different_block_producer && reward_parts.miner_fee > 0
@@ -2610,20 +2634,16 @@ namespace service_nodes
     }
 
     if (miner_tx.vout.size() != expected_vouts_size)
-    {
-      auto type =
-        mode == verify_mode::miner ? "miner"sv :
-        mode == verify_mode::batched_sn_rewards ? "batch reward"sv :
-        mode == verify_mode::pulse_block_leader_is_producer ? "pulse"sv : "pulse alt round"sv;
-      MGINFO_RED("Expected " << type << " block, the miner TX specifies a different amount of outputs vs the expected: " << expected_vouts_size << ", miner tx outputs: " << miner_tx.vout.size());
-      return false;
-    }
+      throw std::runtime_error{fmt::format("Expected {} block, the miner TX specifies a different amount of outputs vs the expected: {}, miner tx outputs: {}",
+          mode == verify_mode::miner ? "miner"sv :
+          mode == verify_mode::batched_sn_rewards ? "batch reward"sv :
+          mode == verify_mode::pulse_block_leader_is_producer ? "pulse"sv :
+          "pulse alt round"sv,
+          expected_vouts_size,
+          miner_tx.vout.size())};
 
     if (hf_version >= hf::hf16_pulse && reward_parts.base_miner != 0)
-    {
-      MGINFO_RED("Miner reward is incorrect expected 0 reward, block specified " << cryptonote::print_money(reward_parts.base_miner));
-      return false;
-    }
+      throw std::runtime_error{fmt::format("Miner reward is incorrect expected 0 reward, block specified {}", cryptonote::print_money(reward_parts.base_miner))};
 
     // NOTE: Verify Coinbase Amounts
     switch(mode)
@@ -2646,8 +2666,7 @@ namespace service_nodes
           const auto& payout = block_leader.payouts[i];
           if (split_rewards[i])
           {
-            if (!verify_coinbase_tx_output(miner_tx, height, vout_index, payout.address, split_rewards[i]))
-              return false;
+            verify_coinbase_tx_output(miner_tx, height, vout_index, payout.address, split_rewards[i]);
             vout_index++;
           }
         }
@@ -2666,8 +2685,7 @@ namespace service_nodes
           const auto& payout = block_leader.payouts[i];
           if (split_rewards[i])
           {
-            if (!verify_coinbase_tx_output(miner_tx, height, vout_index, payout.address, split_rewards[i]))
-              return false;
+            verify_coinbase_tx_output(miner_tx, height, vout_index, payout.address, split_rewards[i]);
             vout_index++;
           }
         }
@@ -2685,8 +2703,7 @@ namespace service_nodes
             const auto& payout = block_producer_payouts.payouts[i];
             if (split_rewards[i])
             {
-              if (!verify_coinbase_tx_output(miner_tx, height, vout_index, payout.address, split_rewards[i]))
-                return false;
+              verify_coinbase_tx_output(miner_tx, height, vout_index, payout.address, split_rewards[i]);
               vout_index++;
             }
           }
@@ -2698,8 +2715,7 @@ namespace service_nodes
           const auto& payout = block_leader.payouts[i];
           if (split_rewards[i])
           {
-            if (!verify_coinbase_tx_output(miner_tx, height, vout_index, payout.address, split_rewards[i]))
-              return false;
+            verify_coinbase_tx_output(miner_tx, height, vout_index, payout.address, split_rewards[i]);
             vout_index++;
           }
         }
@@ -2709,66 +2725,47 @@ namespace service_nodes
       case verify_mode::batched_sn_rewards:
       {
         // NB: this amount is in milli-atomics, not atomics
-        uint64_t total_payout_in_our_db = batched_sn_payments ? std::accumulate(
-                batched_sn_payments->begin(),
-                batched_sn_payments->end(),
+        uint64_t total_payout_in_our_db = std::accumulate(
+                batched_sn_payments.begin(),
+                batched_sn_payments.end(),
                 uint64_t{0},
-                [](auto&& a, auto&& b) { return a + b.amount; }) : 0;
+                [](auto&& a, auto&& b) { return a + b.amount; });
 
         uint64_t total_payout_in_vouts = 0;
         const auto deterministic_keypair = cryptonote::get_deterministic_keypair_from_height(height);
         for (size_t vout_index = 0; vout_index < block.miner_tx.vout.size(); vout_index++)
         {
           const auto& vout = block.miner_tx.vout[vout_index];
-          const auto& batch_payment = (*batched_sn_payments)[vout_index];
+          const auto& batch_payment = batched_sn_payments[vout_index];
 
           if (!std::holds_alternative<cryptonote::txout_to_key>(vout.target))
-          {
-            MGINFO_RED("Service node output target type should be txout_to_key");
-            return false;
-          }
+            throw std::runtime_error{"Service node output target type should be txout_to_key"};
 
           constexpr uint64_t max_amount = std::numeric_limits<uint64_t>::max() / cryptonote::BATCH_REWARD_FACTOR;
           if (vout.amount > max_amount)
-          {
-            // We should never actually hit this limit unless someone is trying something nefarious
-            MGINFO_RED("Batched reward payout invalid: exceeds maximum possible payout size");
-            return false;
-          }
+            throw std::runtime_error{"Batched reward payout invalid: exceeds maximum possible payout size"};
 
           auto paid_amount = vout.amount * cryptonote::BATCH_REWARD_FACTOR;
           total_payout_in_vouts += paid_amount;
           if (paid_amount != batch_payment.amount)
-          {
-            MGINFO_RED(fmt::format("Batched reward payout incorrect: expected {}, not {}", batch_payment.amount, paid_amount));
-            return false;
-          }
+            throw std::runtime_error{fmt::format("Batched reward payout incorrect: expected {}, not {}", batch_payment.amount, paid_amount)};
+
           crypto::public_key out_eph_public_key{};
           if (!cryptonote::get_deterministic_output_key(batch_payment.address_info.address, deterministic_keypair, vout_index, out_eph_public_key))
-          {
-            MGINFO_RED("Failed to generate output one-time public key");
-            return false;
-          }
+            throw std::runtime_error{"Failed to generate output one-time public key"};
+
           const auto& out_to_key = var::get<cryptonote::txout_to_key>(vout.target);
           if (tools::view_guts(out_to_key) != tools::view_guts(out_eph_public_key))
-          {
-            MGINFO_RED("Output Ephermeral Public Key does not match (payment to wrong recipient)");
-            return false;
-          }
+            throw std::runtime_error{"Output Ephermeral Public Key does not match (payment to wrong recipient)"};
         }
         if (total_payout_in_vouts != total_payout_in_our_db)
-        {
-          MGINFO_RED(fmt::format("Total service node reward amount incorrect: expected {}, not {}", total_payout_in_our_db, total_payout_in_vouts));
-          return false;
-        }
+          throw std::runtime_error{fmt::format("Total service node reward amount incorrect: expected {}, not {}", total_payout_in_our_db, total_payout_in_vouts)};
       }
       break;
     }
-
-    return true;
   }
 
-  bool service_node_list::alt_block_added(cryptonote::block const &block, std::vector<cryptonote::transaction> const &txs, cryptonote::checkpoint_t const *checkpoint)
+  void service_node_list::alt_block_add(const cryptonote::block_add_info& info)
   {
     // NOTE: The premise is to search the main list and the alternative list for
     // the parent of the block we just received, generate the new Service Node
@@ -2779,15 +2776,16 @@ namespace service_nodes
     // store into the alt-chain until it gathers enough blocks to cause
     // a reorganization (more checkpoints/PoW than the main chain).
 
+    auto& block = info.block;
     if (block.major_version < hf::hf9_service_nodes)
-      return true;
+      return;
 
     uint64_t block_height         = cryptonote::get_block_height(block);
     state_t const *starting_state = nullptr;
     crypto::hash const block_hash = get_block_hash(block);
 
     auto it = m_transient.alt_state.find(block_hash);
-    if (it != m_transient.alt_state.end()) return true; // NOTE: Already processed alt-state for this block
+    if (it != m_transient.alt_state.end()) return; // NOTE: Already processed alt-state for this block
 
     // NOTE: Check if alt block forks off some historical state on the canonical chain
     if (!starting_state)
@@ -2805,28 +2803,22 @@ namespace service_nodes
     }
 
     if (!starting_state)
-    {
-      LOG_PRINT_L1("Received alt block but couldn't find parent state in historical state");
-      return false;
-    }
+      throw std::runtime_error{"Received alt block but couldn't find parent state in historical state"};
 
     if (starting_state->block_hash != block.prev_id)
-    {
-      LOG_PRINT_L1("Unexpected state_t's hash: " << starting_state->block_hash
-                                                 << ", does not match the block prev hash: " << block.prev_id);
-      return false;
-    }
+      throw std::runtime_error{fmt::format("Unexpected state_t's hash: {}, does not match the block prev hash: {}",
+         starting_state->block_hash, block.prev_id)};
 
     // NOTE: Generate the next Service Node list state from this Alt block.
     state_t alt_state = *starting_state;
-    alt_state.update_from_block(m_blockchain.get_db(), m_blockchain.nettype(), m_transient.state_history, m_transient.state_archive, m_transient.alt_state, block, txs, m_service_node_keys);
+    alt_state.update_from_block(m_blockchain.get_db(), m_blockchain.nettype(), m_transient.state_history, m_transient.state_archive, m_transient.alt_state, block, info.txs, m_service_node_keys);
     auto alt_it = m_transient.alt_state.find(block_hash);
     if (alt_it != m_transient.alt_state.end())
       alt_it->second = std::move(alt_state);
     else
       m_transient.alt_state.emplace(block_hash, std::move(alt_state));
 
-    return verify_block(block, true /*alt_block*/, checkpoint);
+    verify_block(block, true /*alt_block*/, info.checkpoint);
   }
 
   //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
