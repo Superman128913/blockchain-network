@@ -817,8 +817,6 @@ namespace service_nodes
   std::optional<registration_details> reg_tx_extract_fields(const cryptonote::transaction& tx);
   uint64_t offset_testing_quorum_height(quorum_type type, uint64_t height);
 
-  // validate_registration* and convert_registration_args functions throws this on error:
-  struct invalid_registration : std::invalid_argument { using std::invalid_argument::invalid_argument; };
 
   // Converts string input values into a partially filled `registration_details`; pubkey and
   // signature will be defaulted.  Throws invalid_registration on any invalid input.

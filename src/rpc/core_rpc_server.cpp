@@ -3008,26 +3008,24 @@ namespace cryptonote { namespace rpc {
 
     std::vector<std::string> args;
 
-    uint64_t const curr_height   = m_core.get_current_blockchain_height();
-    uint64_t staking_requirement = service_nodes::get_staking_requirement(nettype(), curr_height);
+    std::optional<uint64_t> height = m_core.get_current_blockchain_height();
+    auto hf_version = get_network_version(nettype(), *height);
+    uint64_t staking_requirement = service_nodes::get_staking_requirement(nettype(), *height);
 
     {
-      uint64_t portions_cut;
-      if (!service_nodes::get_portions_from_percent_str(req.operator_cut, portions_cut))
-      {
-        res.status = "Invalid value: " + req.operator_cut + ". Should be between [0-100]";
+      try {
+        args.emplace_back(std::to_string(service_nodes::percent_to_basis_points(req.operator_cut)));
+      } catch(const std::exception &e) {
+        res.status = "Invalid value: "s + e.what();
         MERROR(res.status);
         return res;
       }
-
-      args.push_back(std::to_string(portions_cut));
     }
 
     for (const auto& [address, amount] : req.contributions)
     {
-        uint64_t num_portions = service_nodes::get_portions_to_make_amount(staking_requirement, amount);
-        args.push_back(address);
-        args.push_back(std::to_string(num_portions));
+      args.push_back(address);
+      args.push_back(std::to_string(amount));
     }
 
     GET_SERVICE_NODE_REGISTRATION_CMD_RAW::request req_old{};
