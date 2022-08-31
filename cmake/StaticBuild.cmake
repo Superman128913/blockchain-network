@@ -5,12 +5,12 @@
 
 set(LOCAL_MIRROR "" CACHE STRING "local mirror path/URL for lib downloads")
 
-set(BOOST_VERSION 1.79.0 CACHE STRING "boost version")
+set(BOOST_VERSION 1.80.0 CACHE STRING "boost version")
 set(BOOST_MIRROR ${LOCAL_MIRROR} https://boostorg.jfrog.io/artifactory/main/release/${BOOST_VERSION}/source
     CACHE STRING "boost download mirror(s)")
 string(REPLACE "." "_" BOOST_VERSION_ ${BOOST_VERSION})
 set(BOOST_SOURCE boost_${BOOST_VERSION_}.tar.bz2)
-set(BOOST_HASH SHA256=475d589d51a7f8b3ba2ba4eda022b170e562ca3b760ee922c146b6c65856ef39
+set(BOOST_HASH SHA256=1e19565d82e43bc59209a168f5ac899d3ba471d55c7610c677d4ccf2c9c500c0
     CACHE STRING "boost source hash")
 
 set(NCURSES_VERSION 6.3 CACHE STRING "ncurses version")
@@ -27,11 +27,11 @@ set(READLINE_SOURCE readline-${READLINE_VERSION}.tar.gz)
 set(READLINE_HASH SHA512=27790d0461da3093a7fee6e89a51dcab5dc61928ec42e9228ab36493b17220641d5e481ea3d8fee5ee0044c70bf960f55c7d3f1a704cf6b9c42e5c269b797e00
     CACHE STRING "readline source hash")
 
-set(SQLITE3_VERSION 3380200 CACHE STRING "sqlite3 version")
+set(SQLITE3_VERSION 3390200 CACHE STRING "sqlite3 version")
 set(SQLITE3_MIRROR ${LOCAL_MIRROR} https://www.sqlite.org/2022
     CACHE STRING "sqlite3 download mirror(s)")
 set(SQLITE3_SOURCE sqlite-autoconf-${SQLITE3_VERSION}.tar.gz)
-set(SQLITE3_HASH SHA512=2192675d8638a933ec75ec78dc4185f005c9d37453bc2bbe590b72235066f68ba2cac1be3b491a47d6a7ca74d5b3bfe4e548d576a6b324383bb9bc7739d0b635
+set(SQLITE3_HASH SHA512=c16b50ade3c182d5473014ac0a51e2bb8a5cfc46e532c2bda77ae4d530336e2b57aa4f12dccb6aa2148d60e9289305bf20842ac95dc52f2d31df8eb5f0599de6
     CACHE STRING "sqlite3 source hash")
 
 if(SQLITE3_VERSION MATCHES "^([0-9]+)(0([0-9])|([1-9][0-9]))(0([0-9])|([1-9][0-9]))[0-9][0-9]$")
@@ -95,11 +95,11 @@ set(ZLIB_SOURCE zlib-${ZLIB_VERSION}.tar.gz)
 set(ZLIB_HASH SHA512=cc2366fa45d5dfee1f983c8c51515e0cff959b61471e2e8d24350dea22d3f6fcc50723615a911b046ffc95f51ba337d39ae402131a55e6d1541d3b095d6c0a14
     CACHE STRING "zlib source hash")
 
-set(CURL_VERSION 7.82.0 CACHE STRING "curl version")
+set(CURL_VERSION 7.85.0 CACHE STRING "curl version")
 set(CURL_MIRROR ${LOCAL_MIRROR} https://curl.se/download https://curl.askapache.com
   CACHE STRING "curl mirror(s)")
 set(CURL_SOURCE curl-${CURL_VERSION}.tar.xz)
-set(CURL_HASH SHA256=0aaa12d7bd04b0966254f2703ce80dd5c38dbbd76af0297d3d690cdce58a583c
+set(CURL_HASH SHA512=b57cc31649a4f47cc4b482f56a85c86c8e8aaeaf01bc1b51b065fdb9145a9092bc52535e52a85a66432eb163605b2edbf5bc5c33ea6e40e50f26a69ad1365cbd
   CACHE STRING "curl source hash")
 
 
