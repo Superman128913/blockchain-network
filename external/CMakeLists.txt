@@ -66,6 +66,11 @@ system_or_submodule(FMT fmt fmt>=8.0.0 fmt)
 add_subdirectory(db_drivers)
 add_subdirectory(easylogging++ easyloggingpp)
 add_subdirectory(randomx EXCLUDE_FROM_ALL)
+add_subdirectory(date EXCLUDE_FROM_ALL)
+
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+set(JSON_MultipleHeaders ON CACHE BOOL "") # Allows multi-header nlohmann use
+add_subdirectory(nlohmann-json EXCLUDE_FROM_ALL)
 
 # uSockets doesn't really have a proper build system (just a very simple Makefile) so build it
 # ourselves.
@@ -160,3 +165,5 @@ set(SQLITECPP_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(SQLITECPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(SQLiteCpp)
+
+add_subdirectory(Catch2)

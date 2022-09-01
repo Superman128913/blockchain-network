@@ -1,6 +1,7 @@
 #include "uptime_proof.h"
 #include "service_node_list.h"
 #include "common/string_util.h"
+#include "epee/string_tools.h"
 #include "version.h"
 
 extern "C"

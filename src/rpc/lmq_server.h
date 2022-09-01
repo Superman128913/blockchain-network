@@ -68,6 +68,13 @@ public:
   void send_block_notifications(const block& block);
 
   void send_mempool_notifications(const crypto::hash& id, const transaction& tx, const std::string& blob, const tx_pool_options& opts);
+
+private:
+  void on_get_blocks(oxenmq::Message& m);
+
+  void on_mempool_sub_request(oxenmq::Message& m);
+
+  void on_block_sub_request(oxenmq::Message& m);
 };
 
 } // namespace cryptonote::rpc

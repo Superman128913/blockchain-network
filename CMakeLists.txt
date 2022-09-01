@@ -295,6 +295,7 @@ if(NOT MANUAL_SUBMODULES)
     check_submodule(external/SQLiteCpp)
     if(BUILD_TESTS)
       check_submodule(external/googletest)
+      check_submodule(external/Catch2)
     endif()
     check_submodule(external/uWebSockets uSockets)
     check_submodule(external/ghc-filesystem)
@@ -490,7 +491,6 @@ if(NOT BUILD_STATIC_DEPS)
 endif()
 
 add_subdirectory(external)
-
 target_compile_definitions(easylogging PRIVATE AUTO_INITIALIZE_EASYLOGGINGPP)
 
 if(USE_DEVICE_TREZOR)

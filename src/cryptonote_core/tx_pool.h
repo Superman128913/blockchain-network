@@ -43,7 +43,6 @@
 #include "cryptonote_basic/verification_context.h"
 #include "blockchain_db/blockchain_db.h"
 #include "crypto/hash.h"
-#include "rpc/core_rpc_server_commands_defs.h"
 #include "tx_blink.h"
 #include "oxen_economy.h"
 
@@ -410,37 +409,32 @@ namespace cryptonote
      */
     void get_transaction_hashes(std::vector<crypto::hash>& txs, bool include_unrelayed_txes = true, bool include_only_blinked = false) const;
 
-    /**
-     * @brief get (weight, fee, receive time) for all transaction in the pool
-     *
-     * @param txs return-by-reference that data
-     * @param include_unrelayed_txes include unrelayed txes in the result
-     *
-     */
-    void get_transaction_backlog(std::vector<rpc::tx_backlog_entry>& backlog, bool include_unrelayed_txes = true) const;
+    /// Return type of get_transaction_stats()
+    struct tx_stats
+    {
+      uint64_t bytes_total;     ///< Total size of all transactions in pool.
+      uint32_t bytes_min;       ///< Min transaction size in pool.
+      uint32_t bytes_max;       ///< Max transaction size in pool.
+      uint32_t bytes_med;       ///< Median transaction size in pool.
+      uint64_t fee_total;       ///< Total fee's in pool in atomic units.
+      uint64_t oldest;          ///< Unix time of the oldest transaction in the pool.
+      uint32_t txs_total;       ///< Total number of transactions.
+      uint32_t num_failing;     ///< Bumber of failing transactions.
+      uint32_t num_10m;         ///< Number of transactions in pool for more than 10 minutes.
+      uint32_t num_not_relayed; ///< Number of non-relayed transactions.
+      uint64_t histo_98pc;      ///< the time 98% of txes are "younger" than.
+      std::vector<std::pair<uint32_t, uint64_t>> histo; ///< List of txpool histo [number of txes, size in bytes] pairs.
+      uint32_t num_double_spends; ///< Number of double spend transactions.
+    };
 
     /**
      * @brief get a summary statistics of all transaction hashes in the pool
      *
-     * @param stats return-by-reference the pool statistics
      * @param include_unrelayed_txes include unrelayed txes in the result
      *
+     * @return txpool_stats struct of pool statistics
      */
-    void get_transaction_stats(struct rpc::txpool_stats& stats, bool include_unrelayed_txes = true) const;
-
-    /**
-     * @brief get information about all transactions and key images in the pool
-     *
-     * see documentation on tx_info and spent_key_image_info for more details
-     *
-     * @param tx_infos return-by-reference the transactions' information
-     * @param key_image_infos return-by-reference the spent key images' information
-     * @param post_process optional function to call to do any extra tx_info processing from the transaction
-     * @param include_sensitive_data include unrelayed txes and fields that are sensitive to the node privacy
-     *
-     * @return true
-     */
-    bool get_transactions_and_spent_keys_info(std::vector<rpc::tx_info>& tx_infos, std::vector<rpc::spent_key_image_info>& key_image_infos, std::function<void(const transaction& tx, rpc::tx_info&)> post_process = nullptr, bool include_sensitive_data = true) const;
+    tx_stats get_transaction_stats(bool include_unrelayed_txes = true) const;
 
     /**
      * @brief check for presence of key images in the pool
@@ -471,7 +465,7 @@ namespace cryptonote
      *
      * @return number of transactions added to txblobs
      */
-    int find_transactions(const std::vector<crypto::hash> &tx_hashes, std::vector<std::string> &txblobs) const;
+    int find_transactions(const std::unordered_set<crypto::hash>& tx_hashes, std::vector<std::string>& txblobs) const;
 
     /**
      * @brief get a list of all relayable transactions and their hashes
@@ -545,6 +539,23 @@ namespace cryptonote
      * @param bytes the max cumulative txpool weight in bytes
      */
     void set_txpool_max_weight(size_t bytes);
+
+    //TODO: confirm the below comments and investigate whether or not this
+    //      is the desired behavior
+    //! map key images to transactions which spent them
+    /*! this seems odd, but it seems that multiple transactions can exist
+     *  in the pool which both have the same spent key.  This would happen
+     *  in the event of a reorg where someone creates a new/different
+     *  transaction on the assumption that the original will not be in a
+     *  block again.
+     */
+    using key_images_container = std::unordered_map<crypto::key_image, std::unordered_set<crypto::hash>>;
+
+    /// Returns a copy of the map of key images -> set of transactions which spent them.
+    ///
+    /// \param already_locked can be passed as true if the caller already has a lock on the
+    /// blockchain and mempool objects; otherwise a new lock will be obtained by the call.
+    key_images_container get_spent_key_images(bool already_locked = false);
 
   private:
 
@@ -681,17 +692,6 @@ namespace cryptonote
      * set), false if tx removal and/or rollback are insufficient to eliminate conflicting txes.
      */
     bool remove_blink_conflicts(const crypto::hash &id, const std::vector<crypto::hash> &conflict_txs, uint64_t *blink_rollback_height);
-
-    //TODO: confirm the below comments and investigate whether or not this
-    //      is the desired behavior
-    //! map key images to transactions which spent them
-    /*! this seems odd, but it seems that multiple transactions can exist
-     *  in the pool which both have the same spent key.  This would happen
-     *  in the event of a reorg where someone creates a new/different
-     *  transaction on the assumption that the original will not be in a
-     *  block again.
-     */
-    typedef std::unordered_map<crypto::key_image, std::unordered_set<crypto::hash> > key_images_container;
 
     mutable std::recursive_mutex m_transactions_lock;  //!< mutex for the pool
 

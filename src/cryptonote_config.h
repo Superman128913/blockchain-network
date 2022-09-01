@@ -247,6 +247,37 @@ enum class network_type : uint8_t
   UNDEFINED = 255
 };
 
+constexpr network_type network_type_from_string(std::string_view s)
+{
+  if (s == "mainnet")
+    return network_type::MAINNET;
+  if (s == "testnet")
+    return network_type::TESTNET;
+  if (s == "devnet")
+    return network_type::DEVNET;
+  if (s == "fakechain")
+    return network_type::FAKECHAIN;
+
+  return network_type::UNDEFINED;
+}
+
+constexpr std::string_view network_type_to_string(network_type t)
+{
+  switch (t) {
+    case network_type::MAINNET:
+      return "mainnet";
+    case network_type::TESTNET:
+      return "testnet";
+    case network_type::DEVNET:
+      return "devnet";
+    case network_type::FAKECHAIN:
+      return "fakechain";
+    default:
+      return "undefined";
+  }
+  return "undefined";
+}
+
 // Constants for older hard-forks that are mostly irrelevant now, but are still needed to sync the
 // older parts of the blockchain:
 namespace old {

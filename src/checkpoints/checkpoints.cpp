@@ -54,7 +54,7 @@ namespace cryptonote
     if (result) MINFO   ("CHECKPOINT PASSED FOR HEIGHT " << height << " " << block_hash);
     else        MWARNING("CHECKPOINT FAILED FOR HEIGHT " << height << ". EXPECTED HASH " << block_hash << "GIVEN HASH: " << hash);
     return result;
-  }
+  };
 
   height_to_hash const HARDCODED_MAINNET_CHECKPOINTS[] =
   {

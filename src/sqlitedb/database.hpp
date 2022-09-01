@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <optional>
+#include <string_view>
 
 #include "common/fs.h"
 
@@ -182,13 +183,13 @@ namespace db
   // Storage database class.
   class Database
   {
-    public:
+   public:
     // This must be declared *before* the prepared statements container,
     // so that it is destroyed *after* because sqlite_close() fails if any
     // prepared statements are not finalized.
     SQLite::Database db;
 
-    private:
+   private:
     // SQLiteCpp's statements are not thread-safe, so we prepare them thread-locally when needed
     std::unordered_map<std::thread::id, std::unordered_map<std::string, SQLite::Statement>>
         prepared_sts;

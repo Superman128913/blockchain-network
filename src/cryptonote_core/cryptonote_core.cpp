@@ -380,7 +380,7 @@ namespace cryptonote
 
       bool args_okay = true;
       if (m_quorumnet_port == 0) {
-        MERROR("Quorumnet port cannot be 0; please specify a valid port to listen on with: '--" << arg_quorumnet_port.name << " <port>'");
+        MFATAL("Quorumnet port cannot be 0; please specify a valid port to listen on with: '--" << arg_quorumnet_port.name << " <port>'");
         args_okay = false;
       }
 
@@ -388,7 +388,7 @@ namespace cryptonote
       if (pub_ip.size())
       {
         if (!epee::string_tools::get_ip_int32_from_string(m_sn_public_ip, pub_ip)) {
-          MERROR("Unable to parse IPv4 public address from: " << pub_ip);
+          MFATAL("Unable to parse IPv4 public address from: " << pub_ip);
           args_okay = false;
         }
 
@@ -396,19 +396,19 @@ namespace cryptonote
           if (m_service_node_list.debug_allow_local_ips) {
             MWARNING("Address given for public-ip is not public; allowing it because dev-allow-local-ips was specified. This service node WILL NOT WORK ON THE PUBLIC OXEN NETWORK!");
           } else {
-            MERROR("Address given for public-ip is not public: " << epee::string_tools::get_ip_string_from_int32(m_sn_public_ip));
+            MFATAL("Address given for public-ip is not public: " << epee::string_tools::get_ip_string_from_int32(m_sn_public_ip));
             args_okay = false;
           }
         }
       }
       else
       {
-        MERROR("Please specify an IPv4 public address which the service node & storage server is accessible from with: '--" << arg_public_ip.name << " <ip address>'");
+        MFATAL("Please specify an IPv4 public address which the service node & storage server is accessible from with: '--" << arg_public_ip.name << " <ip address>'");
         args_okay = false;
       }
 
       if (!args_okay) {
-        MERROR("IMPORTANT: One or more required service node-related configuration settings/options were omitted or invalid; "
+        MFATAL("IMPORTANT: One or more required service node-related configuration settings/options were omitted or invalid; "
                 << "please fix them and restart oxend.");
         return false;
       }
@@ -422,9 +422,11 @@ namespace cryptonote
     return m_blockchain_storage.get_current_blockchain_height();
   }
   //-----------------------------------------------------------------------------------------------
-  void core::get_blockchain_top(uint64_t& height, crypto::hash& top_id) const
+  std::pair<uint64_t, crypto::hash> core::get_blockchain_top() const
   {
-    top_id = m_blockchain_storage.get_tail_id(height);
+    std::pair<uint64_t, crypto::hash> result;
+    result.second = m_blockchain_storage.get_tail_id(result.first);
+    return result;
   }
   //-----------------------------------------------------------------------------------------------
   bool core::get_blocks(uint64_t start_offset, size_t count, std::vector<std::pair<std::string,block>>& blocks, std::vector<std::string>& txs) const
@@ -442,17 +444,22 @@ namespace cryptonote
     return m_blockchain_storage.get_blocks_only(start_offset, count, blocks);
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::get_transactions(const std::vector<crypto::hash>& txs_ids, std::vector<std::string>& txs, std::vector<crypto::hash>& missed_txs) const
+  bool core::get_blocks(const std::vector<crypto::hash>& block_ids, std::vector<std::pair<std::string, block>> blocks, std::unordered_set<crypto::hash>* missed_bs) const
+  {
+    return m_blockchain_storage.get_blocks(block_ids, blocks, missed_bs);
+  }
+  //-----------------------------------------------------------------------------------------------
+  bool core::get_transactions(const std::vector<crypto::hash>& txs_ids, std::vector<std::string>& txs, std::unordered_set<crypto::hash>* missed_txs) const
   {
     return m_blockchain_storage.get_transactions_blobs(txs_ids, txs, missed_txs);
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::get_split_transactions_blobs(const std::vector<crypto::hash>& txs_ids, std::vector<std::tuple<crypto::hash, std::string, crypto::hash, std::string>>& txs, std::vector<crypto::hash>& missed_txs) const
+  bool core::get_split_transactions_blobs(const std::vector<crypto::hash>& txs_ids, std::vector<std::tuple<crypto::hash, std::string, crypto::hash, std::string>>& txs, std::unordered_set<crypto::hash>* missed_txs) const
   {
     return m_blockchain_storage.get_split_transactions_blobs(txs_ids, txs, missed_txs);
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::get_transactions(const std::vector<crypto::hash>& txs_ids, std::vector<transaction>& txs, std::vector<crypto::hash>& missed_txs) const
+  bool core::get_transactions(const std::vector<crypto::hash>& txs_ids, std::vector<transaction>& txs, std::unordered_set<crypto::hash>* missed_txs) const
   {
     return m_blockchain_storage.get_transactions(txs_ids, txs, missed_txs);
   }
@@ -582,7 +589,7 @@ namespace cryptonote
     // make sure the data directory exists, and try to lock it
     if (std::error_code ec; !fs::is_directory(folder, ec) && !fs::create_directories(folder, ec) && ec)
     {
-      MERROR("Failed to create directory " + folder.u8string() + (ec ? ": " + ec.message() : ""s));
+      MFATAL("Failed to create directory " + folder.u8string() + (ec ? ": " + ec.message() : ""s));
       return false;
     }
 
@@ -617,7 +624,7 @@ namespace cryptonote
       // reset the db by removing the database file before opening it
       if (!db->remove_data_file(folder))
       {
-        MERROR("Failed to remove data file in " << folder);
+        MFATAL("Failed to remove data file in " << folder);
         return false;
       }
       fs::remove(ons_db_file_path);
@@ -853,7 +860,7 @@ namespace cryptonote
       try {
         generate_pair(privkey, pubkey);
       } catch (const std::exception& e) {
-        MERROR("failed to generate keypair " << e.what());
+        MFATAL("failed to generate keypair " << e.what());
         return false;
       }
 
@@ -1653,9 +1660,7 @@ namespace cryptonote
               m_sn_times.add(entry);
 
               // Counts the number of times we have been out of sync
-              uint8_t num_sn_out_of_sync = std::count_if(m_sn_times.begin(), m_sn_times.end(),
-                [](const service_nodes::timesync_entry entry) { return !entry.in_sync; });
-              if (num_sn_out_of_sync > (m_sn_times.array.size() * service_nodes::MAXIMUM_EXTERNAL_OUT_OF_SYNC/100)) {
+              if (m_sn_times.failures() > (m_sn_times.size() * service_nodes::MAXIMUM_EXTERNAL_OUT_OF_SYNC/100)) {
                 MWARNING("service node time might be out of sync");
                 // If we are out of sync record the other service node as in sync
                 m_service_node_list.record_timesync_status(pubkey, true);
@@ -1778,9 +1783,8 @@ namespace cryptonote
       [this, &cache_to, &result, &cache_build_started](uint64_t height, const crypto::hash& hash, const block& b){
       auto& [emission_amount, total_fee_amount, burnt_oxen] = *result;
       std::vector<transaction> txs;
-      std::vector<crypto::hash> missed_txs;
       auto coinbase_amount = static_cast<int64_t>(get_outs_money_amount(b.miner_tx));
-      get_transactions(b.tx_hashes, txs, missed_txs);
+      get_transactions(b.tx_hashes, txs);
       int64_t tx_fee_amount = 0;
       for(const auto& tx: txs)
       {
@@ -2078,9 +2082,9 @@ namespace cryptonote
     }
     else if(bvc.m_added_to_main_chain)
     {
-      std::vector<crypto::hash> missed_txs;
+      std::unordered_set<crypto::hash> missed_txs;
       std::vector<std::string> txs;
-      m_blockchain_storage.get_transactions_blobs(b.tx_hashes, txs, missed_txs);
+      m_blockchain_storage.get_transactions_blobs(b.tx_hashes, txs, &missed_txs);
       if(missed_txs.size() &&  m_blockchain_storage.get_block_id_by_height(get_block_height(b)) != get_block_hash(b))
       {
         LOG_PRINT_L1("Block found but, seems that reorganize just happened after that, do not relay this block");

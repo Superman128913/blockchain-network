@@ -9,7 +9,7 @@
 #include "cryptonote_core/cryptonote_core.h"
 #include "epee/net/jsonrpc_structs.h"
 #include "rpc/core_rpc_server_commands_defs.h"
-#include "rpc/rpc_args.h"
+#include "rpc/common/rpc_args.h"
 #include "version.h"
 
 #undef OXEN_DEFAULT_LOG_CATEGORY
@@ -168,6 +168,7 @@ namespace cryptonote::rpc {
       error_response(*res, HTTP_FORBIDDEN);
     };
 
+    //note: rpc_commands is a pseudo-global in core_rpc_server.h
     for (auto& [name, call] : rpc_commands) {
       if (call->is_legacy || call->is_binary) {
         if (!call->is_public && m_restricted)
@@ -207,7 +208,7 @@ namespace cryptonote::rpc {
     bool aborted{false};
     bool replied{false};
     bool jsonrpc{false};
-    std::string jsonrpc_id; // pre-formatted json value
+    nlohmann::json jsonrpc_id{nullptr};
     std::vector<std::pair<std::string, std::string>> extra_headers; // Extra headers to send
 
     // If we have to drop the request because we are overloaded we want to reply with an error (so
@@ -217,7 +218,7 @@ namespace cryptonote::rpc {
       if (replied || aborted) return;
       http.loop_defer([&http=http, &res=res, jsonrpc=jsonrpc] {
         if (jsonrpc)
-          http.jsonrpc_error_response(res, -32003, "Server busy, try again later");
+          http.jsonrpc_error_response(res, -32003, "Server busy, try again later", nullptr);
         else
           http.error_response(res, http_server::HTTP_SERVICE_UNAVAILABLE, "Server busy, try again later");
       });
@@ -245,9 +246,8 @@ namespace cryptonote::rpc {
     }
   };
 
-  // Queues a response for the HTTP thread to handle; the response can be in multiple string pieces
-  // to be concatenated together.
-  void queue_response(std::shared_ptr<call_data> data, std::vector<std::string> body)
+  // Queues a response for the HTTP thread to handle
+  void queue_response(std::shared_ptr<call_data> data, std::string body)
   {
     auto& http = data->http;
     data->replied = true;
@@ -261,22 +261,10 @@ namespace cryptonote::rpc {
         if (data->http.closing()) res.writeHeader("Connection", "close");
         for (const auto& [name, value] : data->extra_headers)
           res.writeHeader(name, value);
-
-        for (const auto& piece : body)
-          res.write(piece);
-
-        res.end();
+        res.end(body);
         if (data->http.closing()) res.close();
       });
     });
-  }
-
-  // Wrapper around the above that takes a single string
-  void queue_response(std::shared_ptr<call_data> data, std::string body)
-  {
-    std::vector<std::string> b;
-    b.push_back(std::move(body));
-    queue_response(std::move(data), std::move(b));
   }
 
   void invoke_txpool_hashes_bin(std::shared_ptr<call_data> data);
@@ -297,21 +285,20 @@ namespace cryptonote::rpc {
     if (time_logging)
       start = std::chrono::steady_clock::now();
 
-    std::vector<std::string> result;
-    result.reserve(data.jsonrpc ? 3 : 1);
-    if (data.jsonrpc)
-    {
-      result.emplace_back(R"({"jsonrpc":"2.0","id":)");
-      result.back() += data.jsonrpc_id;
-      result.back() += R"(,"result":)";
-    }
-
     int json_error = -32603;
     std::string json_message = "Internal error";
     std::string http_message;
 
+    std::string result;
     try {
-      result.push_back(data.call->invoke(std::move(data.request), data.core_rpc));
+      auto r = data.call->invoke(std::move(data.request), data.core_rpc);
+      if (data.jsonrpc)
+        result = nlohmann::json{{"jsonrpc", "2.0"}, {"id", data.jsonrpc_id}, {"result", var::get<nlohmann::json>(std::move(r))}}.dump();
+      else if (auto* json = std::get_if<nlohmann::json>(&r))
+        result = json->dump();
+      else
+        result = var::get<std::string>(std::move(r));
+      // And throw if we get back a bt_value because we don't accept that at all
       json_error = 0;
     } catch (const parse_error& e) {
       // This isn't really WARNable as it's the client fault; log at info level instead.
@@ -333,24 +320,18 @@ namespace cryptonote::rpc {
     if (json_error != 0) {
       data.http.loop_defer([data=std::move(dataptr), json_error, msg=std::move(data.jsonrpc ? json_message : http_message)] {
         if (data->jsonrpc)
-          data->jsonrpc_error_response(data->res, json_error, msg);
+          data->jsonrpc_error_response(data->res, json_error, msg, data->jsonrpc_id);
         else
           data->error_response(data->res, http_server::HTTP_ERROR, msg.empty() ? std::nullopt : std::make_optional<std::string_view>(msg));
       });
       return;
     }
 
-    if (data.jsonrpc)
-      result.emplace_back("}\n");
-
     std::string call_duration;
     if (time_logging)
       call_duration = " in " + tools::friendly_duration(std::chrono::steady_clock::now() - start);
-    if (LOG_ENABLED(Info)) {
-      size_t bytes = 0;
-      for (const auto& r : result) bytes += r.size();
-      MINFO("HTTP RPC " << data.uri << " [" << data.request.context.remote << "] OK (" << bytes << " bytes)" << call_duration);
-    }
+    if (LOG_ENABLED(Info))
+      MINFO("HTTP RPC " << data.uri << " [" << data.request.context.remote << "] OK (" << result.size() << " bytes)" << call_duration);
 
     queue_response(std::move(dataptr), std::move(result));
   }
@@ -521,51 +502,44 @@ namespace cryptonote::rpc {
       else
         body = (buffer += d);
 
-      auto& [ps, st_entry] = var::get<jsonrpc_params>(data->request.body = jsonrpc_params{});
-      if(!ps.load_from_json(body))
-        return data->jsonrpc_error_response(data->res, -32700, "Parse error");
+      nlohmann::json jsonrpc;
+      try {
+        jsonrpc = nlohmann::json::parse(body);
+      } catch (const std::exception& e) {
+        return data->jsonrpc_error_response(data->res, -32700, "Parse error", nullptr);
+      }
 
-      epee::serialization::storage_entry id{std::string{}};
-      ps.get_value("id", id, nullptr);
-
-      std::string method;
-      if(!ps.get_value("method", method, nullptr))
-      {
+      data->jsonrpc_id = std::move(jsonrpc["id"]);
+      const std::string* method;
+      try {
+        method = &jsonrpc["method"].get_ref<const std::string&>();
+      } catch (const std::exception& e) {
         MINFO("Invalid JSON RPC request from " << data->request.context.remote << ": no 'method' in request");
-        return data->jsonrpc_error_response(data->res, -32600, "Invalid Request", id);
+        return data->jsonrpc_error_response(data->res, -32600, "Invalid Request", data->jsonrpc_id);
       }
 
-      auto it = rpc_commands.find(method);
-      if (it == rpc_commands.end() || it->second->is_binary)
-      {
-        MINFO("Invalid JSON RPC request from " << data->request.context.remote << ": method '" << method << "' is invalid");
-        return data->jsonrpc_error_response(data->res, -32601, "Method not found", id);
+      if (auto it = rpc_commands.find(*method);
+          it != rpc_commands.end() && !it->second->is_binary)
+        data->call = it->second.get();
+      else {
+        MINFO("Invalid JSON RPC request from " << data->request.context.remote << ": method '" << *method << "' is invalid");
+        return data->jsonrpc_error_response(data->res, -32601, "Method not found", data->jsonrpc_id);
       }
 
-      data->call = it->second.get();
       if (restricted && !data->call->is_public)
       {
-        MWARNING("Invalid JSON RPC request from " << data->request.context.remote << ": method '" << method << "' is restricted");
-        return data->jsonrpc_error_response(data->res, 403, "Forbidden; this command is not available over public RPC", id);
+        MWARNING("Invalid JSON RPC request from " << data->request.context.remote << ": method '" << *method << "' is restricted");
+        return data->jsonrpc_error_response(data->res, 403, "Forbidden; this command is not available over public RPC", data->jsonrpc_id);
       }
 
-      MDEBUG("Incoming JSON RPC request for " << method << " from " << data->request.context.remote);
+      MDEBUG("Incoming JSON RPC request for " << *method << " from " << data->request.context.remote);
 
-      {
-        std::ostringstream o;
-        epee::serialization::dump_as_json(o, id, 0 /*indent*/, false /*newlines*/);
-        data->jsonrpc_id = o.str();
-      }
-
-      // Try to load "params" into a generic epee value; if it fails (because there is no "params")
-      // then we replace request.body with an empty string (instead of the epee jsonrpc_params
-      // alternative) to signal that no params were provided at all.
-      if (!ps.get_value("params", st_entry, nullptr))
-        data->request.body = ""sv;
+      if (auto it = jsonrpc.find("params"); it != jsonrpc.end())
+        data->request.body = *it;
 
       auto& omq = data->core_rpc.get_core().get_omq();
       std::string cat{data->call->is_public ? "rpc" : "admin"};
-      std::string cmd{"jsonrpc:" + method}; // Used for LMQ job logging; prefixed with jsonrpc: so we can distinguish it
+      std::string cmd{"jsonrpc:" + *method}; // Used for LMQ job logging; prefixed with jsonrpc: so we can distinguish it
       std::string remote{data->request.context.remote};
       omq.inject_task(std::move(cat), std::move(cmd), std::move(remote), [data=std::move(data)] { invoke_rpc(std::move(data)); });
     });

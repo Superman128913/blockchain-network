@@ -66,6 +66,8 @@ target_link_libraries(common
     oxenmq::oxenmq
     filesystem
     fmt::fmt
+    date::date
+    fmt::fmt
   PRIVATE
     sodium
     extra)

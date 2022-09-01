@@ -1,0 +1,28 @@
+add_library(wallet3
+  db_schema.cpp
+  default_daemon_comms.cpp
+  keyring.cpp
+  transaction_constructor.cpp
+  transaction_scanner.cpp
+  pending_transaction.cpp
+  output_selection/output_selection.cpp
+  decoy_selection/decoy_selection.cpp
+  wallet.cpp
+  wallet2½.cpp
+  rpc/command_parser.cpp
+  rpc/request_handler.cpp
+  rpc/omq_server.cpp)
+
+target_link_libraries(wallet3
+  PUBLIC
+    rpc_common
+    common
+    nlohmann_json::nlohmann_json
+    oxenmq::oxenmq
+  PRIVATE
+    cryptonote_protocol
+    cryptonote_basic
+    cryptonote_core
+    extra
+    mnemonics
+    SQLiteCpp)

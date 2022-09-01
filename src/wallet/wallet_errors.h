@@ -845,6 +845,14 @@ namespace tools
       }
     };
     //----------------------------------------------------------------------------------------------------
+    struct get_accrued_batched_earnings_error : public wallet_rpc_error
+    {
+      explicit get_accrued_batched_earnings_error(std::string&& loc, const std::string& request)
+        : wallet_rpc_error(std::move(loc), "Failed to get accrued batched service node rewards", request)
+      {
+      }
+    };
+    //----------------------------------------------------------------------------------------------------
     struct mms_error : public wallet_logic_error
     {
     protected:

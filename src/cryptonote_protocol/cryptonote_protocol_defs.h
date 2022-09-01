@@ -49,7 +49,7 @@ namespace cryptonote
 #define BC_COMMANDS_POOL_BASE 2000
 
   /************************************************************************/
-  /* P2P connection info, serializable to json                            */
+  /* P2P connection info                                                  */
   /************************************************************************/
   struct connection_info
   {
@@ -62,7 +62,6 @@ namespace cryptonote
     std::string host;
     std::string ip;
     std::string port;
-    uint16_t rpc_port;
 
     std::string peer_id;
 
@@ -81,8 +80,6 @@ namespace cryptonote
 	
 	uint64_t avg_upload;
 	uint64_t current_upload;
-  
-	uint32_t support_flags;
 
 	std::string connection_id;
 
@@ -91,8 +88,6 @@ namespace cryptonote
     uint32_t pruning_seed;
 
     uint8_t address_type;
-
-    KV_MAP_SERIALIZABLE
   };
 
   /************************************************************************/

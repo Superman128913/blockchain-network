@@ -56,7 +56,6 @@ extern "C" {
 #include "common/random.h"
 #include "common/lock.h"
 #include "common/hex.h"
-#include "epee/misc_os_dependent.h"
 #include "blockchain.h"
 #include "service_node_quorum_cop.h"
 
@@ -66,6 +65,8 @@ extern "C" {
 #include "service_node_rules.h"
 #include "service_node_swarm.h"
 #include "version.h"
+
+#include <date/date.h>
 
 #undef OXEN_DEFAULT_LOG_CATEGORY
 #define OXEN_DEFAULT_LOG_CATEGORY "service_nodes"
@@ -3382,57 +3383,29 @@ namespace service_nodes
   void service_node_list::record_checkpoint_participation(crypto::public_key const &pubkey, uint64_t height, bool participated)
   {
     std::lock_guard lock(m_sn_mutex);
-    if (!m_state.service_nodes_infos.count(pubkey))
-      return;
-
-    participation_entry entry  = {};
-    entry.height               = height;
-    entry.voted                = participated;
-
-    auto &info = proofs[pubkey];
-    info.checkpoint_participation.add(entry);
+    if (m_state.service_nodes_infos.count(pubkey))
+      proofs[pubkey].checkpoint_participation.add({height, participated});
   }
 
   void service_node_list::record_pulse_participation(crypto::public_key const &pubkey, uint64_t height, uint8_t round, bool participated)
   {
     std::lock_guard lock(m_sn_mutex);
-    if (!m_state.service_nodes_infos.count(pubkey))
-      return;
-
-    participation_entry entry  = {};
-    entry.is_pulse             = true;
-    entry.height               = height;
-    entry.voted                = participated;
-    entry.pulse.round          = round;
-
-    auto &info = proofs[pubkey];
-    info.pulse_participation.add(entry);
+    if (m_state.service_nodes_infos.count(pubkey))
+      proofs[pubkey].pulse_participation.add({height, round, participated});
   }
 
   void service_node_list::record_timestamp_participation(crypto::public_key const &pubkey, bool participated)
   {
     std::lock_guard lock(m_sn_mutex);
-    if (!m_state.service_nodes_infos.count(pubkey))
-      return;
-
-    timestamp_participation_entry entry  = {};
-    entry.participated                = participated;
-
-    auto &info = proofs[pubkey];
-    info.timestamp_participation.add(entry);
+    if (m_state.service_nodes_infos.count(pubkey))
+      proofs[pubkey].timestamp_participation.add({participated});
   }
 
   void service_node_list::record_timesync_status(crypto::public_key const &pubkey, bool synced)
   {
     std::lock_guard lock(m_sn_mutex);
-    if (!m_state.service_nodes_infos.count(pubkey))
-      return;
-
-    timesync_entry entry  = {};
-    entry.in_sync                = synced;
-
-    auto &info = proofs[pubkey];
-    info.timesync_status.add(entry);
+    if (m_state.service_nodes_infos.count(pubkey))
+      proofs[pubkey].timesync_status.add({synced});
   }
 
   std::optional<bool> proof_info::reachable_stats::reachable(const std::chrono::steady_clock::time_point& now) const {
@@ -3958,17 +3931,6 @@ namespace service_nodes
             reg.hf,
             tools::type_to_hex(reg.service_node_pubkey),
             tools::type_to_hex(reg.signature));
-
-    if (make_friendly && reg.uses_portions)
-    {
-      std::tm tm;
-      epee::misc_utils::get_gmt_time(reg.hf, tm);
-
-      cmd += "\n\n";
-      cmd += fmt::format(tr("This registration expires at {:%Y-%m-%d %I:%M:%S %p} UTC.\n"), tm);
-      cmd += tr("This should be about 2 weeks from now; if it isn't, check this computer's clock.\n");
-      cmd += tr("Please submit your registration into the blockchain before this time or it will be invalid.");
-    }
 
     return true;
   }
