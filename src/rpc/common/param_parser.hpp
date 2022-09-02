@@ -165,7 +165,7 @@ namespace cryptonote::rpc {
   // nlohmann::json objects are backed by an *ordered* map and so both nlohmann iterators and
   // bt_dict_consumer behave analogously here).
   template <typename In, typename T>
-  void get_next_value(In& in, std::string_view name, T& val) {
+  void get_next_value(In& in, [[maybe_unused]]std::string_view name, T& val) {
     if constexpr (std::is_same_v<std::monostate, In>)
       ;
     else if (skip_until(in, name)) {

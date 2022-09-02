@@ -219,15 +219,15 @@ void wallet_tools::gen_block_data(block_tracker &bt, const cryptonote::block *bl
   parsed_block.block = *bl;
   parsed_block.txes.reserve(bl->tx_hashes.size());
 
-  auto & o_indices = parsed_block.o_indices.indices;
-  o_indices.reserve(bl->tx_hashes.size() + 1);
+  auto& o_indices = parsed_block.o_indices["indices"];
 
   size_t cur = 0;
   for (const transaction *tx : vtx){
     cur += 1;
     o_indices.emplace_back();
     bt.process(bl, tx, cur - 1);
-    bt.global_indices(tx, o_indices.back().indices);
+    std::vector<uint64_t> indices = o_indices.back()["indices"];
+    bt.global_indices(tx, indices);
 
     if (cur > 1)  // miner not included
       parsed_block.txes.push_back(*tx);

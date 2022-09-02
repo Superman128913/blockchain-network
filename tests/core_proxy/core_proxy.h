@@ -77,7 +77,7 @@ namespace tests
     bool deinit(){return true;}
     bool get_short_chain_history(std::list<crypto::hash>& ids);
     bool have_block(const crypto::hash& id);
-    void get_blockchain_top(uint64_t& height, crypto::hash& top_id);
+    std::pair<uint64_t, crypto::hash> get_blockchain_top();
     bool handle_incoming_tx(const std::string& tx_blob, cryptonote::tx_verification_context& tvc, const cryptonote::tx_pool_options &opts);
     std::vector<cryptonote::tx_verification_batch_info> parse_incoming_txs(const std::vector<std::string>& tx_blobs, const cryptonote::tx_pool_options &opts);
     bool handle_parsed_txs(std::vector<cryptonote::tx_verification_batch_info> &parsed_txs, const cryptonote::tx_pool_options &opts, uint64_t *blink_rollback_height = nullptr);
@@ -102,7 +102,7 @@ namespace tests
     virtual crypto::hash on_transaction_relayed(const std::string& tx) { return crypto::null_hash; }
     cryptonote::network_type get_nettype() const { return cryptonote::network_type::MAINNET; }
     bool get_blocks(uint64_t start_offset, size_t count, std::vector<std::pair<std::string, cryptonote::block>>& blocks, std::vector<std::string>& txs) const { return false; }
-    bool get_transactions(const std::vector<crypto::hash>& txs_ids, std::vector<cryptonote::transaction>& txs, std::vector<crypto::hash>& missed_txs) const { return false; }
+    bool get_transactions(const std::vector<crypto::hash>& txs_ids, std::vector<cryptonote::transaction>& txs, std::unordered_set<crypto::hash>* missed_txs = nullptr) const { return false; }
     bool get_block_by_hash(const crypto::hash &h, cryptonote::block &blk, bool *orphan = NULL) const { return false; }
     uint8_t get_ideal_hard_fork_version() const { return 0; }
     uint8_t get_ideal_hard_fork_version(uint64_t height) const { return 0; }
