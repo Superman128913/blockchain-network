@@ -86,6 +86,7 @@ namespace cryptonote
   private:
     bool worker_thread(uint32_t index, bool slow_mining = false);
     bool request_block_template();
+    void update_hashrate();
 
     struct miner_config
     {
@@ -116,20 +117,14 @@ namespace cryptonote
     get_block_hash_t m_gbh;
     account_public_address m_mine_address;
     tools::periodic_task m_update_block_template_interval{5s};
-    tools::periodic_task m_update_merge_hr_interval{2s};
-    tools::periodic_task m_autodetect_interval{1s};
-    std::vector<std::string> m_extra_messages;
-    miner_config m_config;
-    fs::path m_config_dir;
-    std::atomic<uint64_t> m_last_hr_merge_time;
-    std::atomic<uint64_t> m_hashes;
-    std::atomic<uint64_t> m_total_hashes;
-    std::atomic<uint64_t> m_current_hash_rate;
-    std::mutex m_last_hash_rates_lock;
-    std::list<uint64_t> m_last_hash_rates;
-    bool m_do_print_hashrate;
-    bool m_do_mining;
-    std::vector<std::pair<uint64_t, uint64_t>> m_threads_autodetect;
-    std::atomic<uint64_t> m_block_reward;
+    tools::periodic_task m_update_hashrate_interval{2s};
+
+    mutable std::mutex m_hashrate_mutex;
+    std::optional<std::chrono::steady_clock::time_point> m_last_hr_update;
+    std::atomic<uint64_t> m_hashes = 0;
+    double m_current_hash_rate = 0.0;
+
+    bool m_do_mining = false;
+    std::atomic<uint64_t> m_block_reward = 0;
   };
 }

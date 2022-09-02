@@ -56,7 +56,6 @@ namespace cryptonote
 
   namespace
   {
-    const command_line::arg_descriptor<std::string> arg_extra_messages =  {"extra-messages-file", "Specify file for extra messages to include into coinbase transactions", "", true};
     const command_line::arg_descriptor<std::string> arg_start_mining = {"start-mining", "Specify wallet address to mining for", "", true};
     const command_line::arg_descriptor<uint32_t> arg_mining_threads = {"mining-threads", "Specify mining threads count", 0, true};
   }
@@ -101,13 +100,7 @@ namespace cryptonote
     uint64_t height{};
     uint64_t expected_reward; //only used for RPC calls - could possibly be useful here too?
 
-    std::string extra_nonce;
-    if(m_extra_messages.size() && m_config.current_extra_message_index < m_extra_messages.size())
-    {
-      extra_nonce = m_extra_messages[m_config.current_extra_message_index];
-    }
-
-    if(!m_phandler->create_next_miner_block_template(bl, m_mine_address, di, height, expected_reward, extra_nonce))
+    if(!m_phandler->create_next_miner_block_template(bl, m_mine_address, di, height, expected_reward, ""s))
     {
       LOG_ERROR("Failed to get_block_template(), stopping mining");
       return false;
@@ -123,53 +116,32 @@ namespace cryptonote
       return true;
     });
 
+    m_update_hashrate_interval.do_call([&](){
+      update_hashrate();
+      return true;
+    });
+
     return true;
+  }
+  //-----------------------------------------------------------------------------------------------------
+  void miner::update_hashrate()
+  {
+    std::unique_lock lock{m_hashrate_mutex};
+    auto hashes = m_hashes.exchange(0);
+    using dseconds = std::chrono::duration<double>;
+    if (m_last_hr_update && is_mining())
+      m_current_hash_rate = hashes / dseconds{std::chrono::steady_clock::now() - *m_last_hr_update}.count();
+    m_last_hr_update = std::chrono::steady_clock::now();
   }
   //-----------------------------------------------------------------------------------------------------
   void miner::init_options(boost::program_options::options_description& desc)
   {
-    command_line::add_arg(desc, arg_extra_messages);
     command_line::add_arg(desc, arg_start_mining);
     command_line::add_arg(desc, arg_mining_threads);
   }
   //-----------------------------------------------------------------------------------------------------
   bool miner::init(const boost::program_options::variables_map& vm, network_type nettype)
   {
-    if(command_line::has_arg(vm, arg_extra_messages))
-    {
-      std::string buff;
-      bool r = tools::slurp_file(fs::u8path(command_line::get_arg(vm, arg_extra_messages)), buff);
-      CHECK_AND_ASSERT_MES(r, false, "Failed to load file with extra messages: " << command_line::get_arg(vm, arg_extra_messages));
-      auto extra_vec = tools::split_any(buff, "\n"sv, true);
-      m_extra_messages.resize(extra_vec.size());
-      for(size_t i = 0; i != extra_vec.size(); i++)
-      {
-        tools::trim(extra_vec[i]);
-        if(!extra_vec[i].size())
-          continue;
-        if (!oxenc::is_base64(extra_vec[i]))
-        {
-          MWARNING("Invalid (non-base64) extra message `" << extra_vec[i] << "'");
-          continue;
-        }
-
-        std::string buff = oxenc::from_base64(extra_vec[i]);
-        if(buff != "0")
-          m_extra_messages[i] = buff;
-      }
-      m_config_dir = fs::u8path(command_line::get_arg(vm, arg_extra_messages)).parent_path();
-      m_config = {};
-      fs::path filename = m_config_dir / MINER_CONFIG_FILE_NAME;
-      if (std::string contents;
-          !tools::slurp_file(filename, contents) ||
-          !epee::serialization::load_t_from_json(m_config, contents))
-      {
-        MERROR("Failed to load data from " << filename);
-        return false;
-      }
-      MINFO("Loaded " << m_extra_messages.size() << " extra messages, current index " << m_config.current_extra_message_index);
-    }
-
     if(command_line::has_arg(vm, arg_start_mining))
     {
       address_parse_info info;
@@ -240,6 +212,7 @@ namespace cryptonote
   double miner::get_speed() const
   {
     if (is_mining()) {
+      std::unique_lock lock{m_hashrate_mutex};
       return m_current_hash_rate;
     }
     return 0.0;
