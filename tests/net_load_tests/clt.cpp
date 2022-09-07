@@ -240,7 +240,7 @@ namespace
       test_levin_commands_handler &commands_handler = *commands_handler_ptr;
       test_tcp_server tcp_server(epee::net_utils::e_connection_type_RPC);
       tcp_server.get_config_object().set_handler(commands_handler_ptr, [](epee::levin::levin_commands_handler<test_connection_context> *handler)->void { delete handler; });
-      tcp_server.get_config_object().m_invoke_timeout = CONNECTION_TIMEOUT;
+      tcp_server.get_config_object().m_invoke_timeout = 1ms * CONNECTION_TIMEOUT;
 
       if (!tcp_server.init_server(clt_port, "127.0.0.1")) return;
       if (!tcp_server.run_server(2, false)) return;

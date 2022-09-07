@@ -219,7 +219,7 @@ namespace wallet
         }, "de");
   }
 
-  DefaultDaemonComms::DefaultDaemonComms(std::shared_ptr<oxenmq::OxenMQ> omq, DaemonCommsConfig& cfg)
+  DefaultDaemonComms::DefaultDaemonComms(std::shared_ptr<oxenmq::OxenMQ> omq, DaemonCommsConfig cfg)
     : omq(omq),
       config(cfg),
       sync_thread(omq->add_tagged_thread("sync"))

@@ -20,7 +20,7 @@ namespace wallet
         crypto::public_key _spend_public_key,
         crypto::secret_key _view_private_key,
         crypto::public_key _view_public_key,
-        cryptonote::network_type _nettype)
+        cryptonote::network_type _nettype = cryptonote::network_type::TESTNET)
         : spend_private_key(_spend_private_key)
         , spend_public_key(_spend_public_key)
         , view_private_key(_view_private_key)

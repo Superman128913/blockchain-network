@@ -15,7 +15,7 @@ namespace wallet
   PendingTransaction
   TransactionConstructor::create_transaction(
       const std::vector<cryptonote::tx_destination_entry>& recipients,
-      cryptonote::tx_destination_entry change_recipient)
+      const cryptonote::tx_destination_entry& change_recipient)
   {
     PendingTransaction new_tx(recipients);
     auto [hf, hf_uint8] = cryptonote::get_ideal_block_version(db->network_type(), db->scan_target_height());
@@ -24,7 +24,7 @@ namespace wallet
     new_tx.tx.type = tx_params.tx_type;
     new_tx.fee_per_byte = fee_per_byte;
     new_tx.fee_per_output = fee_per_output;
-    new_tx.change = std::move(change_recipient);
+    new_tx.change = change_recipient;
     select_inputs_and_finalise(new_tx);
     return new_tx;
   }
