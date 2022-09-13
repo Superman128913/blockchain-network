@@ -299,7 +299,6 @@ if(NOT MANUAL_SUBMODULES)
     endif()
     check_submodule(external/uWebSockets uSockets)
     check_submodule(external/ghc-filesystem)
-    check_submodule(external/SQLiteCpp)
   endif()
 endif()
 
@@ -491,7 +490,6 @@ if(NOT BUILD_STATIC_DEPS)
 endif()
 
 add_subdirectory(external)
-target_compile_definitions(easylogging PRIVATE AUTO_INITIALIZE_EASYLOGGINGPP)
 
 if(USE_DEVICE_TREZOR)
   include(CheckTrezor)

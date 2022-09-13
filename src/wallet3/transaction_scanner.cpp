@@ -9,6 +9,8 @@
 
 namespace wallet
 {
+  static auto logcat = oxen::log::Cat("wallet.wallet3");
+
   std::vector<Output>
   TransactionScanner::scan_received(
       const BlockTX& tx, int64_t height, int64_t timestamp)
@@ -19,9 +21,7 @@ namespace wallet
 
     if (tx_public_keys.empty())
     {
-      LOG_PRINT_L0(
-          "TransactionScanner found no tx public keys in transaction with hash <" << tx.hash
-                                                                                  << ">.");
+      oxen::log::warning(logcat, "TransactionScanner found no tx public keys in transaction with hash <{}>.", tx.hash);
       return {};
     }
     if (tx.tx.vout.size() != tx.global_indices.size())

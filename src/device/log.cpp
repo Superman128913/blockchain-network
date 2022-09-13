@@ -34,23 +34,21 @@
 
 namespace hw {
 
-  #undef OXEN_DEFAULT_LOG_CATEGORY
-  #define OXEN_DEFAULT_LOG_CATEGORY "device"
+  static auto logcat = oxen::log::Cat("device");
 
   void log_hexbuffer(std::string_view msg, const void* buff, size_t len) {
-    MDEBUG(msg << ": " << oxenc::to_hex(std::string_view{reinterpret_cast<const char*>(buff), len}));
+    oxen::log::debug(logcat, "{}: {}", msg, oxenc::to_hex(std::string_view{reinterpret_cast<const char*>(buff), len}));
   }
 
   void log_message(std::string_view msg, std::string_view info) {
-    MDEBUG(msg << ": " << info);
+    oxen::log::debug(logcat, "{}: {}", msg, info);
   }
 
 
   #ifdef WITH_DEVICE_LEDGER    
     namespace ledger {
     
-    #undef OXEN_DEFAULT_LOG_CATEGORY
-    #define OXEN_DEFAULT_LOG_CATEGORY "device.ledger"
+    static auto logcat = oxen::log::Cat("device.ledger");
 
     
     #ifdef DEBUG_HWDEVICE

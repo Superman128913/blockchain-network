@@ -59,9 +59,6 @@
 #include <stack>
 #include <type_traits>
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "daemon"
-
 using namespace cryptonote::rpc;
 using cryptonote::hf;
 
@@ -1937,14 +1934,6 @@ std::string highlight_money(uint64_t amount) {
 
 bool rpc_command_executor::prepare_registration(bool force_registration)
 {
-  // RAII-style class to temporarily clear categories and restore upon destruction (i.e. upon returning).
-  struct clear_log_categories {
-    std::string categories;
-    clear_log_categories() { categories = mlog_get_categories(); mlog_set_categories(""); }
-    ~clear_log_categories() { mlog_set_categories(categories.c_str()); }
-  };
-  auto scoped_log_cats = std::unique_ptr<clear_log_categories>(new clear_log_categories());
-
   auto maybe_info = try_running([this] { return invoke<GET_INFO>(); }, "Failed to retrieve node info");
   if (!maybe_info)
     return false;
@@ -2340,8 +2329,6 @@ The Service Node will not activate until the entire stake has been contributed.
     args.push_back(addr);
     args.push_back(std::to_string(portion));
   }
-
-  scoped_log_cats.reset();
 
   {
     auto maybe_registration = try_running([this, staking_requirement, &args] { return invoke<GET_SERVICE_NODE_REGISTRATION_CMD_RAW>(json{{"staking_requirement", staking_requirement}, {"args", args}, {"make_friendly", true}}); }, "Failed to validate registration arguments; check the addresses and registration parameters and that the Daemon is running with the '--service-node' flag");

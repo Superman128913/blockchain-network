@@ -36,6 +36,7 @@
 #include <chrono>
 #include <exception>
 #include <oxenc/base64.h>
+#include <fmt/std.h>
 
 #include "wallet_rpc_server_error_codes.h"
 #include "wallet_rpc_server.h"
@@ -57,14 +58,13 @@
 #include "cryptonote_core/oxen_name_system.h"
 #include "serialization/boost_std_variant.h"
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "wallet.rpc"
-
 namespace rpc = cryptonote::rpc;
 using namespace tools::wallet_rpc;
 
 namespace
 {
+  static auto logcat = oxen::log::Cat("wallet.rpc");
+  
   constexpr auto DEFAULT_AUTO_REFRESH_PERIOD = 20s;
 
   const command_line::arg_descriptor<uint16_t, true> arg_rpc_bind_port = {"rpc-bind-port", "Sets bind port for server"};
@@ -80,7 +80,7 @@ namespace
     auto pwd_container = tools::password_container::prompt(verify, prompt);
     if (!pwd_container)
     {
-      MERROR("failed to read wallet password");
+      oxen::log::error(logcat, "failed to read wallet password");
     }
     return pwd_container;
   }
@@ -196,7 +196,7 @@ namespace tools
     http.any("/*", [this](HttpResponse* res, HttpRequest* req) {
       if (m_login && !check_auth(*req, *res))
         return;
-      MINFO("Invalid HTTP request for " << req->getMethod() << " " << req->getUrl());
+      oxen::log::info(logcat, "Invalid HTTP request for {} {}", req->getMethod(), req->getUrl());
       error_response(*res, HTTP_NOT_FOUND);
     });
   }
@@ -231,23 +231,23 @@ namespace tools
       std::string method;
       if(!ps.get_value("method", method, nullptr))
       {
-        MINFO("Invalid JSON RPC request from " << get_remote_address(res) << ": no 'method' in request");
+        oxen::log::info(logcat, "Invalid JSON RPC request from {}: no 'method' in request", get_remote_address(res));
         return jsonrpc_error_response(res, -32600, "Invalid Request", id);
       }
 
       auto it = rpc_commands.find(method);
       if (it == rpc_commands.end())
       {
-        MINFO("Invalid JSON RPC request from " << get_remote_address(res) << ": method '" << method << "' is invalid");
+        oxen::log::info(logcat, "Invalid JSON RPC request from {}: method '{}' is invalid", get_remote_address(res), method);
         return jsonrpc_error_response(res, -32601, "Method not found", id);
       }
-      MDEBUG("Incoming JSON RPC request for " << method << " from " << get_remote_address(res));
+      oxen::log::debug(logcat, "Incoming JSON RPC request for {} from {}", method, get_remote_address(res));
 
       const auto& [restricted, invoke_ptr] = it->second;
 
       // If it's a restricted command and we're in restricted mode then deny it
       if (restricted && m_restricted) {
-        MWARNING("JSON RPC request for restricted command " << method << " in restricted mode from " << get_remote_address(res));
+        oxen::log::warning(logcat, "JSON RPC request for restricted command {} in restricted mode from {}", method, get_remote_address(res));
         return jsonrpc_error_response(res, error_code::DENIED, method + " is not available in restricted mode.", {});
       }
 
@@ -400,7 +400,7 @@ namespace tools
           try {
             if (m_wallet) m_wallet->refresh(m_wallet->is_trusted_daemon());
           } catch (const std::exception& ex) {
-            LOG_ERROR("Exception while refreshing: " << ex.what());
+            oxen::log::error(logcat, "Exception while refreshing: {}", ex.what());
           }
 
           m_last_auto_refresh_time = std::chrono::steady_clock::now();
@@ -411,8 +411,8 @@ namespace tools
       std::this_thread::sleep_for(250ms);
     }
 
-    MGINFO("Stopping wallet rpc server");
-    MINFO("Shutting down listening HTTP RPC sockets");
+    oxen::log::info(logcat, "Stopping wallet rpc server");
+    oxen::log::info(logcat, "Shutting down listening HTTP RPC sockets");
     // Stopped: close the sockets, cancel the long poll, and rejoin the threads
     for (auto* s : m_listen_socks)
       us_listen_socket_close(/*ssl=*/false, s);
@@ -420,23 +420,23 @@ namespace tools
 
     stop_long_poll_thread();
 
-    MDEBUG("Joining uws thread");
+    oxen::log::debug(logcat, "Joining uws thread");
     uws_thread.join();
 
-    MGINFO("Storing wallet...");
+    oxen::log::info(logcat, "Storing wallet...");
     if (m_wallet)
       m_wallet->store();
-    MGINFO("Wallet stopped.");
+    oxen::log::info(logcat, "Wallet stopped.");
   }
   void wallet_rpc_server::start_long_poll_thread()
   {
     assert(m_wallet);
     if (m_long_poll_thread.joinable() || m_long_poll_disabled)
     {
-      MDEBUG("Not starting long poll thread: " << (m_long_poll_thread.joinable() ? "already running" : "long polling disabled"));
+      oxen::log::debug(logcat, "Not starting long poll thread: {}", (m_long_poll_thread.joinable() ? "already running" : "long polling disabled"));
       return;
     }
-    MINFO("Starting long poll thread");
+    oxen::log::info(logcat, "Starting long poll thread");
     m_long_poll_thread = std::thread{[this] {
       for (;;)
       {
@@ -464,10 +464,10 @@ namespace tools
     assert(m_wallet);
     if (!m_long_poll_thread.joinable())
     {
-      MDEBUG("Not stopping long poll thread: not running");
+      oxen::log::debug(logcat, "Not stopping long poll thread: not running");
       return;
     }
-    MINFO("Stopping long poll thread");
+    oxen::log::info(logcat, "Stopping long poll thread");
     m_wallet->cancel_long_poll();
     // Store this to revert it afterwards to its original state
     bool disabled_state = m_long_poll_disabled;
@@ -482,14 +482,14 @@ namespace tools
     try {
       rpc_config = cryptonote::rpc_args::process(m_vm);
     } catch (const std::exception& e) {
-      MERROR("Failed to process rpc arguments: " << e.what());
+      oxen::log::error(logcat, "Failed to process rpc arguments: {}", e.what());
       return false;
     }
 
     const uint16_t port = command_line::get_arg(m_vm, arg_rpc_bind_port);
     if (!port)
     {
-      MERROR("Invalid port " << port << " specified");
+      oxen::log::error(logcat, "Invalid port {} specified", port);
       return false;
     }
 
@@ -510,7 +510,7 @@ namespace tools
     {
       if (!command_line::is_arg_defaulted(m_vm, wallet_args::arg_wallet_file()))
       {
-        MERROR(arg_wallet_dir.name << " and " << wallet_args::arg_wallet_file().name << " are incompatible, use only one of them");
+        oxen::log::error(logcat, "{} and {} are incompatible, use only one of them", arg_wallet_dir.name, wallet_args::arg_wallet_file().name);
         return false;
       }
       m_wallet_dir = fs::u8path(command_line::get_arg(m_vm, arg_wallet_dir));
@@ -521,7 +521,7 @@ namespace tools
           fs::permissions(m_wallet_dir, fs::perms::owner_all, ec);
         else if (ec)
         {
-          LOG_ERROR(tr("Failed to create directory ") << m_wallet_dir << ": " << ec.message());
+          oxen::log::error(logcat, "{}{}: {}", tr("Failed to create directory "), m_wallet_dir, ec.message());
           return false;
         }
       }
@@ -532,7 +532,7 @@ namespace tools
       if (rpc_config.login)
       {
         const cryptonote::rpc_args::descriptors arg{};
-        LOG_ERROR(tr("Cannot specify --") << arg_disable_rpc_login.name << tr(" and --") << arg.rpc_login.name);
+        oxen::log::error(logcat, "{}{}{}{}", tr("Cannot specify --"), arg_disable_rpc_login.name, tr(" and --"), arg.rpc_login.name);
         return false;
       }
       m_login = std::nullopt;
@@ -552,7 +552,7 @@ namespace tools
         rpc_login_file = tools::private_file::create(temp);
         if (!rpc_login_file.handle())
         {
-          LOG_ERROR(tr("Failed to create file ") << temp << tr(". Check permissions or remove file"));
+          oxen::log::error(logcat, "{}{}{}", tr("Failed to create file "), temp, tr(". Check permissions or remove file"));
           return false;
         }
         std::fputs(m_login->username.c_str(), rpc_login_file.handle());
@@ -563,10 +563,10 @@ namespace tools
         std::fflush(rpc_login_file.handle());
         if (std::ferror(rpc_login_file.handle()))
         {
-          LOG_ERROR(tr("Error writing to file ") << temp);
+          oxen::log::error(logcat, "{}{}", tr("Error writing to file "), temp);
           return false;
         }
-        LOG_PRINT_L0(tr("RPC username/password is stored in file ") << temp);
+        oxen::log::warning(logcat, "{}{}", tr("RPC username/password is stored in file "), temp);
       }
       else // chosen user/pass
       {
@@ -590,17 +590,17 @@ namespace tools
   {
     if (m_wallet)
     {
-      MDEBUG(tools::wallet_rpc_server::tr("Closing wallet..."));
+      oxen::log::debug(logcat, tools::wallet_rpc_server::tr("Closing wallet..."));
       stop_long_poll_thread();
       if (save_current)
       {
-        MDEBUG(tools::wallet_rpc_server::tr("Saving wallet..."));
+        oxen::log::debug(logcat, tools::wallet_rpc_server::tr("Saving wallet..."));
         m_wallet->store();
-        MINFO(tools::wallet_rpc_server::tr("Wallet saved"));
+        oxen::log::info(logcat, tools::wallet_rpc_server::tr("Wallet saved"));
       }
       m_wallet->deinit();
       m_wallet.reset();
-      MINFO(tools::wallet_rpc_server::tr("Wallet closed"));
+      oxen::log::info(logcat, tools::wallet_rpc_server::tr("Wallet closed"));
     }
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -1040,7 +1040,7 @@ namespace tools
     std::vector<cryptonote::tx_destination_entry> dsts;
     std::vector<uint8_t> extra;
 
-    LOG_PRINT_L3("on_transfer starts");
+    oxen::log::trace(logcat, "on_transfer starts");
     require_open();
 
     // validate the transfer requested and populate dsts & extra
@@ -1087,9 +1087,9 @@ namespace tools
         throw wallet_rpc_error{error_code::HF_QUERY_FAILED, tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
 
       cryptonote::oxen_construct_tx_params tx_params = tools::wallet2::construct_params(*hf_version, cryptonote::txtype::standard, priority);
-      LOG_PRINT_L2("on_transfer_split calling create_transactions_2");
+      oxen::log::debug(logcat, "on_transfer_split calling create_transactions_2");
       std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_2(dsts, cryptonote::TX_OUTPUT_DECOYS, req.unlock_time, priority, extra, req.account_index, req.subaddr_indices, tx_params);
-      LOG_PRINT_L2("on_transfer_split called create_transactions_2");
+      oxen::log::debug(logcat, "on_transfer_split called create_transactions_2");
 
       if (ptx_vector.empty())
         throw wallet_rpc_error{error_code::TX_NOT_POSSIBLE, "No transaction created"};
@@ -2310,7 +2310,7 @@ namespace tools
   AUTO_REFRESH::response wallet_rpc_server::invoke(AUTO_REFRESH::request&& req)
   {
     m_auto_refresh_period = req.enable ? req.period ? std::chrono::seconds{req.period} : DEFAULT_AUTO_REFRESH_PERIOD : 0s;
-    MINFO("Auto refresh now " << (m_auto_refresh_period != 0s ? std::to_string(std::chrono::duration<float>(m_auto_refresh_period).count()) + " seconds" : std::string("disabled")));
+    oxen::log::info(logcat, "Auto refresh now {}", (m_auto_refresh_period != 0s ? std::to_string(std::chrono::duration<float>(m_auto_refresh_period).count()) + " seconds" : std::string("disabled")));
     return {};
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -2491,7 +2491,7 @@ namespace {
     if (m_wallet->verify_password(req.old_password))
     {
       m_wallet->change_password(m_wallet->get_wallet_file(), req.old_password, req.new_password);
-      LOG_PRINT_L0("Wallet password changed.");
+      oxen::log::warning(logcat, "Wallet password changed.");
     }
     else
       throw wallet_rpc_error{error_code::INVALID_PASSWORD, "Invalid original password."};
@@ -2559,7 +2559,7 @@ namespace {
         wal->generate(wallet_file, std::move(rc.second).password(), info.address, viewkey, false);
         res.info = "Watch-only wallet has been generated successfully.";
       }
-      MINFO("Wallet has been generated.\n");
+      oxen::log::info(logcat, "Wallet has been generated.\n");
     }
 
     if (!wal)
@@ -2641,7 +2641,7 @@ namespace {
     wal->set_seed_language(mnemonic_language);
 
     crypto::secret_key recovery_val = wal->generate(wallet_file, std::move(rc.second).password(), recovery_key, true, false, false);
-    MINFO("Wallet has been restored.\n");
+    oxen::log::info(logcat, "Wallet has been restored.\n");
 
     // // Convert the secret key back to seed
     epee::wipeable_string electrum_words;
@@ -2940,15 +2940,16 @@ namespace {
   {
     if (req.level < 0 || req.level > 4)
       throw wallet_rpc_error{error_code::INVALID_LOG_LEVEL, "Error: log level not valid"};
-    mlog_set_log_level(req.level);
+    auto log_level = oxen::logging::parse_level(req.level);
+    if (log_level.has_value())
+      oxen::log::reset_level(*log_level);
     return {};
   }
   //------------------------------------------------------------------------------------------------------------------------------
   SET_LOG_CATEGORIES::response wallet_rpc_server::invoke(SET_LOG_CATEGORIES::request&& req)
   {
-    mlog_set_log(req.categories.c_str());
     SET_LOG_CATEGORIES::response res{};
-    res.categories = mlog_get_categories();
+    oxen::logging::process_categories_string(req.categories.c_str());
     return res;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -3290,7 +3291,7 @@ namespace {
         {
           if (rec["entry_index"].get<size_t>() >= num_entries)
           {
-            MWARNING("Got back invalid entry_index " << rec["entry_index"] << " for a request for " << num_entries << " entries");
+            oxen::log::warning(logcat, "Got back invalid entry_index {} for a request for {} entries", rec["entry_index"], num_entries);
             continue;
           }
 
@@ -3313,7 +3314,7 @@ namespace {
                 && value.decrypt(res_e.name, type))
               res_e.value = value.to_readable_value(nettype, type);
             else
-              MWARNING("Failed to decrypt ONS value for " << res_e.name << (errmsg.empty() ? ""s : ": " + errmsg));
+              oxen::log::warning(logcat, "Failed to decrypt ONS value for {}{}", res_e.name, (errmsg.empty() ? ""s : ": " + errmsg));
           }
         }
       }
@@ -3467,7 +3468,7 @@ namespace {
       if (wallet_file.empty() && from_json.empty())
         throw std::logic_error{tr("Must specify --wallet-file or --generate-from-json or --wallet-dir")};
 
-      LOG_PRINT_L0(tools::wallet_rpc_server::tr("Loading wallet..."));
+      oxen::log::warning(logcat, tools::wallet_rpc_server::tr("Loading wallet..."));
       if(!wallet_file.empty())
         wal = tools::wallet2::make_from_file(m_vm, true, wallet_file, password_prompt).first;
       else
@@ -3487,12 +3488,12 @@ namespace {
       // if we ^C during potentially length load/refresh, there's no server loop yet
       if (quit)
       {
-        MINFO(tools::wallet_rpc_server::tr("Saving wallet..."));
+        oxen::log::info(globallogcat, tools::wallet_rpc_server::tr("Saving wallet..."));
         wal->store();
-        MINFO(tools::wallet_rpc_server::tr("Successfully saved"));
+        oxen::log::info(globallogcat, tools::wallet_rpc_server::tr("Successfully saved"));
         throw std::runtime_error{tr("Wallet loading cancelled before initial refresh completed")};
       }
-      MINFO(tools::wallet_rpc_server::tr("Successfully loaded"));
+      oxen::log::info(globallogcat, tools::wallet_rpc_server::tr("Successfully loaded"));
     }
     return wal;
   }
@@ -3506,7 +3507,7 @@ namespace {
     }
     catch (const std::exception& e)
     {
-      LOG_ERROR(tr("Wallet initialization failed: ") << e.what());
+      oxen::log::error(logcat, "{}{}", tr("Wallet initialization failed: "), e.what());
       return false;
     }
 
@@ -3515,28 +3516,28 @@ namespace {
     bool r = init();
     CHECK_AND_ASSERT_MES(r, false, tools::wallet_rpc_server::tr("Failed to initialize wallet RPC server"));
     tools::signal_handler::install([this](int) {
-      MWARNING("Shutting down...");
+      oxen::log::warning(logcat, "Shutting down...");
       m_stop = true;
     });
 
-    LOG_PRINT_L0(tools::wallet_rpc_server::tr("Starting wallet RPC server"));
+    oxen::log::warning(globallogcat, tools::wallet_rpc_server::tr("Starting wallet RPC server"));
     try
     {
       run_loop();
     }
     catch (const std::exception &e)
     {
-      LOG_ERROR(tools::wallet_rpc_server::tr("Failed to run wallet: ") << e.what());
+      oxen::log::error(logcat, "{}{}", tools::wallet_rpc_server::tr("Failed to run wallet: "), e.what());
       return false;
     }
-    LOG_PRINT_L0(tools::wallet_rpc_server::tr("Stopped wallet RPC server"));
+    oxen::log::warning(globallogcat, tools::wallet_rpc_server::tr("Stopped wallet RPC server"));
     try
     {
       close_wallet(true);
     }
     catch (const std::exception& e)
     {
-      LOG_ERROR(tools::wallet_rpc_server::tr("Failed to save wallet: ") << e.what());
+      oxen::log::error(logcat, "{}{}", tools::wallet_rpc_server::tr("Failed to save wallet: "), e.what());
       return false;
     }
     return true;
@@ -3580,7 +3581,7 @@ int main(int argc, char **argv)
     tools::wallet_rpc_server::tr("This is the RPC oxen wallet. It needs to connect to a oxen\ndaemon to work correctly."),
     desc_params, hidden_params,
     po::positional_options_description(),
-    [](const std::string &s, bool emphasis){ epee::set_console_color(emphasis ? epee::console_color_white : epee::console_color_default, emphasis); std::cout << s << std::endl; if (emphasis) epee::reset_console_color(); },
+    [](const std::string &s){},
     "oxen-wallet-rpc.log",
     true
   );

@@ -61,7 +61,6 @@
 #include "cryptonote_core/service_node_voting.h"
 #include "cryptonote_core/service_node_list.h"
 #include "common/varint.h"
-#include "common/perf_timer.h"
 #include "common/meta.h"
 #include "common/hex.h"
 #include "checkpoints/checkpoints.h"

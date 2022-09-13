@@ -63,15 +63,20 @@ namespace service_nodes
     _count
   };
 
-  inline std::ostream &operator<<(std::ostream &os, quorum_type v) {
-    switch(v)
+  inline std::string to_string(const quorum_type& q)
+  {
+    switch(q)
     {
-      case quorum_type::obligations:   return os << "obligation";
-      case quorum_type::checkpointing: return os << "checkpointing";
-      case quorum_type::blink:         return os << "blink";
-      case quorum_type::pulse:         return os << "pulse";
-      default: assert(false);          return os << "xx_unhandled_type";
+      case quorum_type::obligations:   return "obligation";
+      case quorum_type::checkpointing: return "checkpointing";
+      case quorum_type::blink:         return "blink";
+      case quorum_type::pulse:         return "pulse";
+      default: assert(false);          return "xx_unhandled_type";
     }
+  };
+
+  inline std::ostream &operator<<(std::ostream &os, quorum_type q) {
+    return os << to_string(q);
   }
 
   enum struct quorum_group : uint8_t { invalid, validator, worker, _count };
@@ -171,4 +176,12 @@ namespace service_nodes
     mutable std::recursive_mutex m_lock;
   };
 }; // namespace service_nodes
+   //
+template <>
+struct fmt::formatter<service_nodes::quorum_type> : fmt::formatter<std::string> {
+  auto format(service_nodes::quorum_type quorum, format_context& ctx) {
+    return formatter<std::string>::format(
+        fmt::format("{}", to_string(quorum)), ctx);
+  }
+};
 

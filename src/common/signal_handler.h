@@ -47,7 +47,7 @@ namespace tools {
       }
       else
       {
-        MGINFO_RED("Got control signal " << type << ". Exiting without saving...");
+        oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Got control signal {}. Exiting without saving...", type);
         return FALSE;
       }
       return TRUE;

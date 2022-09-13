@@ -55,15 +55,14 @@
 #include "common/password.h"
 #include "crypto/crypto.h"  // for definition of crypto::secret_key
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "wallet.simplewallet"
-
 /*!
  * \namespace cryptonote
  * \brief Holds cryptonote related classes and helpers.
  */
 namespace cryptonote
 {
+  static auto logcat = oxen::log::Cat("wallet.simplewallet");
+
   enum class Transfer {
     Normal,
     Locked
@@ -398,7 +397,7 @@ namespace cryptonote
         }
         else
         {
-          LOG_ERROR("Failed to get current blockchain height: " << err);
+          oxen::log::error(logcat, "Failed to get current blockchain height: {}", err);
         }
       }
 

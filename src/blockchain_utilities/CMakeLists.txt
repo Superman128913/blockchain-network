@@ -35,6 +35,7 @@ target_link_libraries(blockchain_tools_common_libs INTERFACE
     filesystem
     Boost::program_options
     SQLiteCpp
+    logging
     extra)
 
 

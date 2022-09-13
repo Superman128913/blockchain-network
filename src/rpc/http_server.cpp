@@ -12,10 +12,9 @@
 #include "rpc/common/rpc_args.h"
 #include "version.h"
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "daemon.rpc"
-
 namespace cryptonote::rpc {
+
+  static auto logcat = oxen::log::Cat("daemon.rpc");
 
   const command_line::arg_descriptor<std::vector<std::string>> http_server::arg_rpc_public{
     "rpc-public",
@@ -164,7 +163,7 @@ namespace cryptonote::rpc {
   void http_server::create_rpc_endpoints(uWS::App& http)
   {
     auto access_denied = [this](HttpResponse* res, HttpRequest* req) {
-      MINFO("Forbidden HTTP request for restricted endpoint " << req->getMethod() << " " << req->getUrl());
+      oxen::log::info(logcat, "Forbidden HTTP request for restricted endpoint {} {}", req->getMethod(), req->getUrl());
       error_response(*res, HTTP_FORBIDDEN);
     };
 
@@ -191,7 +190,7 @@ namespace cryptonote::rpc {
     http.any("/*", [this](HttpResponse* res, HttpRequest* req) {
       if (m_login && !check_auth(*req, *res))
         return;
-      MINFO("Invalid HTTP request for " << req->getMethod() << " " << req->getUrl());
+      oxen::log::info(logcat, "Invalid HTTP request for {} {}", req->getMethod(), req->getUrl());
       error_response(*res, HTTP_NOT_FOUND);
     });
   }
@@ -280,7 +279,7 @@ namespace cryptonote::rpc {
     if (std::string_view{data.uri}.substr(1) == rpc::GET_TRANSACTION_POOL_HASHES_BIN::names()[0])
       return invoke_txpool_hashes_bin(std::move(dataptr));
 
-    const bool time_logging = LOG_ENABLED(Debug);
+    const bool time_logging = OXEN_LOG_ENABLED(debug);
     std::chrono::steady_clock::time_point start;
     if (time_logging)
       start = std::chrono::steady_clock::now();
@@ -302,19 +301,19 @@ namespace cryptonote::rpc {
       json_error = 0;
     } catch (const parse_error& e) {
       // This isn't really WARNable as it's the client fault; log at info level instead.
-      MINFO("HTTP RPC request '" << data.uri << "' called with invalid/unparseable data: " << e.what());
+      oxen::log::info(logcat, "HTTP RPC request '{}' called with invalid/unparseable data: {}", data.uri, e.what());
       json_error = -32602;
       http_message = "Unable to parse request: "s + e.what();
       json_message = "Invalid params";
     } catch (const rpc_error& e) {
-      MWARNING("HTTP RPC request '" << data.uri << "' failed with: " << e.what());
+      oxen::log::warning(logcat, "HTTP RPC request '{}' failed with: {}", data.uri, e.what());
       json_error = e.code;
       json_message = e.message;
       http_message = e.message;
     } catch (const std::exception& e) {
-      MWARNING("HTTP RPC request '" << data.uri << "' raised an exception: " << e.what());
+      oxen::log::warning(logcat, "HTTP RPC request '{}' raised an exception: {}", data.uri, e.what());
     } catch (...) {
-      MWARNING("HTTP RPC request '" << data.uri << "' raised an unknown exception");
+      oxen::log::warning(logcat, "HTTP RPC request '{}' raised an unknown exception", data.uri);
     }
 
     if (json_error != 0) {
@@ -330,8 +329,8 @@ namespace cryptonote::rpc {
     std::string call_duration;
     if (time_logging)
       call_duration = " in " + tools::friendly_duration(std::chrono::steady_clock::now() - start);
-    if (LOG_ENABLED(Info))
-      MINFO("HTTP RPC " << data.uri << " [" << data.request.context.remote << "] OK (" << result.size() << " bytes)" << call_duration);
+    if (OXEN_LOG_ENABLED(info))
+      oxen::log::info(logcat, "HTTP RPC {} [{}] OK ({} bytes){}", data.uri, data.request.context.remote, result.size(), call_duration);
 
     queue_response(std::move(dataptr), std::move(result));
   }
@@ -372,12 +371,12 @@ namespace cryptonote::rpc {
       if (req.tx_pool_checksum == checksum) {
         // Hashes match, which means we need to defer this request until later.
         std::lock_guard lock{long_poll_mutex};
-        MTRACE("Deferring long poll request from " << data->request.context.remote << ": long polling requested and remote's checksum matches current pool (" << checksum << ")");
+        oxen::log::trace(logcat, "Deferring long poll request from {}: long polling requested and remote's checksum matches current pool ({})", data->request.context.remote, checksum);
         long_pollers.emplace_back(std::move(data), std::chrono::steady_clock::now() + GET_TRANSACTION_POOL_HASHES_BIN::long_poll_timeout);
         return;
       }
 
-      MTRACE("Ignoring long poll request from " << data->request.context.remote << ": pool hash mismatch (remote: " << req.tx_pool_checksum << ", local: " << checksum << ")");
+      oxen::log::trace(logcat, "Ignoring long poll request from {}: pool hash mismatch (remote: {}, local: {})", data->request.context.remote, req.tx_pool_checksum, checksum);
     }
 
     // Either not a long poll request or checksum didn't match
@@ -391,7 +390,7 @@ namespace cryptonote::rpc {
     if (long_pollers.empty())
       return;
 
-    MDEBUG("TX pool changed; sending tx pool to " << long_pollers.size() << " pending long poll connections");
+    oxen::log::debug(logcat, "TX pool changed; sending tx pool to {} pending long poll connections", long_pollers.size());
 
     std::optional<std::string> body_public, body_admin;
 
@@ -405,7 +404,7 @@ namespace cryptonote::rpc {
         pool.get_transaction_hashes(pool_hashes, data.request.context.admin, true /*include_only_blinked*/);
         body = pool_hashes_response(std::move(pool_hashes));
       }
-      MTRACE("Sending deferred long poll pool update to " << data.request.context.remote);
+      oxen::log::trace(logcat, "Sending deferred long poll pool update to {}", data.request.context.remote);
       queue_response(std::move(dataptr), *body);
     }
     long_pollers.clear();
@@ -434,7 +433,7 @@ namespace cryptonote::rpc {
     {
       if (it->second < now)
       {
-        MTRACE("Sending long poll timeout to " << it->first->request.context.remote);
+        oxen::log::trace(logcat, "Sending long poll timeout to {}", it->first->request.context.remote);
         queue_response(std::move(it->first), long_poll_timeout_body);
         it = long_pollers.erase(it);
         count++;
@@ -444,9 +443,9 @@ namespace cryptonote::rpc {
     }
 
     if (count > 0)
-      MDEBUG("Timed out " << count << " long poll connections");
+      oxen::log::debug(logcat, "Timed out {} long poll connections", count);
     else
-      MTRACE("None of " << long_pollers.size() << " established long poll connections reached timeout");
+      oxen::log::trace(logcat, "None of {} established long poll connections reached timeout", long_pollers.size());
   }
 
   } // anonymous namespace
@@ -463,7 +462,7 @@ namespace cryptonote::rpc {
     request.context.source = rpc_source::http;
     request.context.remote = get_remote_address(res);
     handle_cors(req, data->extra_headers);
-    MTRACE("Received " << req.getMethod() << " " << req.getUrl() << " request from " << request.context.remote);
+    oxen::log::trace(logcat, "Received {} {} request from {}", req.getMethod(), req.getUrl(), request.context.remote);
 
     res.onAborted([data] { data->aborted = true; });
     res.onData([data=std::move(data)](std::string_view d, bool done) mutable {
@@ -514,7 +513,7 @@ namespace cryptonote::rpc {
       try {
         method = &jsonrpc["method"].get_ref<const std::string&>();
       } catch (const std::exception& e) {
-        MINFO("Invalid JSON RPC request from " << data->request.context.remote << ": no 'method' in request");
+        oxen::log::info(logcat, "Invalid JSON RPC request from {}: no 'method' in request", data->request.context.remote);
         return data->jsonrpc_error_response(data->res, -32600, "Invalid Request", data->jsonrpc_id);
       }
 
@@ -522,17 +521,17 @@ namespace cryptonote::rpc {
           it != rpc_commands.end() && !it->second->is_binary)
         data->call = it->second.get();
       else {
-        MINFO("Invalid JSON RPC request from " << data->request.context.remote << ": method '" << *method << "' is invalid");
+        oxen::log::info(logcat, "Invalid JSON RPC request from {}: method '{}' is invalid", data->request.context.remote, *method);
         return data->jsonrpc_error_response(data->res, -32601, "Method not found", data->jsonrpc_id);
       }
 
       if (restricted && !data->call->is_public)
       {
-        MWARNING("Invalid JSON RPC request from " << data->request.context.remote << ": method '" << *method << "' is restricted");
+        oxen::log::warning(logcat, "Invalid JSON RPC request from {}: method '{}' is restricted", data->request.context.remote, *method);
         return data->jsonrpc_error_response(data->res, 403, "Forbidden; this command is not available over public RPC", data->jsonrpc_id);
       }
 
-      MDEBUG("Incoming JSON RPC request for " << *method << " from " << data->request.context.remote);
+      oxen::log::debug(logcat, "Incoming JSON RPC request for {} from {}", *method, data->request.context.remote);
 
       if (auto it = jsonrpc.find("params"); it != jsonrpc.end())
         data->request.body = *it;
@@ -572,7 +571,7 @@ namespace cryptonote::rpc {
 
     if (!m_sent_shutdown)
     {
-      MTRACE("initiating shutdown");
+      oxen::log::trace(logcat, "initiating shutdown");
       if (!m_sent_startup)
       {
         m_startup_promise.set_value(false);
@@ -581,7 +580,7 @@ namespace cryptonote::rpc {
       else if (!m_listen_socks.empty())
       {
         loop_defer([this] {
-          MTRACE("closing " << m_listen_socks.size() << " listening sockets");
+          oxen::log::trace(logcat, "closing {} listening sockets", m_listen_socks.size());
           for (auto* s : m_listen_socks)
             us_listen_socket_close(/*ssl=*/false, s);
           m_listen_socks.clear();
@@ -590,7 +589,7 @@ namespace cryptonote::rpc {
 
           {
             // Destroy any pending long poll connections as well
-            MTRACE("closing pending long poll requests");
+            oxen::log::trace(logcat, "closing pending long poll requests");
             std::lock_guard lock{long_poll_mutex};
             for (auto it = long_pollers.begin(); it != long_pollers.end(); )
             {
@@ -606,10 +605,10 @@ namespace cryptonote::rpc {
       m_sent_shutdown = true;
     }
 
-    MTRACE("joining rpc thread");
+    oxen::log::trace(logcat, "joining rpc thread");
     if (join)
       m_rpc_thread.join();
-    MTRACE("done shutdown");
+    oxen::log::trace(logcat, "done shutdown");
   }
 
   http_server::~http_server()

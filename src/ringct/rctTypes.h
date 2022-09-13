@@ -47,7 +47,6 @@ extern "C" {
 #include "serialization/variant.h"
 #include "common/util.h"
 
-
 //Define this flag when debugging to get additional info on the console
 #ifdef DBG
 #define DP(x) dp(x)
@@ -576,7 +575,6 @@ inline std::ostream &operator <<(std::ostream &o, const rct::key &v) {
   return o << '<' << tools::type_to_hex(v) << '>';
 }
 }
-
 
 namespace std
 {

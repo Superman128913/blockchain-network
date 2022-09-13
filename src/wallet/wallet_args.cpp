@@ -29,19 +29,19 @@
 #include "wallet/wallet_args.h"
 
 #include <boost/format.hpp>
+#include <fstream>
 #include "common/i18n.h"
 #include "common/util.h"
 #include "common/file.h"
 #include "epee/misc_log_ex.h"
 #include "epee/string_tools.h"
 #include "version.h"
+#include "logging/oxen_logger.h"
+#include <fmt/std.h>
 
 #if defined(WIN32)
 #include <crtdbg.h>
 #endif
-
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "wallet.wallet2"
 
 // workaround for a suspected bug in pthread/kernel on MacOS X
 #ifdef __APPLE__
@@ -52,16 +52,17 @@
 
 namespace
 {
+  static auto logcat = oxen::log::Cat("wallet.wallet2");
+
   class Print
   {
   public:
-    Print(const std::function<void(const std::string&, bool)> &p, bool em = false): print(p), emphasis(em) {}
-    ~Print() { print(ss.str(), emphasis); }
+    Print(const std::function<void(const std::string&)> &p): print(p) {}
+    ~Print() { print(ss.str()); }
     template<typename T> std::ostream &operator<<(const T &t) { ss << t; return ss; }
   private:
-    const std::function<void(const std::string&, bool)> &print;
+    const std::function<void(const std::string&)> &print;
     std::stringstream ss;
-    bool emphasis;
   };
 }
 
@@ -89,7 +90,7 @@ namespace wallet_args
     boost::program_options::options_description desc_params,
     boost::program_options::options_description hidden_params,
     const boost::program_options::positional_options_description& positional_options,
-    const std::function<void(const std::string&, bool)> &print,
+    const std::function<void(const std::string&)> &print,
     const char *default_log_name,
     bool log_to_console)
   
@@ -100,8 +101,8 @@ namespace wallet_args
 #endif
 
     const command_line::arg_descriptor<std::string> arg_log_level = {"log-level", "0-4 or categories", ""};
-    const command_line::arg_descriptor<std::size_t> arg_max_log_file_size = {"max-log-file-size", "Specify maximum log file size [B]", MAX_LOG_FILE_SIZE};
-    const command_line::arg_descriptor<std::size_t> arg_max_log_files = {"max-log-files", "Specify maximum number of rotated log files to be saved (no limit by setting to 0)", MAX_LOG_FILES};
+    const command_line::arg_descriptor<std::size_t> arg_max_log_file_size = {"max-log-file-size", "Specify maximum log file size [B]", 50};
+    const command_line::arg_descriptor<std::size_t> arg_max_log_files = {"max-log-files", "Specify maximum number of rotated log files to be saved (no limit by setting to 0)", 50};
     const command_line::arg_descriptor<uint32_t> arg_max_concurrency = {"max-concurrency", wallet_args::tr("Max number of threads to use for a parallel job"), DEFAULT_MAX_CONCURRENCY};
     const command_line::arg_descriptor<std::string> arg_log_file = {"log-file", wallet_args::tr("Specify log file"), ""};
     const command_line::arg_descriptor<std::string> arg_config_file = {"config-file", wallet_args::tr("Config file"), "", true};
@@ -167,7 +168,7 @@ namespace wallet_args
         }
         else
         {
-          MERROR(wallet_args::tr("Can't find config file ") << config);
+          oxen::log::error(logcat, "{}{}", wallet_args::tr("Can't find config file "), config);
           return false;
         }
       }
@@ -185,16 +186,16 @@ namespace wallet_args
     if (!command_line::is_arg_defaulted(vm, arg_log_file))
       log_path = command_line::get_arg(vm, arg_log_file);
     else
-      log_path = mlog_get_default_log_path(default_log_name);
-    mlog_configure(log_path, log_to_console, command_line::get_arg(vm, arg_max_log_file_size), command_line::get_arg(vm, arg_max_log_files));
-    if (!command_line::is_arg_defaulted(vm, arg_log_level))
-    {
-      mlog_set_log(command_line::get_arg(vm, arg_log_level).c_str());
+      log_path = epee::string_tools::get_current_module_name() + ".log";
+    oxen::log::Level log_level;
+    if (auto level = oxen::logging::parse_level(command_line::get_arg(vm, arg_log_level).c_str())) {
+        log_level = *level;
+    } else {
+        std::cerr << "Incorrect log level: " << command_line::get_arg(vm, arg_log_level).c_str() << std::endl;
+        throw std::runtime_error{"Incorrect log level"};
     }
-    else if (!log_to_console)
-    {
-      mlog_set_categories("");
-    }
+
+    oxen::logging::init(log_path, log_level);
 
     if (notice)
       Print(print) << notice << "\n";
@@ -205,15 +206,15 @@ namespace wallet_args
     Print(print) << "Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")";
 
     if (!command_line::is_arg_defaulted(vm, arg_log_level))
-      MINFO("Setting log level = " << command_line::get_arg(vm, arg_log_level));
+      oxen::log::info(logcat, "Setting log level = {}", command_line::get_arg(vm, arg_log_level));
     else
     {
       const char *logs = getenv("OXEN_LOGS");
-      MINFO("Setting log levels = " << (logs ? logs : "<default>"));
+      oxen::log::info(logcat, "Setting log levels = {}", (logs ? logs : "<default>"));
     }
-    MINFO(wallet_args::tr("Logging to: ") << log_path);
+    //oxen::log::info(logcat, "{}{}", wallet_args::tr("Logging to: "), log_path);
 
-    Print(print) << boost::format(wallet_args::tr("Logging to %s")) % log_path;
+    //Print(print) << boost::format(wallet_args::tr("Logging to %s")) % log_path;
 
     const ssize_t lockable_memory = tools::get_lockable_memory();
     if (lockable_memory >= 0 && lockable_memory < 256 * 4096) // 256 pages -> at least 256 secret keys and other such small/medium objects

@@ -33,11 +33,11 @@
 #include "wallet_errors.h"
 #include "ringdb.h"
 #include "cryptonote_config.h"
-
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "wallet.ringdb"
+#include <fmt/std.h>
 
 #define V1TAG ((uint64_t)798237759845202)
+
+static auto logcat = oxen::log::Cat("wallet.ringdb");
 
 static const char zerokey[8] = {0};
 static const MDB_val zerokeyval = { sizeof(zerokey), (void *)zerokey };
@@ -179,14 +179,14 @@ static int resize_env(MDB_env *env, const fs::path& db_path, size_t needed)
       auto si = fs::space(db_path);
       if(si.available < needed)
       {
-        MERROR("!! WARNING: Insufficient free space to extend database !!: " << (si.available / 1000000) << " MB available");
+        oxen::log::error(logcat, "!! WARNING: Insufficient free space to extend database !!: {} MB available", (si.available / 1000000));
         return ENOSPC;
       }
     }
     catch(...)
     {
       // print something but proceed.
-      MWARNING("Unable to query free disk space.");
+      oxen::log::warning(logcat, "Unable to query free disk space.");
     }
 
     mapsize += needed;
@@ -212,7 +212,7 @@ ringdb::ringdb(fs::path fn_, const std::string &genesis) : filename_{std::move(f
 
   std::error_code ec;
   if (fs::create_directories(filename_, ec); ec)
-    MWARNING("Failed to create ringdb directory " << filename_ << ": " << ec.message());
+    oxen::log::warning(logcat, "Failed to create ringdb directory {}: {}", filename_, ec.message());
 
   dbr = mdb_env_create(&env);
   THROW_WALLET_EXCEPTION_IF(dbr, tools::error::wallet_internal_error, "Failed to create LDMB environment: " + std::string(mdb_strerror(dbr)));
@@ -314,7 +314,7 @@ bool ringdb::remove_rings(const crypto::chacha_key &chacha_key, const std::vecto
       continue;
     THROW_WALLET_EXCEPTION_IF(data.mv_size <= 0, tools::error::wallet_internal_error, "Invalid ring data size");
 
-    MDEBUG("Removing ring data for key image " << key_image);
+    oxen::log::debug(logcat, "Removing ring data for key image {}", key_image);
     dbr = mdb_del(txn, dbi_rings, &key, NULL);
     THROW_WALLET_EXCEPTION_IF(dbr, tools::error::wallet_internal_error, "Failed to remove ring to database: " + std::string(mdb_strerror(dbr)));
   }
@@ -374,10 +374,10 @@ bool ringdb::get_ring(const crypto::chacha_key &chacha_key, const crypto::key_im
     data_plaintext = decrypt(std::string((const char*)data.mv_data, data.mv_size), key_image, chacha_key, 0);
     outs = decompress_ring(data_plaintext, 0);
   }
-  MDEBUG("Found ring for key image " << key_image << ":");
-  MDEBUG("Relative: " << tools::join(" ", outs));
+  oxen::log::debug(logcat, "Found ring for key image {}:", key_image);
+  oxen::log::debug(logcat, "Relative: {}", tools::join(" ", outs));
   outs = cryptonote::relative_output_offsets_to_absolute(outs);
-  MDEBUG("Absolute: " << tools::join(" ", outs));
+  oxen::log::debug(logcat, "Absolute: {}", tools::join(" ", outs));
 
   dbr = mdb_txn_commit(txn);
   THROW_WALLET_EXCEPTION_IF(dbr, tools::error::wallet_internal_error, "Failed to commit txn getting ring from database: " + std::string(mdb_strerror(dbr)));
@@ -437,13 +437,13 @@ bool ringdb::blackball_worker(const std::vector<std::pair<uint64_t, uint64_t>> &
     switch (op)
     {
       case BLACKBALL_BLACKBALL:
-        MDEBUG("Marking output " << output.first << "/" << output.second << " as spent");
+        oxen::log::debug(logcat, "Marking output {}/{} as spent", output.first, output.second);
         dbr = mdb_cursor_put(cursor, &key, &data, MDB_NODUPDATA);
         if (dbr == MDB_KEYEXIST)
           dbr = 0;
         break;
       case BLACKBALL_UNBLACKBALL:
-        MDEBUG("Marking output " << output.first << "/" << output.second << " as unspent");
+        oxen::log::debug(logcat, "Marking output {}/{} as unspent", output.first, output.second);
         dbr = mdb_cursor_get(cursor, &key, &data, MDB_GET_BOTH);
         if (dbr == 0)
           dbr = mdb_cursor_del(cursor, 0);

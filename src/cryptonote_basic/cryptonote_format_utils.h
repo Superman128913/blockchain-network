@@ -38,6 +38,7 @@
 #include "common/meta.h"
 #include "common/string_util.h"
 #include "serialization/binary_utils.h"
+#include "logging/oxen_logger.h"
 #include <unordered_map>
 
 namespace epee
@@ -272,7 +273,7 @@ namespace cryptonote
       blob = serialization::dump_binary(const_cast<std::remove_const_t<T>&>(val));
       return true;
     } catch (const std::exception& e) {
-      LOG_ERROR("Serialization of " << tools::type_name(typeid(T)) << " failed: " << e.what());
+      oxen::log::error(globallogcat, "Serialization of {} failed: {}", tools::type_name(typeid(T)), e.what());
       return false;
     }
   }
@@ -317,7 +318,7 @@ namespace cryptonote
     try {
       serialize(ar, obj);
     } catch (const std::exception& e) {
-      LOG_ERROR("obj_to_json_str failed: serialization failed: " << e.what());
+      oxen::log::error(globallogcat, "obj_to_json_str failed: serialization failed: {}", e.what());
       return ""s;
     }
     return ss.str();

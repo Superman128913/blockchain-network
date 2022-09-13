@@ -3,17 +3,17 @@
 #include "common/string_util.h"
 #include "epee/string_tools.h"
 #include "version.h"
+#include "logging/oxen_logger.h"
 
 extern "C"
 {
 #include <sodium/crypto_sign.h>
 }
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "uptime_proof"
-
 namespace uptime_proof
 {
+
+static auto logcat = oxen::log::Cat("uptime_proof");
 
 //Constructor for the uptime proof, will take the service node keys as a param and sign 
 Proof::Proof(
@@ -84,7 +84,7 @@ Proof::Proof(const std::string& serialized_proof)
       lokinet_version[k++] = static_cast<uint16_t>(get_int<unsigned>(i));
     }
   } catch (const std::exception& e) {
-    MWARNING("deserialization failed: " <<  e.what());
+    oxen::log::warning(logcat, "deserialization failed: {}", e.what());
     throw;
   }
 }

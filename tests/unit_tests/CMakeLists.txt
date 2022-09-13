@@ -105,6 +105,7 @@ target_link_libraries(unit_tests
     SQLiteCpp
     Boost::thread
     gtest
+    logging
     extra)
 set_property(TARGET unit_tests
   PROPERTY

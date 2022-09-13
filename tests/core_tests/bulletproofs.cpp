@@ -207,7 +207,7 @@ bool gen_bp_tx_validation_base::generate_with(std::vector<test_event_entry>& eve
 
     if (pre_tx && !pre_tx(sources, destinations, n))
     {
-      MDEBUG("pre_tx returned failure");
+      oxen::log::debug(globallogcat, "pre_tx returned failure");
       return false;
     }
 
@@ -228,14 +228,14 @@ bool gen_bp_tx_validation_base::generate_with(std::vector<test_event_entry>& eve
         nullptr, /*multisig_out*/
         tx_params))
     {
-      MDEBUG("construct_tx_and_get_tx_key failure");
+      oxen::log::debug(globallogcat, "construct_tx_and_get_tx_key failure");
       return false;
     }
 
     rct_txes.push_back(tx);
     if (post_tx && !post_tx(rct_txes.back(), n))
     {
-      MDEBUG("post_tx returned failure");
+      oxen::log::debug(globallogcat, "post_tx returned failure");
       return false;
     }
 
@@ -258,7 +258,7 @@ bool gen_bp_tx_validation_base::generate_with(std::vector<test_event_entry>& eve
         tx_hash.data[i] = unif(rng);
     }
     starting_rct_tx_hashes.push_back(tx_hash);
-    LOG_PRINT_L0("Test tx: " << obj_to_json_str(rct_txes.back()));
+    oxen::log::warning(globallogcat, "Test tx: {}", obj_to_json_str(rct_txes.back()));
 
     uint64_t total_amount_encoded = 0;
     for (int o = 0; amounts_paid[o] != (uint64_t)-1; ++o)

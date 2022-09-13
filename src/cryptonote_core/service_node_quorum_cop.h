@@ -34,6 +34,7 @@
 #include "cryptonote_core/service_node_voting.h"
 #include <cassert>
 #include <mutex>
+#include <fmt/format.h>
 
 namespace cryptonote
 {
@@ -50,6 +51,16 @@ namespace service_nodes
   {
     std::vector<crypto::public_key> validators; // Array of public keys identifying service nodes who validate and sign.
     std::vector<crypto::public_key> workers;    // Array of public keys of tested service nodes (if applicable).
+                                                //
+    inline std::string to_string() const
+    {
+      std::stringstream result;
+      for (size_t i = 0; i < validators.size(); i++)
+        result << "V[" << i << "] " << validators[i] << "\n";
+      for (size_t i = 0; i < workers.size(); i++)
+        result << "W[" << std::to_string(i) + "] " << workers[i] << "\n";
+      return result.str();
+    };
 
     BEGIN_SERIALIZE()
       FIELD(validators)
@@ -59,10 +70,9 @@ namespace service_nodes
 
   inline std::ostream &operator<<(std::ostream &os, quorum const &q)
   {
-    for (size_t i = 0; i < q.validators.size(); i++) os << "V[" << i << "] " << q.validators[i] << "\n";
-    for (size_t i = 0; i < q.workers.size(); i++) os    << "W[" << i << "] " << q.workers[i] << "\n";
-    return os;
+    return os << q.to_string();
   }
+
 
   struct quorum_manager
   {
@@ -79,7 +89,7 @@ namespace service_nodes
       else if (type == quorum_type::checkpointing) return checkpointing;
       else if (type == quorum_type::blink) return blink;
       else if (type == quorum_type::pulse) return pulse;
-      MERROR("Developer error: Unhandled quorum enum with value: " << (size_t)type);
+      oxen::log::error(oxen::log::Cat("quorum_cop"), "Developer error: Unhandled quorum enum with value: {}", (size_t)type);
       assert(!"Developer error: Unhandled quorum enum with value: ");
       return nullptr;
     }
@@ -155,3 +165,11 @@ namespace service_nodes
    */
   uint64_t quorum_checksum(const std::vector<crypto::public_key> &pubkeys, size_t offset = 0);
 }
+
+template <>
+struct fmt::formatter<service_nodes::quorum> : fmt::formatter<std::string> {
+  auto format(service_nodes::quorum quorum, format_context& ctx) {
+    return formatter<std::string>::format(
+        fmt::format("{}", quorum.to_string()), ctx);
+  }
+};

@@ -71,9 +71,7 @@ namespace
         expect<T> address = T::make(value);
         if (!address)
         {
-            MERROR(
-                "Failed to parse " << T::get_zone() << " address \"" << value << "\": " << address.error().message()
-            );
+            oxen::log::error("Failed to parse " << T::get_zone() << " address \"" << value << "\": " << address.error().message());
             return {};
         }
         return {std::move(*address)};
@@ -93,7 +91,7 @@ namespace
             set = client->set_connect_command(remote.as<net::i2p_address>());
             break;
         default:
-            MERROR("Unsupported network address in socks_connect");
+            oxen::log::error(globallogcat, "Unsupported network address in socks_connect");
             return false;
         }
 
@@ -189,14 +187,14 @@ namespace nodetool
                 set_proxy.max_connections = get_max_connections(*it);
                 if (set_proxy.max_connections == 0)
                 {
-                    MERROR("Invalid max connections given to --" << arg_tx_proxy.name);
+                    oxen::log::error(globallogcat, "Invalid max connections given to --{}", arg_tx_proxy.name);
                     return std::nullopt;
                 }
                 ++it;
             }
             if (it != pieces.end())
             {
-                MERROR("Too many ',' characters given to --" << arg_tx_proxy.name);
+                oxen::log::error(globallogcat, "Too many ',' characters given to --{}", arg_tx_proxy.name);
                 return std::nullopt;
             }
 
@@ -209,7 +207,7 @@ namespace nodetool
                 set_proxy.zone = epee::net_utils::zone::i2p;
                 break;
             default:
-                MERROR("Invalid network for --" << arg_tx_proxy.name);
+                oxen::log::error(globallogcat, "Invalid network for --{}", arg_tx_proxy.name);
                 return std::nullopt;
             }
 
@@ -217,7 +215,7 @@ namespace nodetool
             std::uint16_t port = 0;
             if (!epee::string_tools::parse_peer_from_string(ip, port, proxy) || port == 0)
             {
-                MERROR("Invalid ipv4:port given for --" << arg_tx_proxy.name);
+                oxen::log::error(globallogcat, "Invalid ipv4:port given for --{}", arg_tx_proxy.name);
                 return std::nullopt;
             }
             set_proxy.address = ip::tcp::endpoint{ip::address_v4{oxenc::host_to_big(ip)}, port};
@@ -251,7 +249,7 @@ namespace nodetool
                 set_inbound.max_connections = get_max_connections(pieces[2]);
                 if (set_inbound.max_connections == 0)
                 {
-                    MERROR("Invalid max connections given to --" << arg_tx_proxy.name);
+                    oxen::log::error(globallogcat, "Invalid max connections given to --{}", arg_tx_proxy.name);
                     return std::nullopt;
                 }
             }
@@ -268,7 +266,7 @@ namespace nodetool
                 set_inbound.default_remote = net::i2p_address::unknown();
                 break;
             default:
-                MERROR("Invalid inbound address (" << address << ") for --" << arg_anonymous_inbound.name << ": " << (our_address ? "invalid type" : our_address.error().message()));
+                oxen::log::error(globallogcat, "Invalid inbound address ({}) for --{}: {}", address, arg_anonymous_inbound.name, (our_address ? "invalid type" : our_address.error().message()));
                 return std::nullopt;
             }
 
@@ -280,7 +278,7 @@ namespace nodetool
             std::uint16_t port = 0;
             if (!epee::string_tools::parse_peer_from_string(ip, port, bind))
             {
-                MERROR("Invalid ipv4:port given for --" << arg_anonymous_inbound.name);
+                oxen::log::error(globallogcat, "Invalid ipv4:port given for --{}", arg_anonymous_inbound.name);
                 return std::nullopt;
             }
             set_inbound.local_ip = bind.substr(0, colon);
@@ -305,7 +303,7 @@ namespace nodetool
         if (address.get_zone() == epee::net_utils::zone::public_)
             return false;
 
-        MWARNING("Filtered command (#" << command << ") to/from " << address.str());
+        oxen::log::warning(globallogcat, "Filtered command (#{}) to/from {}", command, address.str());
         return true;
     }
 
@@ -342,7 +340,7 @@ namespace nodetool
         {
             if (socks_connect_timeout < std::chrono::steady_clock::now() - start)
             {
-                MERROR("Timeout on socks connect (" << proxy << " to " << remote.str() << ")");
+                oxen::log::error(globallogcat, "Timeout on socks connect ({} to {})", proxy.address().to_string(), remote.str());
                 return std::nullopt;
             }
 
@@ -356,7 +354,7 @@ namespace nodetool
             if (!result.first)
                 return {std::move(result.second)};
 
-            MERROR("Failed to make socks connection to " << remote.str() << " (via " << proxy << "): " << result.first.message());
+            oxen::log::error(globallogcat, "Failed to make socks connection to {} (via {}): {}", remote.str(), proxy.address().to_string(), result.first.message());
         }
         catch (const std::future_error&)
         {}

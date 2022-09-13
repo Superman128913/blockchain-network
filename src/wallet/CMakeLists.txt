@@ -60,6 +60,7 @@ target_link_libraries(wallet
     Boost::serialization
     filesystem
     Boost::thread
+    logging
   PRIVATE
     extra)
 
@@ -78,6 +79,7 @@ target_link_libraries(wallet_rpc_server
     wallet
     daemonizer
     Boost::program_options
+    logging
     extra)
 
 

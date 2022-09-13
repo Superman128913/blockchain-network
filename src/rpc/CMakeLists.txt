@@ -55,6 +55,7 @@ target_link_libraries(rpc_commands
     nlohmann_json::nlohmann_json
   PRIVATE
     cryptonote_protocol
+    logging
     extra)
 
 target_link_libraries(rpc
@@ -69,6 +70,7 @@ target_link_libraries(rpc
     Boost::thread
     Boost::program_options
     SQLiteCpp
+    logging
     extra)
 
 target_link_libraries(daemon_rpc_server
@@ -78,6 +80,7 @@ target_link_libraries(daemon_rpc_server
     rpc
     Boost::thread
     SQLiteCpp
+    logging
     extra)
 
 target_link_libraries(rpc_http_client
@@ -86,4 +89,5 @@ target_link_libraries(rpc_http_client
     cpr::cpr
     nlohmann_json::nlohmann_json
   PRIVATE
+    logging
     extra)

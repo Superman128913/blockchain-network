@@ -54,6 +54,7 @@
 #include "common/file.h"
 #include "crypto/chacha.h"
 #include "crypto/hash.h"
+#include "crypto/fmt.h"
 #include "ringct/rctTypes.h"
 #include "ringct/rctOps.h"
 #include "checkpoints/checkpoints.h"
@@ -91,9 +92,6 @@
 #include "epee/wipeable_string.h"
 
 #include "rpc/http_client.h"
-
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "wallet.wallet2"
 
 #define SUBADDRESS_LOOKAHEAD_MAJOR 50
 #define SUBADDRESS_LOOKAHEAD_MINOR 200
@@ -1332,12 +1330,12 @@ private:
         if (throw_on_error)
           throw;
         else
-          MERROR("HTTP request failed: " << e.what());
+          oxen::log::error(oxen::log::Cat("wallet.wallet2"), "HTTP request failed: {}", e.what());
       } catch (...) {
         if (throw_on_error)
           throw;
         else
-          MERROR("HTTP request failed: unknown error");
+          oxen::log::error(oxen::log::Cat("wallet.wallet2"), "HTTP request failed: unknown error");
       }
       return false;
     }
@@ -1945,7 +1943,7 @@ namespace boost::serialization
             is_long |= payment_id.data[i];
           if (is_long)
           {
-            MWARNING("Long payment ID ignored on address book load");
+            oxen::log::warning(oxen::log::Cat("wallet.wallet2"), "Long payment ID ignored on address book load");
             x.m_payment_id = crypto::null_hash8;
             x.m_has_payment_id = false;
           }

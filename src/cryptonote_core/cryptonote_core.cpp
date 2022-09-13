@@ -70,13 +70,12 @@ extern "C" {
 #include "epee/memwipe.h"
 #include "common/i18n.h"
 #include "epee/net/local_ip.h"
-
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "cn"
+#include "logging/oxen_logger.h"
+#include <fmt/std.h>
+#include <fmt/color.h>
+#include <oxenmq/fmt.h>
 
 DISABLE_VS_WARNINGS(4355)
-
-#define MERROR_VER(x) MCERROR("verify", x)
 
 #define BAD_SEMANTICS_TXES_MAX_SIZE 100
 
@@ -85,6 +84,10 @@ DISABLE_VS_WARNINGS(4355)
 
 namespace cryptonote
 {
+
+  static auto logcat = oxen::log::Cat("cn");
+  static auto omqlogcat = oxen::log::Cat("omq");
+
   const command_line::arg_descriptor<bool, false> arg_testnet_on  = {
     "testnet"
   , "Run on testnet. The wallet must be launched with --testnet flag."
@@ -380,7 +383,7 @@ namespace cryptonote
 
       bool args_okay = true;
       if (m_quorumnet_port == 0) {
-        MFATAL("Quorumnet port cannot be 0; please specify a valid port to listen on with: '--" << arg_quorumnet_port.name << " <port>'");
+        oxen::log::error(logcat, "Quorumnet port cannot be 0; please specify a valid port to listen on with: '--{} <port>'", arg_quorumnet_port.name);
         args_okay = false;
       }
 
@@ -388,28 +391,28 @@ namespace cryptonote
       if (pub_ip.size())
       {
         if (!epee::string_tools::get_ip_int32_from_string(m_sn_public_ip, pub_ip)) {
-          MFATAL("Unable to parse IPv4 public address from: " << pub_ip);
+          oxen::log::error(logcat, "Unable to parse IPv4 public address from: {}", pub_ip);
           args_okay = false;
         }
 
         if (!epee::net_utils::is_ip_public(m_sn_public_ip)) {
           if (m_service_node_list.debug_allow_local_ips) {
-            MWARNING("Address given for public-ip is not public; allowing it because dev-allow-local-ips was specified. This service node WILL NOT WORK ON THE PUBLIC OXEN NETWORK!");
+            oxen::log::warning(logcat, "Address given for public-ip is not public; allowing it because dev-allow-local-ips was specified. This service node WILL NOT WORK ON THE PUBLIC OXEN NETWORK!");
           } else {
-            MFATAL("Address given for public-ip is not public: " << epee::string_tools::get_ip_string_from_int32(m_sn_public_ip));
+            oxen::log::error(logcat, "Address given for public-ip is not public: {}", epee::string_tools::get_ip_string_from_int32(m_sn_public_ip));
             args_okay = false;
           }
         }
       }
       else
       {
-        MFATAL("Please specify an IPv4 public address which the service node & storage server is accessible from with: '--" << arg_public_ip.name << " <ip address>'");
+        oxen::log::error(logcat, "Please specify an IPv4 public address which the service node & storage server is accessible from with: '--{} <ip address>'", arg_public_ip.name);
         args_okay = false;
       }
 
       if (!args_okay) {
-        MFATAL("IMPORTANT: One or more required service node-related configuration settings/options were omitted or invalid; "
-                << "please fix them and restart oxend.");
+        oxen::log::error(logcat,
+            "IMPORTANT: One or more required service node-related configuration settings/options were omitted or invalid please fix them and restart oxend.");
         return false;
       }
     }
@@ -589,14 +592,14 @@ namespace cryptonote
     // make sure the data directory exists, and try to lock it
     if (std::error_code ec; !fs::is_directory(folder, ec) && !fs::create_directories(folder, ec) && ec)
     {
-      MFATAL("Failed to create directory " + folder.u8string() + (ec ? ": " + ec.message() : ""s));
+      oxen::log::error(logcat, "Failed to create directory " + folder.u8string() + (ec ? ": " + ec.message() : ""s));
       return false;
     }
 
     std::unique_ptr<BlockchainDB> db(new_db());
     if (!db)
     {
-      LOG_ERROR("Failed to initialize a database");
+      oxen::log::error(logcat, "Failed to initialize a database");
       return false;
     }
 
@@ -612,7 +615,7 @@ namespace cryptonote
     auto sqliteDB = std::make_shared<cryptonote::BlockchainSQLite>(m_nettype, sqlite_db_file_path);
 
     folder /= db->get_db_name();
-    MGINFO("Loading blockchain from folder " << folder << " ...");
+    oxen::log::info(logcat, "Loading blockchain from folder {} ...", folder);
 
     // default to fast:async:1 if overridden
     blockchain_db_sync_mode sync_mode = db_defaultsync;
@@ -624,7 +627,7 @@ namespace cryptonote
       // reset the db by removing the database file before opening it
       if (!db->remove_data_file(folder))
       {
-        MFATAL("Failed to remove data file in " << folder);
+        oxen::log::error(logcat, "Failed to remove data file in {}", folder);
         return false;
       }
       fs::remove(ons_db_file_path);
@@ -640,7 +643,7 @@ namespace cryptonote
       const bool db_sync_mode_is_default = command_line::is_arg_defaulted(vm, cryptonote::arg_db_sync_mode);
 
       for(const auto &option : options)
-        MDEBUG("option: " << option);
+        oxen::log::debug(logcat, "option: {}", option);
 
       // default to fast:async:1
       uint64_t DEFAULT_FLAGS = DBF_FAST;
@@ -699,7 +702,7 @@ namespace cryptonote
         }
         else
         {
-          LOG_ERROR("Invalid db sync mode: " << options[2]);
+          oxen::log::error(logcat, "Invalid db sync mode: {}", options[2]);
           return false;
         }
       }
@@ -713,7 +716,7 @@ namespace cryptonote
     }
     catch (const DB_ERROR& e)
     {
-      LOG_ERROR("Error opening database: " << e.what());
+      oxen::log::error(logcat, "Error opening database: {}", e.what());
       return false;
     }
 
@@ -739,7 +742,7 @@ namespace cryptonote
     }
     catch (const std::exception &e)
     {
-      MERROR("Failed to parse reorg notify spec");
+      oxen::log::error(logcat, "Failed to parse reorg notify spec");
     }
 
     try
@@ -753,7 +756,7 @@ namespace cryptonote
     }
     catch (const std::exception &e)
     {
-      MERROR("Failed to parse block notify spec");
+      oxen::log::error(logcat, "Failed to parse block rate notify spec");
     }
     
     cryptonote::test_options regtest_test_options{};
@@ -805,9 +808,9 @@ namespace cryptonote
 
     block_sync_size = command_line::get_arg(vm, arg_block_sync_size);
     if (block_sync_size > BLOCKS_SYNCHRONIZING_MAX_COUNT)
-      MERROR("Error --block-sync-size cannot be greater than " << BLOCKS_SYNCHRONIZING_MAX_COUNT);
+      oxen::log::error(logcat, "Error --block-sync-size cannot be greater than {}", BLOCKS_SYNCHRONIZING_MAX_COUNT);
 
-    MGINFO("Loading checkpoints");
+    oxen::log::info(logcat, "Loading checkpoints");
     CHECK_AND_ASSERT_MES(update_checkpoints_from_json_file(), false, "One or more checkpoints loaded from json conflicted with existing checkpoints.");
 
     r = m_miner.init(vm, m_nettype);
@@ -821,7 +824,7 @@ namespace cryptonote
       // display a message if the blockchain is not pruned yet
       if (!m_blockchain_storage.get_blockchain_pruning_seed())
       {
-        MGINFO("Pruning blockchain...");
+        oxen::log::info(logcat, "Pruning blockchain...");
         CHECK_AND_ASSERT_MES(m_blockchain_storage.prune_blockchain(), false, "Failed to prune blockchain");
       }
       else
@@ -860,7 +863,7 @@ namespace cryptonote
       try {
         generate_pair(privkey, pubkey);
       } catch (const std::exception& e) {
-        MFATAL("failed to generate keypair " << e.what());
+        oxen::log::error(logcat, "failed to generate keypair {}", e.what());
         return false;
       }
 
@@ -939,32 +942,19 @@ namespace cryptonote
     }
 
     if (m_service_node) {
-      MGINFO_YELLOW("Service node public keys:");
-      MGINFO_YELLOW("- primary: " << tools::type_to_hex(keys.pub));
-      MGINFO_YELLOW("- ed25519: " << tools::type_to_hex(keys.pub_ed25519));
+      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Service node public keys:"));
+      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "- primary: {}", tools::type_to_hex(keys.pub)));
+      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "- ed25519: {}", tools::type_to_hex(keys.pub_ed25519)));
       // .snode address is the ed25519 pubkey, encoded with base32z and with .snode appended:
-      MGINFO_YELLOW("- lokinet: " << oxenc::to_base32z(tools::view_guts(keys.pub_ed25519)) << ".snode");
-      MGINFO_YELLOW("-  x25519: " << tools::type_to_hex(keys.pub_x25519));
+      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "- lokinet: {}.snode", oxenc::to_base32z(tools::view_guts(keys.pub_ed25519))));
+      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "-  x25519: {}", tools::type_to_hex(keys.pub_x25519)));
     } else {
       // Only print the x25519 version because it's the only thing useful for a non-SN (for
       // encrypted LMQ RPC connections).
-      MGINFO_YELLOW("x25519 public key: " << tools::type_to_hex(keys.pub_x25519));
+      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "x25519 public key: {}", tools::type_to_hex(keys.pub_x25519)));
     }
 
     return true;
-  }
-
-  static constexpr el::Level easylogging_level(oxenmq::LogLevel level) {
-    using namespace oxenmq;
-    switch (level) {
-        case LogLevel::fatal: return el::Level::Fatal;
-        case LogLevel::error: return el::Level::Error;
-        case LogLevel::warn:  return el::Level::Warning;
-        case LogLevel::info:  return el::Level::Info;
-        case LogLevel::debug: return el::Level::Debug;
-        case LogLevel::trace: return el::Level::Trace;
-        default:              return el::Level::Unknown;
-    }
   }
 
   oxenmq::AuthLevel core::omq_check_access(const crypto::x25519_public_key& pubkey) const {
@@ -995,29 +985,29 @@ namespace cryptonote
       if (user_auth >= AuthLevel::basic) {
         if (user_auth > auth)
           auth = user_auth;
-        MCINFO("omq", "Incoming " << auth << "-authenticated connection");
+        oxen::log::info(oxen::log::Cat("omq"), "Incoming {}-authenticated connection", auth);
       }
 
-      MCINFO("omq", "Incoming [" << auth << "] curve connection from " << ip << "/" << x25519_pubkey);
+        oxen::log::info(oxen::log::Cat("omq"), "Incoming [{}] curve connection from {}/{}", auth, ip, x25519_pubkey);
     }
     else {
-      MCINFO("omq", "Incoming [" << auth << "] plain connection from " << ip);
+      oxen::log::info(oxen::log::Cat("omq"), "Incoming [{}] plain connection from {}", auth, ip);
     }
     return auth;
   }
 
   void core::init_oxenmq(const boost::program_options::variables_map& vm) {
     using namespace oxenmq;
-    MGINFO("Starting oxenmq");
+    oxen::log::info(omqlogcat, "Starting oxenmq");
     m_omq = std::make_unique<OxenMQ>(
         tools::copy_guts(m_service_keys.pub_x25519),
         tools::copy_guts(m_service_keys.key_x25519),
         m_service_node,
         [this](std::string_view x25519_pk) { return m_service_node_list.remote_lookup(x25519_pk); },
-        [](LogLevel level, const char *file, int line, std::string msg) {
-          // What a lovely interface (<-- sarcasm)
-          if (ELPP->vRegistry()->allowed(easylogging_level(level), "omq"))
-            el::base::Writer(easylogging_level(level), file, line, ELPP_FUNC, el::base::DispatchAction::NormalLog).construct("omq") << msg;
+        [](LogLevel omqlevel, const char *file, int line, std::string msg) {
+          auto level = *oxen::logging::parse_level(omqlevel);
+          if(omqlogcat->should_log(level))
+            omqlogcat->log({file, line, "omq"}, level, "{}", msg);
         },
         oxenmq::LogLevel::trace
     );
@@ -1025,7 +1015,7 @@ namespace cryptonote
     // ping.ping: a simple debugging target for pinging the omq listener
     m_omq->add_category("ping", Access{AuthLevel::none})
         .add_request_command("ping", [](Message& m) {
-            MCINFO("omq", "Received ping from " << m.conn);
+            oxen::log::info(oxen::log::Cat("omq"), "Received ping from {}", m.conn);
             m.send_reply("pong");
         })
     ;
@@ -1037,7 +1027,7 @@ namespace cryptonote
       if (listen_ip.empty())
         listen_ip = "0.0.0.0";
       std::string qnet_listen = "tcp://" + listen_ip + ":" + std::to_string(m_quorumnet_port);
-      MGINFO("- listening on " << qnet_listen << " (quorumnet)");
+      oxen::log::info(logcat, "- listening on {} (quorumnet)", qnet_listen);
       m_omq->listen_curve(qnet_listen,
           [this, public_=command_line::get_arg(vm, arg_omq_quorumnet_public)](std::string_view ip, std::string_view pk, bool) {
             return omq_allow(ip, pk, public_ ? AuthLevel::basic : AuthLevel::none);
@@ -1116,14 +1106,14 @@ namespace cryptonote
   {
     if(tx_info.blob->size() > MAX_TX_SIZE)
     {
-      LOG_PRINT_L1("WRONG TRANSACTION BLOB, too big size " << tx_info.blob->size() << ", rejected");
+      oxen::log::info(logcat, "WRONG TRANSACTION BLOB, too big size {}, rejected", tx_info.blob->size());
       tx_info.tvc.m_verifivation_failed = true;
       tx_info.tvc.m_too_big = true;
       return;
     }
     else if (tx_info.blob->empty())
     {
-      LOG_PRINT_L1("WRONG TRANSACTION BLOB, blob is empty, rejected");
+      oxen::log::info(logcat, "WRONG TRANSACTION BLOB, blob is empty, rejected");
       tx_info.tvc.m_verifivation_failed = true;
       return;
     }
@@ -1131,7 +1121,7 @@ namespace cryptonote
     tx_info.parsed = parse_and_validate_tx_from_blob(*tx_info.blob, tx_info.tx, tx_info.tx_hash);
     if(!tx_info.parsed)
     {
-      LOG_PRINT_L1("WRONG TRANSACTION BLOB, Failed to parse, rejected");
+      oxen::log::info(logcat, "WRONG TRANSACTION BLOB, Failed to parse, rejected");
       tx_info.tvc.m_verifivation_failed = true;
       return;
     }
@@ -1142,7 +1132,7 @@ namespace cryptonote
     {
       if (bad_semantics_txes[idx].find(tx_info.tx_hash) != bad_semantics_txes[idx].end())
       {
-        LOG_PRINT_L1("Transaction already seen with bad semantics, rejected");
+        oxen::log::info(logcat, "Transaction already seen with bad semantics, rejected");
         tx_info.tvc.m_verifivation_failed = true;
         return;
       }
@@ -1152,7 +1142,7 @@ namespace cryptonote
   //-----------------------------------------------------------------------------------------------
   void core::set_semantics_failed(const crypto::hash &tx_hash)
   {
-    LOG_PRINT_L1("WRONG TRANSACTION BLOB, Failed to check tx " << tx_hash << " semantic, rejected");
+    oxen::log::info(logcat, "WRONG TRANSACTION BLOB, Failed to check tx {} semantic, rejected", tx_hash);
     bad_semantics_txes_lock.lock();
     bad_semantics_txes[0].insert(tx_hash);
     if (bad_semantics_txes[0].size() >= BAD_SEMANTICS_TXES_MAX_SIZE)
@@ -1177,7 +1167,7 @@ namespace cryptonote
   {
     if (kept_by_block && get_blockchain_storage().is_within_compiled_block_hash_area())
     {
-      MTRACE("Skipping semantics check for txs kept by block in embedded hash area");
+      oxen::log::trace(logcat, "Skipping semantics check for txs kept by block in embedded hash area");
       return;
     }
 
@@ -1201,7 +1191,7 @@ namespace cryptonote
       switch (rv.type) {
         case rct::RCTType::Null:
           // coinbase should not come here, so we reject for all other types
-          MERROR_VER("Unexpected Null rctSig type");
+          oxen::log::error(oxen::log::Cat("verify"), "Unexpected Null rctSig type");
           set_semantics_failed(tx_info[n].tx_hash);
           tx_info[n].tvc.m_verifivation_failed = true;
           tx_info[n].result = false;
@@ -1209,7 +1199,7 @@ namespace cryptonote
         case rct::RCTType::Simple:
           if (!rct::verRctSemanticsSimple(rv))
           {
-            MERROR_VER("rct signature semantics check failed");
+            oxen::log::error(oxen::log::Cat("verify"), "rct signature semantics check failed");
             set_semantics_failed(tx_info[n].tx_hash);
             tx_info[n].tvc.m_verifivation_failed = true;
             tx_info[n].result = false;
@@ -1219,7 +1209,7 @@ namespace cryptonote
         case rct::RCTType::Full:
           if (!rct::verRct(rv, true))
           {
-            MERROR_VER("rct signature semantics check failed");
+            oxen::log::error(oxen::log::Cat("verify"), "rct signature semantics check failed");
             set_semantics_failed(tx_info[n].tx_hash);
             tx_info[n].tvc.m_verifivation_failed = true;
             tx_info[n].result = false;
@@ -1231,7 +1221,7 @@ namespace cryptonote
         case rct::RCTType::CLSAG:
           if (!is_canonical_bulletproof_layout(rv.p.bulletproofs))
           {
-            MERROR_VER("Bulletproof does not have canonical form");
+            oxen::log::error(oxen::log::Cat("verify"), "Bulletproof does not have canonical form");
             set_semantics_failed(tx_info[n].tx_hash);
             tx_info[n].tvc.m_verifivation_failed = true;
             tx_info[n].result = false;
@@ -1240,7 +1230,7 @@ namespace cryptonote
           rvv.push_back(&rv); // delayed batch verification
           break;
         default:
-          MERROR_VER("Unknown rct type: " << (int)rv.type);
+          oxen::log::error(oxen::log::Cat("verify"), "Unknown rct type: {}", (int)rv.type);
           set_semantics_failed(tx_info[n].tx_hash);
           tx_info[n].tvc.m_verifivation_failed = true;
           tx_info[n].result = false;
@@ -1249,7 +1239,7 @@ namespace cryptonote
     }
     if (!rvv.empty() && !rct::verRctSemanticsSimple(rvv))
     {
-      LOG_PRINT_L1("One transaction among this group has bad semantics, verifying one at a time");
+      oxen::log::info(logcat, "One transaction among this group has bad semantics, verifying one at a time");
       const bool assumed_bad = rvv.size() == 1; // if there's only one tx, it must be the bad one
       for (size_t n = 0; n < tx_info.size(); ++n)
       {
@@ -1284,7 +1274,7 @@ namespace cryptonote
         }
         catch (const std::exception &e)
         {
-          MERROR_VER("Exception in handle_incoming_tx_pre: " << e.what());
+        oxen::log::error(oxen::log::Cat("verify"), "Exception in handle_incoming_tx_pre: {}", e.what());
           info.tvc.m_verifivation_failed = true;
         }
       });
@@ -1297,12 +1287,12 @@ namespace cryptonote
 
       if(m_mempool.have_tx(info.tx_hash))
       {
-        LOG_PRINT_L2("tx " << info.tx_hash << " already have transaction in tx_pool");
+        oxen::log::debug(logcat, "tx {} already has a transaction in tx_pool", info.tx_hash);
         info.already_have = true;
       }
       else if(m_blockchain_storage.have_tx(info.tx_hash))
       {
-        LOG_PRINT_L2("tx " << info.tx_hash << " already have transaction in blockchain");
+        oxen::log::debug(logcat, "tx {} already has a transaction in tx_pool", info.tx_hash);
         info.already_have = true;
       }
     }
@@ -1346,15 +1336,15 @@ namespace cryptonote
       }
       if (m_mempool.add_tx(info.tx, info.tx_hash, *info.blob, weight, info.tvc, *local_opts, version, blink_rollback_height))
       {
-        MDEBUG("tx added: " << info.tx_hash);
+        oxen::log::debug(logcat, "tx added: {}", info.tx_hash);
       }
       else
       {
         ok = false;
         if (info.tvc.m_verifivation_failed)
-          MERROR_VER("Transaction verification failed: " << info.tx_hash);
+          oxen::log::error(oxen::log::Cat("verify"), "Transaction verification failed: {}", info.tx_hash);
         else if (info.tvc.m_verifivation_impossible)
-          MERROR_VER("Transaction verification impossible: " << info.tx_hash);
+          oxen::log::error(oxen::log::Cat("verify"), "Transaction verification impossible: {}", info.tx_hash);
       }
     }
 
@@ -1415,7 +1405,7 @@ namespace cryptonote
       }
     }
 
-    MDEBUG("Want " << want_count << " of " << blinks.size() << " incoming blink signature sets after filtering out immutable txes");
+    oxen::log::debug(logcat, "Want {} of {} incoming blink signature sets after filtering out immutable txes", want_count, blinks.size());
     if (!want_count) return results;
 
     // Step 2: filter out any transactions for which we already have a blink signature
@@ -1425,14 +1415,14 @@ namespace cryptonote
       {
         if (want[i] && m_mempool.has_blink(blinks[i].tx_hash))
         {
-          MDEBUG("Ignoring blink data for " << blinks[i].tx_hash << ": already have blink signatures");
+          oxen::log::debug(logcat, "Ignoring blink data for {}: already have blink signatures", blinks[i].tx_hash);
           want[i] = false; // Already have it, move along
           want_count--;
         }
       }
     }
 
-    MDEBUG("Want " << want_count << " of " << blinks.size() << " incoming blink signature sets after filtering out existing blink sigs");
+    oxen::log::debug(logcat, "Want {} of {} incoming blink signature sets after filtering out existing blink sigs", want_count, blinks.size());
     if (!want_count) return results;
 
     // Step 3: create new blink_tx objects for txes and add the blink signatures.  We can do all of
@@ -1458,7 +1448,7 @@ namespace cryptonote
           std::any_of(bdata.position.begin(), bdata.position.end(), [](const auto &p) { return p >= service_nodes::BLINK_SUBQUORUM_SIZE; }) || // invalid position
           std::any_of(bdata.quorum.begin(), bdata.quorum.end(), [](const auto &qi) { return qi >= tools::enum_count<blink_tx::subquorum>; }) // invalid quorum index
       ) {
-        MINFO("Invalid blink tx " << bdata.tx_hash << ": invalid signature data");
+        oxen::log::info(logcat, "Invalid blink tx {}: invalid signature data", bdata.tx_hash);
         continue;
       }
 
@@ -1472,7 +1462,7 @@ namespace cryptonote
           q = get_quorum(service_nodes::quorum_type::blink, q_height);
         if (!q)
         {
-          MINFO("Don't have a quorum for height " << q_height << " (yet?), ignoring this blink");
+          oxen::log::info(logcat, "Don't have a quorum for height {} (yet?), ignoring this blink", q_height);
           no_quorum = true;
           break;
         }
@@ -1493,9 +1483,9 @@ namespace cryptonote
       }
       if (blink.approved())
       {
-        MINFO("Blink tx " << bdata.tx_hash << " blink signatures approved with " << failures.size() << " signature validation failures");
+        oxen::log::info(logcat, "Blink tx {} blink signatures approved with {} signature validation failures", bdata.tx_hash, failures.size());
         for (auto &f : failures)
-          MDEBUG("- failure for quorum " << int(bdata.quorum[f.first]) << ", position " << int(bdata.position[f.first]) << ": " << f.second);
+          oxen::log::debug(logcat, "- failure for quorum {}, position {}: {}", int(bdata.quorum[f.first]), int(bdata.position[f.first]), f.second);
       }
       else
       {
@@ -1503,7 +1493,7 @@ namespace cryptonote
         os << "Blink validation failed:";
         for (auto &f : failures)
           os << " [" << int(bdata.quorum[f.first]) << ":" << int(bdata.position[f.first]) << "]: " << f.second;
-        MINFO("Invalid blink tx " << bdata.tx_hash << ": " << os.str());
+        oxen::log::info(logcat, "Invalid blink tx {}: {}", bdata.tx_hash, os.str());
       }
     }
 
@@ -1525,7 +1515,7 @@ namespace cryptonote
 
     if (added)
     {
-      MINFO("Added blink signatures for " << added << " blinks");
+      oxen::log::info(logcat, "Added blink signatures for {} blinks", added);
       long_poll_trigger(m_mempool);
     }
 
@@ -1544,7 +1534,7 @@ namespace cryptonote
     {
       if (tx.vin.empty())
       {
-        MERROR_VER("tx with empty inputs, rejected for tx id= " << get_transaction_hash(tx));
+        oxen::log::error(oxen::log::Cat("verify"), "tx with empty inputs, rejected for tx id= {}", get_transaction_hash(tx));
         return false;
       }
     }
@@ -1552,20 +1542,20 @@ namespace cryptonote
     {
       if (tx.vin.size() != 0)
       {
-        MERROR_VER("tx type: " << tx.type << " must have 0 inputs, received: " << tx.vin.size() << ", rejected for tx id = " << get_transaction_hash(tx));
+        oxen::log::error(oxen::log::Cat("verify"), "tx type: {} must have 0 inputs, received: {}, rejected for tx id = {}", tx.type, tx.vin.size(), get_transaction_hash(tx));
         return false;
       }
     }
 
     if(!check_inputs_types_supported(tx))
     {
-      MERROR_VER("unsupported input types for tx id= " << get_transaction_hash(tx));
+      oxen::log::error(oxen::log::Cat("verify"), "unsupported input types for tx id= {}", get_transaction_hash(tx));
       return false;
     }
 
     if(!check_outs_valid(tx))
     {
-      MERROR_VER("tx with invalid outputs, rejected for tx id= " << get_transaction_hash(tx));
+      oxen::log::error(oxen::log::Cat("verify"), "tx with invalid outputs, rejected for tx id= {}", get_transaction_hash(tx));
       return false;
     }
 
@@ -1573,14 +1563,14 @@ namespace cryptonote
     {
       if (tx.rct_signatures.outPk.size() != tx.vout.size())
       {
-        MERROR_VER("tx with mismatched vout/outPk count, rejected for tx id= " << get_transaction_hash(tx));
+        oxen::log::error(oxen::log::Cat("verify"), "tx with mismatched vout/outPk count, rejected for tx id= {}", get_transaction_hash(tx));
         return false;
       }
     }
 
     if(!check_money_overflow(tx))
     {
-      MERROR_VER("tx has money overflow, rejected for tx id= " << get_transaction_hash(tx));
+      oxen::log::error(oxen::log::Cat("verify"), "tx has money overflow, rejected for tx id= {}", get_transaction_hash(tx));
       return false;
     }
 
@@ -1592,32 +1582,32 @@ namespace cryptonote
 
       if(amount_in <= amount_out)
       {
-        MERROR_VER("tx with wrong amounts: ins " << amount_in << ", outs " << amount_out << ", rejected for tx id= " << get_transaction_hash(tx));
+        oxen::log::error(oxen::log::Cat("verify"), "tx with wrong amounts: ins {}, outs {}, rejected for tx id= {}", amount_in, amount_out, get_transaction_hash(tx));
         return false;
       }
     }
 
     if(!keeped_by_block && get_transaction_weight(tx) >= m_blockchain_storage.get_current_cumulative_block_weight_limit() - COINBASE_BLOB_RESERVED_SIZE)
     {
-      MERROR_VER("tx is too large " << get_transaction_weight(tx) << ", expected not bigger than " << m_blockchain_storage.get_current_cumulative_block_weight_limit() - COINBASE_BLOB_RESERVED_SIZE);
+      oxen::log::error(oxen::log::Cat("verify"), "tx is too large {}, expected not bigger than {}", get_transaction_weight(tx), m_blockchain_storage.get_current_cumulative_block_weight_limit() - COINBASE_BLOB_RESERVED_SIZE);
       return false;
     }
 
     if(!check_tx_inputs_keyimages_diff(tx))
     {
-      MERROR_VER("tx uses a single key image more than once");
+      oxen::log::error(oxen::log::Cat("verify"), "tx uses a single key image more than once");
       return false;
     }
 
     if (!check_tx_inputs_ring_members_diff(tx))
     {
-      MERROR_VER("tx uses duplicate ring members");
+      oxen::log::error(oxen::log::Cat("verify"), "tx uses duplicate ring members");
       return false;
     }
 
     if (!check_tx_inputs_keyimages_domain(tx))
     {
-      MERROR_VER("tx uses key image not in the valid domain");
+      oxen::log::error(oxen::log::Cat("verify"), "tx uses key image not in the valid domain");
       return false;
     }
 
@@ -1644,7 +1634,7 @@ namespace cryptonote
         "quorum.timestamp",
         [this, pubkey](bool success, std::vector<std::string> data) {
           const time_t local_seconds = time(nullptr);
-          MDEBUG("Timestamp message received: " << data[0] <<", local time is: " << local_seconds);
+          oxen::log::debug(logcat, "Timestamp message received: {}, local time is: ", data[0], local_seconds);
           if(success){
             int64_t received_seconds;
             if (tools::parse_int(data[0],received_seconds)){
@@ -1661,7 +1651,7 @@ namespace cryptonote
 
               // Counts the number of times we have been out of sync
               if (m_sn_times.failures() > (m_sn_times.size() * service_nodes::MAXIMUM_EXTERNAL_OUT_OF_SYNC/100)) {
-                MWARNING("service node time might be out of sync");
+                oxen::log::warning(logcat, "service node time might be out of sync");
                 // If we are out of sync record the other service node as in sync
                 m_service_node_list.record_timesync_status(pubkey, true);
               } else {
@@ -1773,7 +1763,7 @@ namespace cryptonote
         if (cache_to > 0 && count > CACHE_EXCLUSIVE) {
           cache_build_started = std::chrono::steady_clock::now();
           m_coinbase_cache.building = true; // Block out other threads until we're done
-          MINFO("Starting slow cache build request for get_coinbase_tx_sum(" << start_offset << ", " << count << ")");
+          oxen::log::info(logcat, "Starting slow cache build request for get_coinbase_tx_sum({}, {})", start_offset, count);
         }
       }
     }
@@ -1810,8 +1800,8 @@ namespace cryptonote
         if (m_coinbase_cache.building)
         {
           m_coinbase_cache.building = false;
-          MINFO("Finishing cache build for get_coinbase_tx_sum in " <<
-              std::chrono::duration<double>{std::chrono::steady_clock::now() - cache_build_started}.count() << "s");
+          oxen::log::info(logcat, "Finishing cache build for get_coinbase_tx_sum in {} s",
+              std::chrono::duration<double>{std::chrono::steady_clock::now() - cache_build_started}.count());
         }
         cache_to = 0;
       }
@@ -1904,7 +1894,7 @@ namespace cryptonote
     }
 
     if (relayed)
-      MGINFO("Submitted uptime-proof for Service Node (yours): " << m_service_keys.pub);
+      oxen::log::info(logcat, "Submitted uptime-proof for Service Node (yours): {}", m_service_keys.pub);
 
     return true;
   }
@@ -1946,7 +1936,7 @@ namespace cryptonote
     crypto::hash tx_hash;
     if (!parse_and_validate_tx_from_blob(tx_blob, tx, tx_hash))
     {
-      LOG_ERROR("Failed to parse relayed transaction");
+      oxen::log::error(logcat, "Failed to parse relayed transaction");
       return crypto::null_hash;
     }
     txs.push_back(std::make_pair(tx_hash, std::move(tx_blob)));
@@ -2065,7 +2055,7 @@ namespace cryptonote
       std::vector<block> pblocks;
       if (!prepare_handle_incoming_blocks(blocks, pblocks))
       {
-        MERROR("Block found, but failed to prepare to add");
+        oxen::log::error(logcat, "Block found, but failed to prepare to add");
         return false;
       }
       // add_new_block will verify block and set bvc.m_verification_failed accordingly
@@ -2077,7 +2067,7 @@ namespace cryptonote
     if (bvc.m_verifivation_failed)
     {
       bool pulse = cryptonote::block_has_pulse_components(b);
-      MERROR_VER((pulse ? "Pulse" : "Mined") << " block failed verification\n" << cryptonote::obj_to_json_str(b));
+      oxen::log::error(oxen::log::Cat("verify"), "{} block failed verification\n{}", (pulse ? "Pulse" : "Mined"), cryptonote::obj_to_json_str(b));
       return false;
     }
     else if(bvc.m_added_to_main_chain)
@@ -2087,7 +2077,7 @@ namespace cryptonote
       m_blockchain_storage.get_transactions_blobs(b.tx_hashes, txs, &missed_txs);
       if(missed_txs.size() &&  m_blockchain_storage.get_block_id_by_height(get_block_height(b)) != get_block_hash(b))
       {
-        LOG_PRINT_L1("Block found but, seems that reorganize just happened after that, do not relay this block");
+        oxen::log::info(logcat, "Block found but, seems that reorganize just happened after that, do not relay this block");
         return true;
       }
       CHECK_AND_ASSERT_MES(txs.size() == b.tx_hashes.size() && !missed_txs.size(), false, "can't find some transactions in found block:" << get_block_hash(b) << " txs.size()=" << txs.size()
@@ -2157,7 +2147,7 @@ namespace cryptonote
     }
 
     if (((size_t)-1) <= 0xffffffff && block_blob.size() >= 0x3fffffff)
-      MWARNING("This block's size is " << block_blob.size() << ", closing on the 32 bit limit");
+      oxen::log::warning(logcat, "This block's size is {}, closing on the 32 bit limit", block_blob.size());
 
     CHECK_AND_ASSERT_MES(update_checkpoints_from_json_file(), false, "One or more checkpoints loaded from json conflicted with existing checkpoints.");
 
@@ -2167,7 +2157,7 @@ namespace cryptonote
       crypto::hash block_hash;
       if(!parse_and_validate_block_from_blob(block_blob, lb, block_hash))
       {
-        LOG_PRINT_L1("Failed to parse and validate new block");
+        oxen::log::info(logcat, "Failed to parse and validate new block");
         bvc.m_verifivation_failed = true;
         return false;
       }
@@ -2192,7 +2182,7 @@ namespace cryptonote
     // plus the tx hashes, the weight will typically be much larger than the blob size
     if(block_blob.size() > m_blockchain_storage.get_current_cumulative_block_weight_limit() + BLOCK_SIZE_SANITY_LEEWAY)
     {
-      LOG_PRINT_L1("WRONG BLOCK BLOB, sanity check failed on size " << block_blob.size() << ", rejected");
+      oxen::log::info(logcat, "WRONG BLOCK BLOB, sanity check failed on size {}, rejected", block_blob.size());
       return false;
     }
     return true;
@@ -2241,7 +2231,7 @@ namespace cryptonote
     const std::chrono::seconds elapsed{std::time(nullptr) - last_ping};
     if (elapsed > lifetime)
     {
-      MWARNING("Have not heard from " << what << " " <<
+      oxen::log::warning(logcat, "Have not heard from {} {}", what,
               (!last_ping ? "since starting" :
                "since more than " + tools::get_human_readable_timespan(elapsed) + " ago"));
       return false;
@@ -2278,9 +2268,8 @@ namespace cryptonote
         auto pubkey = m_service_node_list.get_pubkey_from_x25519(m_service_keys.pub_x25519);
         if (pubkey != crypto::null_pkey && pubkey != m_service_keys.pub && m_service_node_list.is_service_node(pubkey, false /*don't require active*/))
         {
-          MGINFO_RED(
-              "Failed to submit uptime proof: another service node on the network is using the same ed/x25519 keys as "
-              "this service node. This typically means both have the same 'key_ed25519' private key file.");
+        oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red),
+              "Failed to submit uptime proof: another service node on the network is using the same ed/x25519 keys as this service node. This typically means both have the same 'key_ed25519' private key file."));
           return;
         }
 
@@ -2295,12 +2284,7 @@ namespace cryptonote
             if (pk != m_service_keys.pub && proof.proof->public_ip == m_sn_public_ip &&
                 (proof.proof->qnet_port == m_quorumnet_port || (
                     m_nettype != network_type::DEVNET && (proof.proof->storage_https_port == storage_https_port() || proof.proof->storage_omq_port == storage_omq_port()))))
-            MGINFO_RED(
-                "Another service node (" << pk << ") is broadcasting the same public IP and ports as this service node (" <<
-                epee::string_tools::get_ip_string_from_int32(m_sn_public_ip) << ":" << proof.proof->qnet_port << "[qnet], :" <<
-                proof.proof->storage_https_port << "[SS-HTTP], :" << proof.proof->storage_omq_port << "[SS-LMQ]). "
-                "This will lead to deregistration of one or both service nodes if not corrected. "
-                "(Do both service nodes have the correct IP for the service-node-public-ip setting?)");
+            oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Another service node ({}) is broadcasting the same public IP and ports as this service node ({}:{}[qnet], :{}[SS-HTTP], :{}[SS-LMQ]). This will lead to deregistration of one or both service nodes if not corrected. (Do both service nodes have the correct IP for the service-node-public-ip setting?)", pk, epee::string_tools::get_ip_string_from_int32(m_sn_public_ip), proof.proof->qnet_port, proof.proof->storage_https_port, proof.proof->storage_omq_port));
           });
         }
 
@@ -2308,16 +2292,14 @@ namespace cryptonote
         {
           if (!check_external_ping(m_last_storage_server_ping, get_net_config().UPTIME_PROOF_FREQUENCY, "the storage server"))
           {
-            MGINFO_RED(
-                "Failed to submit uptime proof: have not heard from the storage server recently. Make sure that it "
-                "is running! It is required to run alongside the Loki daemon");
+            oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red),
+                "Failed to submit uptime proof: have not heard from the storage server recently. Make sure that it is running! It is required to run alongside the Loki daemon"));
             return;
           }
           if (!check_external_ping(m_last_lokinet_ping, get_net_config().UPTIME_PROOF_FREQUENCY, "Lokinet"))
           {
-            MGINFO_RED(
-                "Failed to submit uptime proof: have not heard from lokinet recently. Make sure that it "
-                "is running! It is required to run alongside the Loki daemon");
+            oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red),
+                "Failed to submit uptime proof: have not heard from lokinet recently. Make sure that it is running! It is required to run alongside the Loki daemon"));
             return;
           }
         }
@@ -2341,15 +2323,14 @@ namespace cryptonote
         main_message = "The daemon is running offline and will not attempt to sync to the Loki network.";
       else
         main_message = "The daemon will start synchronizing with the network. This may take a long time to complete.";
-      MGINFO_YELLOW("\n**********************************************************************\n"
-        << main_message << "\n"
-        << "\n"
-        << "You can set the level of process detailization through \"set_log <level|categories>\" command,\n"
-        << "where <level> is between 0 (no details) and 4 (very verbose), or custom category based levels (eg, *:WARNING).\n"
-        << "\n"
-        << "Use the \"help\" command to see the list of available commands.\n"
-        << "Use \"help <command>\" to see a command's documentation.\n"
-        << "**********************************************************************\n");
+      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "\n**********************************************************************\n\
+{}\n\n\
+You can set the level of process detailization through \"set_log <level|categories>\" command,\n\
+where <level> is between 0 (no details) and 4 (very verbose), or custom category based levels (eg, *:WARNING).\n\
+\n\
+Use the \"help\" command to see the list of available commands.\n\
+Use \"help <command>\" to see a command's documentation.\n\
+**********************************************************************\n", main_message));
       m_starter_message_showed = true;
     }
 
@@ -2380,10 +2361,7 @@ namespace cryptonote
   {
     uint64_t free_space = get_free_space();
     if (free_space < 1ull * 1024 * 1024 * 1024) // 1 GB
-    {
-      const el::Level level = el::Level::Warning;
-      MCLOG_RED(level, "global", "Free space is below 1 GB on " << m_config_folder);
-    }
+      oxen::log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "Free space is below 1 GB on {}", m_config_folder));
     return true;
   }
   //-----------------------------------------------------------------------------------------------
@@ -2423,7 +2401,7 @@ namespace cryptonote
   {
     if (m_offline || m_nettype == network_type::FAKECHAIN || m_target_blockchain_height > get_current_blockchain_height() || m_target_blockchain_height == 0)
     {
-      MDEBUG("Not checking block rate, offline or syncing");
+      oxen::log::debug(logcat, "Not checking block rate, offline or syncing");
       return true;
     }
 
@@ -2440,10 +2418,13 @@ namespace cryptonote
       const time_t time_boundary = now - static_cast<time_t>(seconds[n]);
       for (time_t ts: timestamps) b += ts >= time_boundary;
       const double p = probability(b, seconds[n] / tools::to_seconds(TARGET_BLOCK_TIME));
-      MDEBUG("blocks in the last " << seconds[n] / 60 << " minutes: " << b << " (probability " << p << ")");
+      oxen::log::debug(logcat, "blocks in the last {} minutes: {} (probability {})", seconds[n] / 60, b, p);
       if (p < threshold)
       {
-        MWARNING("There were " << b << (b == max_blocks_checked ? " or more" : "") << " blocks in the last " << seconds[n] / 60 << " minutes, there might be large hash rate changes, or we might be partitioned, cut off from the Loki network or under attack, or your computer's time is off. Or it could be just sheer bad luck.");
+        oxen::log::warning(logcat, "There were {}{} blocks in the last {} minutes, \
+            there might be large hash rate changes, or we might be partitioned, \
+            cut off from the Loki network or under attack, or your computer's time is off. \
+            Or it could be just sheer bad luck.", b, (b == max_blocks_checked ? " or more" : ""), seconds[n] / 60);
         break; // no need to look further
       }
     }

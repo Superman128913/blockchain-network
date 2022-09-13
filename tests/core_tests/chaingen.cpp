@@ -61,6 +61,7 @@
 #include "chaingen.h"
 #include "device/device.hpp"
 #include "crypto/crypto.h"
+#include "fmt/color.h"
 
 extern "C"
 {
@@ -1612,13 +1613,13 @@ uint64_t get_amount(const cryptonote::account_base& account, const cryptonote::t
     else if (tx.rct_signatures.type == rct::RCTType::Null)
       money_transferred = tx.vout[i].amount;
     else {
-      LOG_PRINT_L0(__func__ << ": Unsupported rct type: " << (int)tx.rct_signatures.type);
+      oxen::log::warning(globallogcat, "{}: Unsupported rct type: {}", __func__, (int)tx.rct_signatures.type);
       return 0;
     }
   }
   catch (const std::exception &e)
   {
-    LOG_PRINT_L0("Failed to decode input " << i << ": " << e.what());
+    oxen::log::warning(globallogcat, "Failed to decode input {}: {}", i, e.what());
     return 0;
   }
 
@@ -2587,7 +2588,7 @@ bool test_chain_unit_base::verify(const std::string& cb_name, cryptonote::core& 
   auto cb_it = m_callbacks.find(cb_name);
   if(cb_it == m_callbacks.end())
   {
-    LOG_ERROR("Failed to find callback " << cb_name);
+    oxen::log::error(globallogcat, "Failed to find callback {}", cb_name);
     return false;
   }
   return cb_it->second(c, ev_index, events);

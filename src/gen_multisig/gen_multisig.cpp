@@ -51,20 +51,18 @@ using namespace cryptonote;
 using boost::lexical_cast;
 namespace po = boost::program_options;
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "wallet.gen_multisig"
-
 namespace genms
 {
   const char* tr(const char* str)
   {
     return i18n_translate(str, "tools::gen_multisig");
   }
-
 }
 
 namespace
 {
+  static auto logcat = oxen::log::Cat("wallet.gen_multisig");
+
   const command_line::arg_descriptor<std::string> arg_filename_base = {"filename-base", genms::tr("Base filename (-1, -2, etc suffixes will be appended as needed)"), ""};
   const command_line::arg_descriptor<std::string> arg_scheme = {"scheme", genms::tr("Give threshold and participants at once as M/N"), ""};
   const command_line::arg_descriptor<uint32_t> arg_participants = {"participants", genms::tr("How many participants will share parts of the multisig wallet"), 0};
@@ -181,7 +179,7 @@ int main(int argc, char* argv[])
     desc_params,
     po::options_description{},
     boost::program_options::positional_options_description(),
-    [](const std::string &s, bool emphasis){ tools::scoped_message_writer(emphasis ? epee::console_color_white : epee::console_color_default, true) << s; },
+    [](const std::string &s){ tools::scoped_message_writer() << s; },
     "oxen-gen-multisig.log"
   );
   if (!vm)

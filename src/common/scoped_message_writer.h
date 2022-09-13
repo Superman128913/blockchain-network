@@ -28,9 +28,11 @@
 
 #pragma once
 
-#include "epee/misc_log_ex.h"
 #include "epee/readline_suspend.h"
+#include "epee/misc_log_ex.h"
 #include <iostream>
+#include "logging/oxen_logger.h"
+#include <fmt/color.h>
 
 namespace tools
 {
@@ -43,19 +45,16 @@ class scoped_message_writer
 private:
   bool m_flush;
   std::ostringstream m_oss;
-  epee::console_colors m_color;
-  bool m_bright;
-  el::Level m_log_level;
+  fmt::terminal_color m_color;
+  oxen::log::Level m_log_level;
 public:
   scoped_message_writer(
-      epee::console_colors color = epee::console_color_default
-    , bool bright = false
+      fmt::terminal_color color = fmt::terminal_color::white 
     , std::string prefix = {}
-    , el::Level log_level = el::Level::Info
+    , spdlog::level::level_enum log_level = spdlog::level::info
     )
     : m_flush(true)
     , m_color(color)
-    , m_bright(bright)
     , m_log_level(log_level)
   {
     m_oss << prefix;
@@ -86,17 +85,17 @@ public:
 
 inline scoped_message_writer success_msg_writer(bool color = true)
 {
-  return scoped_message_writer(color ? epee::console_color_green : epee::console_color_default, false, std::string(), el::Level::Info);
+  return scoped_message_writer(color ? fmt::terminal_color::green : fmt::terminal_color::white, std::string(), spdlog::level::info);
 }
 
-inline scoped_message_writer msg_writer(epee::console_colors color = epee::console_color_default)
+inline scoped_message_writer msg_writer(fmt::terminal_color color = fmt::terminal_color::white)
 {
-  return scoped_message_writer(color, false, std::string(), el::Level::Info);
+  return scoped_message_writer(color, std::string(), spdlog::level::info);
 }
 
 inline scoped_message_writer fail_msg_writer()
 {
-  return scoped_message_writer(epee::console_color_red, true, "Error: ", el::Level::Error);
+  return scoped_message_writer(fmt::terminal_color::red, "Error: ", spdlog::level::err);
 }
 
 } // namespace tools

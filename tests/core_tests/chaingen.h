@@ -40,11 +40,13 @@
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/program_options.hpp>
 #include <boost/serialization/vector.hpp>
+#include <fmt/color.h>
 
 #include "cryptonote_protocol/quorumnet.h"
 #include "common/boost_serialization_helper.h"
 #include "common/command_line.h"
 #include "common/threadpool.h"
+#include "epee/misc_log_ex.h"
 
 #include "cryptonote_basic/account_boost_serialization.h"
 #include "cryptonote_basic/cryptonote_basic.h"
@@ -649,8 +651,11 @@ public:
     opts.kept_by_block = m_txs_keeped_by_block;
     m_c.handle_incoming_tx(t_serializable_object_to_blob(tx), tvc, opts);
     bool tx_added = pool_size + 1 == m_c.get_pool().get_transactions_count();
-    bool r = m_validator.check_tx_verification_context(tvc, tx_added, m_ev_index, tx);
-    CHECK_AND_NO_ASSERT_MES(r, false, "tx verification context check failed");
+    if (!m_validator.check_tx_verification_context(tvc, tx_added, m_ev_index, tx))
+    {
+      oxen::log::warning(globallogcat, "tx verification context check failed");
+      return false;
+    }
     return true;
   }
 
@@ -669,8 +674,11 @@ public:
     for (auto &i : parsed)
         tvcs.push_back(i.tvc);
     size_t tx_added = m_c.get_pool().get_transactions_count() - pool_size;
-    bool r = m_validator.check_tx_verification_context_array(tvcs, tx_added, m_ev_index, txs);
-    CHECK_AND_NO_ASSERT_MES(r, false, "tx verification context check failed");
+    if (!m_validator.check_tx_verification_context_array(tvcs, tx_added, m_ev_index, txs))
+    {
+      oxen::log::warning(globallogcat, "tx verification context check failed");
+      return false;
+    }
     return true;
   }
 
@@ -687,9 +695,12 @@ public:
     }
     else
       bvc.m_verifivation_failed = true;
-    bool r = m_validator.check_block_verification_context(bvc, m_ev_index, b);
-    CHECK_AND_NO_ASSERT_MES(r, false, "block verification context check failed");
-    return r;
+    if (!m_validator.check_block_verification_context(bvc, m_ev_index, b))
+    {
+      oxen::log::warning(globallogcat, "block verification context check failed");
+      return false;
+    }
+    return true;
   }
 
   // TODO(oxen): Deprecate callback_entry for oxen_callback_entry, why don't you
@@ -729,8 +740,11 @@ public:
     } catch (...) {
       blk = cryptonote::block();
     }
-    bool r = m_validator.check_block_verification_context(bvc, m_ev_index, blk);
-    CHECK_AND_NO_ASSERT_MES(r, false, "block verification context check failed");
+    if (!m_validator.check_block_verification_context(bvc, m_ev_index, blk))
+    {
+      oxen::log::warning(globallogcat, "block verification context check failed");
+      return false;
+    }
     return true;
   }
 
@@ -753,8 +767,11 @@ public:
       tx = cryptonote::transaction();
     }
 
-    bool r = m_validator.check_tx_verification_context(tvc, tx_added, m_ev_index, tx);
-    CHECK_AND_NO_ASSERT_MES(r, false, "transaction verification context check failed");
+    if (!m_validator.check_tx_verification_context(tvc, tx_added, m_ev_index, tx))
+    {
+      oxen::log::warning(globallogcat, "transaction verification context check failed");
+      return false;
+    }
     return true;
   }
 
@@ -766,7 +783,14 @@ public:
     log_event("oxen_blockchain_addable<cryptonote::checkpoint_t>");
     cryptonote::Blockchain &blockchain = m_c.get_blockchain_storage();
     bool added = blockchain.update_checkpoint(entry.data);
-    CHECK_AND_NO_ASSERT_MES(added == entry.can_be_added_to_blockchain, false, (entry.fail_msg.size() ? entry.fail_msg : "Failed to add checkpoint (no reason given)"));
+    if (added != entry.can_be_added_to_blockchain)
+    {
+      if (entry.fail_msg.size())
+        oxen::log::warning(globallogcat, entry.fail_msg);
+      else
+        oxen::log::warning(globallogcat, "Failed to add checkpoint (no reason given)");
+      return false;
+    }
     return true;
   }
 
@@ -774,8 +798,15 @@ public:
   {
     log_event("oxen_blockchain_addable<service_nodes::quorum_vote_t>");
     cryptonote::vote_verification_context vvc = {};
-    bool added                                = m_c.add_service_node_vote(entry.data, vvc);
-    CHECK_AND_NO_ASSERT_MES(added == entry.can_be_added_to_blockchain, false, (entry.fail_msg.size() ? entry.fail_msg : "Failed to add service node vote (no reason given)"));
+    bool added = m_c.add_service_node_vote(entry.data, vvc);
+    if (added != entry.can_be_added_to_blockchain)
+    {
+      if (entry.fail_msg.size())
+        oxen::log::warning(globallogcat, entry.fail_msg);
+      else
+        oxen::log::warning(globallogcat, "Failed to add service node vote (no reason given)");
+      return false;
+    }
     return true;
   }
 
@@ -800,7 +831,14 @@ public:
       bvc.m_verifivation_failed = true;
 
     bool added = !bvc.m_verifivation_failed;
-    CHECK_AND_NO_ASSERT_MES(added == entry.can_be_added_to_blockchain, false, (entry.fail_msg.size() ? entry.fail_msg : "Failed to add block with checkpoint (no reason given)"));
+    if (added != entry.can_be_added_to_blockchain)
+    {
+      if (entry.fail_msg.size())
+        oxen::log::warning(globallogcat, entry.fail_msg);
+      else
+        oxen::log::warning(globallogcat, "Failed to add block with checkpoint (no reason given)");
+      return false;
+    }
     return true;
   }
   
@@ -820,7 +858,14 @@ public:
       bvc.m_verifivation_failed = true;
 
     bool added = !bvc.m_verifivation_failed;
-    CHECK_AND_NO_ASSERT_MES(added == entry.can_be_added_to_blockchain, false, (entry.fail_msg.size() ? entry.fail_msg : "Failed to add block (no reason given)"));
+    if (added != entry.can_be_added_to_blockchain)
+    {
+      if (entry.fail_msg.size())
+        oxen::log::warning(globallogcat, entry.fail_msg);
+      else
+        oxen::log::warning(globallogcat, "Failed to add block (no reason given)");
+      return false;
+    }
     return true;
   }
 
@@ -839,7 +884,14 @@ public:
       bvc.m_verifivation_failed = true;
 
     bool added = !bvc.m_verifivation_failed;
-    CHECK_AND_NO_ASSERT_MES(added == entry.can_be_added_to_blockchain, false, (entry.fail_msg.size() ? entry.fail_msg : "Failed to add block (no reason given)"));
+    if (added != entry.can_be_added_to_blockchain)
+    {
+      if (entry.fail_msg.size())
+        oxen::log::warning(globallogcat, entry.fail_msg);
+      else
+        oxen::log::warning(globallogcat, "Failed to add block (no reason given)");
+      return false;
+    }
     return true;
   }
 
@@ -853,9 +905,17 @@ public:
     m_c.handle_incoming_tx(t_serializable_object_to_blob(entry.data.tx), tvc, opts);
 
     bool added = (pool_size + 1) == m_c.get_pool().get_transactions_count();
+    if (added != entry.can_be_added_to_blockchain)
+    {
+      if (entry.fail_msg.size())
+        oxen::log::warning(globallogcat, entry.fail_msg);
+      else if (entry.can_be_added_to_blockchain)
+        oxen::log::warning(globallogcat, "Failed to add transaction that should have been accepted");
+      else
+        oxen::log::warning(globallogcat, "TX adding should have failed, but didn't");
+      return false;
+    }
 
-    CHECK_AND_NO_ASSERT_MES(added == entry.can_be_added_to_blockchain, false, (entry.fail_msg.size() ? entry.fail_msg :
-                entry.can_be_added_to_blockchain ? "Failed to add transaction that should have been accepted" : "TX adding should have failed, but didn't"));
     return true;
   }
 
@@ -869,15 +929,15 @@ public:
   bool operator()(const std::string &msg) const
   {
     log_event("event_msgevent_marker");
-    MGINFO_MAGENTA(msg);
+    oxen::log::info(globallogcat, fmt::format(fg(fmt::terminal_color::magenta), msg));
     return true;
   }
 
 private:
   void log_event(const std::string& event_type) const
   {
-    if (LOG_ENABLED(Info))
-      MGINFO_YELLOW("=== EVENT # " << m_ev_index << ": " << event_type);
+    if (globallogcat->should_log(oxen::log::Level::info))
+      oxen::log::debug(globallogcat, fmt::format(fg(fmt::terminal_color::yellow), "=== EVENT # {}:{}", m_ev_index, event_type));
   }
 };
 //--------------------------------------------------------------------------
@@ -964,7 +1024,7 @@ inline bool do_replay_events_get_core(std::vector<test_event_entry>& events, cry
   cryptonote::test_options const *testing_options = (use_derived_hardforks) ? &derived_test_options : &gto.test_options;
   if (!c.init(vm, testing_options))
   {
-    MERROR("Failed to init core");
+    oxen::log::error(globallogcat, "Failed to init core");
     return false;
   }
   c.get_blockchain_storage().get_db().set_batch_transactions(true);
@@ -979,7 +1039,7 @@ inline bool do_replay_file(const std::string& filename)
   std::vector<test_event_entry> events;
   if (!tools::unserialize_obj_from_file(events, filename))
   {
-    MERROR("Failed to deserialize data from file: ");
+    oxen::log::error(globallogcat, "Failed to deserialize data from file: ");
     return false;
   }
 
@@ -1141,24 +1201,24 @@ inline bool do_replay_file(const std::string& filename)
 #define PLAY(filename, generator_class) \
     if(!do_replay_file<generator_class>(filename)) \
     { \
-      MERROR("Failed to pass test : " << #generator_class); \
+      oxen::log::error(globallogcat, "Failed to pass test : {}", #generator_class); \
       return 1; \
     }
 
 #define CATCH_REPLAY(generator_class)                                                                                  \
-  catch (const std::exception &ex) { MERROR(#generator_class << " generation failed: what=" << ex.what()); }           \
-  catch (...) { MERROR(#generator_class << " generation failed: generic exception"); }
+  catch (const std::exception &ex) { oxen::log::error(globallogcat, "{} generation failed: what={}", #generator_class, ex.what()); }\
+  catch (...) { oxen::log::error(globallogcat, "{} generation failed: generic exception", #generator_class); }
 
 #define REPLAY_CORE(generator_class, generator_class_instance)                                                         \
   {                                                                                                                    \
     cryptonote::core core;                                                                                             \
     if (generated && do_replay_events_get_core<generator_class>(events, &core, generator_class_instance))              \
     {                                                                                                                  \
-      MGINFO_GREEN("#TEST# Succeeded " << #generator_class);                                                           \
+      oxen::log::info(globallogcat, fmt::format(fg(fmt::terminal_color::green), "#TEST# Succeeded {}", #generator_class));\
     }                                                                                                                  \
     else                                                                                                               \
     {                                                                                                                  \
-      MERROR("#TEST# Failed " << #generator_class);                                                                    \
+      oxen::log::error(globallogcat, "#TEST# Failed {}", #generator_class);                                            \
       failed_tests.push_back(#generator_class);                                                                        \
     }                                                                                                                  \
     core.deinit();                                                                                                     \
@@ -1169,11 +1229,11 @@ inline bool do_replay_file(const std::string& filename)
     if (generated &&                                                                                                   \
         replay_events_through_core_plain<generator_class>(events, CORE, generator_class_instance, false /*reinit*/))   \
     {                                                                                                                  \
-      MGINFO_GREEN("#TEST# Succeeded " << #generator_class);                                                           \
+      oxen::log::info(globallogcat, fmt::format(fg(fmt::terminal_color::green), "#TEST# Succeeded {}", #generator_class));\
     }                                                                                                                  \
     else                                                                                                               \
     {                                                                                                                  \
-      MERROR("#TEST# Failed " << #generator_class);                                                                    \
+      oxen::log::error(globallogcat, "{}{}", , "#TEST# Failed ", #generator_class);                                    \
       failed_tests.push_back(#generator_class);                                                                        \
     }                                                                                                                  \
   }

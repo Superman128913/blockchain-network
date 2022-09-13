@@ -496,9 +496,9 @@ bool oxen_core_block_reward_unpenalized_post_pulse::generate(std::vector<test_ev
       CHECK_TEST_CONDITION_MSG(rewards_from_fee > 0 && rewards_from_fee < tx_fee, "Block producer should receive a penalised tx fee less than " << cryptonote::print_money(tx_fee) << "received, " << cryptonote::print_money(rewards_from_fee) << "");
       CHECK_TEST_CONDITION_MSG(top_block.miner_tx.vout[1].amount == unpenalized_reward, "Service Node should receive full reward " << unpenalized_reward);
 
-      MGINFO("rewards_from_fee: "   << cryptonote::print_money(rewards_from_fee));
-      MGINFO("tx_fee: "             << cryptonote::print_money(tx_fee));
-      MGINFO("unpenalized_amount: " << cryptonote::print_money(unpenalized_reward));
+      oxen::log::info(globallogcat, "rewards_from_fee: {}", cryptonote::print_money(rewards_from_fee));
+      oxen::log::info(globallogcat, "tx_fee: {}", cryptonote::print_money(tx_fee));
+      oxen::log::info(globallogcat, "unpenalized_amount: {}", cryptonote::print_money(unpenalized_reward));
       return true;
       });
   return true;
@@ -2810,7 +2810,7 @@ bool oxen_service_nodes_test_rollback::generate(std::vector<test_event_entry>& e
 
       crypto::public_key pk_b;
       if (!cryptonote::get_service_node_pubkey_from_tx_extra(reg_tx.data.tx.extra, pk_b)) {
-        MERROR("Could not get service node key from tx extra");
+        oxen::log::error(globallogcat, "Could not get service node key from tx extra");
         return false;
       }
 
@@ -3730,7 +3730,7 @@ bool oxen_batch_sn_rewards_bad_address::generate(std::vector<test_event_entry> &
   crypto::public_key bob_deterministic_output_key{};
   if (!cryptonote::get_deterministic_output_key(bob_address, txkey, 0, bob_deterministic_output_key))
   {
-    MERROR("Failed to generate output one-time public key");
+    oxen::log::error(globallogcat, "Failed to generate output one-time public key");
     return false;
   }
   // Switch Alice as recipient of payment to Bob

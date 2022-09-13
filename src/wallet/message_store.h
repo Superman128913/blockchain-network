@@ -49,13 +49,13 @@
 #include "common/fs.h"
 #include "message_transporter.h"
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "wallet.mms"
 #define AUTO_CONFIG_TOKEN_BYTES 4
 #define AUTO_CONFIG_TOKEN_PREFIX "mms"
 
 namespace mms
 {
+  static auto logcat = oxen::log::Cat("wallet.mms");
+
   enum class message_type
   {
     key_set,

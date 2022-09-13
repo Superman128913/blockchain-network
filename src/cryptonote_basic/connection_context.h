@@ -35,6 +35,7 @@
 #include "epee/net/net_utils_base.h"
 #include "epee/copyable_atomic.h"
 #include "crypto/hash.h"
+#include "fmt/format.h"
 
 using namespace std::literals;
 
@@ -92,3 +93,11 @@ namespace cryptonote
   }
 
 }
+
+template <typename T>
+struct fmt::formatter<T, char, std::enable_if_t<std::is_base_of_v<epee::net_utils::connection_context_base, T>>> : fmt::formatter<std::string> {
+  auto format(epee::net_utils::connection_context_base connection_context, format_context& ctx) {
+    return formatter<std::string>::format(
+      fmt::format("[{}]", epee::net_utils::print_connection_context_short(connection_context)), ctx);
+  }
+};

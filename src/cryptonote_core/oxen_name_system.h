@@ -340,5 +340,21 @@ private:
   sql_compiled_statement get_mappings_on_height_and_newer_sql{*this};
 };
 
-}; // namespace service_nodes
+}; // namespace ons
+   
+template <>
+struct fmt::formatter<ons::mapping_value> : fmt::formatter<std::string> {
+  auto format(ons::mapping_value v, format_context& ctx) {
+    return formatter<std::string>::format(
+        fmt::format("{}", oxenc::to_hex(v.to_view())), ctx);
+  }
+};
+template <>
+struct fmt::formatter<ons::mapping_type> : fmt::formatter<std::string> {
+  auto format(ons::mapping_type t, format_context& ctx) {
+    return formatter<std::string>::format(
+        fmt::format("{}", ons::mapping_type_str(t)), ctx);
+  }
+};
+
 #endif // OXEN_NAME_SYSTEM_H

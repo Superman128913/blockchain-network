@@ -45,6 +45,8 @@
 #include "ringct/rctTypes.h"
 #include "device/device.hpp"
 #include "txtypes.h"
+#include "logging/oxen_logger.h"
+#include <fmt/format.h>
 
 namespace service_nodes
 {
@@ -226,7 +228,7 @@ namespace cryptonote
       {
         if (out_index >= output_unlock_times.size())
         {
-          LOG_ERROR("Tried to get unlock time of a v3 transaction with missing output unlock time");
+          oxen::log::error(globallogcat, "Tried to get unlock time of a v3 transaction with missing output unlock time");
           return unlock_time;
         }
         return output_unlock_times[out_index];
@@ -602,6 +604,21 @@ namespace cryptonote
       x = static_cast<hf>(val);
   }
 }
+
+template <>
+struct fmt::formatter<cryptonote::txtype> : fmt::formatter<std::string> {
+  auto format(cryptonote::txtype t, format_context& ctx) {
+    return formatter<std::string>::format(
+        fmt::format("{}", cryptonote::transaction::type_to_string(t)), ctx);
+  }
+};
+template <>
+struct fmt::formatter<cryptonote::txversion> : fmt::formatter<std::string> {
+  auto format(cryptonote::txversion v, format_context& ctx) {
+    return formatter<std::string>::format(
+        fmt::format("{}", cryptonote::transaction::version_to_string(v)), ctx);
+  }
+};
 
 namespace std {
   template <>

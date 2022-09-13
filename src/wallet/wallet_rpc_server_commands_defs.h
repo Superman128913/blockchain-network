@@ -39,9 +39,6 @@
 #include "common/meta.h"
 #include "common/oxen.h"
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "wallet.rpc"
-
 // When making *any* change here, bump minor
 // If the change is incompatible, then bump major and set minor to 0
 // This ensures WALLET_RPC_VERSION always increases, that every change
@@ -61,6 +58,8 @@
 /// `wallet_rpc_types` list at the bottom of the file.
 
 namespace tools::wallet_rpc {
+
+  static auto logcat = oxen::log::Cat("wallet.rpc");
 
   /// Base class that all wallet rpc commands inherit from
   struct RPC_COMMAND {};

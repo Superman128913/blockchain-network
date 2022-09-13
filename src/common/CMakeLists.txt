@@ -39,7 +39,6 @@ add_library(common
   oxen.cpp
   notify.cpp
   password.cpp
-  perf_timer.cpp
   pruning.cpp
   random.cpp
   rules.cpp
@@ -67,7 +66,7 @@ target_link_libraries(common
     filesystem
     fmt::fmt
     date::date
-    fmt::fmt
   PRIVATE
     sodium
+    logging
     extra)

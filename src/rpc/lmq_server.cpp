@@ -5,17 +5,17 @@
 #include "oxenmq/oxenmq.h"
 #include <fmt/core.h>
 #include "oxenc/bt.h"
+#include "oxenmq/fmt.h"
 
 // FIXME: Rename this to omq_server.{h,cpp}
-
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "daemon.rpc"
 
 namespace cryptonote { namespace rpc {
 
 using oxenmq::AuthLevel;
 
 namespace {
+
+static auto logcat = oxen::log::Cat("daemon.rpc");
 
 // TODO: all of this --lmq-blah options really should be renamed to --omq-blah, but then we *also*
 // need some sort of backwards compatibility shim, and that is a nuissance.
@@ -112,21 +112,21 @@ omq_rpc::omq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
   // the quorumnet listener set up in cryptonote_core).
   for (const auto &addr : command_line::get_arg(vm, arg_omq_public)) {
     check_omq_listen_addr(addr);
-    MGINFO("LMQ listening on " << addr << " (public unencrypted)");
+    oxen::log::info(logcat, "LMQ listening on {} (public unencrypted)", addr);
     omq.listen_plain(addr,
         [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.omq_allow(ip, pk, AuthLevel::basic); });
   }
 
   for (const auto &addr : command_line::get_arg(vm, arg_omq_curve_public)) {
     check_omq_listen_addr(addr);
-    MGINFO("LMQ listening on " << addr << " (public curve)");
+    oxen::log::info(logcat, "LMQ listening on {} (public curve)", addr);
     omq.listen_curve(addr,
         [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.omq_allow(ip, pk, AuthLevel::basic); });
   }
 
   for (const auto &addr : command_line::get_arg(vm, arg_omq_curve)) {
     check_omq_listen_addr(addr);
-    MGINFO("LMQ listening on " << addr << " (curve restricted)");
+    oxen::log::info(logcat, "LMQ listening on {} (curve restricted)", addr);
     omq.listen_curve(addr,
         [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.omq_allow(ip, pk, AuthLevel::denied); });
   }
@@ -148,7 +148,7 @@ omq_rpc::omq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
   }
   for (const auto &addr : locals) {
     check_omq_listen_addr(addr);
-    MGINFO("LMQ listening on " << addr << " (unauthenticated local admin)");
+    oxen::log::info(logcat, "OMQ listening on {} (unauthenticated local admin)", addr);
     omq.listen_plain(addr,
         [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.omq_allow(ip, pk, AuthLevel::admin); });
   }
@@ -227,19 +227,17 @@ omq_rpc::omq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
         // warnings that get generated deep inside epee, for example when passing a string or
         // number instead of a JSON object.  If you want to find some, `grep number2 epee` (for
         // real).
-        MINFO("LMQ RPC request '" << (call.is_public ? "rpc." : "admin.") << name << "' called with invalid/unparseable data: " << e.what());
+        oxen::log::info(logcat, "LMQ RPC request '{}{}' called with invalid/unparseable data: {}", (call.is_public ? "rpc." : "admin."), name, e.what());
         m.send_reply(LMQ_BAD_REQUEST, "Unable to parse request: "s + e.what());
         return;
       } catch (const rpc_error& e) {
-        MWARNING("LMQ RPC request '" << (call.is_public ? "rpc." : "admin.") << name << "' failed with: " << e.what());
+        oxen::log::warning(logcat, "LMQ RPC request '{}{}' failed with: {}", (call.is_public ? "rpc." : "admin."), name, e.what());
         m.send_reply(LMQ_ERROR, e.what());
         return;
       } catch (const std::exception& e) {
-        MWARNING("LMQ RPC request '" << (call.is_public ? "rpc." : "admin.") << name << "' "
-            "raised an exception: " << e.what());
+        oxen::log::warning(logcat, "LMQ RPC request '{}{}' raised an exception: {}", (call.is_public ? "rpc." : "admin."), name, e.what());
       } catch (...) {
-        MWARNING("LMQ RPC request '" << (call.is_public ? "rpc." : "admin.") << name << "' "
-            "raised an unknown exception");
+        oxen::log::warning(logcat, "LMQ RPC request '{}{}' raised an unknown exception", (call.is_public ? "rpc." : "admin."), name);
       }
       // Don't include the exception message in case it contains something that we don't want go
       // back to the user.  If we want to support it eventually we could add some sort of
@@ -302,7 +300,7 @@ static void send_notifies(Mutex& mutex, Subs& subs, const char* desc, Call call)
   for (auto& conn : remove) {
     auto it = subs.find(conn);
     if (it != subs.end() && it->second.expiry < now /* recheck: client might have resubscribed in between locks */) {
-      MDEBUG("Removing " << conn << " from " << desc << " subscriptions: subscription timed out");
+      oxen::log::debug(logcat, "Removing {} from {} subscriptions: subscription timed out", conn, desc);
       subs.erase(it);
     }
   }
@@ -536,13 +534,13 @@ void omq_rpc::on_mempool_sub_request(oxenmq::Message& m)
     if (!result.second) {
       result.first->second.expiry = expiry;
       if (result.first->second.type == sub_type) {
-        MTRACE("Renewed mempool subscription request from conn id " << m.conn << " @ " << m.remote);
+        oxen::log::trace(logcat, "Renewed mempool subscription request from conn id {}@{}", m.conn, m.remote);
         m.send_reply("ALREADY");
         return;
       }
       result.first->second.type = sub_type;
     }
-    MDEBUG("New " << (sub_type == mempool_sub_type::blink ? "blink" : "all") << " mempool subscription request from conn " << m.conn << " @ " << m.remote);
+    oxen::log::debug(logcat, "New {} mempool subscription request from conn {}@{}", (sub_type == mempool_sub_type::blink ? "blink" : "all"), m.conn, m.remote);
     m.send_reply("OK");
   }
 }
@@ -565,10 +563,10 @@ void omq_rpc::on_block_sub_request(oxenmq::Message& m)
   auto result = block_subs_.emplace(m.conn, block_sub{expiry});
   if (!result.second) {
     result.first->second.expiry = expiry;
-    MTRACE("Renewed block subscription request from conn id " << m.conn << " @ " << m.remote);
+    oxen::log::trace(logcat, "Renewed block subscription request from conn id {}@{}", m.conn, m.remote);
     m.send_reply("ALREADY");
   } else {
-    MDEBUG("New block subscription request from conn " << m.conn << " @ " << m.remote);
+    oxen::log::debug(logcat, "New block subscription request from conn {}@{}", m.conn, m.remote);
     m.send_reply("OK");
   }
 }

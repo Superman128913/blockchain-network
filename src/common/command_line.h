@@ -34,16 +34,20 @@
 #include <sstream>
 #include <array>
 #include <type_traits>
+#include <iostream>
 
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/variables_map.hpp>
-#include "epee/misc_log_ex.h"
 #include "common/string_util.h"
 #include "common/i18n.h"
+#include "logging/oxen_logger.h"
 
 namespace command_line
 {
+
+  static auto logcat = oxen::log::Cat("global");
+
   inline const char* tr(const char* str) { return i18n_translate(str, "command_line"); }
 
   /// @return True if `str` is (case-insensitively) y, yes, a potentially translated yes, or any of
@@ -216,7 +220,8 @@ namespace command_line
   {
     if (0 != description.find_nothrow(arg.name, false))
     {
-      CHECK_AND_ASSERT_MES(!unique, void(), "Argument already exists: " << arg.name);
+      if (!unique)
+        oxen::log::error(logcat, "Argument already exists: {}", arg.name);
       return;
     }
 
@@ -228,7 +233,8 @@ namespace command_line
   {
     if (0 != description.find_nothrow(arg.name, false))
     {
-      CHECK_AND_ASSERT_MES(!unique, void(), "Argument already exists: " << arg.name);
+      if (!unique)
+        oxen::log::error(logcat, "Argument already exists: {}", arg.name);
       return;
     }
 
@@ -240,7 +246,8 @@ namespace command_line
   {
     if (0 != description.find_nothrow(arg.name, false))
     {
-      CHECK_AND_ASSERT_MES(!unique, void(), "Argument already exists: " << arg.name);
+      if (!unique)
+        oxen::log::error(logcat, "Argument already exists: {}", arg.name);
       return;
     }
 

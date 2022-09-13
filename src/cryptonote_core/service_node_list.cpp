@@ -35,6 +35,7 @@
 
 #include <fmt/core.h>
 #include <fmt/chrono.h>
+#include <fmt/color.h>
 
 #include <oxenc/endian.h>
 #include <oxenc/hex.h>
@@ -65,16 +66,14 @@ extern "C" {
 #include "service_node_rules.h"
 #include "service_node_swarm.h"
 #include "version.h"
-
 #include <date/date.h>
-
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "service_nodes"
 
 using cryptonote::hf;
 
 namespace service_nodes
 {
+  static auto logcat = oxen::log::Cat("service_nodes");
+
   size_t constexpr STORE_LONG_TERM_STATE_INTERVAL = 10000;
 
   constexpr auto X25519_MAP_PRUNING_INTERVAL = 5min;
@@ -110,7 +109,7 @@ namespace service_nodes
     uint64_t current_height = m_blockchain.get_current_blockchain_height();
     bool loaded = load(current_height);
     if (loaded && m_transient.old_quorum_states.size() < std::min(m_store_quorum_history, uint64_t{10})) {
-      LOG_PRINT_L0("Full history storage requested, but " << m_transient.old_quorum_states.size() << " old quorum states found");
+      oxen::log::warning(logcat, "Full history storage requested, but {} old quorum states found", m_transient.old_quorum_states.size());
       loaded = false; // Either we don't have stored history or the history is very short, so recalculation is necessary or cheap.
     }
 
@@ -203,13 +202,13 @@ namespace service_nodes
     else if (group == quorum_group::worker)    array = &quorum.workers;
     else
     {
-      MERROR("Invalid quorum group specified");
+      oxen::log::error(logcat, "Invalid quorum group specified");
       return false;
     }
 
     if (quorum_index >= array->size())
     {
-      MERROR("Quorum indexing out of bounds: " << quorum_index << ", quorum_size: " << array->size());
+      oxen::log::error(logcat, "Quorum indexing out of bounds: {}, quorum_size: {}", quorum_index, array->size());
       return false;
     }
 
@@ -222,7 +221,7 @@ namespace service_nodes
     std::shared_ptr<const quorum> quorum = get_quorum(type, height);
     if (!quorum)
     {
-      LOG_PRINT_L1("Quorum for height: " << height << ", was not stored by the daemon");
+      oxen::log::info(logcat, "Quorum for height: {}, was not stored by the daemon", height);
       return false;
     }
 
@@ -475,13 +474,13 @@ namespace service_nodes
               money_transferred = rct::decodeRct(tx.rct_signatures, rct::sk2rct(scalar1), i, mask, hwdev);
               break;
           default:
-              LOG_PRINT_L0(__func__ << ": Unsupported rct type: " << (int)tx.rct_signatures.type);
+              oxen::log::warning(logcat, "{}: Unsupported rct type: {}", __func__, (int)tx.rct_signatures.type);
               return 0;
       }
     }
     catch (const std::exception &e)
     {
-      LOG_PRINT_L0("Failed to decode input " << i);
+      oxen::log::warning(logcat, "Failed to decode input {}", i);
       return 0;
     }
 
@@ -500,7 +499,7 @@ namespace service_nodes
 
     if (!cryptonote::get_tx_secret_key_from_tx_extra(tx.extra, contribution->tx_key))
     {
-      LOG_PRINT_L1("TX: There was a service node contributor but no secret key in the tx extra for tx: " << txid);
+      oxen::log::info(logcat, "TX: There was a service node contributor but no secret key in the tx extra for tx: {}", txid);
       return false;
     }
 
@@ -542,7 +541,7 @@ namespace service_nodes
     crypto::key_derivation derivation;
     if (!crypto::generate_key_derivation(contribution->address.m_view_public_key, contribution->tx_key, derivation))
     {
-      LOG_PRINT_L1("TX: Failed to generate key derivation on height: " << block_height << " for tx: " << cryptonote::get_transaction_hash(tx));
+      oxen::log::info(logcat, "TX: Failed to generate key derivation on height: {} for tx: {}", block_height, cryptonote::get_transaction_hash(tx));
       return false;
     }
 
@@ -565,7 +564,7 @@ namespace service_nodes
       cryptonote::tx_extra_tx_key_image_proofs key_image_proofs;
       if (!get_field_from_tx_extra(tx.extra, key_image_proofs))
       {
-        LOG_PRINT_L1("TX: Didn't have key image proofs in the tx_extra, rejected on height: " << block_height << " for tx: " << cryptonote::get_transaction_hash(tx));
+        oxen::log::info(logcat, "TX: Didn't have key image proofs in the tx_extra, rejected on height: {} for tx: {}", block_height, cryptonote::get_transaction_hash(tx));
         stake_decoded = false;
       }
 
@@ -594,7 +593,7 @@ namespace service_nodes
           // P' := Derivation + B
           if (!hwdev.derive_public_key(derivation, output_index, contribution->address.m_spend_public_key, ephemeral_pub_key))
           {
-            LOG_PRINT_L1("TX: Could not derive TX ephemeral key on height: " << block_height << " for tx: " << get_transaction_hash(tx) << " for output: " << output_index);
+            oxen::log::info(logcat, "TX: Could not derive TX ephemeral key on height: {} for tx: {} for output: {}", block_height, get_transaction_hash(tx), output_index);
             continue;
           }
 
@@ -602,7 +601,7 @@ namespace service_nodes
           const auto& out_to_key = var::get<cryptonote::txout_to_key>(tx.vout[output_index].target);
           if (out_to_key.key != ephemeral_pub_key)
           {
-            LOG_PRINT_L1("TX: Derived TX ephemeral key did not match tx stored key on height: " << block_height << " for tx: " << cryptonote::get_transaction_hash(tx) << " for output: " << output_index);
+            oxen::log::info(logcat, "TX: Derived TX ephemeral key did not match tx stored key on height: {} for tx: {} for output: {}", block_height, cryptonote::get_transaction_hash(tx), output_index);
             continue;
           }
         }
@@ -681,7 +680,7 @@ namespace service_nodes
     cryptonote::tx_extra_service_node_state_change state_change;
     if (!cryptonote::get_service_node_state_change_from_tx_extra(tx.extra, state_change, hf_version))
     {
-      MERROR("Transaction: " << cryptonote::get_transaction_hash(tx) << ", did not have valid state change data in tx extra rejecting malformed tx");
+      oxen::log::error(logcat, "Transaction: {}, did not have valid state change data in tx extra rejecting malformed tx", cryptonote::get_transaction_hash(tx));
       return false;
     }
 
@@ -691,10 +690,7 @@ namespace service_nodes
       it = state_archive.find(state_change.block_height);
       if (it == state_archive.end())
       {
-        MERROR("Transaction: " << cryptonote::get_transaction_hash(tx) << " in block "
-                               << cryptonote::get_block_height(block) << " " << cryptonote::get_block_hash(block)
-                               << " references quorum height " << state_change.block_height
-                               << " but that height is not stored!");
+        oxen::log::error(logcat, "Transaction: {} in block {} {} references quorum height but that height is not stored!", cryptonote::get_transaction_hash(tx), cryptonote::get_block_height(block), cryptonote::get_block_hash(block), state_change.block_height);
         return false;
       }
     }
@@ -720,20 +716,20 @@ namespace service_nodes
 
     if (!quorums)
     {
-      MERROR("Could not get a quorum that could completely validate the votes from state change in tx: " << get_transaction_hash(tx) << ", skipping transaction");
+      oxen::log::error(logcat, "Could not get a quorum that could completely validate the votes from state change in tx: {}, skipping transaction", get_transaction_hash(tx));
       return false;
     }
 
     crypto::public_key key;
     if (!get_pubkey_from_quorum(*quorums->obligations, quorum_group::worker, state_change.service_node_index, key))
     {
-      MERROR("Retrieving the public key from state change in tx: " << cryptonote::get_transaction_hash(tx) << " failed");
+      oxen::log::error(logcat, "Retrieving the public key from state change in tx: {} failed", cryptonote::get_transaction_hash(tx));
       return false;
     }
 
     auto iter = service_nodes_infos.find(key);
     if (iter == service_nodes_infos.end()) {
-      LOG_PRINT_L2("Received state change tx for non-registered service node " << key << " (perhaps a delayed tx?)");
+      oxen::log::debug(logcat, "Received state change tx for non-registered service node {} (perhaps a delayed tx?)", key);
       return false;
     }
 
@@ -744,9 +740,9 @@ namespace service_nodes
     switch (state_change.state) {
       case new_state::deregister:
         if (is_me)
-          MGINFO_RED("Deregistration for service node (yours): " << key);
+          oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Deregistration for service node (yours): {}", key));
         else
-          LOG_PRINT_L1("Deregistration for service node: " << key);
+          oxen::log::info(logcat, "Deregistration for service node: {}", key);
 
         if (hf_version >= hf::hf11_infinite_staking)
         {
@@ -768,19 +764,19 @@ namespace service_nodes
 
       case new_state::decommission:
         if (hf_version < hf::hf12_checkpointing) {
-          MERROR("Invalid decommission transaction seen before network v12");
+          oxen::log::error(logcat, "Invalid decommission transaction seen before network v12");
           return false;
         }
 
         if (info.is_decommissioned()) {
-          LOG_PRINT_L2("Received decommission tx for already-decommissioned service node " << key << "; ignoring");
+          oxen::log::debug(logcat, "Received decommission tx for already-decommissioned service node {}; ignoring", key);
           return false;
         }
 
         if (is_me)
-          MGINFO_RED("Temporary decommission for service node (yours): " << key);
+          oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Temporary decommission for service node (yours): {}", key));
         else
-          LOG_PRINT_L1("Temporary decommission for service node: " << key);
+          oxen::log::info(logcat, "Temporary decommission for service node: {}", key);
 
         info.active_since_height = -info.active_since_height;
         info.last_decommission_height = block_height;
@@ -806,19 +802,19 @@ namespace service_nodes
 
       case new_state::recommission: {
         if (hf_version < hf::hf12_checkpointing) {
-          MERROR("Invalid recommission transaction seen before network v12");
+          oxen::log::error(logcat, "Invalid recommission transaction seen before network v12");
           return false;
         }
 
         if (!info.is_decommissioned()) {
-          LOG_PRINT_L2("Received recommission tx for already-active service node " << key << "; ignoring");
+          oxen::log::debug(logcat, "Received recommission tx for already-active service node {}; ignoring", key);
           return false;
         }
 
         if (is_me)
-          MGINFO_GREEN("Recommission for service node (yours): " << key);
+          oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Recommission for service node (yours): {}", key));
         else
-          LOG_PRINT_L1("Recommission for service node: " << key);
+          oxen::log::info(logcat, "Recommission for service node: {}", key);
 
         // To figure out how much credit the node gets at recommissioned we need to know how much it
         // had when it got decommissioned, and how long it's been decommisioned.
@@ -851,19 +847,19 @@ namespace service_nodes
       }
       case new_state::ip_change_penalty:
         if (hf_version < hf::hf12_checkpointing) {
-          MERROR("Invalid ip_change_penalty transaction seen before network v12");
+          oxen::log::error(logcat, "Invalid ip_change_penalty transaction seen before network v12");
           return false;
         }
 
         if (info.is_decommissioned()) {
-          LOG_PRINT_L2("Received reset position tx for service node " << key << " but it is already decommissioned; ignoring");
+          oxen::log::debug(logcat, "Received reset position tx for service node {} but it is already decommissioned; ignoring", key);
           return false;
         }
 
         if (is_me)
-          MGINFO_RED("Reward position reset for service node (yours): " << key);
+          oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Reward position reset for service node (yours): {}", key));
         else
-          LOG_PRINT_L1("Reward position reset for service node: " << key);
+          oxen::log::info(logcat, "Reward position reset for service node: {}", key);
 
 
         // Move the SN at the back of the list as if it had just registered (or just won)
@@ -874,7 +870,7 @@ namespace service_nodes
 
       default:
         // dev bug!
-        MERROR("BUG: Service node state change tx has unknown state " << static_cast<uint16_t>(state_change.state));
+        oxen::log::error(logcat, "BUG: Service node state change tx has unknown state {}", static_cast<uint16_t>(state_change.state));
         return false;
     }
   }
@@ -892,17 +888,14 @@ namespace service_nodes
     const service_node_info &node_info = *it->second;
     if (node_info.requested_unlock_height != KEY_IMAGE_AWAITING_UNLOCK_HEIGHT)
     {
-      LOG_PRINT_L1("Unlock TX: Node already requested an unlock at height: "
-                   << node_info.requested_unlock_height << " rejected on height: " << block_height
-                   << " for tx: " << cryptonote::get_transaction_hash(tx));
+      oxen::log::info(logcat, "Unlock TX: Node already requested an unlock at height: {} rejected on height: {} for tx: {}", node_info.requested_unlock_height, block_height, cryptonote::get_transaction_hash(tx));
       return false;
     }
 
     cryptonote::tx_extra_tx_key_image_unlock unlock;
     if (!cryptonote::get_field_from_tx_extra(tx.extra, unlock))
     {
-      LOG_PRINT_L1("Unlock TX: Didn't have key image unlock in the tx_extra, rejected on height: "
-                   << block_height << " for tx: " << cryptonote::get_transaction_hash(tx));
+      oxen::log::info(logcat, "Unlock TX: Didn't have key image unlock in the tx_extra, rejected on height: {} for tx: {}", block_height, cryptonote::get_transaction_hash(tx));
       return false;
     }
 
@@ -924,11 +917,7 @@ namespace service_nodes
         {
           if (cit->amount < small_contributor_amount_threshold && (block_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
           {
-            LOG_PRINT_L1("Unlock TX: small contributor trying to unlock node before "
-                << std::to_string(service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
-                << " blocks have passed, rejected on height: "
-                << block_height << " for tx: "
-                << get_transaction_hash(tx));
+            oxen::log::info(logcat, "Unlock TX: small contributor trying to unlock node before {} blocks have passed, rejected on height: {} for tx: {}", std::to_string(service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER), block_height, get_transaction_hash(tx));
             return false;
           }
         }
@@ -937,11 +926,7 @@ namespace service_nodes
         {
           if (cit->amount < 3749 && (block_height - node_info.registration_height) < service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
           {
-            LOG_PRINT_L1("Unlock TX: small contributor trying to unlock node before "
-                << std::to_string(service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER)
-                << " blocks have passed, rejected on height: "
-                << block_height << " for tx: "
-                << get_transaction_hash(tx));
+            oxen::log::info(logcat, "Unlock TX: small contributor trying to unlock node before {} blocks have passed, rejected on height: {} for tx: {}", std::to_string(service_nodes::SMALL_CONTRIBUTOR_UNLOCK_TIMER), block_height, get_transaction_hash(tx));
             return false;
           }
         }
@@ -954,8 +939,7 @@ namespace service_nodes
         }
         else
         {
-          LOG_PRINT_L1("Unlock TX: Couldn't verify key image unlock in the tx_extra, rejected on height: "
-                       << block_height << " for tx: " << get_transaction_hash(tx));
+          oxen::log::info(logcat, "Unlock TX: Couldn't verify key image unlock in the tx_extra, rejected on height: {} for tx: {}", block_height, get_transaction_hash(tx));
           return false;
         }
       }
@@ -1017,7 +1001,7 @@ namespace service_nodes
     }
     catch (const invalid_registration &e)
     {
-      LOG_PRINT_L1("Invalid registration (" << cryptonote::get_transaction_hash(tx) << " @ " << block_height << "): " << e.what());
+      oxen::log::info(logcat, "Invalid registration ({} @ {}): {}", cryptonote::get_transaction_hash(tx), block_height, e.what());
       return false;
     }
 
@@ -1028,7 +1012,7 @@ namespace service_nodes
     staking_components stake = {};
     if (!tx_get_staking_components_and_amounts(nettype, hf_version, tx, block_height, &stake))
     {
-      LOG_PRINT_L1("Register TX: Had service node registration fields, but could not decode contribution on height: " << block_height << " for tx: " << cryptonote::get_transaction_hash(tx));
+      oxen::log::info(logcat, "Register TX: Had service node registration fields, but could not decode contribution on height: {} for tx: {}", block_height, cryptonote::get_transaction_hash(tx));
       return false;
     }
 
@@ -1038,7 +1022,7 @@ namespace service_nodes
       // 1. the staked amount in the tx must be a single output.
       if (stake.locked_contributions.size() != 1)
       {
-        LOG_PRINT_L1("Register TX invalid: multi-output registration transactions are not permitted as of HF16");
+        oxen::log::info(logcat, "Register TX invalid: multi-output registration transactions are not permitted as of HF16");
         return false;
       }
 
@@ -1046,7 +1030,7 @@ namespace service_nodes
       // could manually construct a registration tx that stakes for someone *other* than the operator).
       if (stake.address != reg.reserved[0].first)
       {
-        LOG_PRINT_L1("Register TX invalid: registration stake is not from the operator");
+        oxen::log::info(logcat, "Register TX invalid: registration stake is not from the operator");
         return false;
       }
 
@@ -1059,7 +1043,7 @@ namespace service_nodes
       const uint64_t min_transfer = get_min_node_contribution(hf_version, staking_requirement, 0, 0);
       if (stake.transferred < min_transfer)
       {
-        LOG_PRINT_L1("Register TX: Contribution transferred: " << stake.transferred << " didn't meet the minimum transfer requirement: " << min_transfer << " on height: " << block_height << " for tx: " << cryptonote::get_transaction_hash(tx));
+        oxen::log::info(logcat, "Register TX: Contribution transferred: {} didn't meet the minimum transfer requirement: {} on height: {} for tx: {}", stake.transferred, min_transfer, block_height, cryptonote::get_transaction_hash(tx));
         return false;
       }
 
@@ -1072,10 +1056,7 @@ namespace service_nodes
       // the registration details, and we disallow a non-operator registration.
       if (total_num_of_addr > oxen::MAX_CONTRIBUTORS_V1)
       {
-        LOG_PRINT_L1("Register TX: Number of participants: " << total_num_of_addr <<
-                     " exceeded the max number of contributors: " << oxen::MAX_CONTRIBUTORS_V1 <<
-                     " on height: " << block_height <<
-                     " for tx: " << cryptonote::get_transaction_hash(tx));
+        oxen::log::info(logcat, "Register TX: Number of participants: {} exceeded the max number of contributions: {} on height: {} for tx: {}", total_num_of_addr, oxen::MAX_CONTRIBUTORS_V1, block_height, cryptonote::get_transaction_hash(tx));
         return false;
       }
     }
@@ -1107,7 +1088,7 @@ namespace service_nodes
       {
         if (it2->first == addr)
         {
-          LOG_PRINT_L1("Invalid registration: duplicate reserved address in registration (tx " << cryptonote::get_transaction_hash(tx) << ")");
+          oxen::log::info(logcat, "Invalid registration: duplicate reserved address in registration (tx {})", cryptonote::get_transaction_hash(tx));
           return false;
         }
       }
@@ -1127,7 +1108,7 @@ namespace service_nodes
     // reserved amount was higher (though wallets would never actually do this).
     if (hf_version >= hf::hf16_pulse && stake.transferred < info.contributors[0].reserved)
     {
-      LOG_PRINT_L1("Register TX rejected: TX does not have sufficient operator stake");
+      oxen::log::info(logcat, "Register TX rejected: TX does not have sufficient operator stake");
       return false;
     }
 
@@ -1162,8 +1143,10 @@ namespace service_nodes
         proof.store(key, sn_list->m_blockchain);
       }
 
-      if (my_keys && my_keys->pub == key) MGINFO_GREEN("Service node registered (yours): " << key << " on height: " << block_height);
-      else                                LOG_PRINT_L1("New service node registered: "     << key << " on height: " << block_height);
+      if (my_keys && my_keys->pub == key)
+        oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Service node registered (yours): {} on height: {}", key, block_height));
+      else
+        oxen::log::info(logcat, "New service node registered: {} on height: {}", key, block_height);
     }
     else
     {
@@ -1195,16 +1178,16 @@ namespace service_nodes
       {
         if (registered_during_grace_period)
         {
-          MGINFO_GREEN("Service node re-registered (yours): " << key << " at block height: " << block_height);
+          oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Service node re-registered (yours): {} at block height: {}", key, block_height));
         }
         else
         {
-          MGINFO_GREEN("Service node registered (yours): " << key << " at block height: " << block_height);
+          oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Service node registered (yours): {} at block height: {}", key, block_height));
         }
       }
       else
       {
-        LOG_PRINT_L1("New service node registered: " << key << " at block height: " << block_height);
+        oxen::log::info(logcat, "New service node registered: {} at block height: {}", key, block_height);
       }
     }
 
@@ -1221,33 +1204,27 @@ namespace service_nodes
     if (!tx_get_staking_components_and_amounts(nettype, hf_version, tx, block_height, &stake))
     {
       if (stake.service_node_pubkey)
-        LOG_PRINT_L1("TX: Could not decode contribution for service node: " << stake.service_node_pubkey << " on height: " << block_height << " for tx: " << cryptonote::get_transaction_hash(tx));
+        oxen::log::info(logcat, "TX: Could not decode contribution for service node: {} on height: {} for tx: {}", stake.service_node_pubkey, block_height, cryptonote::get_transaction_hash(tx));
       return false;
     }
 
     auto iter = service_nodes_infos.find(stake.service_node_pubkey);
     if (iter == service_nodes_infos.end())
     {
-      LOG_PRINT_L1("TX: Contribution received for service node: "
-                   << stake.service_node_pubkey << ", but could not be found in the service node list on height: "
-                   << block_height << " for tx: " << cryptonote::get_transaction_hash(tx)
-                   << "\n"
-                      "This could mean that the service node was deregistered before the contribution was processed.");
+      oxen::log::info(logcat, "TX: Contribution received for service node: {}, but could not be found in the service node list on height: {} for tx: {}\n This could mean that the service node was deregistered before the contribution was processed.", stake.service_node_pubkey, block_height, cryptonote::get_transaction_hash(tx));
       return false;
     }
 
     const service_node_info& curinfo = *iter->second;
     if (curinfo.is_fully_funded())
     {
-      LOG_PRINT_L1("TX: Service node: " << stake.service_node_pubkey
-                                        << " is already fully funded, but contribution received on height: "
-                                        << block_height << " for tx: " << cryptonote::get_transaction_hash(tx));
+      oxen::log::info(logcat, "TX: Service node: {} is already fully funded, but contribution received on height: {} for tx: {}", stake.service_node_pubkey, block_height, cryptonote::get_transaction_hash(tx));
       return false;
     }
 
     if (!cryptonote::get_tx_secret_key_from_tx_extra(tx.extra, stake.tx_key))
     {
-      LOG_PRINT_L1("TX: Failed to get tx secret key from contribution received on height: "  << block_height << " for tx: " << cryptonote::get_transaction_hash(tx));
+      oxen::log::info(logcat, "TX: Failed to get tx secret key from contribution received on height: {} for tx: {}", block_height, cryptonote::get_transaction_hash(tx));
       return false;
     }
 
@@ -1275,7 +1252,7 @@ namespace service_nodes
     {
       // Nothing has ever created stake txes with multiple stake outputs, but we start enforcing
       // that in HF16.
-      LOG_PRINT_L1("Ignoring staking tx: multi-output stakes are not permitted as of HF16");
+      oxen::log::info(logcat, "Ignoring staking tx: multi-output stakes are not permitted as of HF16");
       return false;
     }
 
@@ -1297,10 +1274,7 @@ namespace service_nodes
 
       if (too_many_contributions)
       {
-        LOG_PRINT_L1("TX: Already hit the max number of contributions: "
-                     << (hf_version >= hf::hf19_reward_batching ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1)
-                     << " for contributor: " << cryptonote::get_account_address_as_str(nettype, false, stake.address)
-                     << " on height: " << block_height << " for tx: " << cryptonote::get_transaction_hash(tx));
+        oxen::log::info(logcat, "TX: Already hit the max number of contributions: {} for contributor: {} on height: {} for tx: {}", (hf_version >= hf::hf19_reward_batching ? oxen::MAX_CONTRIBUTORS_HF19 : oxen::MAX_CONTRIBUTORS_V1), cryptonote::get_account_address_as_str(nettype, false, stake.address), block_height, cryptonote::get_transaction_hash(tx));
         return false;
       }
     }
@@ -1327,9 +1301,7 @@ namespace service_nodes
 
     if (stake.transferred < min_contribution)
     {
-      LOG_PRINT_L1("TX: Amount " << stake.transferred << " did not meet min " << min_contribution
-                                 << " for service node: " << stake.service_node_pubkey << " on height: "
-                                 << block_height << " for tx: " << cryptonote::get_transaction_hash(tx));
+      oxen::log::info(logcat, "TX: Amount {} did not meet min {} for service node: {} on height: {} for tx: {}", stake.transferred, min_contribution, stake.service_node_pubkey, block_height, cryptonote::get_transaction_hash(tx));
       return false;
     }
 
@@ -1338,7 +1310,7 @@ namespace service_nodes
     if (auto max = get_max_node_contribution(hf_version, curinfo.staking_requirement, curinfo.total_reserved - contr_unfilled_reserved);
         stake.transferred > max)
     {
-      MINFO("TX: Amount " << stake.transferred << " is too large (max " << max << ").  This is probably a result of competing stakes.");
+      oxen::log::info(logcat, "TX: Amount {} is too large (max {}).  This is probably a result of competing stakes.", stake.transferred, max);
       return false;
     }
 
@@ -1376,7 +1348,7 @@ namespace service_nodes
       for (const auto &contribution : stake.locked_contributions)
         contributor.locked_contributions.push_back(contribution);
 
-    LOG_PRINT_L1("Contribution of " << stake.transferred << " received for service node " << stake.service_node_pubkey);
+    oxen::log::info(logcat, "Contribution of {} received for service node {}", stake.transferred, stake.service_node_pubkey);
     if (info.is_fully_funded()) {
       info.active_since_height = block_height;
       return true;
@@ -1422,7 +1394,7 @@ namespace service_nodes
                                       std::shared_ptr<const quorum> pulse_quorum,
                                       std::vector<std::shared_ptr<const quorum>> &alt_pulse_quorums)
   {
-    std::string_view block_type = alt_block ? "alt block "sv : "block "sv;
+    std::string_view block_type = alt_block ? "alt block"sv : "block"sv;
     uint64_t height             = cryptonote::get_block_height(block);
     crypto::hash hash           = cryptonote::get_block_hash(block);
 
@@ -1431,26 +1403,30 @@ namespace service_nodes
 
       if (cryptonote::block_has_pulse_components(block))
       {
-        if (log_errors) MGINFO("Pulse " << block_type << "received but only miner blocks are permitted\n" << dump_pulse_block_data(block, pulse_quorum.get()));
+        if (log_errors)
+          oxen::log::info(logcat, "Pulse {} received but only miner blocks are permitted\n{}", block_type, dump_pulse_block_data(block, pulse_quorum.get()));
         return false;
       }
 
       if (block.pulse.round != 0)
       {
-        if (log_errors) MGINFO("Miner " << block_type << "given but unexpectedly set round " << block.pulse.round <<  " on height " << height);
+        if (log_errors)
+          oxen::log::info(logcat, "Miner {} given but unexpectedly set round {} on height {}", block_type, block.pulse.round, height);
         return false;
       }
 
       if (block.pulse.validator_bitset != 0)
       {
         std::bitset<8 * sizeof(block.pulse.validator_bitset)> const bitset = block.pulse.validator_bitset;
-        if (log_errors) MGINFO("Miner " << block_type << "block given but unexpectedly set validator bitset " << bitset <<  " on height " << height);
+        if (log_errors)
+          oxen::log::info(logcat, "Miner {} block given but unexpectedly set validator bitset {} on height {}", block_type, bitset.to_string(), height);
         return false;
       }
 
       if (block.signatures.size())
       {
-        if (log_errors) MGINFO("Miner " << block_type << "block given but unexpectedly has " << block.signatures.size() <<  " signatures on height " << height);
+        if (log_errors)
+          oxen::log::info(logcat, "Miner {} block given but unexpectedly has {} signatures on height {}", block_type, block.signatures.size(), height);
         return false;
       }
 
@@ -1460,7 +1436,8 @@ namespace service_nodes
     {
       if (!cryptonote::block_has_pulse_components(block))
       {
-        if (log_errors) MGINFO("Miner " << block_type << "received but only pulse blocks are permitted\n" << dump_pulse_block_data(block, pulse_quorum.get()));
+        if (log_errors)
+          oxen::log::info(logcat, "Miner {} received but only pulse blocks are permitted\n{}", block_type, dump_pulse_block_data(block, pulse_quorum.get()));
         return false;
       }
 
@@ -1478,14 +1455,16 @@ namespace service_nodes
           std::string time  = tools::get_human_readable_timestamp(block.timestamp);
           std::string begin = tools::get_human_readable_timestamp(begin_time);
           std::string end   = tools::get_human_readable_timestamp(end_time);
-          if (log_errors) MGINFO("Pulse " << block_type << "with round " << +block.pulse.round << " specifies timestamp " << time << " is not within an acceptable range of time [" << begin << ", " << end << "]");
+          if (log_errors)
+            oxen::log::info(logcat, "Pulse {} with round {} specifies timestamp {} is not within an acceptable range of time [{}, {}]", block_type, +block.pulse.round, time, begin, end);
           return false;
         }
       }
 
       if (block.nonce != 0)
       {
-        if (log_errors) MGINFO("Pulse " << block_type << "specified a nonce when quorum block generation is available, nonce: " << block.nonce);
+        if (log_errors)
+          oxen::log::info(logcat, "Pulse {} specified a nonce when quorum block generation is available, nonce: {}", block_type, block.nonce);
         return false;
       }
 
@@ -1497,7 +1476,7 @@ namespace service_nodes
         bool failed_quorum_verify = true;
         if (pulse_quorum)
         {
-          LOG_PRINT_L1("Verifying alt-block " << height << ":" << hash << " against main chain quorum");
+          oxen::log::info(logcat, "Verifying alt-block {}:{} against main chain quorum", height, hash);
           failed_quorum_verify = service_nodes::verify_quorum_signatures(*pulse_quorum,
                                                                          quorum_type::pulse,
                                                                          block.major_version,
@@ -1510,7 +1489,7 @@ namespace service_nodes
         // NOTE: Check alt pulse quorums
         if (failed_quorum_verify)
         {
-          LOG_PRINT_L1("Verifying alt-block " << height << ":" << hash << " against alt chain quorum(s)");
+          oxen::log::info(logcat, "Verifying alt-block {}:{} against alt chain quorum(s)", height, hash);
           for (auto const &alt_quorum : alt_pulse_quorums)
           {
             if (service_nodes::verify_quorum_signatures(*alt_quorum,
@@ -1537,7 +1516,8 @@ namespace service_nodes
         bool insufficient_nodes_for_pulse = pulse_quorum == nullptr;
         if (insufficient_nodes_for_pulse)
         {
-          if (log_errors) MGINFO("Pulse " << block_type << "specified but no quorum available " << dump_pulse_block_data(block, pulse_quorum.get()));
+          if (log_errors)
+            oxen::log::info(logcat, "Pulse {} specified but no quorum available {}", block_type, dump_pulse_block_data(block, pulse_quorum.get()));
           return false;
         }
 
@@ -1554,7 +1534,7 @@ namespace service_nodes
       {
         // NOTE: These invariants are already checked in verify_quorum_signatures
         if (alt_block)
-          LOG_PRINT_L1("Alt-block " << height << ":" << hash << " verified successfully");
+          oxen::log::info(logcat, "Alt-block {}:{} verified successfully", height, hash);
         assert(block.pulse.validator_bitset != 0);
         assert(block.pulse.validator_bitset < (1 << PULSE_QUORUM_NUM_VALIDATORS));
         assert(block.signatures.size() == service_nodes::PULSE_BLOCK_REQUIRED_SIGNATURES);
@@ -1562,7 +1542,7 @@ namespace service_nodes
       else
       {
         if (log_errors)
-          MGINFO("Pulse " << block_type << "failed quorum verification\n" << dump_pulse_block_data(block, pulse_quorum.get()));
+          oxen::log::info(logcat, "Pulse {} failed quorum verification\n{}", block_type, dump_pulse_block_data(block, pulse_quorum.get()));
       }
 
       return quorum_verified;
@@ -1578,18 +1558,18 @@ namespace service_nodes
     catch(std::exception const &e)
     {
       // ignore not found block, try alt db
-      LOG_PRINT_L1("Block " << hash << " not found in main DB, searching alt DB");
+      oxen::log::info(logcat, "Block {} not found in main DB, searching alt DB", hash);
       cryptonote::alt_block_data_t alt_data;
       std::string blob;
       if (!db.get_alt_block(hash, &alt_data, &blob, nullptr))
       {
-        MERROR("Failed to find block " << hash);
+        oxen::log::error(logcat, "Failed to find block {}", hash);
         return false;
       }
 
       if (!cryptonote::parse_and_validate_block_from_blob(blob, block, nullptr))
       {
-        MERROR("Failed to parse alt block blob at " << alt_data.height << ":" << hash);
+        oxen::log::error(logcat, "Failed to parse alt block blob at {}:{}", alt_data.height, hash);
         return false;
       }
     }
@@ -1777,7 +1757,7 @@ namespace service_nodes
     uint64_t block_height = cryptonote::get_block_height(block);
     if (m_blockchain.nettype() != cryptonote::network_type::FAKECHAIN && block.major_version >= hf::hf19_reward_batching && height() != block_height)
     {
-      MERROR("Service node list out of sync with the batching database, adding block will fail because the service node list is at height: " << height() << " and the batching database is at height: " << m_blockchain.sqlite_db()->height+1);
+      oxen::log::error(logcat, "Service node list out of sync with the batching database, adding block will fail because the service node list is at height: {} and the batching database is at height: {}", height(), m_blockchain.sqlite_db()->height+1);
       return false;
     }
     return m_blockchain.sqlite_db()->add_block(block, m_state);
@@ -1896,7 +1876,7 @@ namespace service_nodes
     uint64_t const top_height = cryptonote::get_block_height(top_block);
     if (top_height < PULSE_QUORUM_ENTROPY_LAG)
     {
-      MERROR("Insufficient blocks to get quorum entropy for Pulse, height is " << top_height << ", we need " << PULSE_QUORUM_ENTROPY_LAG << " blocks.");
+      oxen::log::error(logcat, "Insufficient blocks to get quorum entropy for Pulse, height is {}, we need {} blocks.", top_height, PULSE_QUORUM_ENTROPY_LAG);
       return {};
     }
 
@@ -1916,7 +1896,7 @@ namespace service_nodes
       cryptonote::block block;
       if (!find_block_in_db(db, prev_hash, block))
       {
-        MERROR("Failed to get quorum entropy for Pulse, block at " << prev_height << prev_hash);
+        oxen::log::error(logcat, "Failed to get quorum entropy for Pulse, block at {}{}", prev_height, prev_hash);
         return {};
       }
 
@@ -1937,7 +1917,7 @@ namespace service_nodes
     cryptonote::block top_block;
     if (!find_block_in_db(db, top_hash, top_block))
     {
-      MERROR("Failed to get quorum entropy for Pulse, next block parent " << top_hash);
+      oxen::log::error(logcat, "Failed to get quorum entropy for Pulse, next block parent {}", top_hash);
       return {};
     }
 
@@ -1960,13 +1940,13 @@ namespace service_nodes
     service_nodes::quorum result = {};
     if (active_snode_list.size() < pulse_min_service_nodes(nettype))
     {
-      LOG_PRINT_L2("Insufficient active Service Nodes for Pulse: " << active_snode_list.size());
+      oxen::log::debug(logcat, "Insufficient active Service Nodes for Pulse: {}", active_snode_list.size());
       return result;
     }
 
     if (pulse_entropy.size() != PULSE_QUORUM_SIZE)
     {
-      LOG_PRINT_L2("Blockchain has insufficient blocks to generate Pulse data");
+      oxen::log::debug(logcat, "Blockchain has insufficient blocks to generate Pulse data");
       return result;
     }
 
@@ -2123,7 +2103,7 @@ namespace service_nodes
 
         // NOTE: NOP. Pulse quorums are generated pre-Service Node List changes for the block
         case quorum_type::pulse: continue;
-        default: MERROR("Unhandled quorum type enum with value: " << type_int); continue;
+        default: oxen::log::error(logcat, "Unhandled quorum type enum with value: {}", type_int); continue;
       }
 
       quorum->validators.reserve(num_validators);
@@ -2212,8 +2192,10 @@ namespace service_nodes
       auto i = service_nodes_infos.find(pubkey);
       if (i != service_nodes_infos.end())
       {
-        if (my_keys && my_keys->pub == pubkey) MGINFO_GREEN("Service node expired (yours): " << pubkey << " at block height: " << block_height);
-        else                                   LOG_PRINT_L1("Service node expired: " << pubkey << " at block height: " << block_height);
+        if (my_keys && my_keys->pub == pubkey) 
+          oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Service node expired (yours): {} at block height: {}", pubkey, block_height));
+        else
+          oxen::log::info(logcat, "Service node expired: {} at block height: {}", pubkey, block_height);
 
         need_swarm_update += i->second->is_active();
         service_nodes_infos.erase(i);
@@ -2404,7 +2386,7 @@ namespace service_nodes
       }
       catch (std::exception const &e)
       {
-        LOG_ERROR("Failed to get historical block to find expired nodes in v9: " << e.what());
+        oxen::log::error(logcat, "Failed to get historical block to find expired nodes in v9: {}", e.what());
         return expired_nodes;
       }
 
@@ -2416,7 +2398,7 @@ namespace service_nodes
         cryptonote::transaction tx;
         if (!db.get_tx(hash, tx))
         {
-          LOG_ERROR("Failed to get historical tx to find expired service nodes in v9");
+          oxen::log::error(logcat, "Failed to get historical tx to find expired service nodes in v9");
           continue;
         }
 
@@ -2600,7 +2582,7 @@ namespace service_nodes
     if (block.major_version >= hf::hf19_reward_batching)
     {
       mode = verify_mode::batched_sn_rewards;
-      MDEBUG("Batched miner reward");
+      oxen::log::debug(logcat, "Batched miner reward");
     }
 
     size_t expected_vouts_size;
@@ -2907,7 +2889,7 @@ namespace service_nodes
       try {
         serialization::serialize(ba, m_transient.cache_long_term_data);
       } catch (const std::exception& e) {
-        LOG_ERROR("Failed to store service node info: failed to serialize long term data: " << e.what());
+        oxen::log::error(logcat, "Failed to store service node info: failed to serialize long term data: {}", e.what());
         return false;
       }
       m_transient.cache_data_blob.append(ba.str());
@@ -2924,7 +2906,7 @@ namespace service_nodes
       try {
         serialization::serialize(ba, m_transient.cache_short_term_data);
       } catch (const std::exception& e) {
-        LOG_ERROR("Failed to store service node info: failed to serialize short term data: " << e.what());
+        oxen::log::error(logcat, "Failed to store service node info: failed to serialize short term data: {}", e.what());
         return false;
       }
       m_transient.cache_data_blob.append(ba.str());
@@ -3088,20 +3070,22 @@ namespace service_nodes
     if (pk && 0 == crypto_sign_ed25519_pk_to_curve25519(pubkey_x25519.data, pk.data)) {
       proof->pubkey_ed25519 = pk;
     } else {
-      MWARNING("Failed to derive x25519 pubkey from ed25519 pubkey " << proof->pubkey_ed25519);
+      oxen::log::warning(logcat, "Failed to derive x25519 pubkey from ed25519 pubkey {}", proof->pubkey_ed25519);
       pubkey_x25519 = crypto::x25519_public_key::null();
       proof->pubkey_ed25519 = crypto::ed25519_public_key::null();
     }
   }
 
-#define REJECT_PROOF(log) do { LOG_PRINT_L2("Rejecting uptime proof from " << proof.pubkey << ": " log); return false; } while (0)
 
   //TODO remove after HF18, snode revision 1
   bool service_node_list::handle_uptime_proof(cryptonote::NOTIFY_UPTIME_PROOF::request const &proof, bool &my_uptime_proof_confirmation, crypto::x25519_public_key &x25519_pkey)
   {
     auto vers = get_network_version_revision(m_blockchain.nettype(), m_blockchain.get_current_blockchain_height());
     if (vers >= std::make_pair(hf::hf18, uint8_t{1}))
-      REJECT_PROOF("Old format (non-bt) proofs are not acceptable from v18+1 onwards");
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: Old format (non-bt) proofs are not acceptable from v18+1 onwards", proof.pubkey);
+      return false;
+    }
 
     auto& netconf = get_config(m_blockchain.nettype());
     auto now = std::chrono::system_clock::now();
@@ -3109,15 +3093,23 @@ namespace service_nodes
     // Validate proof version, timestamp range,
     auto time_deviation = now - std::chrono::system_clock::from_time_t(proof.timestamp);
     if (time_deviation > netconf.UPTIME_PROOF_TOLERANCE || time_deviation < -netconf.UPTIME_PROOF_TOLERANCE)
-      REJECT_PROOF("timestamp is too far from now");
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: timestamp is too far from now", proof.pubkey);
+      return false;
+    }
 
     for (auto const &min : MIN_UPTIME_PROOF_VERSIONS)
       if (vers >= min.hardfork_revision && proof.snode_version < min.oxend)
-        REJECT_PROOF("v" << tools::join(".", min.oxend) << "+ oxend version is required for v"
-                << static_cast<int>(vers.first) << "." << +vers.second << "+ network proofs");
+      {
+        oxen::log::debug(logcat, "Rejecting uptime proof from {}: v{}+ oxend version is required for v{}.{}+ network proofs", proof.pubkey, tools::join(".", min.oxend), static_cast<int>(vers.first), vers.second);
+        return false;
+      }
 
     if (!debug_allow_local_ips && !epee::net_utils::is_ip_public(proof.public_ip))
-      REJECT_PROOF("public_ip is not actually public");
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: public_ip is not actually public", proof.pubkey);
+      return false;
+    }
 
     //
     // Validate proof signature
@@ -3126,46 +3118,65 @@ namespace service_nodes
 
 
     if (!crypto::check_signature(hash, proof.pubkey, proof.sig))
-      REJECT_PROOF("signature validation failed");
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: signature validation failed", proof.pubkey);
+      return false;
+    }
 
     crypto::x25519_public_key derived_x25519_pubkey = crypto::x25519_public_key::null();
     if (!proof.pubkey_ed25519)
-      REJECT_PROOF("required ed25519 auxiliary pubkey " << proof.pubkey_ed25519 << " not included in proof");
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: required ed25519 auxiliary pubkey {} not included in proof", proof.pubkey, proof.pubkey_ed25519);
+      return false;
+    }
 
     if (0 != crypto_sign_verify_detached(proof.sig_ed25519.data, reinterpret_cast<unsigned char *>(hash.data), sizeof(hash.data), proof.pubkey_ed25519.data))
-      REJECT_PROOF("ed25519 signature validation failed");
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: ed25519 signature validation failed", proof.pubkey);
+      return false;
+    }
 
-    if (0 != crypto_sign_ed25519_pk_to_curve25519(derived_x25519_pubkey.data, proof.pubkey_ed25519.data)
-        || !derived_x25519_pubkey)
-      REJECT_PROOF("invalid ed25519 pubkey included in proof (x25519 derivation failed)");
+    if (0 != crypto_sign_ed25519_pk_to_curve25519(derived_x25519_pubkey.data, proof.pubkey_ed25519.data) || !derived_x25519_pubkey)
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: invalid ed25519 pubkey included in proof (x25519 derivation failed)", proof.pubkey);
+      return false;
+    }
 
     if (proof.qnet_port == 0)
-      REJECT_PROOF("invalid quorumnet port in uptime proof");
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: invalid quorumnet port in uptime proof", proof.pubkey);
+      return false;
+    }
 
     auto locks = tools::unique_locks(m_blockchain, m_sn_mutex, m_x25519_map_mutex);
     auto it = m_state.service_nodes_infos.find(proof.pubkey);
     if (it == m_state.service_nodes_infos.end())
-      REJECT_PROOF("no such service node is currently registered");
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: no such service node is currently registered", proof.pubkey);
+      return false;
+    }
 
     auto &iproof = proofs[proof.pubkey];
 
 
     if (now <= std::chrono::system_clock::from_time_t(iproof.timestamp) + std::chrono::seconds{netconf.UPTIME_PROOF_FREQUENCY} / 2)
-      REJECT_PROOF("already received one uptime proof for this node recently");
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: already received one uptime proof for this node recently", proof.pubkey);
+      return false;
+    }
 
     if (m_service_node_keys && proof.pubkey == m_service_node_keys->pub)
     {
       my_uptime_proof_confirmation = true;
-      MGINFO("Received uptime-proof confirmation back from network for Service Node (yours): " << proof.pubkey);
+      oxen::log::info(logcat, "Received uptime-proof confirmation back from network for Service Node (yours): {}", proof.pubkey);
     }
     else
     {
       my_uptime_proof_confirmation = false;
-      LOG_PRINT_L2("Accepted uptime proof from " << proof.pubkey);
+      oxen::log::debug(logcat, "Accepted uptime proof from {}", proof.pubkey);
 
       if (m_service_node_keys && proof.pubkey_ed25519 == m_service_node_keys->pub_ed25519)
-        MGINFO_RED("Uptime proof from SN " << proof.pubkey << " is not us, but is using our ed/x25519 keys; "
-            "this is likely to lead to deregistration of one or both service nodes.");
+        oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Uptime proof from SN {} is not us, but is using our ed/x25519 keys; this is likely to lead to deregistration of one or both service nodes.", proof.pubkey));
     }
 
     auto old_x25519 = iproof.pubkey_x25519;
@@ -3191,9 +3202,6 @@ namespace service_nodes
     return true;
   }
 
-#undef REJECT_PROOF
-#define REJECT_PROOF(log) do { LOG_PRINT_L2("Rejecting uptime proof from " << proof->pubkey << ": " log); return false; } while (0)
-
   bool service_node_list::handle_btencoded_uptime_proof(std::unique_ptr<uptime_proof::Proof> proof, bool &my_uptime_proof_confirmation, crypto::x25519_public_key &x25519_pkey)
   {
     auto vers = get_network_version_revision(m_blockchain.nettype(), m_blockchain.get_current_blockchain_height());
@@ -3203,21 +3211,36 @@ namespace service_nodes
     // Validate proof version, timestamp range,
     auto time_deviation = now - std::chrono::system_clock::from_time_t(proof->timestamp);
     if (time_deviation > netconf.UPTIME_PROOF_TOLERANCE || time_deviation < -netconf.UPTIME_PROOF_TOLERANCE)
-      REJECT_PROOF("timestamp is too far from now");
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: timestamp is too far from now", proof->pubkey);
+      return false;
+    }
 
     for (auto const &min : MIN_UPTIME_PROOF_VERSIONS) {
       if (vers >= min.hardfork_revision && m_blockchain.nettype() != cryptonote::network_type::DEVNET) {
         if (proof->version < min.oxend)
-          REJECT_PROOF("v" << tools::join(".", min.oxend) << "+ oxend version is required for v" << static_cast<int>(vers.first) << "." << +vers.second << "+ network proofs");
+        {
+          oxen::log::debug(logcat, "Rejecting uptime proof from {}: v{}+ oxend version is required for v{}.{}+ network proofs", proof->pubkey, tools::join(".", min.oxend), static_cast<int>(vers.first), vers.second);
+          return false;
+        }
         if (proof->lokinet_version < min.lokinet)
-          REJECT_PROOF("v" << tools::join(".", min.lokinet) << "+ lokinet version is required for v" << static_cast<int>(vers.first) << "." << +vers.second << "+ network proofs");
+        {
+          oxen::log::debug(logcat, "Rejecting uptime proof from {}: v{}+ lokinet version is required for v{}.{}+ network proofs", proof->pubkey, tools::join(".", min.lokinet), static_cast<int>(vers.first), vers.second);
+          return false;
+        }
         if (proof->storage_server_version < min.storage_server)
-          REJECT_PROOF("v" << tools::join(".", min.storage_server) << "+ storage server version is required for v" << static_cast<int>(vers.first) << "." << +vers.second << "+ network proofs");
+        {
+          oxen::log::debug(logcat, "Rejecting uptime proof from {}: v{}+ storage server version is required for v{}.{}+ network proofs", proof->pubkey, tools::join(".", min.storage_server), static_cast<int>(vers.first), vers.second);
+          return false;
+        }
       }
     }
 
     if (!debug_allow_local_ips && !epee::net_utils::is_ip_public(proof->public_ip))
-      REJECT_PROOF("public_ip is not actually public");
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: public_ip is not actually public", proof->pubkey);
+      return false;
+    }
 
     //
     // Validate proof signature
@@ -3225,45 +3248,64 @@ namespace service_nodes
     crypto::hash hash = proof->hash_uptime_proof();
 
     if (!crypto::check_signature(hash, proof->pubkey, proof->sig))
-      REJECT_PROOF("signature validation failed");
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: signature validation failed", proof->pubkey);
+      return false;
+    }
 
     crypto::x25519_public_key derived_x25519_pubkey = crypto::x25519_public_key::null();
     if (!proof->pubkey_ed25519)
-      REJECT_PROOF("required ed25519 auxiliary pubkey " << proof->pubkey_ed25519 << " not included in proof");
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: required ed25519 auxiliary pubkey {} not included in proof", proof->pubkey, proof->pubkey_ed25519);
+      return false;
+    }
 
     if (0 != crypto_sign_verify_detached(proof->sig_ed25519.data, reinterpret_cast<unsigned char *>(hash.data), sizeof(hash.data), proof->pubkey_ed25519.data))
-      REJECT_PROOF("ed25519 signature validation failed");
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: ed25519 signature validation failed", proof->pubkey);
+      return false;
+    }
 
-    if (0 != crypto_sign_ed25519_pk_to_curve25519(derived_x25519_pubkey.data, proof->pubkey_ed25519.data)
-        || !derived_x25519_pubkey)
-      REJECT_PROOF("invalid ed25519 pubkey included in proof (x25519 derivation failed)");
+    if (0 != crypto_sign_ed25519_pk_to_curve25519(derived_x25519_pubkey.data, proof->pubkey_ed25519.data) || !derived_x25519_pubkey)
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: invalid ed25519 pubkey included in proof (x25519 derivation failed)", proof->pubkey);
+      return false;
+    }
 
     if (proof->qnet_port == 0)
-      REJECT_PROOF("invalid quorumnet port in uptime proof");
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: invalid quorumnet port in uptime proof", proof->pubkey);
+      return false;
+    }
 
     auto locks = tools::unique_locks(m_blockchain, m_sn_mutex, m_x25519_map_mutex);
     auto it = m_state.service_nodes_infos.find(proof->pubkey);
     if (it == m_state.service_nodes_infos.end())
-      REJECT_PROOF("no such service node is currently registered");
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: no such service node is currently registered", proof->pubkey);
+      return false;
+    }
 
     auto &iproof = proofs[proof->pubkey];
 
     if (now <= std::chrono::system_clock::from_time_t(iproof.timestamp) + std::chrono::seconds{netconf.UPTIME_PROOF_FREQUENCY} / 2)
-      REJECT_PROOF("already received one uptime proof for this node recently");
+    {
+      oxen::log::debug(logcat, "Rejecting uptime proof from {}: already received one uptime proof for this node recently", proof->pubkey);
+      return false;
+    }
 
     if (m_service_node_keys && proof->pubkey == m_service_node_keys->pub)
     {
       my_uptime_proof_confirmation = true;
-      MGINFO("Received uptime-proof confirmation back from network for Service Node (yours): " << proof->pubkey);
+      oxen::log::info(logcat, "Received uptime-proof confirmation back from network for Service Node (yours): {}", proof->pubkey);
     }
     else
     {
       my_uptime_proof_confirmation = false;
-      LOG_PRINT_L2("Accepted uptime proof from " << proof->pubkey);
+      oxen::log::debug(logcat, "Accepted uptime proof from {}", proof->pubkey);
 
       if (m_service_node_keys && proof->pubkey_ed25519 == m_service_node_keys->pub_ed25519)
-        MGINFO_RED("Uptime proof from SN " << proof->pubkey << " is not us, but is using our ed/x25519 keys; "
-            "this is likely to lead to deregistration of one or both service nodes.");
+        oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Uptime proof from SN {} is not us, but is using our ed/x25519 keys; this is likely to lead to deregistration of one or both service nodes.", proof->pubkey)); 
     }
 
     auto old_x25519 = iproof.pubkey_x25519;
@@ -3293,7 +3335,7 @@ namespace service_nodes
 
   void service_node_list::cleanup_proofs()
   {
-    MDEBUG("Cleaning up expired SN proofs");
+    oxen::log::debug(logcat, "Cleaning up expired SN proofs");
     auto locks = tools::unique_locks(m_sn_mutex, m_blockchain);
     uint64_t now = std::time(nullptr);
     auto& db = m_blockchain.get_db();
@@ -3355,7 +3397,7 @@ namespace service_nodes
 
     auto pubkey = get_pubkey_from_x25519(x25519_pub);
     if (!pubkey) {
-      MDEBUG("no connection available: could not find primary pubkey from x25519 pubkey " << x25519_pub);
+      oxen::log::debug(logcat, "no connection available: could not find primary pubkey from x25519 pubkey {}", x25519_pub);
       return "";
     }
 
@@ -3369,11 +3411,11 @@ namespace service_nodes
     });
 
     if (!found) {
-      MDEBUG("no connection available: primary pubkey " << pubkey << " is not registered");
+      oxen::log::debug(logcat, "no connection available: primary pubkey {} is not registered", pubkey);
       return "";
     }
     if (!(ip && port)) {
-      MDEBUG("no connection available: service node " << pubkey << " has no associated ip and/or port");
+      oxen::log::debug(logcat, "no connection available: service node {} has no associated ip and/or port", pubkey);
       return "";
     }
 
@@ -3435,11 +3477,11 @@ namespace service_nodes
     const auto type = storage_server ? "storage server"sv : "lokinet"sv;
 
     if (!m_state.service_nodes_infos.count(pubkey)) {
-      MDEBUG("Dropping " << type << " reachable report: " << pubkey << " is not a registered SN pubkey");
+      oxen::log::debug(logcat, "Dropping {} reachable report: {} is not a registered SN pubkey", type, pubkey);
       return false;
     }
 
-    MDEBUG("Received " << type << (reachable ? " reachable" : " UNREACHABLE") << " report for SN " << pubkey);
+    oxen::log::debug(logcat, "Received {}{} report for SN {}", type, (reachable ? " reachable" : " UNREACHABLE"), pubkey);
 
     const auto now = std::chrono::steady_clock::now();
 
@@ -3537,7 +3579,7 @@ namespace service_nodes
 
   bool service_node_list::load(const uint64_t current_height)
   {
-    LOG_PRINT_L1("service_node_list::load()");
+    oxen::log::info(logcat, "service_node_list::load()");
     reset(false);
     if (!m_blockchain.has_db())
     {
@@ -3574,9 +3616,7 @@ namespace service_nodes
           size_t const last_index = data_in.states.size() - 1;
           if ((data_in.states.back().height % STORE_LONG_TERM_STATE_INTERVAL) != 0)
           {
-            LOG_PRINT_L0("Last serialised quorum height: " << data_in.states.back().height
-                                                           << " in archive is unexpectedly not a multiple of: "
-                                                           << STORE_LONG_TERM_STATE_INTERVAL << ", regenerating state");
+            oxen::log::warning(logcat, "Last serialised quorum height: {} in archive is unexpectedly not a multiple of: {}, regenerating state", data_in.states.back().height, STORE_LONG_TERM_STATE_INTERVAL);
             return false;
           }
 
@@ -3629,7 +3669,7 @@ namespace service_nodes
     try {
       serialization::parse_binary(blob, data_in);
     } catch (const std::exception& e) {
-      LOG_ERROR("Failed to parse service node data from blob: " << e.what());
+      oxen::log::error(logcat, "Failed to parse service node data from blob: {}", e.what());
       return false;
     }
 
@@ -3650,7 +3690,7 @@ namespace service_nodes
 
         if (states.height <= last_loaded_height)
         {
-          LOG_PRINT_L0("Serialised quorums is not stored in ascending order by height in DB, failed to load from DB");
+          oxen::log::warning(logcat, "Serialised quorums is not stored in ascending order by height in DB, failed to load from DB");
           return false;
         }
         last_loaded_height = states.height;
@@ -3663,7 +3703,7 @@ namespace service_nodes
       size_t const last_index = data_in.states.size() - 1;
       if (data_in.states[last_index].only_stored_quorums)
       {
-        LOG_PRINT_L0("Unexpected last serialized state only has quorums loaded");
+        oxen::log::warning(logcat, "Unexpected last serialized state only has quorums loaded");
         return false;
       }
 
@@ -3707,12 +3747,10 @@ namespace service_nodes
 
     initialize_x25519_map();
 
-    MGINFO("Service node data loaded successfully, height: " << m_state.height);
-    MGINFO(m_state.service_nodes_infos.size()
-           << " nodes and " << m_transient.state_history.size() << " recent states loaded, " << m_transient.state_archive.size()
-           << " historical states loaded, (" << tools::get_human_readable_bytes(bytes_loaded) << ")");
+    oxen::log::info(logcat, "Service node data loaded successfully, height: {}", m_state.height);
+    oxen::log::info(logcat, "{} nodes and {} recent states loaded, {} historical states loaded, ({})", m_state.service_nodes_infos.size(), m_transient.state_history.size(), m_transient.state_archive.size(), tools::get_human_readable_bytes(bytes_loaded));
 
-    LOG_PRINT_L1("service_node_list::load() returning success");
+    oxen::log::info(logcat, "service_node_list::load() returning success");
     return true;
   }
 
@@ -3907,7 +3945,7 @@ namespace service_nodes
     try {
       reg = convert_registration_args(nettype, hf_version, args, staking_requirement);
     } catch (const invalid_registration& e) {
-      MERROR(tr("Could not parse registration arguments: ") << e.what());
+      oxen::log::error(logcat, "{}{}", tr("Could not parse registration arguments: "), e.what());
       return false;
     }
 
@@ -3939,23 +3977,23 @@ namespace service_nodes
   {
     // If the SN expired and was reregistered since the height we'll be voting on it prematurely
     if (!is_fully_funded()) {
-      MDEBUG("SN vote at height " << height << " invalid: not fully funded");
+      oxen::log::debug(logcat, "SN vote at height {} invalid: not fully funded", height);
       return false;
     } else if (height <= registration_height) {
-      MDEBUG("SN vote at height " << height << " invalid: height <= reg height (" << registration_height << ")");
+      oxen::log::debug(logcat, "SN vote at height {} invalid: height <= reg height ({})", height, registration_height);
       return false;
     } else if (is_decommissioned() && height <= last_decommission_height) {
-      MDEBUG("SN vote at height " << height << " invalid: height <= last decomm height (" << last_decommission_height << ")");
+      oxen::log::debug(logcat, "SN vote at height {} invalid: height <= last decomm height ({})", height, last_decommission_height);
       return false;
     } else if (is_active()) {
       assert(active_since_height >= 0); // should be satisfied whenever is_active() is true
       if (height <= static_cast<uint64_t>(active_since_height)) {
-        MDEBUG("SN vote at height " << height << " invalid: height <= active-since height (" << active_since_height << ")");
+        oxen::log::debug(logcat, "SN vote at height {} invalid: height <= active-since height ({})", height, active_since_height);
         return false;
       }
     }
 
-    MTRACE("SN vote at height " << height << " is valid.");
+    oxen::log::trace(logcat, "SN vote at height {} is valid.", height);
     return true;
   }
 
@@ -3963,25 +4001,25 @@ namespace service_nodes
   {
     if (hf_version >= hf::hf13_enforce_checkpoints) {
       if (!can_be_voted_on(height)) {
-        MDEBUG("SN state transition invalid: " << height << " is not a valid vote height");
+        oxen::log::debug(logcat, "SN state transition invalid: {} is not a valid vote height", height);
         return false;
       }
 
       if (proposed_state == new_state::deregister) {
         if (height <= registration_height) {
-          MDEBUG("SN deregister invalid: vote height (" << height << ") <= registration_height (" << registration_height << ")");
+          oxen::log::debug(logcat, "SN deregister invalid: vote height ({}) <= registration_height ({})", height, registration_height);
           return false;
         }
       } else if (proposed_state == new_state::ip_change_penalty) {
         if (height <= last_ip_change_height) {
-          MDEBUG("SN ip change penality invalid: vote height (" << height << ") <= last_ip_change_height (" << last_ip_change_height << ")");
+          oxen::log::debug(logcat, "SN ip change penality invalid: vote height ({}) <= last_ip_change_height ({})", height, last_ip_change_height);
           return false;
         }
       }
     } else { // pre-HF13
       if (proposed_state == new_state::deregister) {
         if (height < registration_height) {
-          MDEBUG("SN deregister invalid: vote height (" << height << ") < registration_height (" << registration_height << ")");
+          oxen::log::debug(logcat, "SN deregister invalid: vote height ({}) < registration_height ({})", height, registration_height);
           return false;
         }
       }
@@ -3989,18 +4027,18 @@ namespace service_nodes
 
     if (is_decommissioned()) {
       if (proposed_state == new_state::decommission) {
-        MDEBUG("SN decommission invalid: already decommissioned");
+        oxen::log::debug(logcat, "SN decommission invalid: already decommissioned");
         return false;
       } else if (proposed_state == new_state::ip_change_penalty) {
-        MDEBUG("SN ip change penalty invalid: currently decommissioned");
+        oxen::log::debug(logcat, "SN ip change penalty invalid: currently decommissioned");
         return false;
       }
       return true; // recomm or dereg
     } else if (proposed_state == new_state::recommission) {
-      MDEBUG("SN recommission invalid: not recommissioned");
+      oxen::log::debug(logcat, "SN recommission invalid: not recommissioned");
       return false;
     }
-    MTRACE("SN state change is valid");
+    oxen::log::trace(logcat, "SN state change is valid");
     return true;
   }
 

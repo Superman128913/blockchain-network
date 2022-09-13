@@ -3,6 +3,7 @@
 #include <iterator>
 #include <vector>
 #include <algorithm>
+#include <fmt/std.h>
 #include "common/hex.h"
 #include "cryptonote_config.h"
 #include "oxen_name_system.h"
@@ -34,13 +35,12 @@ extern "C"
 #include <sodium/randombytes.h>
 }
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "ons"
-
 using cryptonote::hf;
 
 namespace ons
 {
+
+static auto logcat = oxen::log::Cat("ons");
 
 enum struct ons_sql_type
 {
@@ -361,7 +361,7 @@ bool sql_copy_blob(sql_compiled_statement& statement, I column, void *dest, size
   auto blob = get<blob_view>(statement, column);
   if (blob.data.size() != dest_size)
   {
-    LOG_PRINT_L0("Unexpected blob size=" << blob.data.size() << ", in ONS DB does not match expected size=" << dest_size);
+    oxen::log::warning(logcat, "Unexpected blob size={}, in ONS DB does not match expected size={}", blob.data.size(), dest_size);
     assert(blob.data.size() == dest_size);
     return false;
   }
@@ -389,7 +389,7 @@ mapping_record sql_get_mapping_from_statement(sql_compiled_statement& statement)
     auto value = get<std::string_view>(statement, mapping_record_column::encrypted_value);
     if (value.size() > result.encrypted_value.buffer.size())
     {
-      MERROR("Unexpected encrypted value blob with size=" << value.size() << ", in ONS db larger than the available size=" << result.encrypted_value.buffer.size());
+      oxen::log::error(logcat, "Unexpected encrypted value blob with size={}, in ONS db larger than the available size={}", value.size(), result.encrypted_value.buffer.size());
       return result;
     }
     result.encrypted_value.len = value.size();
@@ -435,7 +435,7 @@ bool sql_run_statement(ons_sql_type type, sql_compiled_statement& statement, voi
       {
         switch (type)
         {
-          default: MERROR("Unhandled ons type enum with value: " << (int)type << ", in: " << __func__); break;
+          default: oxen::log::error(logcat, "Unhandled ons type enum with value: {}, in: {}", (int)type, __func__); break;
 
           case ons_sql_type::internal_cmd: break;
           case ons_sql_type::get_owner:
@@ -499,7 +499,7 @@ bool sql_run_statement(ons_sql_type type, sql_compiled_statement& statement, voi
 
       default:
       {
-        LOG_PRINT_L1("Failed to execute statement: " << sqlite3_sql(statement.statement) <<", reason: " << sqlite3_errstr(step_result));
+        oxen::log::info(logcat, "Failed to execute statement: {}, reason: {}", sqlite3_sql(statement.statement), sqlite3_errstr(step_result));
         infinite_loop = false;
         break;
       }
@@ -541,7 +541,7 @@ bool sql_compiled_statement::compile(std::string_view query, bool optimise_for_m
 #endif
 
   if (prepare_result != SQLITE_OK) {
-    MERROR("Can not compile SQL statement:\n" << query << "\nReason: " << sqlite3_errstr(prepare_result));
+    oxen::log::error(logcat, "Can not compile SQL statement:\n{}\nReason: {}", query, sqlite3_errstr(prepare_result));
     return false;
   }
   sqlite3_finalize(statement);
@@ -568,7 +568,7 @@ sqlite3 *init_oxen_name_system(const fs::path& file_path, bool read_only)
   int sql_init    = sqlite3_initialize();
   if (sql_init != SQLITE_OK)
   {
-    MERROR("Failed to initialize sqlite3: " << sqlite3_errstr(sql_init));
+    oxen::log::error(logcat, "Failed to initialize sqlite3: {}", sqlite3_errstr(sql_init));
     return nullptr;
   }
 
@@ -576,7 +576,7 @@ sqlite3 *init_oxen_name_system(const fs::path& file_path, bool read_only)
   int sql_open    = sqlite3_open_v2(file_path.u8string().c_str(), &result, flags, nullptr);
   if (sql_open != SQLITE_OK)
   {
-    MERROR("Failed to open ONS db at: " << file_path << ", reason: " << sqlite3_errstr(sql_open));
+    oxen::log::error(logcat, "Failed to open ONS db at: {}, reason: {}", file_path, sqlite3_errstr(sql_open));
     return nullptr;
   }
 
@@ -591,7 +591,7 @@ sqlite3 *init_oxen_name_system(const fs::path& file_path, bool read_only)
   int exec = sqlite3_exec(result, "PRAGMA journal_mode = WAL", nullptr, nullptr, nullptr);
   if (exec != SQLITE_OK)
   {
-    MERROR("Failed to set journal mode to WAL: " << sqlite3_errstr(exec));
+    oxen::log::error(logcat, "Failed to set journal mode to WAL: {}", sqlite3_errstr(exec));
     return nullptr;
   }
 
@@ -605,7 +605,7 @@ sqlite3 *init_oxen_name_system(const fs::path& file_path, bool read_only)
   exec = sqlite3_exec(result, "PRAGMA synchronous = NORMAL", nullptr, nullptr, nullptr);
   if (exec != SQLITE_OK)
   {
-    MERROR("Failed to set synchronous mode to NORMAL: " << sqlite3_errstr(exec));
+    oxen::log::error(logcat, "Failed to set synchronous mode to NORMAL: {}", sqlite3_errstr(exec));
     return nullptr;
   }
 
@@ -664,7 +664,7 @@ std::string tx_extra_signature(std::string_view value, ons::generic_owner const 
   static_assert(sizeof(crypto::hash) == crypto_generichash_BYTES, "Using libsodium generichash for signature hash, require we fit into crypto::hash");
   if (value.size() > mapping_value::BUFFER_SIZE)
   {
-    MERROR("Unexpected value len=" << value.size() << " greater than the expected capacity=" << mapping_value::BUFFER_SIZE);
+    oxen::log::error(logcat, "Unexpected value len={} greater than the expected capacity={}", value.size(), mapping_value::BUFFER_SIZE);
     return ""s;
   }
 
@@ -858,7 +858,7 @@ bool validate_ons_name(mapping_type type, std::string name, std::string *reason)
   }
   else
   {
-    MERROR("Type not implemented");
+    oxen::log::error(logcat, "Type not implemented");
     return false;
   }
 
@@ -1410,7 +1410,7 @@ bool mapping_value::encrypt(std::string_view name, const crypto::hash* name_hash
 
   if (encryption_len > buffer.size())
   {
-    MERROR("Encrypted value pre-allocated buffer too small=" << buffer.size() << ", required=" << encryption_len);
+    oxen::log::error(logcat, "Encrypted value pre-allocated buffer too small={}, required={}", buffer.size(), encryption_len);
     return false;
   }
 
@@ -1482,18 +1482,18 @@ bool mapping_value::decrypt(std::string_view name, mapping_type type, const cryp
             plain_len == WALLET_ACCOUNT_BINARY_LENGTH_INC_PAYMENT_ID || plain_len == WALLET_ACCOUNT_BINARY_LENGTH_NO_PAYMENT_ID) {
           dec_length = plain_len;
         } else {
-          MERROR("Invalid wallet mapping_type length passed to mapping_value::decrypt");
+          oxen::log::error(logcat, "Invalid wallet mapping_type length passed to mapping_value::decrypt");
           return false;
         }
         break;
-      default: MERROR("Invalid mapping_type passed to mapping_value::decrypt");
+      default: oxen::log::error(logcat, "Invalid mapping_type passed to mapping_value::decrypt");
       return false;
     }
 
     auto expected_len = dec_length + crypto_aead_xchacha20poly1305_ietf_ABYTES + crypto_aead_xchacha20poly1305_ietf_NPUBBYTES;
     if (len != expected_len)
     {
-      MERROR("Encrypted value size is invalid=" << len << ", expected=" << expected_len);
+      oxen::log::error(logcat, "Encrypted value size is invalid={}, expected={}", len, expected_len);
       return false;
     }
     const auto& [enc, nonce] = value_nonce(type);
@@ -1597,7 +1597,7 @@ CREATE INDEX IF NOT EXISTS mapping_type_name_exp ON mappings (type, name_hash, e
   int table_created   = sqlite3_exec(ons_db.db, BUILD_TABLE_SQL.c_str(), nullptr /*callback*/, nullptr /*callback context*/, &table_err_msg);
   if (table_created != SQLITE_OK)
   {
-    MERROR("Can not generate SQL table for ONS: " << (table_err_msg ? table_err_msg : "??"));
+    oxen::log::error(logcat, "Can not generate SQL table for ONS: {}", (table_err_msg ? table_err_msg : "??"));
     sqlite3_free(table_err_msg);
     return false;
   }
@@ -1627,7 +1627,7 @@ CREATE INDEX IF NOT EXISTS mapping_type_name_exp ON mappings (type, name_hash, e
         "ALTER TABLE mappings ADD COLUMN update_height INTEGER NOT NULL DEFAULT register_height",
         nullptr /*callback*/, nullptr /*callback ctx*/, nullptr /*errstr*/);
 
-    LOG_PRINT_L1("Migrating ONS mappings database to new format");
+    oxen::log::info(logcat, "Migrating ONS mappings database to new format");
     const std::string migrate = R"(
 BEGIN TRANSACTION;
 ALTER TABLE mappings RENAME TO mappings_old;
@@ -1646,7 +1646,7 @@ COMMIT TRANSACTION;
     int migrated = sqlite3_exec(ons_db.db, migrate.c_str(), nullptr /*callback*/, nullptr /*callback context*/, &table_err_msg);
     if (migrated != SQLITE_OK)
     {
-      MERROR("Can not migrate SQL mappings table for ONS: " << (table_err_msg ? table_err_msg : "??"));
+      oxen::log::error(logcat, "Can not migrate SQL mappings table for ONS: {}", (table_err_msg ? table_err_msg : "??"));
       sqlite3_free(table_err_msg);
       return false;
     }
@@ -1687,14 +1687,14 @@ scoped_db_transaction::scoped_db_transaction(name_system_db &ons_db)
 {
   if (ons_db.transaction_begun)
   {
-    MERROR("Failed to begin transaction, transaction exists previously that was not closed properly");
+    oxen::log::error(logcat, "Failed to begin transaction, transaction exists previously that was not closed properly");
     return;
   }
 
   char *sql_err = nullptr;
   if (sqlite3_exec(ons_db.db, "BEGIN;", nullptr, nullptr, &sql_err) != SQLITE_OK)
   {
-    MERROR("Failed to begin transaction " << ", reason=" << (sql_err ? sql_err : "??"));
+    oxen::log::error(logcat, "Failed to begin transaction , reason={}", (sql_err ? sql_err : "??"));
     sqlite3_free(sql_err);
     return;
   }
@@ -1708,14 +1708,14 @@ scoped_db_transaction::~scoped_db_transaction()
   if (!initialised) return;
   if (!ons_db.transaction_begun)
   {
-    MERROR("Trying to apply non-existent transaction (no prior history of a db transaction beginning) to the ONS DB");
+    oxen::log::error(logcat, "Trying to apply non-existent transaction (no prior history of a db transaction beginning) to the ONS DB");
     return;
   }
 
   char *sql_err = nullptr;
   if (sqlite3_exec(ons_db.db, commit ? "END;" : "ROLLBACK;", NULL, NULL, &sql_err) != SQLITE_OK)
   {
-    MERROR("Failed to " << (commit ? "end " : "rollback ") << " transaction to ONS DB, reason=" << (sql_err ? sql_err : "??"));
+    oxen::log::error(logcat, "Failed to {} transaction to ONS DB, reason={}", (commit ? "end " : "rollback "), (sql_err ? sql_err : "??"));
     sqlite3_free(sql_err);
     return;
   }
@@ -1792,13 +1792,13 @@ AND NOT EXISTS   (SELECT * FROM mappings WHERE owner.id = mappings.backup_owner_
     {
       if (!blockchain)
       {
-        MERROR("Migration required, blockchain can not be nullptr");
+        oxen::log::error(logcat, "Migration required, blockchain can not be nullptr");
         return false;
       }
 
       if (blockchain->get_db().is_read_only())
       {
-        MERROR("DB is opened in read-only mode, unable to migrate ONS DB");
+        oxen::log::error(logcat, "DB is opened in read-only mode, unable to migrate ONS DB");
         return false;
       }
 
@@ -1949,7 +1949,7 @@ std::optional<int64_t> add_or_get_owner_id(ons::name_system_db &ons_db, crypto::
   {
     if (!ons_db.save_owner(key, &result))
     {
-      LOG_PRINT_L1("Failed to save ONS owner to DB tx: " << tx_hash << ", type: " << entry.type << ", name_hash: " << entry.name_hash << ", owner: " << entry.owner.to_string(ons_db.network_type()));
+      oxen::log::info(logcat, "Failed to save ONS owner to DB tx: {}, type: {}, name_hash: {}, owner: {}", tx_hash, entry.type, entry.name_hash, entry.owner.to_string(ons_db.network_type()));
       return std::nullopt;
     }
   }
@@ -1994,7 +1994,7 @@ SELECT                type, name_hash, ?,    ?)";
       auto opt_id = add_or_get_owner_id(ons_db, tx_hash, entry, entry.owner);
       if (!opt_id)
       {
-        MERROR("Failed to add or get owner with key=" << entry.owner.to_string(ons_db.network_type()));
+        oxen::log::error(logcat, "Failed to add or get owner with key={}", entry.owner.to_string(ons_db.network_type()));
         assert(opt_id);
         return {};
       }
@@ -2009,7 +2009,7 @@ SELECT                type, name_hash, ?,    ?)";
       auto opt_id = add_or_get_owner_id(ons_db, tx_hash, entry, entry.backup_owner);
       if (!opt_id)
       {
-        MERROR("Failed to add or get backup owner with key=" << entry.backup_owner.to_string(ons_db.network_type()));
+        oxen::log::error(logcat, "Failed to add or get backup owner with key={}", entry.backup_owner.to_string(ons_db.network_type()));
         assert(opt_id);
         return {};
       }
@@ -2046,7 +2046,7 @@ bool add_ons_entry(ons::name_system_db &ons_db, uint64_t height, cryptonote::tx_
     auto owner_id = add_or_get_owner_id(ons_db, tx_hash, entry, entry.owner);
     if (!owner_id)
     {
-      MERROR("Failed to add or get owner with key=" << entry.owner.to_string(ons_db.network_type()));
+      oxen::log::error(logcat, "Failed to add or get owner with key={}", entry.owner.to_string(ons_db.network_type()));
       assert(owner_id);
       return false;
     }
@@ -2057,7 +2057,7 @@ bool add_ons_entry(ons::name_system_db &ons_db, uint64_t height, cryptonote::tx_
       backup_owner_id = add_or_get_owner_id(ons_db, tx_hash, entry, entry.backup_owner);
       if (!backup_owner_id)
       {
-        MERROR("Failed to add or get backup owner with key=" << entry.backup_owner.to_string(ons_db.network_type()));
+        oxen::log::error(logcat, "Failed to add or get backup owner with key={}", entry.backup_owner.to_string(ons_db.network_type()));
         assert(backup_owner_id);
         return false;
       }
@@ -2067,7 +2067,7 @@ bool add_ons_entry(ons::name_system_db &ons_db, uint64_t height, cryptonote::tx_
     if (expiry) *expiry += height;
     if (!ons_db.save_mapping(tx_hash, entry, height, expiry, *owner_id, backup_owner_id))
     {
-      LOG_PRINT_L1("Failed to save ONS entry to DB tx: " << tx_hash << ", type: " << entry.type << ", name_hash: " << entry.name_hash << ", owner: " << entry.owner.to_string(ons_db.network_type()));
+      oxen::log::info(logcat, "Failed to save ONS entry to DB tx: {}, type: {}, name_hash: {}, owner: {}", tx_hash, entry.type, entry.name_hash, entry.owner.to_string(ons_db.network_type()));
       return false;
     }
   }
@@ -2085,7 +2085,7 @@ bool add_ons_entry(ons::name_system_db &ons_db, uint64_t height, cryptonote::tx_
     sql_compiled_statement statement{ons_db};
     if (!statement.compile(sql, false /*optimise_for_multiple_usage*/))
     {
-      MERROR("Failed to compile SQL statement for updating ONS record=" << sql);
+      oxen::log::error(logcat, "Failed to compile SQL statement for updating ONS record={}", sql);
       return false;
     }
 
@@ -2123,7 +2123,7 @@ bool name_system_db::add_block(const cryptonote::block &block, const std::vector
       std::string fail_reason;
       if (!validate_ons_tx(block.major_version, height, tx, entry, &fail_reason))
       {
-        MFATAL("ONS TX: Failed to validate for tx=" << get_transaction_hash(tx) << ". This should have failed validation earlier reason=" << fail_reason);
+        oxen::log::error(logcat, "ONS TX: Failed to validate for tx={}. This should have failed validation earlier reason={}", get_transaction_hash(tx), fail_reason);
         assert("Failed to validate acquire name service. Should already have failed validation prior" == nullptr);
         return false;
       }

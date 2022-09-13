@@ -34,6 +34,7 @@
 #include <stdexcept>
 #include <oxenmq/oxenmq.h>
 #include <utility>
+#include <fmt/color.h>
 
 #include "cryptonote_config.h"
 #include "cryptonote_core/cryptonote_core.h"
@@ -66,10 +67,9 @@ extern "C" {
 
 using namespace std::literals;
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "daemon"
-
 namespace daemonize {
+
+static auto logcat = oxen::log::Cat("daemon");
 
 std::pair<std::string, uint16_t> parse_ip_port(std::string_view ip_port, const std::string& argname)
 {
@@ -110,13 +110,13 @@ daemon::daemon(boost::program_options::variables_map vm_) :
     p2p{std::make_unique<node_server>(*protocol)},
     rpc{std::make_unique<cryptonote::rpc::core_rpc_server>(*core, *p2p)}
 {
-  MGINFO_BLUE("Initializing daemon objects...");
+  oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "Initializing daemon objects..."));
 
-  MGINFO("- cryptonote protocol");
+  oxen::log::info(logcat, "- cryptonote protocol");
   if (!protocol->init(vm))
     throw std::runtime_error("Failed to initialize cryptonote protocol.");
 
-  MGINFO("- p2p");
+  oxen::log::info(logcat, "- p2p");
   if (!p2p->init(vm))
     throw std::runtime_error("Failed to initialize p2p server.");
 
@@ -145,7 +145,7 @@ daemon::daemon(boost::program_options::variables_map vm_) :
   std::vector<std::tuple<std::string, uint16_t, bool>> rpc_listen_admin, rpc_listen_public;
   if (deprecated_rpc_options)
   {
-    MGINFO_RED(deprecated_option_names << " options are deprecated and will be removed from a future oxend version; use --rpc-public/--rpc-admin instead");
+    oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "{} options are deprecated and will be removed from a future oxend version; use --rpc-public/--rpc-admin instead", deprecated_option_names));
 
     // These old options from Monero are really janky: --restricted-rpc turns the main port
     // restricted, but then we also have --rpc-restricted-bind-port but both are stuck with
@@ -208,55 +208,55 @@ daemon::daemon(boost::program_options::variables_map vm_) :
 
   if (!rpc_listen_admin.empty())
   {
-    MGINFO("- admin HTTP RPC server");
+    oxen::log::info(logcat, "- admin HTTP RPC server");
     http_rpc_admin.emplace(*rpc, rpc_config, false /*not restricted*/, std::move(rpc_listen_admin));
   }
 
   if (!rpc_listen_public.empty())
   {
-    MGINFO("- public HTTP RPC server");
+    oxen::log::info(logcat, "- public HTTP RPC server");
     http_rpc_public.emplace(*rpc, rpc_config, true /*restricted*/, std::move(rpc_listen_public));
   }
 
-  MGINFO_BLUE("Done daemon object initialization");
+  oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "Done daemon object initialization"));
 }
 
 daemon::~daemon()
 {
-  MGINFO_BLUE("Deinitializing daemon objects...");
+  oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "Deinitializing daemon objects..."));
 
   if (http_rpc_public) {
-    MGINFO("- public HTTP RPC server");
+    oxen::log::info(logcat, "- public HTTP RPC server");
     http_rpc_public.reset();
   }
   if (http_rpc_admin) {
-    MGINFO("- admin HTTP RPC server");
+    oxen::log::info(logcat, "- admin HTTP RPC server");
     http_rpc_admin.reset();
   }
 
-  MGINFO("- p2p");
+  oxen::log::info(logcat, "- p2p");
   try {
     p2p->deinit();
   } catch (const std::exception& e) {
-    MERROR("Failed to deinitialize p2p: " << e.what());
+    oxen::log::error(logcat, "Failed to deinitialize p2p: {}", e.what());
   }
 
-  MGINFO("- core");
+  oxen::log::info(logcat, "- core");
   try {
     core->deinit();
     core->set_cryptonote_protocol(nullptr);
   } catch (const std::exception& e) {
-    MERROR("Failed to deinitialize core: " << e.what());
+    oxen::log::error(logcat, "Failed to deinitialize core: {}", e.what());
   }
 
-  MGINFO("- cryptonote protocol");
+  oxen::log::info(logcat, "- cryptonote protocol");
   try {
     protocol->deinit();
     protocol->set_p2p_endpoint(nullptr);
   } catch (const std::exception& e) {
-    MERROR("Failed to stop cryptonote protocol: " << e.what());
+    oxen::log::error(logcat, "Failed to stop cryptonote protocol: {}", e.what());
   }
-  MGINFO_BLUE("Deinitialization complete");
+  oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "Deinitialization complete"));
 }
 
 void daemon::init_options(boost::program_options::options_description& option_spec, boost::program_options::options_description& hidden)
@@ -297,32 +297,32 @@ bool daemon::run(bool interactive)
 
   try
   {
-    MGINFO_BLUE("Starting up oxend services...");
+    oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "Starting up oxend services..."));
     cryptonote::GetCheckpointsCallback get_checkpoints;
 #if defined(PER_BLOCK_CHECKPOINT)
     get_checkpoints = blocks::GetCheckpointsData;
 #endif
-    MGINFO("Starting core");
+    oxen::log::info(logcat, "Starting core");
     if (!core->init(vm, nullptr, get_checkpoints))
       throw std::runtime_error("Failed to start core");
 
-    MGINFO("Starting OxenMQ");
+    oxen::log::info(logcat, "Starting OxenMQ");
     omq_rpc = std::make_unique<cryptonote::rpc::omq_rpc>(*core, *rpc, vm);
     core->start_oxenmq();
 
     if (http_rpc_admin) {
-      MGINFO("Starting admin HTTP RPC server");
+      oxen::log::info(logcat, "Starting admin HTTP RPC server");
       http_rpc_admin->start();
     }
     if (http_rpc_public) {
-      MGINFO("Starting public HTTP RPC server");
+      oxen::log::info(logcat, "Starting public HTTP RPC server");
       http_rpc_public->start();
     }
 
     std::optional<daemonize::command_server> rpc_commands;
     if (interactive)
     {
-      MGINFO("Starting command-line processor");
+      oxen::log::info(logcat, "Starting command-line processor");
       auto& omq = core->get_omq();
 
       std::promise<void> p;
@@ -341,42 +341,42 @@ bool daemon::run(bool interactive)
       rpc_commands->start_handling([this] { stop(); });
     }
 
-    MGINFO_GREEN("Starting up main network");
+    oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Starting up main network"));
 
 #ifdef ENABLE_SYSTEMD
     sd_notify(0, ("READY=1\nSTATUS=" + core->get_status_string()).c_str());
 #endif
 
     p2p->run(); // blocks until p2p goes down
-    MGINFO_YELLOW("Main network stopped");
+    oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Main network stopped"));
 
     if (rpc_commands)
     {
-      MGINFO("Stopping RPC command processor");
+      oxen::log::info(logcat, "Stopping RPC command processor");
       rpc_commands->stop_handling();
       rpc_commands.reset();
     }
 
     if (http_rpc_public) {
-      MGINFO("Stopping public HTTP RPC server...");
+      oxen::log::info(logcat, "Stopping public HTTP RPC server...");
       http_rpc_public->shutdown();
     }
     if (http_rpc_admin) {
-      MGINFO("Stopping admin HTTP RPC server...");
+      oxen::log::info(logcat, "Stopping admin HTTP RPC server...");
       http_rpc_admin->shutdown();
     }
 
-    MGINFO("Node stopped.");
+    oxen::log::info(logcat, "Node stopped.");
     return true;
   }
   catch (std::exception const& ex)
   {
-    MFATAL(ex.what());
+    oxen::log::error(logcat, ex.what());
     return false;
   }
   catch (...)
   {
-    MFATAL("Unknown exception occured!");
+    oxen::log::error(logcat, "Unknown exception occured!");
     return false;
   }
 }

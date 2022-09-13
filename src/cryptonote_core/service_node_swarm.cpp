@@ -1,9 +1,6 @@
 #include "service_node_swarm.h"
 #include "common/random.h"
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "service_nodes"
-
 #ifdef UNIT_TEST
   #define prod_static
 #else
@@ -12,6 +9,8 @@
 
 namespace service_nodes
 {
+  static auto logcat = oxen::log::Cat("service_nodes");
+
   uint64_t get_new_swarm_id(const swarm_snode_map_t &swarm_to_snodes)
   {
     if (swarm_to_snodes.empty()) return 0;
@@ -70,7 +69,7 @@ namespace service_nodes
                                             const ssize_t margin = pair.second.size() - EXCESS_BASE;
                                             return result + std::max(margin, ssize_t(0));
                                           });
-    LOG_PRINT_L2("Calculated excess: " << excess);
+    oxen::log::debug(logcat, "Calculated excess: {}", excess);
     return excess;
   };
 
@@ -81,7 +80,7 @@ namespace service_nodes
   prod_static size_t calc_threshold(const swarm_snode_map_t &swarm_to_snodes)
   {
     const size_t threshold = NEW_SWARM_SIZE + (swarm_to_snodes.size() * IDEAL_SWARM_MARGIN);
-    LOG_PRINT_L2("Calculated threshold: " << threshold);
+    oxen::log::debug(logcat, "Calculated threshold: {}", threshold);
     return threshold;
   };
 
@@ -137,7 +136,7 @@ namespace service_nodes
 
     while (calc_excess(swarm_to_snodes) >= calc_threshold(swarm_to_snodes))
     {
-      LOG_PRINT_L2("New swarm creation");
+      oxen::log::debug(logcat, "New swarm creation");
       std::vector<crypto::public_key> new_swarm_snodes;
       new_swarm_snodes.reserve(NEW_SWARM_SIZE);
       while (new_swarm_snodes.size() < NEW_SWARM_SIZE)
@@ -146,7 +145,7 @@ namespace service_nodes
         get_excess_pool(EXCESS_BASE, swarm_to_snodes, pool_snodes, excess);
         if (pool_snodes.size() == 0)
         {
-          MERROR("Error while getting excess pool for new swarm creation");
+          oxen::log::error(logcat, "Error while getting excess pool for new swarm creation");
           return;
         }
         const auto& random_excess_snode = pick_from_excess_pool(pool_snodes, mt);
@@ -156,12 +155,12 @@ namespace service_nodes
       const auto new_swarm_id = get_new_swarm_id(swarm_to_snodes);
       if (auto [it, ins] = swarm_to_snodes.emplace(new_swarm_id, std::move(new_swarm_snodes));
               !ins) {
-          MFATAL("New swarm ID gave a swarm id (" << new_swarm_id << ") that already exists -- this is a bug!");
+          oxen::log::error(logcat, "New swarm ID gave a swarm id ({}) that already exists -- this is a bug!", new_swarm_id);
           // If we actually abort() here then hitting this would potentially kill the whole network
           // if we hit this bug, so just warn very loudly and move on; if it happens we'll have to
           // track down the bug and fix it separately.
       } else {
-          LOG_PRINT_L2("Created new swarm from excess: " << new_swarm_id);
+          oxen::log::debug(logcat, "Created new swarm from excess: {}", new_swarm_id);
       }
     }
   }
@@ -228,22 +227,22 @@ namespace service_nodes
       swarm_to_snodes.erase(it);
     }
 
-    LOG_PRINT_L3("calc_swarm_changes. swarms: " << swarm_to_snodes.size() << ", regs: " << unassigned_snodes.size());
+    oxen::log::trace(logcat, "calc_swarm_changes. swarms: {}, regs: {}", swarm_to_snodes.size(), unassigned_snodes.size());
 
     /// 0. Ensure there is always 1 swarm
     if (swarm_to_snodes.size() == 0)
     {
       const auto new_swarm_id = get_new_swarm_id({});
       swarm_to_snodes.insert({new_swarm_id, {}});
-      LOG_PRINT_L2("Created initial swarm " << new_swarm_id);
+      oxen::log::debug(logcat, "Created initial swarm {}", new_swarm_id);
     }
 
     /// 1. Assign new registered snodes
     assign_snodes(unassigned_snodes, swarm_to_snodes, mersenne_twister, FILL_SWARM_LOWER_PERCENTILE);
-    LOG_PRINT_L2("After assignment:");
+    oxen::log::debug(logcat, "After assignment:");
     for (const auto &entry : swarm_to_snodes)
     {
-      LOG_PRINT_L2(entry.first << ": " << entry.second.size());
+      oxen::log::debug(logcat, "{}: {}", entry.first, entry.second.size());
     }
 
     /// 2. *Robin Hood Round* steal snodes from wealthy swarms and give them to the poor
@@ -276,7 +275,7 @@ namespace service_nodes
           remove_excess_snode_from_swarm(excess_snode, swarm_to_snodes);
           /// Add public key to poor swarm
           poor_swarm_snodes.push_back(excess_snode.public_key);
-          LOG_PRINT_L2("Stolen 1 snode from " << excess_snode.public_key << " and donated to " << swarm.swarm_id);
+          oxen::log::debug(logcat, "Stolen 1 snode from {} and donated to {}", excess_snode.public_key, swarm.swarm_id);
         } while (poor_swarm_snodes.size() < MIN_SWARM_SIZE);
 
         /// If there is not enough excess for the current swarm,
@@ -302,7 +301,7 @@ namespace service_nodes
         if (it == swarm_to_snodes.end())
           break;
 
-        MWARNING("swarm " << it->first << " is DECOMMISSIONED");
+        oxen::log::warning(logcat, "swarm {} is DECOMMISSIONED", it->first);
         /// Good ol' switcheroo
         std::vector<crypto::public_key> decommissioned_snodes;
         std::swap(decommissioned_snodes, it->second);
@@ -314,10 +313,10 @@ namespace service_nodes
     }
 
     /// print
-    LOG_PRINT_L2("Swarm outputs:");
+    oxen::log::debug(logcat, "Swarm outputs:");
     for (const auto &entry : swarm_to_snodes)
     {
-      LOG_PRINT_L2(entry.first << ": " << entry.second.size());
+      oxen::log::debug(logcat, "{}: {}", entry.first, entry.second.size());
     }
   }
 }

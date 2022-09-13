@@ -39,12 +39,12 @@
 #include "crypto/hash.h"
 #include "epee/int-util.h"
 #include "common/oxen.h"
+#include "logging/oxen_logger.h"
 #include <cfenv>
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "cn"
-
 namespace cryptonote {
+
+  static auto logcat = oxen::log::Cat("cn");
 
   struct integrated_address {
     account_public_address adr;
@@ -133,7 +133,7 @@ namespace cryptonote {
     }
 
     if(current_block_weight > 2 * median_weight) {
-      MERROR("Block cumulative weight is too big: " << current_block_weight << ", expected less than " << 2 * median_weight);
+      oxen::log::error(logcat, "Block cumulative weight is too big: {}, expected less than {}", current_block_weight, 2 * median_weight);
       return false;
     }
 
@@ -225,7 +225,7 @@ namespace cryptonote {
     uint64_t prefix{0};
     if (!tools::base58::decode_addr(str, prefix, data))
     {
-      LOG_PRINT_L2("Invalid address format");
+      oxen::log::debug(logcat, "Invalid address format");
       return false;
     }
 
@@ -245,9 +245,7 @@ namespace cryptonote {
       info.has_payment_id = false;
     }
     else {
-      LOG_PRINT_L1("Wrong address prefix: " << prefix << ", expected " << address_prefix 
-        << " or " << integrated_address_prefix
-        << " or " << subaddress_prefix);
+      oxen::log::info(logcat, "Wrong address prefix: {}, expected {} or {} or {}", prefix, address_prefix, integrated_address_prefix, subaddress_prefix);
       return false;
     }
 
@@ -264,13 +262,13 @@ namespace cryptonote {
         serialization::parse_binary(data, info.address);
       }
     } catch (const std::exception& e) {
-      LOG_PRINT_L1("Account public address keys can't be parsed: "s + e.what());
+      oxen::log::info(logcat, "Account public address keys can't be parsed: "s + e.what());
       return false;
     }
 
     if (!crypto::check_key(info.address.m_spend_public_key) || !crypto::check_key(info.address.m_view_public_key))
     {
-      LOG_PRINT_L1("Failed to validate address keys");
+      oxen::log::info(logcat, "Failed to validate address keys");
       return false;
     }
 

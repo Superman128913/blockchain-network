@@ -73,9 +73,9 @@
 #include "common/base58.h"
 #include "common/combinator.h"
 #include "common/notify.h"
-#include "common/perf_timer.h"
 #include "common/hex.h"
 #include "ringct/rctSigs.h"
+#include "ringct/fmt.h"
 #include "ringdb.h"
 #include "device/device_cold.hpp"
 #ifdef DEVICE_TREZOR_READY
@@ -86,6 +86,9 @@
 #include "cryptonote_core/service_node_rules.h"
 #include "common/oxen.h"
 #include "oxen_economy.h"
+#include "logging/oxen_logger.h"
+#include <fmt/color.h>
+#include <fmt/std.h>
 
 extern "C"
 {
@@ -101,9 +104,8 @@ extern "C"
 using namespace crypto;
 using namespace cryptonote;
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "wallet.wallet2"
 namespace {
+  static auto logcat = oxen::log::Cat("wallet.wallet2");
 
   constexpr std::string_view UNSIGNED_TX_PREFIX = "Loki unsigned tx set\004"sv;
   constexpr std::string_view SIGNED_TX_PREFIX = "Loki signed tx set\004"sv;
@@ -389,7 +391,7 @@ std::unique_ptr<tools::wallet2> make_basic(const boost::program_options::variabl
       command_line::get_arg(vm, opts.daemon_login), false, [password_prompter](bool verify) {
         if (!password_prompter)
         {
-          MERROR("Password needed without prompt function");
+          oxen::log::error(logcat, "Password needed without prompt function");
           return std::optional<tools::password_container>();
         }
         return password_prompter("Daemon client password", verify);
@@ -441,7 +443,7 @@ std::unique_ptr<tools::wallet2> make_basic(const boost::program_options::variabl
   if (!command_line::is_arg_defaulted(vm, opts.trusted_daemon) || !command_line::is_arg_defaulted(vm, opts.untrusted_daemon))
     trusted_daemon = command_line::get_arg(vm, opts.trusted_daemon) && !command_line::get_arg(vm, opts.untrusted_daemon);
   else if (trusted_daemon)
-    MINFO(tools::wallet2::tr("Daemon is local, assuming trusted"));
+    oxen::log::info(logcat, tools::wallet2::tr("Daemon is local, assuming trusted"));
 
   auto wallet = std::make_unique<tools::wallet2>(nettype, kdf_rounds, unattended);
   wallet->init(std::move(daemon_address), std::move(login), std::move(proxy), 0, trusted_daemon);
@@ -477,7 +479,7 @@ std::unique_ptr<tools::wallet2> make_basic(const boost::program_options::variabl
   }
   catch (const std::exception &e)
   {
-    MERROR("Failed to parse tx notify spec");
+    oxen::log::error(logcat, "Failed to parse tx notify spec");
   }
 
   return wallet;
@@ -790,7 +792,7 @@ size_t estimate_rct_tx_size(int n_inputs, int mixin, int n_outputs, size_t extra
   // txnFee
   size += 4;
 
-  LOG_PRINT_L2("estimated bulletproof rct tx size for " << n_inputs << " inputs with ring size " << (mixin+1) << " and " << n_outputs << " outputs: " << size << " (" << ((32 * n_inputs/*+1*/) + 2 * 32 * (mixin+1) * n_inputs + 32 * n_outputs) << " saved)");
+  oxen::log::debug(logcat, "estimated bulletproof rct tx size for {} inputs with ring size {} and {} outputs: {} ({} saved)", n_inputs, (mixin+1), n_outputs, size, ((32 * n_inputs/*+1*/) + 2 * 32 * (mixin+1) * n_inputs + 32 * n_outputs));
   return size;
 }
 
@@ -806,7 +808,7 @@ uint64_t estimate_tx_weight(int n_inputs, int mixin, int n_outputs, size_t extra
     uint64_t nlr = 2 * (6 + log_padded_outputs);
     const uint64_t bp_size = 32 * (9 + nlr);
     const uint64_t bp_clawback = (bp_base * (1<<log_padded_outputs) - bp_size) * 4 / 5;
-    MDEBUG("clawback on size " << size << ": " << bp_clawback);
+    oxen::log::debug(logcat, "clawback on size {}: {}", size, bp_clawback);
     size += bp_clawback;
   }
   return size;
@@ -834,7 +836,7 @@ bool get_short_payment_id(crypto::hash8 &payment_id8, const tools::wallet2::pend
     {
       if (ptx.dests.empty())
       {
-        MWARNING("Encrypted payment id found, but no destinations public key, cannot decrypt");
+        oxen::log::warning(logcat, "Encrypted payment id found, but no destinations public key, cannot decrypt");
         return false;
       }
       return hwdev.decrypt_payment_id(payment_id8, ptx.dests[0].addr.m_view_public_key, ptx.tx_key);
@@ -856,7 +858,7 @@ wallet::tx_construction_data get_construction_data_with_decrypted_short_payment_
     set_encrypted_payment_id_to_tx_extra_nonce(extra_nonce, payment_id);
     THROW_WALLET_EXCEPTION_IF(!add_extra_nonce_to_tx_extra(construction_data.extra, extra_nonce),
         tools::error::wallet_internal_error, "Failed to add decrypted payment id to tx extra");
-    LOG_PRINT_L1("Decrypted payment ID: " << payment_id);
+    oxen::log::info(logcat, "Decrypted payment ID: {}", payment_id);
   }
   return construction_data;
 }
@@ -967,7 +969,7 @@ uint64_t gamma_picker::pick()
   const uint64_t n_rct = rct_offsets[index] - first_rct;
   if (n_rct == 0)
     return std::numeric_limits<uint64_t>::max(); // bad pick
-  MTRACE("Picking 1/" << n_rct << " in block " << index);
+  oxen::log::trace(logcat, "Picking 1/{} in block {}", n_rct, index);
   return first_rct + crypto::rand_idx(n_rct);
 };
 
@@ -1010,7 +1012,7 @@ wallet_keys_unlocker::~wallet_keys_unlocker()
     std::lock_guard lock{lockers_mutex};
     if (lockers == 0)
     {
-      MERROR("There are no lockers in wallet_keys_unlocker dtor");
+      oxen::log::error(logcat, "There are no lockers in wallet_keys_unlocker dtor");
       return;
     }
     --lockers;
@@ -1020,7 +1022,7 @@ wallet_keys_unlocker::~wallet_keys_unlocker()
   }
   catch (...)
   {
-    MERROR("Failed to re-encrypt wallet keys");
+    oxen::log::error(logcat, "Failed to re-encrypt wallet keys");
     // do not propagate through dtor, we'd crash
   }
 }
@@ -1258,7 +1260,7 @@ bool wallet2::set_daemon(std::string daemon_address, std::optional<tools::login>
     auto [proto, host, port, uri] = rpc::http_client::parse_url(daemon_address);
     localhost = tools::is_local_address(host);
   } catch (const rpc::http_client_error& e) {
-    MWARNING("Invalid daemon URL: "s + e.what());
+    oxen::log::warning(logcat, "Invalid daemon URL: "s + e.what());
     return false;
   }
 
@@ -1285,7 +1287,7 @@ bool wallet2::set_daemon(std::string daemon_address, std::optional<tools::login>
   m_node_rpc_proxy.invalidate();
 
   std::string url = m_http_client.get_base_url();
-  MINFO("set daemon to " << (url.empty() ? "(none, offline)" : url));
+  oxen::log::info(logcat, "set daemon to {}", (url.empty() ? "(none, offline)" : url));
   {
     std::lock_guard lock{default_daemon_address_mutex};
     default_daemon_address = std::move(url);
@@ -1413,13 +1415,13 @@ bool wallet2::reconnect_device()
   hwdev.set_callback(get_device_callback());
   r = hwdev.init();
   if (!r){
-    MERROR("Could not init device");
+    oxen::log::error(logcat, "Could not init device");
     return false;
   }
 
   r = hwdev.connect();
   if (!r){
-    MERROR("Could not connect to the device");
+    oxen::log::error(logcat, "Could not connect to the device");
     return false;
   }
 
@@ -1543,7 +1545,7 @@ std::string wallet2::get_subaddress_label(const cryptonote::subaddress_index& in
 {
   if (index.major >= m_subaddress_labels.size() || index.minor >= m_subaddress_labels[index.major].size())
   {
-    MERROR("Subaddress label doesn't exist");
+    oxen::log::error(logcat, "Subaddress label doesn't exist");
     return "";
   }
   return m_subaddress_labels[index.major][index.minor];
@@ -1578,7 +1580,7 @@ void wallet2::set_spent(size_t idx, uint64_t height)
 {
   CHECK_AND_ASSERT_THROW_MES(idx < m_transfers.size(), "Invalid index");
   transfer_details &td = m_transfers[idx];
-  LOG_PRINT_L2("Setting SPENT at " << height << ": ki " << td.m_key_image << ", amount " << print_money(td.m_amount));
+  oxen::log::debug(logcat, "Setting SPENT at {}: ki {}, amount {}", height, td.m_key_image, print_money(td.m_amount));
   td.m_spent = true;
   td.m_spent_height = height;
 }
@@ -1587,7 +1589,7 @@ void wallet2::set_unspent(size_t idx)
 {
   CHECK_AND_ASSERT_THROW_MES(idx < m_transfers.size(), "Invalid index");
   transfer_details &td = m_transfers[idx];
-  LOG_PRINT_L2("Setting UNSPENT: ki " << td.m_key_image << ", amount " << print_money(td.m_amount));
+  oxen::log::debug(logcat, "Setting UNSPENT: ki {}, amount {}", td.m_key_image, print_money(td.m_amount));
   td.m_spent = false;
   td.m_spent_height = 0;
 }
@@ -1671,7 +1673,7 @@ void wallet2::check_acc_out_precomp(const tx_out &o, const crypto::key_derivatio
   if (!std::holds_alternative<txout_to_key>(o.target))
   {
      tx_scan_info.error = true;
-     LOG_ERROR("wrong type id in transaction out");
+     oxen::log::error(logcat, "wrong type id in transaction out");
      return;
   }
   tx_scan_info.received = is_out_to_acc_precomp(m_subaddresses, var::get<txout_to_key>(o.target).key, derivation, additional_derivations, i, hwdev);
@@ -1729,13 +1731,13 @@ static uint64_t decodeRct(const rct::rctSig & rv, const crypto::key_derivation &
     case rct::RCTType::Full:
       return rct::decodeRct(rv, rct::sk2rct(scalar1), i, mask, hwdev);
     default:
-      LOG_ERROR(__func__ << ": Unsupported rct type: " << (int)rv.type);
+      oxen::log::error(logcat, "{}: Unsupported rct type: {}", __func__, (int)rv.type);
       return 0;
     }
   }
   catch (const std::exception &e)
   {
-    LOG_ERROR("Failed to decode input " << i);
+    oxen::log::error(logcat, "Failed to decode input {}", i);
     return 0;
   }
 }
@@ -1789,7 +1791,7 @@ void wallet2::scan_output(const cryptonote::transaction &tx, bool miner_tx, cons
 
   if (tx_scan_info.money_transfered == 0)
   {
-    MERROR("Invalid output amount, skipping");
+    oxen::log::error(logcat, "Invalid output amount, skipping");
     tx_scan_info.error = true;
     return;
   }
@@ -1821,7 +1823,7 @@ void wallet2::cache_tx_data(const cryptonote::transaction& tx, const crypto::has
   if(!parse_tx_extra(tx.extra, tx_cache_data.tx_extra_fields))
   {
     // Extra may only be partially parsed, it's OK if tx_extra_fields contains public key
-    LOG_PRINT_L0("Transaction extra has unsupported format: " << txid);
+    oxen::log::warning(logcat, "Transaction extra has unsupported format: {}", txid);
     if (tx_cache_data.tx_extra_fields.empty())
       return;
   }
@@ -1859,7 +1861,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
   if (!tx.is_transfer() || tx.version <= txversion::v1)
     return;
 
-  PERF_TIMER(process_new_transaction);
+  oxen::log::trace(logcat, "PROC NEW TX {}", txid);
   // In this function, tx (probably) only contains the base information
   // (that is, the prunable stuff may or may not be included)
   confirmed_transfer_details* just_confirmed = nullptr;
@@ -1881,7 +1883,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
     if(!parse_tx_extra(tx.extra, local_tx_extra_fields))
     {
       // Extra may only be partially parsed, it's OK if tx_extra_fields contains public key
-      LOG_PRINT_L0("Transaction extra has unsupported format: " << txid);
+      oxen::log::warning(logcat, "Transaction extra has unsupported format: {}", txid);
     }
   }
   const auto& tx_extra_fields = tx_cache_data.tx_extra_fields.empty() ? local_tx_extra_fields : tx_cache_data.tx_extra_fields;
@@ -1921,7 +1923,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
     {
       if (pk_index > 1)
         break;
-      LOG_PRINT_L0("Public key wasn't found in the transaction extra. Skipping transaction " << txid);
+      oxen::log::warning(logcat, "Public key wasn't found in the transaction extra. Skipping transaction {}", txid);
       if (m_callback)
         m_callback->on_skip_transaction(height, txid, tx);
       break;
@@ -1950,7 +1952,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
       hwdev.set_mode(hw::device::mode::TRANSACTION_PARSE);
       if (!hwdev.generate_key_derivation(tx_pub_key, keys.m_view_secret_key, derivation))
       {
-        MWARNING("Failed to generate key derivation from tx pubkey in " << txid << ", skipping");
+        oxen::log::warning(logcat, "Failed to generate key derivation from tx pubkey in {}, skipping", txid);
         static_assert(sizeof(derivation) == sizeof(rct::key), "Mismatched sizes of key_derivation and rct::key");
         memcpy(&derivation, rct::identity().bytes, sizeof(derivation));
       }
@@ -1965,7 +1967,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
             additional_derivations.push_back({});
             if (!hwdev.generate_key_derivation(additional_tx_pub_keys.data[i], keys.m_view_secret_key, additional_derivations.back()))
             {
-              MWARNING("Failed to generate key derivation from additional tx pubkey in " << txid << ", skipping");
+              oxen::log::warning(logcat, "Failed to generate key derivation from additional tx pubkey in {}, skipping", txid);
               memcpy(&additional_derivations.back(), rct::identity().bytes, sizeof(crypto::key_derivation));
             }
           }
@@ -2135,7 +2137,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
               if (m_multisig_rescan_info && m_multisig_rescan_info->front().size() >= m_transfers.size())
                 update_multisig_rescan_info(*m_multisig_rescan_k, *m_multisig_rescan_info, m_transfers.size() - 1);
             }
-            LOG_PRINT_L0("Received money: " << print_money(td.amount()) << ", with tx: " << txid);
+            oxen::log::warning(logcat, "Received money: {}, with tx: {}", print_money(td.amount()), txid);
             if (m_callback)
               m_callback->on_money_received(height, txid, tx, td.m_amount, td.m_subaddr_index, td.m_tx.unlock_time, blink);
           }
@@ -2158,10 +2160,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
         {
           if (transfer.amount() > tx_scan_info[o].amount)
           {
-            LOG_ERROR("Public key " << tools::type_to_hex(kit->first)
-                << " from received " << print_money(tx_scan_info[o].amount) << " output already exists with "
-                << (transfer.m_spent ? "spent" : "unspent") << " "
-                << print_money(transfer.amount()) << " in tx " << transfer.m_txid << ", received output ignored");
+            oxen::log::error(logcat, "Public key {} from received {} output already exists with {} in tx {}, received output ignored", tools::type_to_hex(kit->first), print_money(tx_scan_info[o].amount), (transfer.m_spent ? "spent" : "unspend"), print_money(transfer.amount()), transfer.m_txid);
           }
 
           if (transfer.m_unmined_blink)
@@ -2170,9 +2169,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
             THROW_WALLET_EXCEPTION_IF(transfer.amount() != tx_scan_info[o].amount, error::wallet_internal_error, "A blink should credit the amount exactly as we recorded it when it arrived in the mempool");
             THROW_WALLET_EXCEPTION_IF(transfer.m_spent, error::wallet_internal_error, "Blink can not be spent before it is mined, this should never happen");
 
-            MINFO("Public key " << tools::type_to_hex(kit->first)
-                << " of blink tx " << transfer.m_txid << " (for " << print_money(tx_scan_info[o].amount) << ")"
-                << " status updated: now mined in block " << height);
+            oxen::log::info(logcat, "Public key {} of blink tx {} (for {}) status updated: now mined in block {}", tools::type_to_hex(kit->first), transfer.m_txid, print_money(tx_scan_info[o].amount), height);
 
             // We previous had this as a blink, but now it's been mined so update the tx status with the height and output index
             transfer.m_block_height = height;
@@ -2195,10 +2192,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
         }
         else if (transfer.m_spent || transfer.amount() >= tx_scan_info[o].amount)
         {
-          LOG_ERROR("Public key " << tools::type_to_hex(kit->first)
-              << " from received " << print_money(tx_scan_info[o].amount) << " output already exists with "
-              << (transfer.m_spent ? "spent" : "unspent") << " "
-              << print_money(transfer.amount()) << " in tx " << transfer.m_txid << ", received output ignored");
+          oxen::log::error(logcat, "Public key {} from received {} output already exists with {} {} in tx {}, received output ignored", tools::type_to_hex(kit->first), print_money(tx_scan_info[o].amount), (transfer.m_spent ? "spent" : "unspent"), print_money(transfer.amount()), transfer.m_txid);
 
           auto iter = std::find_if(
               tx_money_got_in_outs.begin(),
@@ -2216,9 +2210,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
         }
         else
         {
-          LOG_ERROR("Public key " << tools::type_to_hex(kit->first)
-              << " from received " << print_money(tx_scan_info[o].amount) << " output already exists with "
-              << print_money(transfer.amount()) << ", replacing with new output");
+          oxen::log::error(logcat, "Public key {} from received {} output already exists with {}, replacing with new output", tools::type_to_hex(kit->first), print_money(tx_scan_info[o].amount), print_money(transfer.amount()));
 
           // The new larger output replaced a previous smaller one
           auto unlock_time_it = pk_to_unlock_times.find(kit->first);
@@ -2313,7 +2305,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
             THROW_WALLET_EXCEPTION_IF(transfer.get_public_key() != tx_scan_info[o].in_ephemeral.pub, error::wallet_internal_error, "Inconsistent public keys");
             THROW_WALLET_EXCEPTION_IF(transfer.m_spent, error::wallet_internal_error, "Inconsistent spent status");
 
-            LOG_PRINT_L0("Received money: " << print_money(transfer.amount()) << ", with tx: " << txid);
+            oxen::log::warning(logcat, "Received money: {}, with tx: {}", print_money(transfer.amount()), txid);
             if (m_callback)
               m_callback->on_money_received(height, txid, tx, transfer.m_amount, transfer.m_subaddr_index, transfer.m_tx.unlock_time, blink);
           }
@@ -2342,8 +2334,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
       {
         if(amount != td.amount())
         {
-          MERROR("Inconsistent amount in tx input: got " << print_money(amount) <<
-            ", expected " << print_money(td.amount()));
+          oxen::log::error(logcat, "Inconsistent amount in tx input: got {}, expected {}", print_money(amount), print_money(td.amount()));
           // this means:
           //   1) the same output pub key was used as destination multiple times,
           //   2) the wallet set the highest amount among them to transfer_details::m_amount, and
@@ -2357,12 +2348,12 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
       }
       tx_money_spent_in_ins += amount;
       if (subaddr_account && *subaddr_account != td.m_subaddr_index.major)
-        LOG_ERROR("spent funds are from different subaddress accounts; count of incoming/outgoing payments will be incorrect");
+        oxen::log::error(logcat, "spent funds are from different subaddress accounts; count of incoming/outgoing payments will be incorrect");
       subaddr_account = td.m_subaddr_index.major;
       subaddr_indices.insert(td.m_subaddr_index.minor);
       if (!pool)
       {
-        LOG_PRINT_L0("Spent money: " << print_money(amount) << ", with tx: " << txid);
+        oxen::log::warning(logcat, "Spent money: {}, with tx: {}", print_money(amount), txid);
         set_spent(it->second, height);
         if (m_callback)
           m_callback->on_money_spent(height, txid, tx, amount, tx, td.m_subaddr_index);
@@ -2371,7 +2362,6 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
 
     if (!pool && m_track_uses)
     {
-      PERF_TIMER(track_uses);
       const uint64_t amount = in_to_key.amount;
       std::vector<uint64_t> offsets = cryptonote::relative_output_offsets_to_absolute(in_to_key.key_offsets);
       if (output_tracker_cache)
@@ -2446,17 +2436,17 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
       if(get_encrypted_payment_id_from_tx_extra_nonce(extra_nonce.nonce, payment_id8))
       {
         // We got a payment ID to go with this tx
-        LOG_PRINT_L2("Found encrypted payment ID: " << payment_id8);
-        MINFO("Consider using subaddresses instead of encrypted payment IDs");
+        oxen::log::debug(logcat, "Found encrypted payment ID: {}", payment_id8);
+        oxen::log::info(logcat, "Consider using subaddresses instead of encrypted payment IDs");
         if (tx_pub_key != null_pkey)
         {
           if (!m_account.get_device().decrypt_payment_id(payment_id8, tx_pub_key, m_account.get_keys().m_view_secret_key))
           {
-            LOG_PRINT_L0("Failed to decrypt payment ID: " << payment_id8);
+            oxen::log::warning(logcat, "Failed to decrypt payment ID: {}", payment_id8);
           }
           else
           {
-            LOG_PRINT_L2("Decrypted payment ID: " << payment_id8);
+            oxen::log::debug(logcat, "Decrypted payment ID: {}", payment_id8);
             // put the 64 bit decrypted payment id in the first 8 bytes
             memcpy(payment_id.data, payment_id8.data, 8);
             // rest is already 0, but guard against code changes above
@@ -2465,7 +2455,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
         }
         else
         {
-          LOG_PRINT_L1("No public key found in tx, unable to decrypt payment id");
+          oxen::log::info(logcat, "No public key found in tx, unable to decrypt payment id");
         }
       }
       else if (get_payment_id_from_tx_extra_nonce(extra_nonce.nonce, payment_id))
@@ -2473,14 +2463,14 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
         bool ignore = block_version >= IGNORE_LONG_PAYMENT_ID_FROM_BLOCK_VERSION;
         if (ignore)
         {
-          LOG_PRINT_L2("Found unencrypted payment ID in tx " << txid << " (ignored)");
-          MWARNING("Found OBSOLETE AND IGNORED unencrypted payment ID: these are bad for privacy, use subaddresses instead");
+          oxen::log::debug(logcat, "Found unencrypted payment ID in tx {} (ignored)", txid);
+          oxen::log::warning(logcat, "Found OBSOLETE AND IGNORED unencrypted payment ID: these are bad for privacy, use subaddresses instead");
           payment_id = crypto::null_hash;
         }
         else
         {
-          LOG_PRINT_L2("Found unencrypted payment ID: " << payment_id);
-          MWARNING("Found unencrypted payment ID: these are bad for privacy, consider using subaddresses instead");
+          oxen::log::debug(logcat, "Found unencrypted payment ID: {}", payment_id);
+          oxen::log::warning(logcat, "Found unencrypted payment ID: these are bad for privacy, consider using subaddresses instead");
         }
       }
     }
@@ -2494,11 +2484,10 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
 
     if (total_received_1 != total_received_2)
     {
-      const el::Level level = el::Level::Warning;
-      MCLOG_RED(level, "global", "**********************************************************************");
-      MCLOG_RED(level, "global", "Consistency failure in amounts received");
-      MCLOG_RED(level, "global", "Check transaction " << txid);
-      MCLOG_RED(level, "global", "**********************************************************************");
+      oxen::log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "**********************************************************************"));
+      oxen::log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "Consistency failure in amounts received"));
+      oxen::log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "Check transaction {}", txid));
+      oxen::log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "**********************************************************************"));
       exit(1);
       return;
     }
@@ -2525,7 +2514,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
       }
       else
         m_payments.emplace(payment_id, payment);
-      LOG_PRINT_L2("Payment found in " << (pool ? blink ? "blink pool" : "pool" : "block") << ": " << payment_id << " / " << payment.m_tx_hash << " / " << payment.m_amount);
+      oxen::log::debug(logcat, "Payment found in {}: {} / {} / {}", (pool ? blink ? "blink pool" : "pool" : "block"), payment_id, payment.m_tx_hash, payment.m_amount);
     }
 
     // if it's a pool tx and we already had it, don't notify again
@@ -2597,7 +2586,7 @@ wallet2::confirmed_transfer_details* wallet2::process_unconfirmed(const crypto::
       }
       catch (...) {
         // can fail if the tx has unexpected input types
-        LOG_PRINT_L0("Failed to add outgoing transaction to confirmed transaction map");
+        oxen::log::warning(logcat, "Failed to add outgoing transaction to confirmed transaction map");
       }
     }
     m_unconfirmed_txs.erase(unconf_it);
@@ -2686,13 +2675,19 @@ void wallet2::process_new_blockchain_entry(const cryptonote::block& b, const cry
     m_last_block_reward = cryptonote::get_outs_money_amount(b.miner_tx);
 
     if (height > 0 && ((height % 2000) == 0))
-      LOG_PRINT_L0("Blockchain sync progress: " << bl_id << ", height " << height);
+      oxen::log::warning(logcat, "Blockchain sync progress: {}, height {}", bl_id, height);
 
-    LOG_PRINT_L2("Processed block: " << bl_id << ", height " << height << ", " <<  tools::friendly_duration(miner_tx_handle_time_duration + txs_handle_time_duration) << "(" << tools::friendly_duration(miner_tx_handle_time_duration) << "/" << tools::friendly_duration(txs_handle_time_duration) <<")ms");
+    oxen::log::debug(logcat, "Processed block: {}, height {}, {}({}/{})",
+        bl_id,
+        height,
+        tools::friendly_duration(miner_tx_handle_time_duration + txs_handle_time_duration),
+        tools::friendly_duration(miner_tx_handle_time_duration),
+        tools::friendly_duration(txs_handle_time_duration));
+
   }else
   {
     if (!(height % 128))
-      LOG_PRINT_L2( "Skipped block by timestamp, height: " << height << ", block time " << b.timestamp << ", account time " << m_account.get_createtime());
+      oxen::log::debug(logcat, "Skipped block by timestamp, height: {}, block time {}, account time {}", height, b.timestamp, m_account.get_createtime());
   }
   m_blockchain.push_back(bl_id);
   m_cached_height++;
@@ -2745,7 +2740,7 @@ void wallet2::pull_blocks(uint64_t start_height, uint64_t& blocks_start_height, 
   cryptonote::rpc::GET_BLOCKS_BIN::response res{};
   req.block_ids = short_chain_history;
 
-  MDEBUG("Pulling blocks: start_height " << start_height);
+  oxen::log::debug(logcat, "Pulling blocks: start_height {}", start_height);
 
   req.prune = true;
   req.start_height = start_height;
@@ -2763,8 +2758,7 @@ void wallet2::pull_blocks(uint64_t start_height, uint64_t& blocks_start_height, 
   o_indices = std::move(res.output_indices);
   current_height = res.current_height;
 
-  MDEBUG("Pulled blocks: blocks_start_height " << blocks_start_height << ", count " << blocks.size()
-      << ", height " << blocks_start_height + blocks.size() << ", node height " << res.current_height);
+  oxen::log::debug(logcat, "Pulled blocks: blocks_start_height {}, count {}, height {}, node height {}", blocks_start_height, blocks.size(), blocks_start_height + blocks.size(), res.current_height);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::pull_hashes(uint64_t start_height, uint64_t &blocks_start_height, const std::list<crypto::hash> &short_chain_history, std::vector<crypto::hash> &hashes)
@@ -2829,7 +2823,7 @@ void wallet2::process_parsed_blocks(uint64_t start_height, const std::vector<cry
   auto gender = [&](wallet2::is_out_data &iod) {
     if (!hwdev.generate_key_derivation(iod.pkey, keys.m_view_secret_key, iod.derivation))
     {
-      MWARNING("Failed to generate key derivation from tx pubkey, skipping");
+      oxen::log::warning(logcat, "Failed to generate key derivation from tx pubkey, skipping");
       static_assert(sizeof(iod.derivation) == sizeof(rct::key), "Mismatched sizes of key_derivation and rct::key");
       memcpy(&iod.derivation, rct::identity().bytes, sizeof(iod.derivation));
     }
@@ -2929,7 +2923,7 @@ void wallet2::process_parsed_blocks(uint64_t start_height, const std::vector<cry
     }
     else
     {
-      LOG_PRINT_L2("Block is already in blockchain: " << tools::type_to_hex(bl_id));
+      oxen::log::debug(logcat, "Block is already in blockchain: {}", tools::type_to_hex(bl_id));
     }
     ++current_index;
     tx_cache_data_offset += 1 + parsed_blocks[i].txes.size();
@@ -3035,7 +3029,7 @@ void wallet2::remove_obsolete_pool_txs(const std::vector<crypto::hash> &tx_hashe
     auto pit = uit++;
     if (!found)
     {
-      MDEBUG("Removing " << txid << " from unconfirmed payments, not found in pool");
+      oxen::log::debug(logcat, "Removing {} from unconfirmed payments, not found in pool", txid);
       m_unconfirmed_payments.erase(pit);
       if (m_callback)
         m_callback->on_pool_tx_removed(txid);
@@ -3062,10 +3056,10 @@ bool wallet2::long_poll_pool_state()
     res = m_long_poll_client.binary<GET_TRANSACTION_POOL_HASHES_BIN>(GET_TRANSACTION_POOL_HASHES_BIN::names()[0], req);
   } catch (const std::exception& e) {
     if (m_long_poll_disabled)
-      MDEBUG("Long poll request cancelled");
+      oxen::log::debug(logcat, "Long poll request cancelled");
     else
     {
-      MWARNING("Long poll request failed: " << e.what());
+      oxen::log::warning(logcat, "Long poll request failed: {}", e.what());
       std::this_thread::sleep_for(error_sleep);
     }
     throw;
@@ -3073,7 +3067,7 @@ bool wallet2::long_poll_pool_state()
 
   if (res.status == rpc::STATUS_TX_LONG_POLL_TIMED_OUT)
   {
-    MINFO("Long poll replied with no pool change");
+    oxen::log::debug(logcat, "Long poll replied with no pool change");
     return false;
   }
 
@@ -3112,7 +3106,7 @@ static std::vector<std::string> hashes_to_hex(It begin, It end)
 std::vector<wallet2::get_pool_state_tx> wallet2::get_pool_state(bool refreshed)
 {
   std::vector<wallet2::get_pool_state_tx> process_txs;
-  MTRACE("get_pool_state: take hashes from cache");
+  oxen::log::trace(logcat, "get_pool_state: take hashes from cache");
   std::vector<crypto::hash> blink_hashes, pool_hashes;
   {
     // We make two requests here: one for all pool txes, and then (assuming there are any) a second
@@ -3123,7 +3117,7 @@ std::vector<wallet2::get_pool_state_tx> wallet2::get_pool_state(bool refreshed)
     THROW_WALLET_EXCEPTION_IF(!r, error::no_connection_to_daemon, "get_transaction_pool_hashes.bin");
     THROW_WALLET_EXCEPTION_IF(res.status == rpc::STATUS_BUSY, error::daemon_busy, "get_transaction_pool_hashes.bin");
     THROW_WALLET_EXCEPTION_IF(res.status != rpc::STATUS_OK, error::get_tx_pool_error);
-    MTRACE("get_pool_state got full pool");
+    oxen::log::trace(logcat, "get_pool_state got full pool");
     pool_hashes = std::move(res.tx_hashes);
 
     // NOTE: Only request blinked transactions, normal transactions will appear
@@ -3136,7 +3130,7 @@ std::vector<wallet2::get_pool_state_tx> wallet2::get_pool_state(bool refreshed)
     THROW_WALLET_EXCEPTION_IF(!r, error::no_connection_to_daemon, "get_transaction_pool_hashes.bin");
     THROW_WALLET_EXCEPTION_IF(res.status == rpc::STATUS_BUSY, error::daemon_busy, "get_transaction_pool_hashes.bin");
     THROW_WALLET_EXCEPTION_IF(res.status != rpc::STATUS_OK, error::get_tx_pool_error);
-    MTRACE("get_pool_state got blinks");
+    oxen::log::trace(logcat, "get_pool_state got blinks");
     blink_hashes = std::move(res.tx_hashes);
   }
 
@@ -3165,12 +3159,12 @@ std::vector<wallet2::get_pool_state_tx> wallet2::get_pool_state(bool refreshed)
       // we're sure we've seen the blockchain state first)
       if (pit->second.m_state == wallet2::unconfirmed_transfer_details::pending)
       {
-        LOG_PRINT_L1("Pending txid " << txid << " not in pool, marking as not in pool");
+        oxen::log::info(logcat, "Pending txid {} not in pool, marking as not in pool", txid);
         pit->second.m_state = wallet2::unconfirmed_transfer_details::pending_not_in_pool;
       }
       else if (pit->second.m_state == wallet2::unconfirmed_transfer_details::pending_not_in_pool && refreshed)
       {
-        LOG_PRINT_L1("Pending txid " << txid << " not in pool, marking as failed");
+        oxen::log::info(logcat, "Pending txid {} not in pool, marking as failed", txid);
         pit->second.m_state = wallet2::unconfirmed_transfer_details::failed;
 
         // the inputs aren't spent anymore, since the tx failed
@@ -3183,7 +3177,7 @@ std::vector<wallet2::get_pool_state_tx> wallet2::get_pool_state(bool refreshed)
               const transfer_details &td = m_transfers[i];
               if (td.m_key_image == tx_in_to_key->k_image)
               {
-                 LOG_PRINT_L1("Resetting spent status for output " << vini << ": " << td.m_key_image);
+                 oxen::log::info(logcat, "Resetting spent status for output {}: {}", vini, td.m_key_image);
                  set_unspent(i);
                  break;
               }
@@ -3193,7 +3187,7 @@ std::vector<wallet2::get_pool_state_tx> wallet2::get_pool_state(bool refreshed)
       }
     }
   }
-  MTRACE("get_pool_state done first loop");
+  oxen::log::trace(logcat, "get_pool_state done first loop");
 
   // remove pool txes to us that aren't in the pool anymore
   // but only if we just refreshed, so that the tx can go in
@@ -3202,7 +3196,7 @@ std::vector<wallet2::get_pool_state_tx> wallet2::get_pool_state(bool refreshed)
   if (refreshed)
     remove_obsolete_pool_txs(pool_hashes);
 
-  MTRACE("get_pool_state done second loop");
+  oxen::log::trace(logcat, "get_pool_state done second loop");
 
   // gather txids of new blink txes to us. We just ignore non-blinks here (we pick them up when they
   // get mined into a block).
@@ -3223,13 +3217,13 @@ std::vector<wallet2::get_pool_state_tx> wallet2::get_pool_state(bool refreshed)
       // if it's for us, we want to keep track of whether we saw a double spend, so don't bail out
       if (!txid_found_in_up)
       {
-        LOG_PRINT_L2("Already seen " << txid << ", and not for us, skipped");
+        oxen::log::debug(logcat, "Already seen {}, and not for us, skipped", txid);
         continue;
       }
     }
     if (!txid_found_in_up)
     {
-      LOG_PRINT_L1("Found new pool tx: " << txid);
+      oxen::log::info(logcat, "Found new pool tx: {}", txid);
       bool found = false;
       for (const auto &i: m_unconfirmed_txs)
       {
@@ -3258,7 +3252,7 @@ std::vector<wallet2::get_pool_state_tx> wallet2::get_pool_state(bool refreshed)
       }
       else
       {
-        LOG_PRINT_L1("We sent that one");
+        oxen::log::info(logcat, "We sent that one");
       }
     }
   }
@@ -3278,7 +3272,7 @@ std::vector<wallet2::get_pool_state_tx> wallet2::get_pool_state(bool refreshed)
       };
       auto res = m_http_client.json_rpc("get_transactions", get_transactions_params);
     } catch (const std::exception& e) {
-      LOG_PRINT_L0("Failed to retrieve transactions: " << e.what());
+      oxen::log::warning(logcat, "Failed to retrieve transactions: {}", e.what());
       return process_txs;
     }
     for (const auto &tx_entry: res["txs"])
@@ -3299,21 +3293,21 @@ std::vector<wallet2::get_pool_state_tx> wallet2::get_pool_state(bool refreshed)
             }
             else
             {
-              MERROR("Got txid " << tx_hash << " which we did not ask for");
+              oxen::log::error(logcat, "Got txid {} which we did not ask for", tx_hash);
             }
         }
         else
         {
-          LOG_PRINT_L0("Failed to parse transaction from daemon");
+          oxen::log::warning(logcat, "Failed to parse transaction from daemon");
         }
       }
       else
       {
-        LOG_PRINT_L1("Transaction from daemon was in pool, but is no more");
+        oxen::log::info(logcat, "Transaction from daemon was in pool, but is no more");
       }
     }
   }
-  MTRACE("get_pool_state end");
+  oxen::log::trace(logcat, "get_pool_state end");
   return process_txs;
 }
 //----------------------------------------------------------------------------------------------------
@@ -3359,7 +3353,7 @@ void wallet2::fast_refresh(uint64_t stop_height, uint64_t &blocks_start_height, 
       return;
     if (blocks_start_height < m_blockchain.offset())
     {
-      MERROR("Blocks start before blockchain offset: " << blocks_start_height << " " << m_blockchain.offset());
+      oxen::log::error(logcat, "Blocks start before blockchain offset: {} {}", blocks_start_height, m_blockchain.offset());
       return;
     }
     current_index = blocks_start_height;
@@ -3377,7 +3371,7 @@ void wallet2::fast_refresh(uint64_t stop_height, uint64_t &blocks_start_height, 
       if(current_index >= m_blockchain.size())
       {
         if (!(current_index % 1024))
-          LOG_PRINT_L2( "Skipped block by height: " << current_index);
+          oxen::log::debug(logcat, "Skipped block by height: {}", current_index);
         m_blockchain.push_back(bl_id);
         m_cached_height++;
 
@@ -3546,7 +3540,7 @@ void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blo
         }
         catch (const tools::error::out_of_hashchain_bounds_error&)
         {
-          MINFO("Daemon claims next refresh block is out of hash chain bounds, resetting hash chain");
+          oxen::log::info(logcat, "Daemon claims next refresh block is out of hash chain bounds, resetting hash chain");
           uint64_t stop_height = m_blockchain.offset();
           std::vector<crypto::hash> tip(m_blockchain.size() - m_blockchain.offset());
           for (size_t i = m_blockchain.offset(); i < m_blockchain.size(); ++i)
@@ -3571,7 +3565,7 @@ void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blo
         }
         catch (const std::exception &e)
         {
-          MERROR("Error parsing blocks: " << e.what());
+          oxen::log::error(logcat, "Error parsing blocks: {}", e.what());
           error = true;
         }
         blocks_fetched += added_blocks;
@@ -3613,7 +3607,7 @@ void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blo
       waiter.wait(&tpool);
       if(try_count < 3)
       {
-        LOG_PRINT_L1("Another try pull_blocks (try_count=" << try_count << ")...");
+        oxen::log::info(logcat, "Another try pull_blocks (try_count={})...", try_count);
         first = true;
         start_height = 0;
         blocks.clear();
@@ -3624,7 +3618,7 @@ void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blo
       }
       else
       {
-        LOG_ERROR("pull_blocks failed, try_count=" << try_count);
+        oxen::log::error(logcat, "pull_blocks failed, try_count={}", try_count);
         throw;
       }
     }
@@ -3644,14 +3638,14 @@ void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blo
   }
   catch (...)
   {
-    LOG_PRINT_L1("Failed to check pending transactions");
+    oxen::log::info(logcat, "Failed to check pending transactions");
   }
 
   refresh_batching_cache();
 
   m_first_refresh_done = true;
 
-  LOG_PRINT_L1("Refresh done, blocks received: " << blocks_fetched << ", balance (all accounts): " << print_money(balance_all(false)) << ", unlocked: " << print_money(unlocked_balance_all(false)));
+  oxen::log::info(logcat, "Refresh done, blocks received: {}, balance (all accounts): {}, unlocked: {}", blocks_fetched, print_money(balance_all(false)), print_money(unlocked_balance_all(false)));
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::refresh(bool trusted_daemon, uint64_t & blocks_fetched, bool& received_money, bool& ok)
@@ -3676,10 +3670,10 @@ bool wallet2::get_rct_distribution(uint64_t &start_height, std::vector<uint64_t>
 
   if (rpc_version < rpc::version_t{1, 19})
   {
-    MWARNING("Daemon is too old, not requesting rct distribution");
+    oxen::log::warning(logcat, "Daemon is too old, not requesting rct distribution");
     return false;
   }
-  MDEBUG("Daemon is recent enough, requesting rct distribution");
+  oxen::log::debug(logcat, "Daemon is recent enough, requesting rct distribution");
 
   cryptonote::rpc::GET_OUTPUT_DISTRIBUTION_BIN::request req{};
   cryptonote::rpc::GET_OUTPUT_DISTRIBUTION_BIN::response res{};
@@ -3691,27 +3685,27 @@ bool wallet2::get_rct_distribution(uint64_t &start_height, std::vector<uint64_t>
   bool r = invoke_http<rpc::GET_OUTPUT_DISTRIBUTION_BIN>(req, res);
   if (!r)
   {
-    MWARNING("Failed to request output distribution: no connection to daemon");
+    oxen::log::warning(logcat, "Failed to request output distribution: no connection to daemon");
     return false;
   }
   if (res.status == rpc::STATUS_BUSY)
   {
-    MWARNING("Failed to request output distribution: daemon is busy");
+    oxen::log::warning(logcat, "Failed to request output distribution: daemon is busy");
     return false;
   }
   if (res.status != rpc::STATUS_OK)
   {
-    MWARNING("Failed to request output distribution: " << res.status);
+    oxen::log::warning(logcat, "Failed to request output distribution: {}", res.status);
     return false;
   }
   if (res.distributions.size() != 1)
   {
-    MWARNING("Failed to request output distribution: not the expected single result");
+    oxen::log::warning(logcat, "Failed to request output distribution: not the expected single result");
     return false;
   }
   if (res.distributions[0].amount != 0)
   {
-    MWARNING("Failed to request output distribution: results are not for amount 0");
+    oxen::log::warning(logcat, "Failed to request output distribution: results are not for amount 0");
     return false;
   }
   for (size_t i = 1; i < res.distributions[0].data.distribution.size(); ++i)
@@ -3730,16 +3724,17 @@ bool wallet2::get_output_blacklist(std::vector<uint64_t> &blacklist)
   }
   if (rpc_version < rpc::version_t{2, 3})
   {
-    MWARNING("Daemon is too old, not requesting output blacklist");
+    oxen::log::warning(logcat, "Daemon is too old, not requesting output blacklist");
     return false;
   }
-  MDEBUG("Daemon is recent enough, requesting output blacklist");
+  oxen::log::debug(logcat, "Daemon is recent enough, requesting output blacklist");
 
   try {
     auto res = m_http_client.json_rpc("get_output_blacklist", {});
     blacklist = std::move(res["blacklist"].get<std::vector<uint64_t>>());
   } catch (...) {
-    MWARNING("Failed to request output blacklist: no connection to daemon");
+    oxen::log::warning(logcat, "Failed to request output blacklist: no connection to daemon");
+    oxen::log::warning(logcat, "Failed to request output blacklist: no connection to daemon");
     return false;
   }
 
@@ -3748,7 +3743,7 @@ bool wallet2::get_output_blacklist(std::vector<uint64_t> &blacklist)
 //----------------------------------------------------------------------------------------------------
 void wallet2::detach_blockchain(uint64_t height, std::map<std::pair<uint64_t, uint64_t>, size_t> *output_tracker_cache)
 {
-  LOG_PRINT_L0("Detaching blockchain on height " << height);
+  oxen::log::warning(logcat, "Detaching blockchain on height {}", height);
 
   // size  1 2 3 4 5 6 7 8 9
   // block 0 1 2 3 4 5 6 7 8
@@ -3763,7 +3758,7 @@ void wallet2::detach_blockchain(uint64_t height, std::map<std::pair<uint64_t, ui
     wallet2::transfer_details &td = m_transfers[i];
     if (td.m_spent && td.m_spent_height >= height)
     {
-      LOG_PRINT_L1("Resetting spent/frozen status for output " << i << ": " << td.m_key_image);
+      oxen::log::info(logcat, "Resetting spent/frozen status for output {}: {}", i, td.m_key_image);
       set_unspent(i);
       thaw(i);
     }
@@ -3819,7 +3814,7 @@ void wallet2::detach_blockchain(uint64_t height, std::map<std::pair<uint64_t, ui
       ++it;
   }
 
-  LOG_PRINT_L0("Detached blockchain on height " << height << ", transfers detached " << transfers_detached << ", blocks detached " << blocks_detached);
+  oxen::log::warning(logcat, "Detached blockchain on height {}, transfers detached {}, blocks detached {}", height, transfers_detached, blocks_detached);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::deinit()
@@ -3907,7 +3902,7 @@ bool wallet2::store_keys(const fs::path& keys_file_name, const epee::wipeable_st
 
   if (e) {
     fs::remove(tmp_file_name);
-    LOG_ERROR("failed to update wallet keys file " << keys_file_name);
+    oxen::log::error(logcat, "failed to update wallet keys file {}", keys_file_name);
     return false;
   }
 
@@ -3970,7 +3965,7 @@ std::optional<wallet2::keys_file_data> wallet2::get_keys_file_data(const epee::w
     try {
       multisig_signers = serialization::dump_binary(m_multisig_signers);
     } catch (const std::exception& e) {
-      LOG_ERROR("failed to serialize wallet multisig signers: " << e.what());
+      oxen::log::error(logcat, "failed to serialize wallet multisig signers: {}", e.what());
       return std::nullopt;
     }
     value.SetString(multisig_signers.c_str(), multisig_signers.length());
@@ -3979,7 +3974,7 @@ std::optional<wallet2::keys_file_data> wallet2::get_keys_file_data(const epee::w
     try {
       multisig_derivations = serialization::dump_binary(m_multisig_derivations);
     } catch (const std::exception& e) {
-      LOG_ERROR("failed to serialize wallet multisig derivations");
+      oxen::log::error(logcat, "failed to serialize wallet multisig derivations");
       return std::nullopt;
     }
     value.SetString(multisig_derivations.c_str(), multisig_derivations.length());
@@ -4159,7 +4154,7 @@ bool wallet2::load_keys(const fs::path& keys_file_name, const epee::wipeable_str
     if (!saved_ret)
     {
       // just moan a bit, but not fatal
-      MERROR("Error saving keys file with encrypted keys, not fatal");
+      oxen::log::error(logcat, "Error saving keys file with encrypted keys, not fatal");
     }
     if (m_ask_password == AskPasswordToDecrypt && !m_unattended && !m_watch_only)
       decrypt_keys(*keys_to_encrypt);
@@ -4235,12 +4230,12 @@ bool wallet2::load_keys_buf(const std::string& keys_buf, const epee::wipeable_st
   {
     if (!json.HasMember("key_data"))
     {
-      LOG_ERROR("Field key_data not found in JSON");
+      oxen::log::error(logcat, "Field key_data not found in JSON");
       return false;
     }
     if (!json["key_data"].IsString())
     {
-      LOG_ERROR("Field key_data found in JSON, but not String");
+      oxen::log::error(logcat, "Field key_data found in JSON, but not String");
       return false;
     }
     const char *field_key_data = json["key_data"].GetString();
@@ -4269,12 +4264,12 @@ bool wallet2::load_keys_buf(const std::string& keys_buf, const epee::wipeable_st
     {
       if (!json.HasMember("multisig_signers"))
       {
-        LOG_ERROR("Field multisig_signers not found in JSON");
+        oxen::log::error(logcat, "Field multisig_signers not found in JSON");
         return false;
       }
       if (!json["multisig_signers"].IsString())
       {
-        LOG_ERROR("Field multisig_signers found in JSON, but not String");
+        oxen::log::error(logcat, "Field multisig_signers found in JSON, but not String");
         return false;
       }
       const char *field_multisig_signers = json["multisig_signers"].GetString();
@@ -4282,7 +4277,7 @@ bool wallet2::load_keys_buf(const std::string& keys_buf, const epee::wipeable_st
       try {
         serialization::parse_binary(multisig_signers, m_multisig_signers);
       } catch (const std::exception& e) {
-        LOG_ERROR("Field multisig_signers found in JSON, but failed to parse: " << e.what());
+        oxen::log::error(logcat, "Field multisig_signers found in JSON, but failed to parse: {}", e.what());
         return false;
       }
 
@@ -4291,7 +4286,7 @@ bool wallet2::load_keys_buf(const std::string& keys_buf, const epee::wipeable_st
       {
         if (!json["multisig_derivations"].IsString())
         {
-          LOG_ERROR("Field multisig_derivations found in JSON, but not String");
+          oxen::log::error(logcat, "Field multisig_derivations found in JSON, but not String");
           return false;
         }
         const char *field_multisig_derivations = json["multisig_derivations"].GetString();
@@ -4299,7 +4294,7 @@ bool wallet2::load_keys_buf(const std::string& keys_buf, const epee::wipeable_st
         try {
           serialization::parse_binary(multisig_derivations, m_multisig_derivations);
         } catch (const std::exception& e) {
-          LOG_ERROR("Field multisig_derivations found in JSON, but failed to parse: " << e.what());
+          oxen::log::error(logcat, "Field multisig_derivations found in JSON, but failed to parse: {}", e.what());
           return false;
         }
       }
@@ -4342,7 +4337,7 @@ bool wallet2::load_keys_buf(const std::string& keys_buf, const epee::wipeable_st
       if (field_refresh_type == RefreshFull || field_refresh_type == RefreshOptimizeCoinbase || field_refresh_type == RefreshNoCoinbase)
         m_refresh_type = (RefreshType)field_refresh_type;
       else
-        LOG_PRINT_L0("Unknown refresh-type value (" << field_refresh_type << "), using default");
+        oxen::log::warning(logcat, "Unknown refresh-type value ({}), using default", field_refresh_type);
     }
     GET_FIELD_FROM_JSON_RETURN_ON_ERROR(json, refresh_height, uint64_t, Uint64, false, 0);
     m_refresh_from_block_height = field_refresh_height;
@@ -4418,7 +4413,7 @@ bool wallet2::load_keys_buf(const std::string& keys_buf, const epee::wipeable_st
         bool ok = get_account_address_from_str(info, m_nettype, field_original_address);
         if (!ok)
         {
-          LOG_ERROR("Failed to parse original_address from JSON");
+          oxen::log::error(logcat, "Failed to parse original_address from JSON");
           return false;
         }
         m_original_address = info.address;
@@ -4426,7 +4421,7 @@ bool wallet2::load_keys_buf(const std::string& keys_buf, const epee::wipeable_st
         ok = tools::hex_to_type(field_original_view_secret_key, m_original_view_secret_key);
         if (!ok)
         {
-          LOG_ERROR("Failed to parse original_view_secret_key from JSON");
+          oxen::log::error(logcat, "Failed to parse original_view_secret_key from JSON");
           return false;
         }
       }
@@ -4445,7 +4440,7 @@ bool wallet2::load_keys_buf(const std::string& keys_buf, const epee::wipeable_st
   bool r = epee::serialization::load_t_from_binary(m_account, account_data);
   THROW_WALLET_EXCEPTION_IF(!r, error::invalid_password);
   if (m_key_device_type == hw::device::type::LEDGER || m_key_device_type == hw::device::type::TREZOR) {
-    LOG_PRINT_L0("Account on device. Initing device...");
+    oxen::log::warning(logcat, "Account on device. Initing device...");
     hw::device &hwdev = lookup_device(m_device_name);
     THROW_WALLET_EXCEPTION_IF(!hwdev.set_name(m_device_name), error::wallet_internal_error, "Could not set device name " + m_device_name);
     hwdev.set_network_type(m_nettype);
@@ -4461,7 +4456,7 @@ bool wallet2::load_keys_buf(const std::string& keys_buf, const epee::wipeable_st
             "Device wallet does not match wallet address. "
             "Device address: " + cryptonote::get_account_address_as_str(m_nettype, false, device_account_public_address) +
             ", wallet address: " + m_account.get_public_address_str(m_nettype));
-    LOG_PRINT_L0("Device initialized...");
+    oxen::log::warning(logcat, "Device initialized...");
   } else if (key_on_device()) {
     THROW_WALLET_EXCEPTION(error::wallet_internal_error, "hardware device not supported");
   }
@@ -4627,7 +4622,7 @@ void wallet2::create_keys_file(const fs::path &wallet_, bool watch_only, const e
       auto addrfile = m_wallet_file;
       addrfile += ".address.txt";
       r = tools::dump_file(addrfile, m_account.get_public_address_str(m_nettype));
-      if(!r) MERROR("String with address text not saved");
+      if(!r) oxen::log::error(logcat, "String with address text not saved");
     }
   }
 }
@@ -4975,7 +4970,7 @@ void wallet2::restore_from_device(const fs::path& wallet_, const epee::wipeable_
   hwdev_filename += ".hwdev.txt";
   std::string hwdev_text = hwdev_label.value_or("");
   if (!tools::dump_file(hwdev_filename, hwdev_text))
-    MERROR("failed to write .hwdev.txt comment file");
+    oxen::log::error(logcat, "failed to write .hwdev.txt comment file");
   if (progress_callback)
     progress_callback(tr("Setting up account and subaddresses"));
   setup_new_blockchain();
@@ -5037,7 +5032,7 @@ std::string wallet2::make_multisig(const epee::wipeable_string &password,
   if (threshold == spend_keys.size() + 1)
   {
     // In N / N case we only need to do one round and calculate secret multisig keys and new secret spend key
-    MINFO("Creating spend key...");
+    oxen::log::info(logcat, "Creating spend key...");
 
     // Calculates all multisig keys and spend key
     cryptonote::generate_multisig_N_N(get_account().get_keys(), spend_keys, multisig_keys, spend_skey, spend_pkey);
@@ -5061,7 +5056,7 @@ std::string wallet2::make_multisig(const epee::wipeable_string &password,
 
       // We need an extra step, so we package all the composite public keys
       // we know about, and make a signed string out of them
-      MINFO("Creating spend key...");
+      oxen::log::info(logcat, "Creating spend key...");
 
       // Calculating set of our secret multisig keys as follows: mi = H(Mi),
       // where mi - secret multisig key, Mi - others' participants public multisig key
@@ -5079,7 +5074,7 @@ std::string wallet2::make_multisig(const epee::wipeable_string &password,
     else
     {
       // M / N case
-      MINFO("Preparing keys for next exchange round...");
+      oxen::log::info(logcat, "Preparing keys for next exchange round...");
 
       // Preparing data for middle round - packing new public multisig keys to exchage with others.
       extra_multisig_info = pack_multisignature_keys(derivations, m_account.get_keys().m_spend_secret_key);
@@ -5100,10 +5095,10 @@ std::string wallet2::make_multisig(const epee::wipeable_string &password,
   }
 
   clear();
-  MINFO("Creating view key...");
+  oxen::log::info(logcat, "Creating view key...");
   crypto::secret_key view_skey = cryptonote::generate_multisig_view_secret_key(get_account().get_keys().m_view_secret_key, view_keys);
 
-  MINFO("Creating multisig address...");
+  oxen::log::info(logcat, "Creating multisig address...");
   CHECK_AND_ASSERT_THROW_MES(m_account.make_multisig(view_skey, rct::rct2sk(spend_skey), rct::rct2pk(spend_pkey), multisig_keys),
       "Failed to create multisig wallet due to bad keys");
   memwipe(&spend_skey, sizeof(rct::key));
@@ -5221,7 +5216,7 @@ std::string wallet2::exchange_multisig_keys(const epee::wipeable_string &passwor
       if (fs::exists(addrfile))
       {
         r = tools::dump_file(addrfile, m_account.get_public_address_str(m_nettype));
-        if(!r) MERROR("String with address text not saved");
+        if(!r) oxen::log::error(logcat, "String with address text not saved");
       }
     }
 
@@ -5247,7 +5242,7 @@ std::string wallet2::exchange_multisig_keys(const epee::wipeable_string &passwor
   if (m_multisig_rounds_passed == multisig_rounds_required(m_multisig_signers.size(), m_multisig_threshold) - 2) // next round is last
   {
     // Next round is last therefore we are performing secret spend establishment round as described above.
-    MINFO("Creating spend key...");
+    oxen::log::info(logcat, "Creating spend key...");
 
     // Calculating our secret multisig keys by hashing our public multisig keys.
     auto multisig_keys = cryptonote::calculate_multisig_keys(std::vector<crypto::public_key>(new_derivations.begin(), new_derivations.end()));
@@ -5262,7 +5257,7 @@ std::string wallet2::exchange_multisig_keys(const epee::wipeable_string &passwor
   else
   {
     // This is just middle round
-    MINFO("Preparing keys for next exchange round...");
+    oxen::log::info(logcat, "Preparing keys for next exchange round...");
     extra_multisig_info = pack_multisignature_keys(new_derivations, m_account.get_keys().m_spend_secret_key);
     m_multisig_derivations = new_derivations;
   }
@@ -5299,7 +5294,7 @@ void wallet2::unpack_multisig_info(const std::vector<std::string>& info,
     {
       if (rct::sk2rct(secret_keys[i]) == rct::sk2rct(secret_keys[j]))
       {
-        MDEBUG("Duplicate key found, ignoring");
+        oxen::log::debug(logcat, "Duplicate key found, ignoring");
         secret_keys[j] = secret_keys.back();
         public_keys[j] = public_keys.back();
         secret_keys.pop_back();
@@ -5316,7 +5311,7 @@ void wallet2::unpack_multisig_info(const std::vector<std::string>& info,
   {
     if (secret_keys[i] == local_skey)
     {
-      MDEBUG("Local key is present, ignoring");
+      oxen::log::debug(logcat, "Local key is present, ignoring");
       secret_keys[i] = secret_keys.back();
       public_keys[i] = public_keys.back();
       secret_keys.pop_back();
@@ -5347,17 +5342,17 @@ bool wallet2::finalize_multisig(const epee::wipeable_string &password, const std
   uint32_t threshold, total;
   if (!multisig(&ready, &threshold, &total))
   {
-    MERROR("This is not a multisig wallet");
+    oxen::log::error(logcat, "This is not a multisig wallet");
     return false;
   }
   if (ready)
   {
-    MERROR("This multisig wallet is already finalized");
+    oxen::log::error(logcat, "This multisig wallet is already finalized");
     return false;
   }
   if (threshold + 1 != total)
   {
-    MERROR("finalize_multisig should only be used for N-1/N wallets, use exchange_multisig_keys instead");
+    oxen::log::error(logcat, "finalize_multisig should only be used for N-1/N wallets, use exchange_multisig_keys instead");
     return false;
   }
   exchange_multisig_keys(password, pkeys, signers);
@@ -5387,7 +5382,7 @@ bool wallet2::finalize_multisig(const epee::wipeable_string &password, const std
   std::vector<crypto::public_key> signers;
   if (!unpack_extra_multisig_info(info, signers, public_keys))
   {
-    MERROR("Bad multisig info");
+    oxen::log::error(logcat, "Bad multisig info");
     return false;
   }
 
@@ -5417,18 +5412,18 @@ bool wallet2::verify_multisig_info(const std::string &data, crypto::secret_key &
 {
   if (!tools::starts_with(data, MULTISIG_MAGIC))
   {
-    MERROR("Multisig info header check error");
+    oxen::log::error(logcat, "Multisig info header check error");
     return false;
   }
   std::string decoded;
   if (!tools::base58::decode(data.substr(MULTISIG_MAGIC.size()), decoded))
   {
-    MERROR("Multisig info decoding error");
+    oxen::log::error(logcat, "Multisig info decoding error");
     return false;
   }
   if (decoded.size() != sizeof(crypto::secret_key) + sizeof(crypto::public_key) + sizeof(crypto::signature))
   {
-    MERROR("Multisig info is corrupt");
+    oxen::log::error(logcat, "Multisig info is corrupt");
     return false;
   }
 
@@ -5443,7 +5438,7 @@ bool wallet2::verify_multisig_info(const std::string &data, crypto::secret_key &
   crypto::cn_fast_hash(decoded.data(), decoded.size() - sizeof(signature), hash);
   if (!crypto::check_signature(hash, pkey, signature))
   {
-    MERROR("Multisig info signature is invalid");
+    oxen::log::error(logcat, "Multisig info signature is invalid");
     return false;
   }
 
@@ -5454,23 +5449,23 @@ bool wallet2::verify_extra_multisig_info(const std::string &data, std::unordered
 {
   if (!tools::starts_with(data, MULTISIG_EXTRA_INFO_MAGIC))
   {
-    MERROR("Multisig info header check error");
+    oxen::log::error(logcat, "Multisig info header check error");
     return false;
   }
   std::string decoded;
   if (!tools::base58::decode(data.substr(MULTISIG_EXTRA_INFO_MAGIC.size()), decoded))
   {
-    MERROR("Multisig info decoding error");
+    oxen::log::error(logcat, "Multisig info decoding error");
     return false;
   }
   if (decoded.size() < sizeof(crypto::public_key) + sizeof(crypto::signature))
   {
-    MERROR("Multisig info is corrupt");
+    oxen::log::error(logcat, "Multisig info is corrupt");
     return false;
   }
   if ((decoded.size() - (sizeof(crypto::public_key) + sizeof(crypto::signature))) % sizeof(crypto::public_key))
   {
-    MERROR("Multisig info is corrupt");
+    oxen::log::error(logcat, "Multisig info is corrupt");
     return false;
   }
 
@@ -5484,7 +5479,7 @@ bool wallet2::verify_extra_multisig_info(const std::string &data, std::unordered
   crypto::cn_fast_hash(decoded.data(), decoded.size() - sizeof(signature), hash);
   if (!crypto::check_signature(hash, signer, signature))
   {
-    MERROR("Multisig info signature is invalid");
+    oxen::log::error(logcat, "Multisig info signature is invalid");
     return false;
   }
 
@@ -5675,7 +5670,7 @@ void wallet2::load(const fs::path& wallet_, const epee::wipeable_string& passwor
     {
       THROW_WALLET_EXCEPTION_IF(true, error::file_read_error, m_keys_file);
     }
-    LOG_PRINT_L0("Loaded wallet keys file, with public address: " << m_account.get_public_address_str(m_nettype));
+    oxen::log::warning(logcat, "Loaded wallet keys file, with public address: {}", m_account.get_public_address_str(m_nettype));
     lock_keys_file();
   }
   else if (!load_keys_buf(keys_buf, password))
@@ -5689,7 +5684,7 @@ void wallet2::load(const fs::path& wallet_, const epee::wipeable_string& passwor
   //try to load wallet file. but even if we failed, it is not big problem
   if (use_fs && (!fs::exists(m_wallet_file, e) || e))
   {
-    LOG_PRINT_L0("file not found: " << m_wallet_file << ", starting with empty blockchain");
+    oxen::log::warning(logcat, "file not found: {}, starting with empty blockchain", m_wallet_file);
     m_account_public_address = m_account.get_keys().m_account_address;
   }
   else if (use_fs || !cache_buf.empty())
@@ -5706,7 +5701,7 @@ void wallet2::load(const fs::path& wallet_, const epee::wipeable_string& passwor
     // try to read it as an encrypted cache
     try
     {
-      LOG_PRINT_L1("Trying to decrypt cache data");
+      oxen::log::info(logcat, "Trying to decrypt cache data");
 
       try {
         serialization::parse_binary(use_fs ? cache_file_buf : cache_buf, cache_file_data);
@@ -5747,7 +5742,7 @@ void wallet2::load(const fs::path& wallet_, const epee::wipeable_string& passwor
           }
           catch (...)
           {
-            LOG_PRINT_L0("Failed to open portable binary, trying unportable");
+            oxen::log::warning(logcat, "Failed to open portable binary, trying unportable");
             auto unportable = m_wallet_file;
             unportable += ".unportable";
             if (use_fs) fs::copy_file(m_wallet_file, unportable, fs::copy_options::overwrite_existing);
@@ -5761,7 +5756,7 @@ void wallet2::load(const fs::path& wallet_, const epee::wipeable_string& passwor
     }
     catch (...)
     {
-      LOG_PRINT_L1("Failed to load encrypted cache, trying unencrypted");
+      oxen::log::info(logcat, "Failed to load encrypted cache, trying unencrypted");
       try {
         std::stringstream iss;
         iss << cache_file_buf;
@@ -5770,7 +5765,7 @@ void wallet2::load(const fs::path& wallet_, const epee::wipeable_string& passwor
       }
       catch (...)
       {
-        LOG_PRINT_L0("Failed to open portable binary, trying unportable");
+        oxen::log::warning(logcat, "Failed to open portable binary, trying unportable");
         auto unportable = m_wallet_file;
         unportable += ".unportable";
         if (use_fs) fs::copy_file(m_wallet_file, unportable, fs::copy_options::overwrite_existing);
@@ -5818,7 +5813,7 @@ void wallet2::load(const fs::path& wallet_, const epee::wipeable_string& passwor
   }
   catch (const std::exception &e)
   {
-    MERROR("Failed to save rings, will try again next time");
+    oxen::log::error(logcat, "Failed to save rings, will try again next time");
   }
 
 #ifdef WALLET_ENABLE_MMS
@@ -5829,7 +5824,7 @@ void wallet2::load(const fs::path& wallet_, const epee::wipeable_string& passwor
   }
   catch (const std::exception &e)
   {
-    MERROR("Failed to initialize MMS, it will be unusable");
+    oxen::log::error(logcat, "Failed to initialize MMS, it will be unusable");
   }
 #endif
 }
@@ -5845,7 +5840,7 @@ void wallet2::trim_hashchain()
 
   if (!m_blockchain.empty() && m_blockchain.size() == m_blockchain.offset())
   {
-    MINFO("Fixing empty hashchain");
+    oxen::log::info(logcat, "Fixing empty hashchain");
     nlohmann::json req_params{
       {"height", m_blockchain.size() - 1}
     };
@@ -5859,19 +5854,19 @@ void wallet2::trim_hashchain()
       }
       else
       {
-        MERROR("Failed to request block header from daemon, hash chain may be unable to sync till the wallet is loaded with a usable daemon");
+        oxen::log::error(logcat, "Failed to request block header from daemon, hash chain may be unable to sync till the wallet is loaded with a usable daemon");
       }
     }
     catch (const std::exception &e)
     {
-      MERROR("Failed to request block header from daemon when requesting get_block_header_by_height, hash chain may be unable to sync till the wallet is loaded with a usable daemon");
+      oxen::log::error(logcat, "Failed to request block header from daemon when requesting get_block_header_by_height, hash chain may be unable to sync till the wallet is loaded with a usable daemon");
     }
 
   }
   if (height > 0 && m_blockchain.size() > height)
   {
     --height;
-    MDEBUG("trimming to " << height << ", offset " << m_blockchain.offset());
+    oxen::log::debug(logcat, "trimming to {}, offset {}", height, m_blockchain.offset());
     m_blockchain.trim(height);
   }
   m_cached_height = m_blockchain.size();
@@ -5941,18 +5936,18 @@ void wallet2::store_to(const fs::path &path, const epee::wipeable_string &passwo
       THROW_WALLET_EXCEPTION_IF(!r, error::file_save_error, m_wallet_file);
       // remove old address file
       if (!fs::remove(old_address_file, ec))
-        LOG_ERROR("error removing file: " << old_address_file << ": " << ec.message());
+        oxen::log::error(logcat, "error removing file: {}: {}", old_address_file, ec.message());
     }
     // remove old wallet file
     if (!fs::remove(old_file, ec))
-      LOG_ERROR("error removing file: " << old_file << ": " << ec.message());
+      oxen::log::error(logcat, "error removing file: {}: {}", old_file, ec.message());
     // remove old keys file
     if (!fs::remove(old_keys_file, ec))
-      LOG_ERROR("error removing file: " << old_keys_file << ": " << ec.message());
+      oxen::log::error(logcat, "error removing file: {}: {}", old_keys_file, ec.message());
 #ifdef WALLET_ENABLE_MMS
     // remove old message store file
     if (fs::exists(m_mms_file, ec) && !fs::remove(m_mms_file, ec))
-      LOG_ERROR("error removing file: " << m_mms_file << ": " << ec.message());
+      oxen::log::error(logcat, "error removing file: {}: {}", m_mms_file, ec.message());
 #endif
   } else {
     // save to new file
@@ -6307,8 +6302,7 @@ void wallet2::get_transfers(get_transfers_args_t args, std::vector<wallet::trans
   std::list<std::pair<crypto::hash, tools::wallet2::unconfirmed_transfer_details>> pending_or_failed;
   std::list<std::pair<crypto::hash, tools::wallet2::pool_payment_details>> pool;
 
-  MDEBUG("Getting transfers of type(s) " << (args.in ? "in " : "") << (args.out ? "out " : "") << (args.pending ? "pending " : "") << (args.failed ? "failed " : "")
-      << (args.pool ? "pool " : "") << " for heights in [" << args.min_height << "," << args.max_height << "]");
+  oxen::log::debug(logcat, "Getting transfers of type(s) {}{}{}{}{} for heights in[{},{}]", (args.in ? "in " : ""), (args.out ? "out " : ""), (args.pending ? "pending " : ""), (args.failed ? "failed " : ""), (args.pool ? "pool " : ""), args.min_height, args.max_height);
 
   size_t size = 0;
   if (args.in)
@@ -6407,7 +6401,7 @@ std::string wallet2::transfers_to_csv(const std::vector<wallet::transfer_view>& 
         running_balance -= transfer.amount + transfer.fee;
         break;
       default:
-        MERROR("Warning: Unhandled pay type, this is most likely a developer error, please report it to the Oxen developers.");
+        oxen::log::error(logcat, "Warning: Unhandled pay type, this is most likely a developer error, please report it to the Oxen developers.");
         break;
     }
 
@@ -6526,12 +6520,12 @@ std::optional<std::string> wallet2::resolve_address(std::string address, uint64_
         {
           info = std::move(*addr_info);
           result = true;
-          LOG_PRINT_L2("Resolved ONS name: "<< address << " to address: " << get_account_address_as_str(m_nettype, info.is_subaddress, info.address));
+          oxen::log::debug(logcat, "Resolved ONS name: {} to address: {}", address, get_account_address_as_str(m_nettype, info.is_subaddress, info.address));
         }
       }
 
     } else {
-      LOG_PRINT_L2("Invalid address format, could not resolve " << address);
+      oxen::log::debug(logcat, "Invalid address format, could not resolve {}", address);
     }
   }
 
@@ -6560,7 +6554,7 @@ void wallet2::rescan_spent()
   for (size_t start_offset = 0; start_offset < m_transfers.size(); start_offset += chunk_size)
   {
     const size_t n_outputs = std::min<size_t>(chunk_size, m_transfers.size() - start_offset);
-    MDEBUG("Calling is_key_image_spent on " << start_offset << " - " << (start_offset + n_outputs - 1) << ", out of " << m_transfers.size());
+    oxen::log::debug(logcat, "Calling is_key_image_spent on {} - {}, out of {}", start_offset, (start_offset + n_outputs - 1), m_transfers.size());
     std::vector<std::string> key_images;
     key_images.reserve(n_outputs);
     for (size_t n = start_offset; n < start_offset + n_outputs; ++n)
@@ -6589,13 +6583,13 @@ void wallet2::rescan_spent()
     {
       if (td.m_spent)
       {
-        LOG_PRINT_L0("Marking output " << i << "(" << td.m_key_image << ") as unspent, it was marked as spent");
+        oxen::log::warning(logcat, "Marking output {}({}) as unspent, it was marked as spent", i, td.m_key_image);
         set_unspent(i);
         td.m_spent_height = 0;
       }
       else
       {
-        LOG_PRINT_L0("Marking output " << i << "(" << td.m_key_image << ") as spent, it was marked as unspent");
+        oxen::log::warning(logcat, "Marking output {}({}) as spent, it was marked as unspent", i, td.m_key_image);
         set_spent(i, td.m_spent_height);
         // unknown height, if this gets reorged, it might still be missed
       }
@@ -6666,7 +6660,7 @@ bool wallet2::is_transfer_unlocked(uint64_t unlock_time, uint64_t block_height, 
     if (!success)
     {
       // We'll already have a log message printed containing the request failure reason
-      LOG_PRINT_L1("Failed to query service node for blacklisted transfers, assuming transfer not blacklisted");
+      oxen::log::info(logcat, "Failed to query service node for blacklisted transfers, assuming transfer not blacklisted");
       return true;
     }
 
@@ -6675,7 +6669,7 @@ bool wallet2::is_transfer_unlocked(uint64_t unlock_time, uint64_t block_height, 
       crypto::key_image check_image;
       if(!tools::hex_to_type(entry["key_image"].get<std::string>(), check_image))
       {
-        MERROR("Failed to parse hex representation of key image: " << entry["key_image"]);
+        oxen::log::error(logcat, "Failed to parse hex representation of key image: {}", entry["key_image"]);
         break;
       }
 
@@ -6690,7 +6684,7 @@ bool wallet2::is_transfer_unlocked(uint64_t unlock_time, uint64_t block_height, 
     auto [success, service_nodes_states] = m_node_rpc_proxy.get_contributed_service_nodes(primary_address);
     if (!success)
     {
-      LOG_PRINT_L1("Failed to query service node for locked transfers, assuming transfer not locked");
+      oxen::log::info(logcat, "Failed to query service node for locked transfers, assuming transfer not locked");
       return true;
     }
 
@@ -6706,7 +6700,7 @@ bool wallet2::is_transfer_unlocked(uint64_t unlock_time, uint64_t block_height, 
           crypto::key_image check_image;
           if(!tools::hex_to_type(contribution["key_image"].get<std::string>(), check_image))
           {
-            MERROR("Failed to parse hex representation of key image: " << contribution["key_image"]);
+            oxen::log::error(logcat, "Failed to parse hex representation of key image: {}", contribution["key_image"]);
             break;
           }
 
@@ -6919,7 +6913,7 @@ crypto::hash wallet2::get_payment_id(const pending_tx &ptx) const
     {
       if (ptx.dests.empty())
       {
-        MWARNING("Encrypted payment id found, but no destinations public key, cannot decrypt");
+        oxen::log::warning(logcat, "Encrypted payment id found, but no destinations public key, cannot decrypt");
         return crypto::null_hash;
       }
       if (m_account.get_device().decrypt_payment_id(payment_id8, ptx.dests[0].addr.m_view_public_key, ptx.tx_key))
@@ -6998,7 +6992,7 @@ void wallet2::commit_tx(pending_tx& ptx, bool blink)
     m_additional_tx_keys.insert(std::make_pair(txid, ptx.additional_tx_keys));
   }
 
-  LOG_PRINT_L2("transaction " << txid << " generated ok and sent to daemon, key_images: [" << ptx.key_images << "]");
+  oxen::log::debug(logcat, "transaction {} generated ok and sent to daemon, key_images: [{}]", txid, ptx.key_images);
 
   for(size_t idx: ptx.selected_transfers)
   {
@@ -7010,11 +7004,12 @@ void wallet2::commit_tx(pending_tx& ptx, bool blink)
     memwipe(m_transfers[idx].m_multisig_k.data(), m_transfers[idx].m_multisig_k.size() * sizeof(m_transfers[idx].m_multisig_k[0]));
 
   //fee includes dust if dust policy specified it.
-  LOG_PRINT_L1("Transaction successfully " << (blink ? "blinked. " : "sent. ") << txid
-            << "\nCommission: " << print_money(ptx.fee) << " (dust sent to dust addr: " << print_money((ptx.dust_added_to_fee ? 0 : ptx.dust)) << ")"
-            << "\nBalance: " << print_money(balance(ptx.construction_data.subaddr_account, false))
-            << "\nUnlocked: " << print_money(unlocked_balance(ptx.construction_data.subaddr_account, false))
-            << "\nPlease, wait for confirmation for your balance to be unlocked.");
+  oxen::log::info(logcat, "Transaction successfully {}{} \
+      \nCommission: {} (dust sent to dust addr: {})\
+      \nBalance: {} \
+      \nUnlocked: {} \
+      \nPlease, wait for confirmation for your balance to be unlocked.",
+      (blink ? "blinked. " : "sent. "), txid, print_money(ptx.fee), print_money((ptx.dust_added_to_fee ? 0 : ptx.dust)), print_money(balance(ptx.construction_data.subaddr_account, false)), print_money(unlocked_balance(ptx.construction_data.subaddr_account, false)));
 }
 
 void wallet2::commit_tx(std::vector<pending_tx>& ptx_vector, bool blink)
@@ -7027,7 +7022,7 @@ void wallet2::commit_tx(std::vector<pending_tx>& ptx_vector, bool blink)
 //----------------------------------------------------------------------------------------------------
 bool wallet2::save_tx(const std::vector<pending_tx>& ptx_vector, const fs::path& filename) const
 {
-  LOG_PRINT_L0("saving " << ptx_vector.size() << " transactions");
+  oxen::log::warning(logcat, "saving {} transactions", ptx_vector.size());
   std::string ciphertext = dump_tx_to_str(ptx_vector);
   if (ciphertext.empty())
     return false;
@@ -7036,7 +7031,7 @@ bool wallet2::save_tx(const std::vector<pending_tx>& ptx_vector, const fs::path&
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::dump_tx_to_str(const std::vector<pending_tx> &ptx_vector) const
 {
-  LOG_PRINT_L0("saving " << ptx_vector.size() << " transactions");
+  oxen::log::warning(logcat, "saving {} transactions", ptx_vector.size());
   unsigned_tx_set txs;
   for (auto &tx: ptx_vector)
   {
@@ -7058,7 +7053,7 @@ std::string wallet2::dump_tx_to_str(const std::vector<pending_tx> &ptx_vector) c
   {
     return std::string();
   }
-  LOG_PRINT_L2("Saving unsigned tx data: " << oss.str());
+  oxen::log::debug(logcat, "Saving unsigned tx data: {}", oss.str());
   std::string ciphertext = encrypt_with_view_secret_key(oss.str());
   return std::string(UNSIGNED_TX_PREFIX) + ciphertext;
 }
@@ -7067,14 +7062,14 @@ bool wallet2::load_unsigned_tx(const fs::path& unsigned_filename, unsigned_tx_se
 {
   if (std::error_code ec; !fs::exists(unsigned_filename, ec))
   {
-    LOG_PRINT_L0("File " << unsigned_filename << " does not exist: " << ec.message());
+    oxen::log::warning(logcat, "File {} does not exist: {}", unsigned_filename, ec.message());
     return false;
   }
 
   std::string s;
   if (!tools::slurp_file(unsigned_filename, s))
   {
-    LOG_PRINT_L0("Failed to load from " << unsigned_filename);
+    oxen::log::warning(logcat, "Failed to load from {}", unsigned_filename);
     return false;
   }
 
@@ -7085,7 +7080,7 @@ bool wallet2::parse_unsigned_tx_from_str(std::string_view s, unsigned_tx_set &ex
 {
   if (!tools::starts_with(s, UNSIGNED_TX_PREFIX_NOVER))
   {
-    LOG_PRINT_L0("Bad magic from unsigned tx");
+    oxen::log::warning(logcat, "Bad magic from unsigned tx");
     return false;
   }
   s.remove_prefix(UNSIGNED_TX_PREFIX_NOVER.size());
@@ -7102,7 +7097,7 @@ bool wallet2::parse_unsigned_tx_from_str(std::string_view s, unsigned_tx_set &ex
     }
     catch (...)
     {
-      LOG_PRINT_L0("Failed to parse data from unsigned tx");
+      oxen::log::warning(logcat, "Failed to parse data from unsigned tx");
       return false;
     }
   }
@@ -7119,22 +7114,22 @@ bool wallet2::parse_unsigned_tx_from_str(std::string_view s, unsigned_tx_set &ex
       }
       catch (...)
       {
-        LOG_PRINT_L0("Failed to parse data from unsigned tx");
+        oxen::log::warning(logcat, "Failed to parse data from unsigned tx");
         return false;
       }
     }
     catch (const std::exception &e)
     {
-      LOG_PRINT_L0("Failed to decrypt unsigned tx: " << e.what());
+      oxen::log::warning(logcat, "Failed to decrypt unsigned tx: {}", e.what());
       return false;
     }
   }
   else
   {
-    LOG_PRINT_L0("Unsupported version in unsigned tx");
+    oxen::log::warning(logcat, "Unsupported version in unsigned tx");
     return false;
   }
-  LOG_PRINT_L1("Loaded tx unsigned data from binary: " << exported_txs.txes.size() << " transactions");
+  oxen::log::info(logcat, "Loaded tx unsigned data from binary: {} transactions", exported_txs.txes.size());
 
   return true;
 }
@@ -7147,7 +7142,7 @@ bool wallet2::sign_tx(const fs::path& unsigned_filename, const fs::path& signed_
 
   if (accept_func && !accept_func(exported_txs))
   {
-    LOG_PRINT_L1("Transactions rejected by callback");
+    oxen::log::info(logcat, "Transactions rejected by callback");
     return false;
   }
   return sign_tx(exported_txs, signed_filename, txs, export_raw);
@@ -7162,7 +7157,7 @@ bool wallet2::sign_tx(unsigned_tx_set &exported_txs, std::vector<wallet2::pendin
   {
     auto& sd = exported_txs.txes[n];
     THROW_WALLET_EXCEPTION_IF(sd.sources.empty(), error::wallet_internal_error, "Empty sources");
-    LOG_PRINT_L1(" " << (n+1) << ": " << sd.sources.size() << " inputs, ring size " << sd.sources[0].outputs.size());
+    oxen::log::info(logcat, " {}: {} inputs, ring size {}", (n+1), sd.sources.size(), sd.sources[0].outputs.size());
     signed_txes.ptx.push_back(pending_tx());
     tools::wallet2::pending_tx &ptx = signed_txes.ptx.back();
     rct::RCTConfig rct_config = sd.rct_config;
@@ -7242,7 +7237,7 @@ bool wallet2::sign_tx(unsigned_tx_set &exported_txs, std::vector<wallet2::pendin
     hwdev.set_mode(hw::device::mode::TRANSACTION_PARSE);
     if (!hwdev.generate_key_derivation(tx_pub_key, keys.m_view_secret_key, derivation))
     {
-      MWARNING("Failed to generate key derivation from tx pubkey in " << cryptonote::get_transaction_hash(tx) << ", skipping");
+      oxen::log::warning(logcat, "Failed to generate key derivation from tx pubkey in {}, skipping", cryptonote::get_transaction_hash(tx));
       static_assert(sizeof(derivation) == sizeof(rct::key), "Mismatched sizes of key_derivation and rct::key");
       memcpy(&derivation, rct::identity().bytes, sizeof(derivation));
     }
@@ -7251,7 +7246,7 @@ bool wallet2::sign_tx(unsigned_tx_set &exported_txs, std::vector<wallet2::pendin
       additional_derivations.push_back({});
       if (!hwdev.generate_key_derivation(additional_tx_pub_keys[i], keys.m_view_secret_key, additional_derivations.back()))
       {
-        MWARNING("Failed to generate key derivation from additional tx pubkey in " << cryptonote::get_transaction_hash(tx) << ", skipping");
+        oxen::log::warning(logcat, "Failed to generate key derivation from additional tx pubkey in {}, skipping", cryptonote::get_transaction_hash(tx));
         memcpy(&additional_derivations.back(), rct::identity().bytes, sizeof(crypto::key_derivation));
       }
     }
@@ -7269,7 +7264,7 @@ bool wallet2::sign_tx(unsigned_tx_set &exported_txs, std::vector<wallet2::pendin
       if (generate_key_image_helper(keys, m_subaddresses, out.key, tx_pub_key, additional_tx_pub_keys, i, in_ephemeral, ki, hwdev))
         signed_txes.tx_key_images[out.key] = ki;
       else
-        MERROR("Failed to calculate key image");
+        oxen::log::error(logcat, "Failed to calculate key image");
     }
   }
 
@@ -7278,7 +7273,7 @@ bool wallet2::sign_tx(unsigned_tx_set &exported_txs, std::vector<wallet2::pendin
   for (size_t i = 0; i < m_transfers.size(); ++i)
   {
     if (!m_transfers[i].m_key_image_known || m_transfers[i].m_key_image_partial)
-      LOG_PRINT_L0("WARNING: key image not known in signing wallet at index " << i);
+      oxen::log::warning(logcat, "WARNING: key image not known in signing wallet at index {}", i);
     signed_txes.key_images[i] = m_transfers[i].m_key_image;
   }
 
@@ -7292,13 +7287,13 @@ bool wallet2::sign_tx(unsigned_tx_set& exported_txs, const fs::path& signed_file
   std::string ciphertext = sign_tx_dump_to_str(exported_txs, txs, signed_txes);
   if (ciphertext.empty())
   {
-    LOG_PRINT_L0("Failed to sign unsigned_tx_set");
+    oxen::log::warning(logcat, "Failed to sign unsigned_tx_set");
     return false;
   }
 
   if (!tools::dump_file(signed_filename, ciphertext))
   {
-    LOG_PRINT_L0("Failed to save file to " << signed_filename);
+    oxen::log::warning(logcat, "Failed to save file to {}", signed_filename);
     return false;
   }
   // export signed raw tx without encryption
@@ -7312,7 +7307,7 @@ bool wallet2::sign_tx(unsigned_tx_set& exported_txs, const fs::path& signed_file
       if (signed_txes.ptx.size() > 1) raw_filename += "_" + std::to_string(i);
       if (!tools::dump_file(raw_filename, tx_as_hex))
       {
-        LOG_PRINT_L0("Failed to save file to " << raw_filename);
+        oxen::log::warning(logcat, "Failed to save file to {}", raw_filename);
         return false;
       }
     }
@@ -7326,7 +7321,7 @@ std::string wallet2::sign_tx_dump_to_str(unsigned_tx_set &exported_txs, std::vec
   bool r = sign_tx(exported_txs, ptx, signed_txes);
   if (!r)
   {
-    LOG_PRINT_L0("Failed to sign unsigned_tx_set");
+    oxen::log::warning(logcat, "Failed to sign unsigned_tx_set");
     return std::string();
   }
 
@@ -7341,7 +7336,7 @@ std::string wallet2::sign_tx_dump_to_str(unsigned_tx_set &exported_txs, std::vec
   {
     return std::string();
   }
-  LOG_PRINT_L3("Saving signed tx data (with encryption): " << oss.str());
+  oxen::log::trace(logcat, "Saving signed tx data (with encryption): {}", oss.str());
   std::string ciphertext = encrypt_with_view_secret_key(oss.str());
   return std::string(SIGNED_TX_PREFIX) + ciphertext;
 }
@@ -7350,14 +7345,14 @@ bool wallet2::load_tx(const fs::path& signed_filename, std::vector<tools::wallet
 {
   if (std::error_code ec; !fs::exists(signed_filename, ec))
   {
-    LOG_PRINT_L0("File " << signed_filename << " does not exist: " << ec);
+    oxen::log::warning(logcat, "File {} does not exist: {}", signed_filename, ec.message());
     return false;
   }
 
   std::string s;
   if (!tools::slurp_file(signed_filename, s))
   {
-    LOG_PRINT_L0("Failed to load from " << signed_filename);
+    oxen::log::warning(logcat, "Failed to load from {}", signed_filename);
     return false;
   }
 
@@ -7369,7 +7364,7 @@ bool wallet2::parse_tx_from_str(std::string_view s, std::vector<tools::wallet2::
 
   if (!tools::starts_with(s, SIGNED_TX_PREFIX_NOVER))
   {
-    LOG_PRINT_L0("Bad magic from signed transaction");
+    oxen::log::warning(logcat, "Bad magic from signed transaction");
     return false;
   }
   s.remove_prefix(SIGNED_TX_PREFIX_NOVER.size());
@@ -7387,7 +7382,7 @@ bool wallet2::parse_tx_from_str(std::string_view s, std::vector<tools::wallet2::
     }
     catch (...)
     {
-      LOG_PRINT_L0("Failed to parse data from signed transaction");
+      oxen::log::warning(logcat, "Failed to parse data from signed transaction");
       return false;
     }
   }
@@ -7404,27 +7399,27 @@ bool wallet2::parse_tx_from_str(std::string_view s, std::vector<tools::wallet2::
       }
       catch (...)
       {
-        LOG_PRINT_L0("Failed to parse decrypted data from signed transaction");
+        oxen::log::warning(logcat, "Failed to parse decrypted data from signed transaction");
         return false;
       }
     }
     catch (const std::exception &e)
     {
-      LOG_PRINT_L0("Failed to decrypt signed transaction: " << e.what());
+      oxen::log::warning(logcat, "Failed to decrypt signed transaction: {}", e.what());
       return false;
     }
   }
   else
   {
-    LOG_PRINT_L0("Unsupported version in signed transaction");
+    oxen::log::warning(logcat, "Unsupported version in signed transaction");
     return false;
   }
-  LOG_PRINT_L0("Loaded signed tx data from binary: " << signed_txs.ptx.size() << " transactions");
-  for (auto &c_ptx: signed_txs.ptx) LOG_PRINT_L0(cryptonote::obj_to_json_str(c_ptx.tx));
+  oxen::log::warning(logcat, "Loaded signed tx data from binary: {} transactions", signed_txs.ptx.size());
+  for (auto &c_ptx: signed_txs.ptx) oxen::log::warning(logcat, cryptonote::obj_to_json_str(c_ptx.tx));
 
   if (accept_func && !accept_func(signed_txs))
   {
-    LOG_PRINT_L1("Transactions rejected by callback");
+    oxen::log::info(logcat, "Transactions rejected by callback");
     return false;
   }
 
@@ -7443,7 +7438,7 @@ bool wallet2::parse_tx_from_str(std::string_view s, std::vector<tools::wallet2::
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::save_multisig_tx(multisig_tx_set txs)
 {
-  LOG_PRINT_L0("saving " << txs.m_ptx.size() << " multisig transactions");
+  oxen::log::warning(logcat, "saving {} multisig transactions", txs.m_ptx.size());
 
   // txes generated, get rid of used k values
   for (size_t n = 0; n < txs.m_ptx.size(); ++n)
@@ -7474,7 +7469,7 @@ std::string wallet2::save_multisig_tx(multisig_tx_set txs)
   {
     return std::string();
   }
-  LOG_PRINT_L2("Saving multisig unsigned tx data: " << oss.str());
+  oxen::log::debug(logcat, "Saving multisig unsigned tx data: {}", oss.str());
   std::string ciphertext = encrypt_with_view_secret_key(oss.str());
   return std::string(MULTISIG_UNSIGNED_TX_PREFIX) + ciphertext;
 }
@@ -7519,7 +7514,7 @@ bool wallet2::parse_multisig_tx_from_str(std::string_view multisig_tx_st, multis
 {
   if (!tools::starts_with(multisig_tx_st, MULTISIG_UNSIGNED_TX_PREFIX))
   {
-    LOG_PRINT_L0("Bad magic from multisig tx data");
+    oxen::log::warning(logcat, "Bad magic from multisig tx data");
     return false;
   }
   std::stringstream iss;
@@ -7529,7 +7524,7 @@ bool wallet2::parse_multisig_tx_from_str(std::string_view multisig_tx_st, multis
   }
   catch (const std::exception &e)
   {
-    LOG_PRINT_L0("Failed to decrypt multisig tx data: " << e.what());
+    oxen::log::warning(logcat, "Failed to decrypt multisig tx data: {}", e.what());
     return false;
   }
   try
@@ -7539,7 +7534,7 @@ bool wallet2::parse_multisig_tx_from_str(std::string_view multisig_tx_st, multis
   }
   catch (...)
   {
-    LOG_PRINT_L0("Failed to parse multisig tx data");
+    oxen::log::warning(logcat, "Failed to parse multisig tx data");
     return false;
   }
 
@@ -7562,16 +7557,16 @@ bool wallet2::load_multisig_tx(std::string s, multisig_tx_set &exported_txs, std
 {
   if(!parse_multisig_tx_from_str(s, exported_txs))
   {
-    LOG_PRINT_L0("Failed to parse multisig transaction from string");
+    oxen::log::warning(logcat, "Failed to parse multisig transaction from string");
     return false;
   }
 
-  LOG_PRINT_L1("Loaded multisig tx unsigned data from binary: " << exported_txs.m_ptx.size() << " transactions");
-  for (auto &ptx: exported_txs.m_ptx) LOG_PRINT_L0(cryptonote::obj_to_json_str(ptx.tx));
+  oxen::log::info(logcat, "Loaded multisig tx unsigned data from binary: {} transactions", exported_txs.m_ptx.size());
+  for (auto &ptx: exported_txs.m_ptx) oxen::log::warning(logcat, cryptonote::obj_to_json_str(ptx.tx));
 
   if (accept_func && !accept_func(exported_txs))
   {
-    LOG_PRINT_L1("Transactions rejected by callback");
+    oxen::log::info(logcat, "Transactions rejected by callback");
     return false;
   }
 
@@ -7596,20 +7591,20 @@ bool wallet2::load_multisig_tx_from_file(const fs::path& filename, multisig_tx_s
 {
   if (std::error_code ec; !fs::exists(filename, ec))
   {
-    LOG_PRINT_L0("File " << filename << " does not exist: " << ec.message());
+    oxen::log::warning(logcat, "File {} does not exist: {}", filename, ec.message());
     return false;
   }
 
   std::string s;
   if (!tools::slurp_file(filename, s))
   {
-    LOG_PRINT_L0("Failed to load from " << filename);
+    oxen::log::warning(logcat, "Failed to load from {}", filename);
     return false;
   }
 
   if (!load_multisig_tx(s, exported_txs, accept_func))
   {
-    LOG_PRINT_L0("Failed to parse multisig tx data from " << filename);
+    oxen::log::warning(logcat, "Failed to parse multisig tx data from {}", filename);
     return false;
   }
   return true;
@@ -7636,8 +7631,7 @@ bool wallet2::sign_multisig_tx(multisig_tx_set &exported_txs, std::vector<crypto
     tools::wallet2::pending_tx &ptx = exported_txs.m_ptx[n];
     THROW_WALLET_EXCEPTION_IF(ptx.multisig_sigs.empty(), error::wallet_internal_error, "No signatures found in multisig tx");
     auto &sd = ptx.construction_data;
-    LOG_PRINT_L1(" " << (n+1) << ": " << sd.sources.size() << " inputs, mixin " << (sd.sources[0].outputs.size()-1) <<
-        ", signed by " << exported_txs.m_signers.size() << "/" << m_multisig_threshold);
+    oxen::log::info(logcat, " {}: {} inputs, mixin {}, signed by {}/{}", (n+1), sd.sources.size(), (sd.sources[0].outputs.size()-1), exported_txs.m_signers.size(), m_multisig_threshold);
     cryptonote::transaction tx;
     rct::multisig_out msout = ptx.multisig_sigs.front().msout;
     auto sources = sd.sources;
@@ -7744,7 +7738,7 @@ bool wallet2::sign_multisig_tx_from_file(const fs::path& filename, std::vector<c
 
   if (accept_func && !accept_func(exported_txs))
   {
-    LOG_PRINT_L1("Transactions rejected by callback");
+    oxen::log::info(logcat, "Transactions rejected by callback");
     return false;
   }
   return sign_multisig_tx_to_file(exported_txs, filename, txids);
@@ -7802,7 +7796,7 @@ byte_and_output_fees wallet2::get_dynamic_base_fee_estimate() const
   else
     fees = {old::FEE_PER_BYTE_V12, 0};
 
-  LOG_PRINT_L1("Failed to query base fee, using " << print_money(fees.first) << "/byte + " << print_money(fees.second) << "/output");
+  oxen::log::info(logcat, "Failed to query base fee, using {}/byte + {}/output", print_money(fees.first), print_money(fees.second));
   return fees;
 }
 //----------------------------------------------------------------------------------------------------
@@ -7853,7 +7847,7 @@ oxen_construct_tx_params wallet2::construct_params(hf hf_version, txtype tx_type
 bool wallet2::set_ring_database(fs::path filename)
 {
   m_ring_database = std::move(filename);
-  MINFO("ringdb path set to " << m_ring_database.u8string());
+  oxen::log::info(logcat, "ringdb path set to {}", m_ring_database.u8string());
   m_ringdb.reset();
   if (!m_ring_database.empty())
   {
@@ -7865,7 +7859,7 @@ bool wallet2::set_ring_database(fs::path filename)
     }
     catch (const std::exception &e)
     {
-      MERROR("Failed to initialize ringdb: " << e.what());
+      oxen::log::error(logcat, "Failed to initialize ringdb: {}", e.what());
       m_ring_database.clear();
       return false;
     }
@@ -7877,7 +7871,7 @@ crypto::chacha_key wallet2::get_ringdb_key()
 {
   if (!m_ringdb_key)
   {
-    MINFO("caching ringdb key");
+    oxen::log::debug(logcat, "caching ringdb key");
     crypto::chacha_key key;
     generate_chacha_key_from_secret_keys(key);
     m_ringdb_key = key;
@@ -8005,7 +7999,7 @@ bool wallet2::find_and_save_rings(bool force)
   if (!m_ringdb)
     return false;
 
-  MDEBUG("Finding and saving rings...");
+  oxen::log::debug(logcat, "Finding and saving rings...");
 
   // get payments we made
   std::vector<crypto::hash> txs_hashes;
@@ -8014,7 +8008,7 @@ bool wallet2::find_and_save_rings(bool force)
   for (const auto& [txid, details]: payments)
     txs_hashes.push_back(txid);
 
-  MDEBUG("Found " << std::to_string(txs_hashes.size()) << " transactions");
+  oxen::log::debug(logcat, "Found {} transactions", std::to_string(txs_hashes.size()));
 
   // get those transactions from the daemon
   auto it = txs_hashes.begin();
@@ -8027,7 +8021,7 @@ bool wallet2::find_and_save_rings(bool force)
     };
     auto res = m_http_client.json_rpc("get_transactions", get_transactions_params);
 
-    MDEBUG("Scanning " << res["txs"].size() << " transactions");
+    oxen::log::debug(logcat, "Scanning {} transactions", res["txs"].size());
     for (size_t i = 0; i < res["txs"].size(); ++i, ++it)
     {
       const auto &tx_info = res["txs"][i];
@@ -8040,7 +8034,7 @@ bool wallet2::find_and_save_rings(bool force)
     }
   }
 
-  MINFO("Found and saved rings for " << txs_hashes.size() << " transactions");
+  oxen::log::info(logcat, "Found and saved rings for {} transactions", txs_hashes.size());
   m_ring_history_saved = true;
   return true;
 }
@@ -8991,7 +8985,7 @@ bool wallet2::lock_keys_file()
     return true;
   if (m_keys_file_locker)
   {
-    MDEBUG(m_keys_file << " is already locked.");
+    oxen::log::debug(logcat, "{} is already locked.", m_keys_file);
     return false;
   }
   m_keys_file_locker.reset(new tools::file_locker(m_keys_file));
@@ -9004,7 +8998,7 @@ bool wallet2::unlock_keys_file()
     return true;
   if (!m_keys_file_locker)
   {
-    MDEBUG(m_keys_file << " is already unlocked.");
+    oxen::log::debug(logcat, "{} is already unlocked.", m_keys_file);
     return false;
   }
   m_keys_file_locker.reset();
@@ -9076,13 +9070,13 @@ bool wallet2::tx_add_fake_output(std::vector<std::vector<tools::wallet2::get_out
     // and so we want the added correctness this check offers.
     if (nettype() == cryptonote::network_type::MAINNET)
     {
-      MWARNING("Key " << output_public_key << " at index " << global_index << " is not in the main subgroup");
+      oxen::log::warning(logcat, "Key {} at index {} is not in the main subgroup", output_public_key, global_index);
       return false;
     }
   }
   if (!rct::isInMainSubgroup(mask))
   {
-    MWARNING("Commitment " << mask << " at index " << global_index << " is not in the main subgroup");
+    oxen::log::warning(logcat, "Commitment {} at index {} is not in the main subgroup", mask, global_index);
     return false;
   }
 //  if (is_output_blackballed(output_public_key)) // don't add blackballed outputs
@@ -9134,7 +9128,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
 
 void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> &outs, const std::vector<size_t> &selected_transfers, size_t fake_outputs_count, std::vector<uint64_t> &rct_offsets, bool has_rct)
 {
-  LOG_PRINT_L2("fake_outputs_count: " << fake_outputs_count);
+  oxen::log::debug(logcat, "fake_outputs_count: {}", fake_outputs_count);
   outs.clear();
 
 #ifdef ENABLE_LIGHT_WALLET
@@ -9195,9 +9189,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
     std::sort(output_blacklist.begin(), output_blacklist.end());
     if (output_blacklist.size() * 0.05 > (double)rct_offsets.size())
     {
-      MWARNING("More than 5% of outputs are blacklisted ("
-               << output_blacklist.size() << "/" << rct_offsets.size()
-               << "), please notify the Oxen developers");
+      oxen::log::warning(logcat, "More than 5% of outputs are blacklisted ({}/{}), please notify the Oxen developers", output_blacklist.size(), rct_offsets.size());
     }
 
     nlohmann::json res;
@@ -9264,7 +9256,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
 
     // we ask for more, to have spares if some outputs are still locked
     size_t base_requested_outputs_count = (size_t)((fake_outputs_count + 1) * 1.5 + 1);
-    LOG_PRINT_L2("base_requested_outputs_count: " << base_requested_outputs_count);
+    oxen::log::debug(logcat, "base_requested_outputs_count: {}", base_requested_outputs_count);
 
     // generate output indices to request
     rpc::GET_OUTPUTS_BIN::request req{};
@@ -9305,8 +9297,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
         {
           if (he["amount"].get<uint64_t>() == amount)
           {
-            LOG_PRINT_L2("Found " << print_money(amount) << ": " << he["total_instances"] << " total, "
-                << he["unlocked_instances"] << " unlocked, " << he["recent_instances"] << " recent");
+            oxen::log::debug(logcat, "Found {}: {} total, {} unlocked, {} recent", print_money(amount), he["total_instances"], he["unlocked_instances"], he["recent_instances"]);
             num_outs = he["unlocked_instances"].get<uint64_t>();
             num_recent_outs = he["recent_instances"].get<uint64_t>();
             break;
@@ -9342,7 +9333,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
 
       if (use_histogram)
       {
-        LOG_PRINT_L1("" << num_outs << " unlocked outputs of size " << print_money(amount));
+        oxen::log::info(logcat, "{} unlocked outputs of size {}", num_outs, print_money(amount));
         THROW_WALLET_EXCEPTION_IF(num_outs == 0, error::wallet_internal_error,
             "histogram reports no unlocked outputs for " + std::to_string(amount) + ", not even ours");
         THROW_WALLET_EXCEPTION_IF(num_recent_outs > num_outs, error::wallet_internal_error,
@@ -9352,7 +9343,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
       {
         // the base offset of the first rct output in the first unlocked block (or the one to be if there's none)
         num_outs = rct_offsets[rct_offsets.size() - DEFAULT_TX_SPENDABLE_AGE];
-        LOG_PRINT_L1("" << num_outs << " unlocked rct outputs");
+        oxen::log::info(logcat, "{} unlocked rct outputs", num_outs);
         THROW_WALLET_EXCEPTION_IF(num_outs == 0, error::wallet_internal_error,
             "histogram reports no unlocked rct outputs, not even ours");
       }
@@ -9375,9 +9366,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
         if (td.m_global_output_index >= num_outs - num_recent_outs && recent_outputs_count > 0)
           --recent_outputs_count; // if the real out is recent, pick one less recent fake out
       }
-      LOG_PRINT_L1("Fake output makeup: " << requested_outputs_count << " requested: " << recent_outputs_count << " recent, " <<
-          pre_fork_outputs_count << " pre-fork, " << post_fork_outputs_count << " post-fork, " <<
-          (requested_outputs_count - recent_outputs_count - pre_fork_outputs_count - post_fork_outputs_count) << " full-chain");
+      oxen::log::info(logcat, "Fake output makeup: {} requested: {} recent, {} pre-fork, {} post-fork, {} full-chain", requested_outputs_count, recent_outputs_count, pre_fork_outputs_count, post_fork_outputs_count, (requested_outputs_count - recent_outputs_count - pre_fork_outputs_count - post_fork_outputs_count));
 
       uint64_t num_found = 0;
 
@@ -9387,7 +9376,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
         std::vector<uint64_t> ring;
         if (get_ring(get_ringdb_key(), td.m_key_image, ring))
         {
-          MINFO("This output has a known ring, reusing (size " << ring.size() << ")");
+          oxen::log::info(logcat, "This output has a known ring, reusing (size {})", ring.size());
           THROW_WALLET_EXCEPTION_IF(ring.size() > fake_outputs_count + 1, error::wallet_internal_error,
               "An output in this transaction was previously spent on another chain with ring size " +
               std::to_string(ring.size()) + ", it cannot be spent now with ring size " +
@@ -9395,22 +9384,22 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
           bool own_found = false;
           for (const auto &out: ring)
           {
-            MINFO("Ring has output " << out);
+            oxen::log::info(logcat, "Ring has output {}", out);
             if (out < num_outs)
             {
-              MINFO("Using it");
+              oxen::log::info(logcat, "Using it");
               get_outputs.push_back({amount, out});
               ++num_found;
               seen_indices.emplace(out);
               if (out == td.m_global_output_index)
               {
-                MINFO("This is the real output");
+                oxen::log::info(logcat, "This is the real output");
                 own_found = true;
               }
             }
             else
             {
-              MINFO("Ignoring output " << out << ", too recent");
+              oxen::log::info(logcat, "Ignoring output {}, too recent", out);
             }
           }
           THROW_WALLET_EXCEPTION_IF(!own_found, error::wallet_internal_error,
@@ -9436,7 +9425,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
           num_found = 1;
           seen_indices.emplace(td.m_global_output_index);
           get_outputs.push_back({amount, td.m_global_output_index});
-          LOG_PRINT_L1("Selecting real output: " << td.m_global_output_index << " for " << print_money(amount));
+          oxen::log::info(logcat, "Selecting real output: {} for {}", td.m_global_output_index, print_money(amount));
         }
 
         std::unordered_map<const char*, std::set<uint64_t>> picks;
@@ -9444,8 +9433,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
         // while we still need more mixins
         uint64_t num_usable_outs = num_outs;
         bool allow_blackballed_or_blacklisted = false;
-        MDEBUG("Starting gamma picking with " << num_outs << ", num_usable_outs " << num_usable_outs
-            << ", requested_outputs_count " << requested_outputs_count);
+        oxen::log::debug(logcat, "Starting gamma picking with {}, num_usable_outs {}, requested_outputs_count {}", num_outs, num_usable_outs, requested_outputs_count);
         while (num_found < requested_outputs_count)
         {
           // if we've gone through every possible output, we've gotten all we can
@@ -9457,7 +9445,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
             // outputs, we still need to reach the minimum ring size)
             if (allow_blackballed_or_blacklisted)
               break;
-            MINFO("Not enough output not marked as spent, we'll allow outputs marked as spent and outputs with known destinations and amounts");
+            oxen::log::info(logcat, "Not enough output not marked as spent, we'll allow outputs marked as spent and outputs with known destinations and amounts");
             allow_blackballed_or_blacklisted = true;
             num_usable_outs = num_outs;
           }
@@ -9549,17 +9537,17 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
           picks[type].insert(i);
           get_outputs.push_back({amount, i});
           ++num_found;
-          MDEBUG("picked " << i << ", " << num_found << " now picked");
+          oxen::log::debug(logcat, "picked {}, {} now picked", i, num_found);
         }
 
-        if (LOG_ENABLED(Debug))
+        if (OXEN_LOG_ENABLED(debug))
         {
           for (const auto &pick: picks)
           {
             std::string outputs;
             for (const auto& out : pick.second)
               outputs += " " + std::to_string(out);
-            MDEBUG("picking " << pick.first << " outputs:" << outputs);
+            oxen::log::debug(logcat, "picking {} outputs:{}", pick.first, outputs);
           }
         }
 
@@ -9578,19 +9566,19 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
           [](const auto& a, const auto& b) { return a.index < b.index; });
     }
 
-    if (ELPP->vRegistry()->allowed(el::Level::Debug, OXEN_DEFAULT_LOG_CATEGORY))
+    if (OXEN_LOG_ENABLED(debug))
     {
       std::map<uint64_t, std::set<uint64_t>> outs;
       for (const auto &i: get_outputs)
         outs[i.amount].insert(i.index);
-      if (LOG_ENABLED(Debug))
+      if (OXEN_LOG_ENABLED(debug))
       {
         for (const auto &o: outs)
         {
           std::string outputs;
           for (const auto& out : o.second)
             outputs += " " + std::to_string(out);
-          MDEBUG("asking for outputs with amount " << print_money(o.first) << ":" << outputs);
+          oxen::log::debug(logcat, "asking for outputs with amount {}:{}", print_money(o.first), outputs);
         }
       }
     }
@@ -9692,7 +9680,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
                   size_t i = base + o;
                   if (get_outputs[i].index == out)
                   {
-                    LOG_PRINT_L2("Index " << i << "/" << requested_outputs_count << ": idx " << get_outputs[i].index << " (real " << td.m_global_output_index << "), unlocked " << got_outs[i].unlocked << ", key " << got_outs[i].key << " (from existing ring)");
+                    oxen::log::debug(logcat, "Index {}/{}: idx {} (real {}), unlocked {}, key {} (from existing ring)", i, requested_outputs_count, get_outputs[i].index, td.m_global_output_index, got_outs[i].unlocked, got_outs[i].key);
                     tx_add_fake_output(outs, get_outputs[i].index, got_outs[i].key, got_outs[i].mask, td.m_global_output_index, got_outs[i].unlocked);
                     found = true;
                     break;
@@ -9713,11 +9701,11 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
         order[n] = n;
       std::shuffle(order.begin(), order.end(), crypto::random_device{});
 
-      LOG_PRINT_L2("Looking for " << (fake_outputs_count+1) << " outputs of size " << print_money(td.is_rct() ? 0 : td.amount()));
+      oxen::log::debug(logcat, "Looking for {} outputs of size {}", (fake_outputs_count+1), print_money(td.is_rct() ? 0 : td.amount()));
       for (size_t o = 0; o < requested_outputs_count && outs.back().size() < fake_outputs_count + 1; ++o)
       {
         size_t i = base + order[o];
-        LOG_PRINT_L2("Index " << i << "/" << requested_outputs_count << ": idx " << get_outputs[i].index << " (real " << td.m_global_output_index << "), unlocked " << got_outs[i].unlocked << ", key " << got_outs[i].key);
+        oxen::log::debug(logcat, "Index {}/{}: idx {} (real {}), unlocked {}, key {}", i, requested_outputs_count, get_outputs[i].index, td.m_global_output_index, got_outs[i].unlocked, got_outs[i].key);
         tx_add_fake_output(outs, get_outputs[i].index, got_outs[i].key, got_outs[i].mask, td.m_global_output_index, got_outs[i].unlocked);
       }
       if (outs.back().size() < fake_outputs_count + 1)
@@ -9756,7 +9744,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
     for (const auto &e: outs[i])
       ring.push_back(std::get<0>(e));
     if (!set_ring(td.m_key_image, ring, false))
-      MERROR("Failed to set ring for " << td.m_key_image);
+      oxen::log::error(logcat, "Failed to set ring for {}", td.m_key_image);
   }
 }
 
@@ -9769,8 +9757,8 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
 
   uint64_t upper_transaction_weight_limit = get_upper_transaction_weight_limit();
   uint64_t needed_money = fee;
-  LOG_PRINT_L2("transfer_selected_rct: starting with fee " << print_money (needed_money));
-  LOG_PRINT_L2("selected transfers: " << tools::join(" ", selected_transfers));
+  oxen::log::debug(logcat, "transfer_selected_rct: starting with fee {}", print_money (needed_money));
+  oxen::log::debug(logcat, "selected transfers: {}", tools::join(" ", selected_transfers));
 
   // calculate total amount being sent to all destinations
   // throw if total amount overflows uint64_t
@@ -9778,7 +9766,7 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
   {
     THROW_WALLET_EXCEPTION_IF(0 == dt.amount && (tx_params.tx_type != txtype::oxen_name_system), error::zero_destination);
     needed_money += dt.amount;
-    LOG_PRINT_L2("transfer: adding " << print_money(dt.amount) << ", for a total of " << print_money (needed_money));
+    oxen::log::debug(logcat, "transfer: adding {}, for a total of {}", print_money(dt.amount), print_money (needed_money));
     THROW_WALLET_EXCEPTION_IF(needed_money < dt.amount, error::tx_sum_overflow, dsts, fee, m_nettype);
   }
 
@@ -9808,7 +9796,7 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
       }
     }
     // n_available_signers includes the transaction creator, but multisig_signers doesn't
-    MDEBUG("We can use " << n_available_signers << "/" << m_multisig_signers.size() <<  " other signers");
+    oxen::log::debug(logcat, "We can use {}/{} other signers", n_available_signers, m_multisig_signers.size());
     THROW_WALLET_EXCEPTION_IF(n_available_signers < m_multisig_threshold, error::multisig_import_needed);
     if (n_available_signers > m_multisig_threshold)
     {
@@ -9835,7 +9823,7 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
       // If we have exact count of signers just to fit in threshold we don't exclude anyone and create 1 transaction
       n_multisig_txes = 1;
     }
-    MDEBUG("We will create " << n_multisig_txes << " txes");
+    oxen::log::debug(logcat, "We will create {} txes", n_multisig_txes);
   }
 
   uint64_t found_money = 0;
@@ -9853,14 +9841,14 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
     else
       THROW_WALLET_EXCEPTION_IF(subaddr_account != m_transfers[transfer_idx].m_subaddr_index.major, error::wallet_internal_error, "the tx uses funds from multiple accounts");
   }
-  LOG_PRINT_L2("wanted " << print_money(needed_money) << ", found " << print_money(found_money) << ", fee " << print_money(fee));
+  oxen::log::debug(logcat, "wanted {}, found {}, fee {}", print_money(needed_money), print_money(found_money), print_money(fee));
   THROW_WALLET_EXCEPTION_IF(found_money < needed_money, error::not_enough_unlocked_money, found_money, needed_money - fee, fee);
 
   if (outs.empty())
     get_outs(outs, selected_transfers, fake_outputs_count, has_rct); // may throw
 
   //prepare inputs
-  LOG_PRINT_L2("preparing outputs");
+  oxen::log::debug(logcat, "preparing outputs");
   size_t i = 0, out_index = 0;
   std::vector<cryptonote::tx_source_entry> sources;
   std::unordered_set<rct::key> used_L;
@@ -9916,12 +9904,12 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
     {
       std::string indexes;
       for (auto& out: src.outputs) { indexes += ' '; indexes += std::to_string(out.first); }
-      LOG_PRINT_L0("amount=" << cryptonote::print_money(src.amount) << ", real_output=" <<src.real_output << ", real_output_in_tx_index=" << src.real_output_in_tx_index << ", indexes:" << indexes);
+      oxen::log::warning(logcat, "amount={}, real_output={}, real_output_in_tx_index={}, indexes:{}", cryptonote::print_money(src.amount), src.real_output, src.real_output_in_tx_index, indexes);
     }
 
     ++out_index;
   }
-  LOG_PRINT_L2("outputs prepared");
+  oxen::log::debug(logcat, "outputs prepared");
 
   // we still keep a copy, since we want to keep dsts free of change for user feedback purposes
   std::vector<cryptonote::tx_destination_entry> splitted_dsts = dsts;
@@ -9937,10 +9925,10 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
       // letting the destination be able to work out which of the inputs is the
       // real one in our rings
 
-      LOG_PRINT_L2("generating dummy address for 0 change");
+      oxen::log::debug(logcat, "generating dummy address for 0 change");
       cryptonote::account_base dummy;
       dummy.generate();
-      LOG_PRINT_L2("generated dummy address for 0 change");
+      oxen::log::debug(logcat, "generated dummy address for 0 change");
       change_dts.addr = dummy.get_keys().m_account_address;
     }
     else
@@ -9973,7 +9961,7 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
   crypto::secret_key tx_key;
   std::vector<crypto::secret_key> additional_tx_keys;
   rct::multisig_out msout;
-  LOG_PRINT_L2("constructing tx");
+  oxen::log::debug(logcat, "constructing tx");
   auto sources_copy = sources;
   bool r = cryptonote::construct_tx_and_get_tx_key(
       m_account.get_keys(),
@@ -9990,7 +9978,7 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
       m_multisig ? &msout : nullptr,
       tx_params);
 
-  LOG_PRINT_L2("constructed tx, r="<<r);
+  oxen::log::debug(logcat, "constructed tx, r={}", r);
   THROW_WALLET_EXCEPTION_IF(!r, error::tx_not_constructed, sources, dsts, unlock_time, m_nettype);
   THROW_WALLET_EXCEPTION_IF(upper_transaction_weight_limit <= get_transaction_weight(tx), error::tx_too_big, tx, upper_transaction_weight_limit);
 
@@ -10031,7 +10019,7 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
           ++src_idx;
         }
 
-        LOG_PRINT_L2("Creating supplementary multisig transaction");
+        oxen::log::debug(logcat, "Creating supplementary multisig transaction");
         cryptonote::transaction ms_tx;
         auto sources_copy_copy = sources_copy;
 
@@ -10049,7 +10037,7 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
                                                       &msout,
                                                       /*shuffle_outs*/ false,
                                                       tx_params);
-        LOG_PRINT_L2("constructed tx, r="<<r);
+        oxen::log::debug(logcat, "constructed tx, r={}", r);
         THROW_WALLET_EXCEPTION_IF(!r, error::tx_not_constructed, sources, splitted_dsts, unlock_time, m_nettype);
         THROW_WALLET_EXCEPTION_IF(upper_transaction_weight_limit <= get_transaction_weight(tx), error::tx_too_big, tx, upper_transaction_weight_limit);
         THROW_WALLET_EXCEPTION_IF(cryptonote::get_transaction_prefix_hash(ms_tx) != prefix_hash, error::wallet_internal_error, "Multisig txes do not share prefix");
@@ -10061,7 +10049,7 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
     }
   }
 
-  LOG_PRINT_L2("gathering key images");
+  oxen::log::debug(logcat, "gathering key images");
   std::ostringstream key_images;
   bool all_are_txin_to_key = std::all_of(tx.vin.begin(), tx.vin.end(), [&](const txin_v& s_e) -> bool
   {
@@ -10070,7 +10058,7 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
     return true;
   });
   THROW_WALLET_EXCEPTION_IF(!all_are_txin_to_key, error::unexpected_txin_type, tx);
-  LOG_PRINT_L2("gathered key images");
+  oxen::log::debug(logcat, "gathered key images");
 
   ptx = {};
   ptx.key_images = key_images.str();
@@ -10103,7 +10091,7 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
   ptx.construction_data.subaddr_indices.clear();
   for (size_t idx: selected_transfers)
     ptx.construction_data.subaddr_indices.insert(m_transfers[idx].m_subaddr_index.minor);
-  LOG_PRINT_L2("transfer_selected_rct done");
+  oxen::log::debug(logcat, "transfer_selected_rct done");
 }
 
 std::vector<size_t> wallet2::pick_preferred_rct_inputs(uint64_t needed_money, uint32_t subaddr_account, const std::set<uint32_t> &subaddr_indices) const
@@ -10111,7 +10099,7 @@ std::vector<size_t> wallet2::pick_preferred_rct_inputs(uint64_t needed_money, ui
   std::vector<size_t> picks;
   float current_output_relatdness = 1.0f;
 
-  LOG_PRINT_L2("pick_preferred_rct_inputs: needed_money " << print_money(needed_money));
+  oxen::log::debug(logcat, "pick_preferred_rct_inputs: needed_money {}", print_money(needed_money));
 
   // try to find a rct input of enough size
   for (size_t i = 0; i < m_transfers.size(); ++i)
@@ -10121,10 +10109,10 @@ std::vector<size_t> wallet2::pick_preferred_rct_inputs(uint64_t needed_money, ui
     {
       if (td.amount() > m_ignore_outputs_above || td.amount() < m_ignore_outputs_below)
       {
-        MDEBUG("Ignoring output " << i << " of amount " << print_money(td.amount()) << " which is outside prescribed range [" << print_money(m_ignore_outputs_below) << ", " << print_money(m_ignore_outputs_above) << "]");
+        oxen::log::debug(logcat, "Ignoring output {} of amount {} which is outside prescribed range [{}, {}]", i, print_money(td.amount()), print_money(m_ignore_outputs_below), print_money(m_ignore_outputs_above));
         continue;
       }
-      LOG_PRINT_L2("We can use " << i << " alone: " << print_money(td.amount()));
+      oxen::log::debug(logcat, "We can use {} alone: {}", i, print_money(td.amount()));
       picks.push_back(i);
       return picks;
     }
@@ -10141,16 +10129,16 @@ std::vector<size_t> wallet2::pick_preferred_rct_inputs(uint64_t needed_money, ui
     {
       if (td.amount() > m_ignore_outputs_above || td.amount() < m_ignore_outputs_below)
       {
-        MDEBUG("Ignoring output " << i << " of amount " << print_money(td.amount()) << " which is outside prescribed range [" << print_money(m_ignore_outputs_below) << ", " << print_money(m_ignore_outputs_above) << "]");
+        oxen::log::debug(logcat, "Ignoring output {} of amount {} which is outside prescribed range [{}, {}]", i, print_money(td.amount()), print_money(m_ignore_outputs_below), print_money(m_ignore_outputs_above));
         continue;
       }
-      LOG_PRINT_L2("Considering input " << i << ", " << print_money(td.amount()));
+      oxen::log::debug(logcat, "Considering input {}, {}", i, print_money(td.amount()));
       for (size_t j = i + 1; j < m_transfers.size(); ++j)
       {
         const transfer_details& td2 = m_transfers[j];
         if (td2.amount() > m_ignore_outputs_above || td2.amount() < m_ignore_outputs_below)
         {
-          MDEBUG("Ignoring output " << j << " of amount " << print_money(td2.amount()) << " which is outside prescribed range [" << print_money(m_ignore_outputs_below) << ", " << print_money(m_ignore_outputs_above) << "]");
+          oxen::log::debug(logcat, "Ignoring output {} of amount {} which is outside prescribed range [{}, {}]", j, print_money(td2.amount()), print_money(m_ignore_outputs_below), print_money(m_ignore_outputs_above));
           continue;
         }
         if (!is_spent(td2, false) && !td2.m_frozen && !td.m_key_image_partial && td2.is_rct() && td.amount() + td2.amount() >= needed_money && is_transfer_unlocked(td2) && td2.m_subaddr_index == td.m_subaddr_index)
@@ -10159,7 +10147,7 @@ std::vector<size_t> wallet2::pick_preferred_rct_inputs(uint64_t needed_money, ui
           // already found. If the same, don't update, and oldest suitable outputs
           // will be used in preference.
           float relatedness = get_output_relatedness(td, td2);
-          LOG_PRINT_L2("  with input " << j << ", " << print_money(td2.amount()) << ", relatedness " << relatedness);
+          oxen::log::debug(logcat, "  with input {}, {}, relatedness {}", j, print_money(td2.amount()), relatedness);
           if (relatedness < current_output_relatdness)
           {
             // reset the current picks with those, and return them directly
@@ -10168,7 +10156,7 @@ std::vector<size_t> wallet2::pick_preferred_rct_inputs(uint64_t needed_money, ui
             picks.clear();
             picks.push_back(i);
             picks.push_back(j);
-            LOG_PRINT_L0("we could use " << i << " and " << j);
+            oxen::log::warning(logcat, "we could use {} and {}", i, j);
             if (relatedness == 0.0f)
               return picks;
             current_output_relatdness = relatedness;
@@ -10236,7 +10224,7 @@ static uint32_t get_count_above(const std::vector<wallet2::transfer_details> &tr
 #ifdef ENABLE_LIGHT_WALLET
 void wallet2::light_wallet_get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> &outs, const std::vector<size_t> &selected_transfers, size_t fake_outputs_count) {
 
-  MDEBUG("LIGHTWALLET - Getting random outs");
+  oxen::log::debug(logcat, "LIGHTWALLET - Getting random outs");
 
   light_rpc::GET_RANDOM_OUTS::request oreq{};
   light_rpc::GET_RANDOM_OUTS::response ores{};
@@ -10260,10 +10248,10 @@ void wallet2::light_wallet_get_outs(std::vector<std::vector<tools::wallet2::get_
   // Check if we got enough outputs for each amount
   for(auto& out: ores.amount_outs) {
     THROW_WALLET_EXCEPTION_IF(out.outputs.size() < light_wallet_requested_outputs_count , error::wallet_internal_error, "Not enough outputs for amount: " + std::to_string(out.amount));
-    MDEBUG(out.outputs.size() << " outputs for amount "+ std::to_string(out.amount) + " received from light wallet node");
+    oxen::log::debug(logcat, "{} outputs for amount "+ std::to_string(out.amount) + " received from light wallet node", out.outputs.size());
   }
 
-  MDEBUG("selected transfers size: " << selected_transfers.size());
+  oxen::log::debug(logcat, "selected transfers size: {}", selected_transfers.size());
 
   for(size_t idx: selected_transfers)
   {
@@ -10275,7 +10263,7 @@ void wallet2::light_wallet_get_outs(std::vector<std::vector<tools::wallet2::get_
     const transfer_details &td = m_transfers[idx];
     const uint64_t amount = td.is_rct() ? 0 : td.amount();
     outs.back().push_back(std::make_tuple(td.m_global_output_index, td.get_public_key(), rct::commit(td.amount(), td.m_mask)));
-    MDEBUG("added real output " << tools::type_to_hex(td.get_public_key()));
+    oxen::log::debug(logcat, "added real output {}", tools::type_to_hex(td.get_public_key()));
 
     // Even if the lightwallet server returns random outputs, we pick them randomly.
     std::vector<size_t> order;
@@ -10285,8 +10273,8 @@ void wallet2::light_wallet_get_outs(std::vector<std::vector<tools::wallet2::get_
     std::shuffle(order.begin(), order.end(), crypto::random_device{});
 
 
-    LOG_PRINT_L2("Looking for " << (fake_outputs_count+1) << " outputs with amounts " << print_money(td.is_rct() ? 0 : td.amount()));
-    MDEBUG("OUTS SIZE: " << outs.back().size());
+    oxen::log::debug(logcat, "Looking for {} outputs with amounts {}", (fake_outputs_count+1), print_money(td.is_rct() ? 0 : td.amount()));
+    oxen::log::debug(logcat, "OUTS SIZE: {}", outs.back().size());
     for (size_t o = 0; o < light_wallet_requested_outputs_count && outs.back().size() < fake_outputs_count + 1; ++o)
     {
       // Random pick
@@ -10304,7 +10292,7 @@ void wallet2::light_wallet_get_outs(std::vector<std::vector<tools::wallet2::get_
       }
       THROW_WALLET_EXCEPTION_IF(!found_amount , error::wallet_internal_error, "Outputs for amount " + std::to_string(ores.amount_outs[amount_key].amount) + " not found" );
 
-      LOG_PRINT_L2("Index " << i << "/" << light_wallet_requested_outputs_count << ": idx " << ores.amount_outs[amount_key].outputs[i].global_index << " (real " << td.m_global_output_index << "), unlocked " << "(always in light)" << ", key " << ores.amount_outs[0].outputs[i].public_key);
+      oxen::log::debug(logcat, "Index {}/{}: idx {} (real {}), unlocked (always in light), key {}", i, light_wallet_requested_outputs_count, ores.amount_outs[amount_key].outputs[i].global_index, td.m_global_output_index, ores.amount_outs[0].outputs[i].public_key);
 
       // Convert light wallet string data to proper data structures
       crypto::public_key tx_public_key;
@@ -10318,27 +10306,27 @@ void wallet2::light_wallet_get_outs(std::vector<std::vector<tools::wallet2::get_
         rct_commit = rct::zeroCommit(td.amount());
 
       if (tx_add_fake_output(outs, global_index, tx_public_key, rct_commit, td.m_global_output_index, true)) {
-        MDEBUG("added fake output " << ores.amount_outs[amount_key].outputs[i].public_key);
-        MDEBUG("index " << global_index);
+        oxen::log::debug(logcat, "added fake output {}", ores.amount_outs[amount_key].outputs[i].public_key);
+        oxen::log::debug(logcat, "index {}", global_index);
       }
     }
 
     THROW_WALLET_EXCEPTION_IF(outs.back().size() < fake_outputs_count + 1 , error::wallet_internal_error, "Not enough fake outputs found" );
 
     // Real output is the first. Shuffle outputs
-    MTRACE(outs.back().size() << " outputs added. Sorting outputs by index:");
+    oxen::log::trace(logcat, "{} outputs added. Sorting outputs by index:", outs.back().size());
     std::sort(outs.back().begin(), outs.back().end(), [](const get_outs_entry &a, const get_outs_entry &b) { return std::get<0>(a) < std::get<0>(b); });
 
     // Print output order
     for(auto added_out: outs.back())
-      MTRACE(std::get<0>(added_out));
+      oxen::log::trace( std::get<0>(added_out));
 
   }
 }
 
 bool wallet2::light_wallet_login(bool &new_address)
 {
-  MDEBUG("Light wallet login request");
+  oxen::log::debug(logcat, "Light wallet login request");
   m_light_wallet_connected = false;
   light_rpc::LOGIN::request request{};
   light_rpc::LOGIN::response response{};
@@ -10350,9 +10338,9 @@ bool wallet2::light_wallet_login(bool &new_address)
   // MyMonero doesn't send any status message. OpenMonero does.
   m_light_wallet_connected  = connected && (response.status.empty() || response.status == "success");
   new_address = response.new_address;
-  MDEBUG("Status: " << response.status);
-  MDEBUG("Reason: " << response.reason);
-  MDEBUG("New wallet: " << response.new_address);
+  oxen::log::debug(logcat, "Status: {}", response.status);
+  oxen::log::debug(logcat, "Reason: {}", response.reason);
+  oxen::log::debug(logcat, "New wallet: {}", response.new_address);
   if(m_light_wallet_connected)
   {
     // Clear old data on successful login.
@@ -10365,7 +10353,7 @@ bool wallet2::light_wallet_login(bool &new_address)
 
 bool wallet2::light_wallet_import_wallet_request(light_rpc::IMPORT_WALLET_REQUEST::response &response)
 {
-  MDEBUG("Light wallet import wallet request");
+  oxen::log::debug(logcat, "Light wallet import wallet request");
   light_rpc::IMPORT_WALLET_REQUEST::request oreq{};
   oreq.address = get_account().get_public_address_str(m_nettype);
   oreq.view_key = tools::type_to_hex(get_account().get_keys().m_view_secret_key);
@@ -10378,7 +10366,7 @@ bool wallet2::light_wallet_import_wallet_request(light_rpc::IMPORT_WALLET_REQUES
 
 void wallet2::light_wallet_get_unspent_outs()
 {
-  MDEBUG("Getting unspent outs");
+  oxen::log::debug(logcat, "Getting unspent outs");
 
   light_rpc::GET_UNSPENT_OUTS::request oreq{};
   light_rpc::GET_UNSPENT_OUTS::response ores{};
@@ -10403,7 +10391,7 @@ void wallet2::light_wallet_get_unspent_outs()
   for(const auto &t: m_transfers)
     transfers_txs.emplace(t.m_txid,t.m_spent);
 
-  MDEBUG("FOUND " << ores.outputs.size() <<" outputs");
+  oxen::log::debug(logcat, "FOUND {} outputs", ores.outputs.size());
 
   // return if no outputs found
   if(ores.outputs.empty())
@@ -10427,11 +10415,11 @@ void wallet2::light_wallet_get_unspent_outs()
       THROW_WALLET_EXCEPTION_IF(ski.size() != 64 || !oxenc::is_hex(ski), error::wallet_internal_error, "Invalid key image");
       tools::hex_to_type(ski, unspent_key_image);
       if(light_wallet_key_image_is_ours(unspent_key_image, tx_public_key, o.index)){
-        MTRACE("Output " << o.public_key << " is spent. Key image: " <<  ski);
+        oxen::log::trace(logcat, "Output {} is spent. Key image: {}", o.public_key, ski);
         spent = true;
         break;
       } {
-        MTRACE("Unspent output found. " << o.public_key);
+        oxen::log::trace(logcat, "Unspent output found. {}", o.public_key);
       }
     }
 
@@ -10508,11 +10496,11 @@ void wallet2::light_wallet_get_unspent_outs()
         bool valid_commit = (rct_commit == rct::commit(td.amount(), td.m_mask));
         if(!valid_commit)
         {
-          MDEBUG("output index: " << o.global_index);
-          MDEBUG("mask: " + tools::type_to_hex(td.m_mask));
-          MDEBUG("calculated commit: " + tools::type_to_hex(rct::commit(td.amount(), td.m_mask)));
-          MDEBUG("expected commit: " + tools::type_to_hex(rct_commit));
-          MDEBUG("amount: " << td.amount());
+          oxen::log::debug(logcat, "output index: {}", o.global_index);
+          oxen::log::debug(logcat, "mask: " + tools::type_to_hex(td.m_mask));
+          oxen::log::debug(logcat, "calculated commit: " + tools::type_to_hex(rct::commit(td.amount(), td.m_mask)));
+          oxen::log::debug(logcat, "expected commit: " + tools::type_to_hex(rct_commit));
+          oxen::log::debug(logcat, "amount: {}", td.amount());
         }
         THROW_WALLET_EXCEPTION_IF(!valid_commit, error::wallet_internal_error, "Lightwallet: rct commit hash mismatch!");
       }
@@ -10532,7 +10520,7 @@ void wallet2::light_wallet_get_unspent_outs()
 
 bool wallet2::light_wallet_get_address_info(light_rpc::GET_ADDRESS_INFO::response &response)
 {
-  MTRACE(__FUNCTION__);
+  oxen::log::trace( __FUNCTION__);
 
   light_rpc::GET_ADDRESS_INFO::request request{};
 
@@ -10546,7 +10534,7 @@ bool wallet2::light_wallet_get_address_info(light_rpc::GET_ADDRESS_INFO::respons
 
 void wallet2::light_wallet_get_address_txs()
 {
-  MDEBUG("Refreshing light wallet");
+  oxen::log::debug(logcat, "Refreshing light wallet");
 
   light_rpc::GET_ADDRESS_TXS::request ireq{};
   light_rpc::GET_ADDRESS_TXS::response ires{};
@@ -10707,7 +10695,7 @@ void wallet2::light_wallet_get_address_txs()
         {
           if(confirmed_tx->second.m_amount_in != amount_sent || confirmed_tx->second.m_amount_out != amount_sent)
           {
-            MDEBUG("Adjusting amount sent/received for tx: <" + t.hash + ">. Is tx sent to own wallet? " << print_money(amount_sent) << " != " << print_money(confirmed_tx->second.m_amount_in));
+            oxen::log::debug(logcat, "Adjusting amount sent/received for tx: <" + t.hash + ">. Is tx sent to own wallet? {} != {}", print_money(amount_sent), print_money(confirmed_tx->second.m_amount_in));
             confirmed_tx->second.m_amount_in = amount_sent;
             confirmed_tx->second.m_amount_out = amount_sent;
             confirmed_tx->second.m_change = 0;
@@ -10914,7 +10902,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
   {
     THROW_WALLET_EXCEPTION_IF(0 == dt.amount && !is_ons_tx, error::zero_destination);
     needed_money += dt.amount;
-    LOG_PRINT_L2("transfer: adding " << print_money(dt.amount) << ", for a total of " << print_money (needed_money));
+    oxen::log::debug(logcat, "transfer: adding {}, for a total of {}", print_money(dt.amount), print_money (needed_money));
     THROW_WALLET_EXCEPTION_IF(needed_money < dt.amount, error::tx_sum_overflow, dsts, 0, m_nettype);
   }
 
@@ -10956,7 +10944,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
   }
 
   for (uint32_t i : subaddr_indices)
-    LOG_PRINT_L2("Candidate subaddress index for spending: " << i);
+    oxen::log::debug(logcat, "Candidate subaddress index for spending: {}", i);
 
   // determine threshold for fractional amount
   const size_t tx_weight_one_ring = estimate_tx_weight(1, fake_outs_count, 2, 0, clsag);
@@ -10975,7 +10963,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
     {
       if (td.amount() > m_ignore_outputs_above || td.amount() < m_ignore_outputs_below)
       {
-        MDEBUG("Ignoring output " << i << " of amount " << print_money(td.amount()) << " which is outside prescribed range [" << print_money(m_ignore_outputs_below) << ", " << print_money(m_ignore_outputs_above) << "]");
+        oxen::log::debug(logcat, "Ignoring output {} of amount {} which is outside prescribed range [{}, {}]", i, print_money(td.amount()), print_money(m_ignore_outputs_below), print_money(m_ignore_outputs_above));
         continue;
       }
       const uint32_t index_minor = td.m_subaddr_index.minor;
@@ -11019,7 +11007,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
     std::sort(unused_dust_indices_per_subaddr.begin(), unused_dust_indices_per_subaddr.end(), sort_predicate);
   }
 
-  LOG_PRINT_L2("Starting with " << num_nondust_outputs << " non-dust outputs and " << num_dust_outputs << " dust outputs");
+  oxen::log::debug(logcat, "Starting with {} non-dust outputs and {} dust outputs", num_nondust_outputs, num_dust_outputs);
 
   if (unused_dust_indices_per_subaddr.empty() && unused_transfers_indices_per_subaddr.empty())
     return std::vector<wallet2::pending_tx>();
@@ -11043,7 +11031,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
   // this prevents linking to another by provenance analysis, but two is ok if we
   // try to pick outputs not from the same block. We will get two outputs, one for
   // the destination, and one for change.
-  LOG_PRINT_L2("checking preferred");
+  oxen::log::debug(logcat, "checking preferred");
   std::vector<size_t> preferred_inputs;
   {
     // this is used to build a tx that's 1 or 2 inputs, and 1 or 2 outputs, which will get us a known fee.
@@ -11053,7 +11041,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
     {
       std::string s;
       for (auto i: preferred_inputs) s += std::to_string(i) + " (" + print_money(m_transfers[i].amount()) + ") ";
-      LOG_PRINT_L1("Found preferred rct inputs for rct tx: " << s);
+      oxen::log::info(logcat, "Found preferred rct inputs for rct tx: {}", s);
 
       // bring the list of available outputs stored by the same subaddress index to the front of the list
       uint32_t index_minor = m_transfers[preferred_inputs[0]].m_subaddr_index.minor;
@@ -11075,7 +11063,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
       }
     }
   }
-  LOG_PRINT_L2("done checking preferred");
+  oxen::log::debug(logcat, "done checking preferred");
 
   // while:
   // - we have something to send
@@ -11089,15 +11077,15 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
   while ((!dsts.empty() && dsts[0].amount > 0) || adding_fee || !preferred_inputs.empty() || should_pick_a_second_output(txes.back().selected_transfers.size(), *unused_transfers_indices, *unused_dust_indices)) {
     TX &tx = txes.back();
 
-    LOG_PRINT_L2("Start of loop with " << unused_transfers_indices->size() << " " << unused_dust_indices->size() << ", tx.dsts.size() " << tx.dsts.size());
-    LOG_PRINT_L2("unused_transfers_indices: " << tools::join(" ", *unused_transfers_indices));
-    LOG_PRINT_L2("unused_dust_indices: " << tools::join(" ", *unused_dust_indices));
-    LOG_PRINT_L2("dsts size " << dsts.size() << ", first " << (dsts.empty() ? "-" : cryptonote::print_money(dsts[0].amount)));
-    LOG_PRINT_L2("adding_fee " << adding_fee);
+    oxen::log::debug(logcat, "Start of loop with {} {}, tx.dsts.size() {}", unused_transfers_indices->size(), unused_dust_indices->size(), tx.dsts.size());
+    oxen::log::debug(logcat, "unused_transfers_indices: {}", tools::join(" ", *unused_transfers_indices));
+    oxen::log::debug(logcat, "unused_dust_indices: {}", tools::join(" ", *unused_dust_indices));
+    oxen::log::debug(logcat, "dsts size {}, first {}", dsts.size(), (dsts.empty() ? "-" : cryptonote::print_money(dsts[0].amount)));
+    oxen::log::debug(logcat, "adding_fee {}", adding_fee);
 
     // if we need to spend money and don't have any left, we fail
     if (unused_dust_indices->empty() && unused_transfers_indices->empty()) {
-      LOG_PRINT_L2("No more outputs to choose from");
+      oxen::log::debug(logcat, "No more outputs to choose from");
       THROW_WALLET_EXCEPTION_IF(1, error::tx_not_possible, unlocked_balance(subaddr_account, false), needed_money, accumulated_fee + needed_fee);
     }
 
@@ -11128,7 +11116,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
       }
       if (m_transfers[idx].amount() >= min_output_value) {
         if (get_count_above(m_transfers, *unused_transfers_indices, min_output_value) < min_output_count) {
-          LOG_PRINT_L2("Second output was not strictly needed, and we're running out of outputs above " << print_money(min_output_value) << ", not adding");
+          oxen::log::debug(logcat, "Second output was not strictly needed, and we're running out of outputs above {}, not adding", print_money(min_output_value));
           break;
         }
       }
@@ -11138,7 +11126,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
       float relatedness = get_output_relatedness(m_transfers[idx], m_transfers[tx.selected_transfers.front()]);
       if (relatedness > SECOND_OUTPUT_RELATEDNESS_THRESHOLD)
       {
-        LOG_PRINT_L2("Second output was not strictly needed, and relatedness " << relatedness << ", not adding");
+        oxen::log::debug(logcat, "Second output was not strictly needed, and relatedness {}, not adding", relatedness);
         break;
       }
       pop_if_present(*unused_transfers_indices, idx);
@@ -11147,7 +11135,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
       idx = pop_best_value(unused_transfers_indices->empty() ? *unused_dust_indices : *unused_transfers_indices, tx.selected_transfers);
 
     const transfer_details &td = m_transfers[idx];
-    LOG_PRINT_L2("Picking output " << idx << ", amount " << print_money(td.amount()) << ", ki " << td.m_key_image);
+    oxen::log::debug(logcat, "Picking output {}, amount {}, ki {}", idx, print_money(td.amount()), td.m_key_image);
 
     // add this output to the list to spend
     tx.selected_transfers.push_back(idx);
@@ -11158,7 +11146,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
 
     if (adding_fee)
     {
-      LOG_PRINT_L2("We need more fee, adding it to fee");
+      oxen::log::debug(logcat, "We need more fee, adding it to fee");
       available_for_fee += available_amount;
     }
     else
@@ -11166,8 +11154,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
       while (!dsts.empty() && dsts[0].amount <= available_amount && estimate_tx_weight(tx.selected_transfers.size(), fake_outs_count, tx.dsts.size()+1, extra.size(), clsag) < tx_weight_target(upper_transaction_weight_limit))
       {
         // we can fully pay that destination
-        LOG_PRINT_L2("We can fully pay " << get_account_address_as_str(m_nettype, dsts[0].is_subaddress, dsts[0].addr) <<
-          " for " << print_money(dsts[0].amount));
+        oxen::log::debug(logcat, "We can fully pay {} for {}", get_account_address_as_str(m_nettype, dsts[0].is_subaddress, dsts[0].addr), print_money(dsts[0].amount));
         tx.add(dsts[0], dsts[0].amount, original_output_index, m_merge_destinations);
         available_amount -= dsts[0].amount;
         dsts[0].amount = 0;
@@ -11177,8 +11164,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
 
       if (available_amount > 0 && !dsts.empty() && estimate_tx_weight(tx.selected_transfers.size(), fake_outs_count, tx.dsts.size()+1, extra.size(), clsag) < tx_weight_target(upper_transaction_weight_limit)) {
         // we can partially fill that destination
-        LOG_PRINT_L2("We can partially pay " << get_account_address_as_str(m_nettype, dsts[0].is_subaddress, dsts[0].addr) <<
-          " for " << print_money(available_amount) << "/" << print_money(dsts[0].amount));
+        oxen::log::debug(logcat, "We can partially pay {} for {}/{}", get_account_address_as_str(m_nettype, dsts[0].is_subaddress, dsts[0].addr), print_money(available_amount), print_money(dsts[0].amount));
         tx.add(dsts[0], available_amount, original_output_index, m_merge_destinations);
         dsts[0].amount -= available_amount;
         available_amount = 0;
@@ -11186,8 +11172,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
     }
 
     // here, check if we need to sent tx and start a new one
-    LOG_PRINT_L2("Considering whether to create a tx now, " << tx.selected_transfers.size() << " inputs, tx limit "
-      << upper_transaction_weight_limit);
+    oxen::log::debug(logcat, "Considering whether to create a tx now, {} inputs, tx limit {}", tx.selected_transfers.size(), upper_transaction_weight_limit);
     bool try_tx = false;
     // if we have preferred picks, but haven't yet used all of them, continue
     if (preferred_inputs.empty())
@@ -11218,20 +11203,18 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
 
       if (inputs < outputs)
       {
-        LOG_PRINT_L2("We don't have enough for the basic fee, switching to adding_fee");
+        oxen::log::debug(logcat, "We don't have enough for the basic fee, switching to adding_fee");
         adding_fee = true;
         goto skip_tx;
       }
 
-      LOG_PRINT_L2("Trying to create a tx now, with " << tx.dsts.size() << " outputs and " <<
-        tx.selected_transfers.size() << " inputs");
+      oxen::log::debug(logcat, "Trying to create a tx now, with {} outputs and {} inputs", tx.dsts.size(), tx.selected_transfers.size());
       transfer_selected_rct(tx.dsts, tx.selected_transfers, fake_outs_count, outs, unlock_time, needed_fee, extra,
           test_tx, test_ptx, rct_config, tx_params);
       auto txBlob = t_serializable_object_to_blob(test_ptx.tx);
       needed_fee = calculate_fee(test_ptx.tx, txBlob.size(), base_fee, fee_percent, fixed_fee, fee_quantization_mask);
       available_for_fee = test_ptx.fee + test_ptx.change_dts.amount + (!test_ptx.dust_added_to_fee ? test_ptx.dust : 0);
-      LOG_PRINT_L2("Made a " << get_weight_string(test_ptx.tx, txBlob.size()) << " tx, with " << print_money(available_for_fee) << " available for fee (" <<
-        print_money(needed_fee) << " needed)");
+      oxen::log::debug(logcat, "Made a {} tx, with {} available for fee ({} needed)", get_weight_string(test_ptx.tx, txBlob.size()), print_money(available_for_fee), print_money(needed_fee));
 
       if (needed_fee > available_for_fee && !dsts.empty() && dsts[0].amount > 0)
       {
@@ -11243,9 +11226,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
         if (i->amount > needed_fee)
         {
           uint64_t new_paid_amount = i->amount /*+ test_ptx.fee*/ - needed_fee;
-          LOG_PRINT_L2("Adjusting amount paid to " << get_account_address_as_str(m_nettype, i->is_subaddress, i->addr) << " from " <<
-            print_money(i->amount) << " to " << print_money(new_paid_amount) << " to accommodate " <<
-            print_money(needed_fee) << " fee");
+          oxen::log::debug(logcat, "Adjusting amount paid to {} from {} to {} to accomodate {} fee", get_account_address_as_str(m_nettype, i->is_subaddress, i->addr), print_money(i->amount), print_money(new_paid_amount), print_money(needed_fee));
           dsts[0].amount += i->amount - new_paid_amount;
           i->amount = new_paid_amount;
           test_ptx.fee = needed_fee;
@@ -11255,24 +11236,22 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
 
       if (needed_fee > available_for_fee)
       {
-        LOG_PRINT_L2("We could not make a tx, switching to fee accumulation");
+        oxen::log::debug(logcat, "We could not make a tx, switching to fee accumulation");
 
         adding_fee = true;
       }
       else
       {
-        LOG_PRINT_L2("We made a tx, adjusting fee and saving it, we need " << print_money(needed_fee) << " and we have " << print_money(test_ptx.fee));
+        oxen::log::debug(logcat, "We made a tx, adjusting fee and saving it, we need {} and we have {}", print_money(needed_fee), print_money(test_ptx.fee));
         while (needed_fee > test_ptx.fee) {
           transfer_selected_rct(tx.dsts, tx.selected_transfers, fake_outs_count, outs, unlock_time, needed_fee, extra,
               test_tx, test_ptx, rct_config, tx_params);
           txBlob = t_serializable_object_to_blob(test_ptx.tx);
           needed_fee = calculate_fee(test_ptx.tx, txBlob.size(), base_fee, fee_percent, fixed_fee, fee_quantization_mask);
-          LOG_PRINT_L2("Made an attempt at a  final " << get_weight_string(test_ptx.tx, txBlob.size()) << " tx, with " << print_money(test_ptx.fee) <<
-            " fee  and " << print_money(test_ptx.change_dts.amount) << " change");
+          oxen::log::debug(logcat, "Made an attempt at a  final {} tx, with {} fee and {} change", get_weight_string(test_ptx.tx, txBlob.size()), print_money(test_ptx.fee), print_money(test_ptx.change_dts.amount));
         }
 
-        LOG_PRINT_L2("Made a final " << get_weight_string(test_ptx.tx, txBlob.size()) << " tx, with " << print_money(test_ptx.fee) <<
-          " fee  and " << print_money(test_ptx.change_dts.amount) << " change");
+        oxen::log::debug(logcat, "Made a final {} tx, with {} fee and {} change", get_weight_string(test_ptx.tx, txBlob.size()), print_money(test_ptx.fee), print_money(test_ptx.change_dts.amount));
 
         tx.tx = test_tx;
         tx.ptx = test_ptx;
@@ -11284,7 +11263,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
         adding_fee = false;
         if (!dsts.empty())
         {
-          LOG_PRINT_L2("We have more to pay, starting another tx");
+          oxen::log::debug(logcat, "We have more to pay, starting another tx");
           txes.push_back(TX());
           original_output_index = 0;
         }
@@ -11311,12 +11290,11 @@ skip_tx:
 
   if (adding_fee)
   {
-    LOG_PRINT_L1("We ran out of outputs while trying to gather final fee");
+    oxen::log::info(logcat, "We ran out of outputs while trying to gather final fee");
     THROW_WALLET_EXCEPTION_IF(1, error::tx_not_possible, unlocked_balance(subaddr_account, false), needed_money, accumulated_fee + needed_fee);
   }
 
-  LOG_PRINT_L1("Done creating " << txes.size() << " transactions, " << print_money(accumulated_fee) <<
-    " total fee, " << print_money(accumulated_change) << " total change");
+  oxen::log::info(logcat, "Done creating {} transactions, {} total fee, {} total change", txes.size(), print_money(accumulated_fee), print_money(accumulated_change));
 
   hwdev.set_mode(hw::device::mode::TRANSACTION_CREATE_REAL);
   for (auto &tx : txes)
@@ -11353,10 +11331,7 @@ skip_tx:
     uint64_t tx_money = 0;
     for (size_t idx: tx.selected_transfers)
       tx_money += m_transfers[idx].amount();
-    LOG_PRINT_L1("  Transaction " << (1+std::distance(txes.begin(), i)) << "/" << txes.size() <<
-      " " << get_transaction_hash(tx.ptx.tx) << ": " << get_weight_string(tx.weight) << ", sending " << print_money(tx_money) << " in " << tx.selected_transfers.size() <<
-      " outputs to " << tx.dsts.size() << " destination(s), including " <<
-      print_money(tx.ptx.fee) << " fee, " << print_money(tx.ptx.change_dts.amount) << " change");
+    oxen::log::info(logcat, "  Transaction {}/{} {}: {}, sending {} in {} outputs to{} destination(s), including {} fee, {} change", (1+std::distance(txes.begin(), i)), txes.size(), get_transaction_hash(tx.ptx.tx), get_weight_string(tx.weight), print_money(tx_money), tx.selected_transfers.size(), tx.dsts.size(), print_money(tx.ptx.fee), print_money(tx.ptx.change_dts.amount));
     ptx_vector.push_back(tx.ptx);
   }
 
@@ -11368,7 +11343,7 @@ skip_tx:
 
 bool wallet2::sanity_check(const std::vector<wallet2::pending_tx> &ptx_vector, std::vector<cryptonote::tx_destination_entry> dsts) const
 {
-  MDEBUG("sanity_check: " << ptx_vector.size() << " txes, " << dsts.size() << " destinations");
+  oxen::log::debug(logcat, "sanity_check: {} txes, {} destinations", ptx_vector.size(), dsts.size());
 
   hw::device &hwdev = m_account.get_device();
 
@@ -11392,7 +11367,7 @@ bool wallet2::sanity_check(const std::vector<wallet2::pending_tx> &ptx_vector, s
   }
   for (const auto &r: required)
     change -= r.second.first;
-  MDEBUG("Adding " << cryptonote::print_money(change) << " expected change");
+  oxen::log::debug(logcat, "Adding {} expected change", cryptonote::print_money(change));
 
   // for all txes that have actual change, check change is coming back to the sending wallet
   for (const pending_tx &ptx: ptx_vector)
@@ -11426,7 +11401,7 @@ bool wallet2::sanity_check(const std::vector<wallet2::pending_tx> &ptx_vector, s
     std::stringstream ss;
     ss << "Total received by " << cryptonote::get_account_address_as_str(m_nettype, r.second.second, address) << ": "
         << cryptonote::print_money(total_received) << ", expected " << cryptonote::print_money(r.second.first);
-    MDEBUG(ss.str());
+    oxen::log::debug(logcat, ss.str());
     THROW_WALLET_EXCEPTION_IF(total_received < r.second.first, error::wallet_internal_error, ss.str());
   }
 
@@ -11474,7 +11449,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_all(uint64_t below
     std::advance(i, crypto::rand_idx(unused_transfer_dust_indices_per_subaddr.size()));
     unused_transfers_indices = i->second.first;
     unused_dust_indices = i->second.second;
-    LOG_PRINT_L2("Spending from subaddress index " << i->first);
+    oxen::log::debug(logcat, "Spending from subaddress index {}", i->first);
   }
   else
   {
@@ -11482,7 +11457,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_all(uint64_t below
     {
       unused_transfers_indices.insert(unused_transfers_indices.end(), p.second.first.begin(), p.second.first.end());
       unused_dust_indices.insert(unused_dust_indices.end(), p.second.second.begin(), p.second.second.end());
-      LOG_PRINT_L2("Spending from subaddress index " << p.first);
+      oxen::log::debug(logcat, "Spending from subaddress index {}", p.first);
     }
   }
 
@@ -11562,7 +11537,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_from(const crypton
     THROW_WALLET_EXCEPTION_IF(burn_percent > fee_percent, error::wallet_internal_error, "invalid burn fees: cannot burn more than the tx fee");
   }
 
-  LOG_PRINT_L2("Starting with " << unused_transfers_indices.size() << " non-dust outputs and " << unused_dust_indices.size() << " dust outputs");
+  oxen::log::debug(logcat, "Starting with {} non-dust outputs and {} dust outputs", unused_transfers_indices.size(), unused_dust_indices.size());
 
   if (unused_dust_indices.empty() && unused_transfers_indices.empty())
     return std::vector<wallet2::pending_tx>();
@@ -11598,7 +11573,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_from(const crypton
       : pop_best_value(unused_transfers_indices, tx.selected_transfers);
 
     const transfer_details &td = m_transfers[idx];
-    LOG_PRINT_L2("Picking output " << idx << ", amount " << print_money(td.amount()));
+    oxen::log::debug(logcat, "Picking output {}, amount {}", idx, print_money(td.amount()));
 
     // add this output to the list to spend
     tx.selected_transfers.push_back(idx);
@@ -11609,8 +11584,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_from(const crypton
     outs.clear();
 
     // here, check if we need to sent tx and start a new one
-    LOG_PRINT_L2("Considering whether to create a tx now, " << tx.selected_transfers.size() << " inputs, tx limit "
-      << upper_transaction_weight_limit);
+    oxen::log::debug(logcat, "Considering whether to create a tx now, {} inputs, tx limit {}", tx.selected_transfers.size(), upper_transaction_weight_limit);
     const size_t estimated_rct_tx_weight = estimate_tx_weight(tx.selected_transfers.size(), fake_outs_count, tx.dsts.size() + 2, extra.size(), clsag);
     bool try_tx = (unused_dust_indices.empty() && unused_transfers_indices.empty()) || ( estimated_rct_tx_weight >= tx_weight_target(upper_transaction_weight_limit));
 
@@ -11625,8 +11599,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_from(const crypton
       for (size_t i = 0; i < ((outputs > 1) ? outputs - 1 : outputs); ++i)
         tx.dsts.push_back(tx_destination_entry(1, address, is_subaddress));
 
-      LOG_PRINT_L2("Trying to create a tx now, with " << tx.dsts.size() << " destinations and " <<
-        tx.selected_transfers.size() << " outputs");
+      oxen::log::debug(logcat, "Trying to create a tx now, with {} destinations and {} outputs", tx.dsts.size(), tx.selected_transfers.size());
       transfer_selected_rct(tx.dsts, tx.selected_transfers, fake_outs_count, outs, unlock_time, needed_fee, extra,
           test_tx, test_ptx, rct_config, oxen_tx_params);
       auto txBlob = t_serializable_object_to_blob(test_ptx.tx);
@@ -11634,8 +11607,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_from(const crypton
       available_for_fee = test_ptx.fee + test_ptx.change_dts.amount;
       for (auto &dt: test_ptx.dests)
         available_for_fee += dt.amount;
-      LOG_PRINT_L2("Made a " << get_weight_string(test_ptx.tx, txBlob.size()) << " tx, with " << print_money(available_for_fee) << " available for fee (" <<
-        print_money(needed_fee) << " needed)");
+      oxen::log::debug(logcat, "Made a {} tx, with {} available for fee ({} needed)", get_weight_string(test_ptx.tx, txBlob.size()), print_money(available_for_fee), print_money(needed_fee));
 
       // add last output, missed for fee estimation
       if (outputs > 1)
@@ -11644,7 +11616,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_from(const crypton
       THROW_WALLET_EXCEPTION_IF(needed_fee > available_for_fee, error::wallet_internal_error, "Transaction cannot pay for itself");
 
       do {
-        LOG_PRINT_L2("We made a tx, adjusting fee and saving it");
+        oxen::log::debug(logcat, "We made a tx, adjusting fee and saving it");
         // distribute total transferred amount between outputs
         uint64_t amount_transferred = available_for_fee - needed_fee;
         uint64_t dt_amount = amount_transferred / outputs;
@@ -11664,12 +11636,10 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_from(const crypton
             test_tx, test_ptx, rct_config, oxen_tx_params);
         txBlob = t_serializable_object_to_blob(test_ptx.tx);
         needed_fee = calculate_fee(test_ptx.tx, txBlob.size(), base_fee, fee_percent, fixed_fee, fee_quantization_mask);
-        LOG_PRINT_L2("Made an attempt at a final " << get_weight_string(test_ptx.tx, txBlob.size()) << " tx, with " << print_money(test_ptx.fee) <<
-          " fee  and " << print_money(test_ptx.change_dts.amount) << " change");
+        oxen::log::debug(logcat, "Made an attempt at a final {} tx, with {} fee and {} change", get_weight_string(test_ptx.tx, txBlob.size()), print_money(test_ptx.fee), print_money(test_ptx.change_dts.amount));
       } while (needed_fee > test_ptx.fee);
 
-      LOG_PRINT_L2("Made a final " << get_weight_string(test_ptx.tx, txBlob.size()) << " tx, with " << print_money(test_ptx.fee) <<
-        " fee  and " << print_money(test_ptx.change_dts.amount) << " change");
+      oxen::log::debug(logcat, "Made a final {} tx, with {} fee and {} change", get_weight_string(test_ptx.tx, txBlob.size()), print_money(test_ptx.fee), print_money(test_ptx.change_dts.amount));
 
       tx.tx = test_tx;
       tx.ptx = test_ptx;
@@ -11680,14 +11650,13 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_from(const crypton
       accumulated_change += test_ptx.change_dts.amount;
       if (!unused_transfers_indices.empty() || !unused_dust_indices.empty())
       {
-        LOG_PRINT_L2("We have more to pay, starting another tx");
+        oxen::log::debug(logcat, "We have more to pay, starting another tx");
         txes.push_back(TX());
       }
     }
   }
 
-  LOG_PRINT_L1("Done creating " << txes.size() << " transactions, " << print_money(accumulated_fee) <<
-    " total fee, " << print_money(accumulated_change) << " total change");
+  oxen::log::info(logcat, "Done creating {} transactions, {} total fee, {} total change", txes.size(), print_money(accumulated_fee), print_money(accumulated_change));
 
   hwdev.set_mode(hw::device::mode::TRANSACTION_CREATE_REAL);
   for (auto &tx : txes)
@@ -11714,10 +11683,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_from(const crypton
     uint64_t tx_money = 0;
     for (size_t idx: tx.selected_transfers)
       tx_money += m_transfers[idx].amount();
-    LOG_PRINT_L1("  Transaction " << (1+std::distance(txes.begin(), i)) << "/" << txes.size() <<
-      " " << get_transaction_hash(tx.ptx.tx) << ": " << get_weight_string(tx.weight) << ", sending " << print_money(tx_money) << " in " << tx.selected_transfers.size() <<
-      " outputs to " << tx.dsts.size() << " destination(s), including " <<
-      print_money(tx.ptx.fee) << " fee, " << print_money(tx.ptx.change_dts.amount) << " change");
+    oxen::log::info(logcat, "  Transaction {}/{} {}: {}, sending {} in {} outputs to {} destinations(s), including {} fee, {} change", (1+std::distance(txes.begin(), i)), txes.size(), get_transaction_hash(tx.ptx.tx), get_weight_string(tx.weight), print_money(tx_money), tx.selected_transfers.size(), tx.dsts.size(), print_money(tx.ptx.fee), print_money(tx.ptx.change_dts.amount));
     ptx_vector.push_back(tx.ptx);
   }
 
@@ -11775,8 +11741,8 @@ void wallet2::cold_sign_tx(const std::vector<pending_tx>& ptx_vector, signed_tx_
   dev_cold->tx_sign(&wallet_shim, txs, exported_txs, aux_data);
   tx_device_aux = aux_data.tx_device_aux;
 
-  MDEBUG("Signed tx data from hw: " << exported_txs.ptx.size() << " transactions");
-  for (auto &c_ptx: exported_txs.ptx) LOG_PRINT_L0(cryptonote::obj_to_json_str(c_ptx.tx));
+  oxen::log::debug(logcat, "Signed tx data from hw: {} transactions", exported_txs.ptx.size());
+  for (auto &c_ptx: exported_txs.ptx) oxen::log::warning(logcat, cryptonote::obj_to_json_str(c_ptx.tx));
 }
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::cold_key_image_sync(uint64_t &spent, uint64_t &unspent) {
@@ -11834,9 +11800,9 @@ bool wallet2::use_fork_rules(hf version, uint64_t early_blocks) const
     close_enough = true;
 
   if (close_enough)
-    LOG_PRINT_L2("Using v" << (unsigned)version << " rules");
+    oxen::log::debug(logcat, "Using v{} rules", (unsigned)version);
   else
-    LOG_PRINT_L2("Not using v" << (unsigned)version << " rules");
+    oxen::log::debug(logcat, "Not using v{} rules", (unsigned)version);
   return close_enough;
 }
 //----------------------------------------------------------------------------------------------------
@@ -12013,7 +11979,7 @@ bool wallet2::get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key, s
   bool r = get_tx_key_cached(txid, tx_key, additional_tx_keys);
   if (r)
   {
-    MDEBUG("tx key cached for txid: " << txid);
+    oxen::log::debug(logcat, "tx key cached for txid: {}", txid);
     return true;
   }
 
@@ -12028,7 +11994,7 @@ bool wallet2::get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key, s
   const auto tx_data_it = m_tx_device.find(txid);
   if (tx_data_it == m_tx_device.end())
   {
-    MDEBUG("Aux data not found for txid: " << txid);
+    oxen::log::debug(logcat, "Aux data not found for txid: {}", txid);
     return false;
   }
 
@@ -12036,7 +12002,7 @@ bool wallet2::get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key, s
   CHECK_AND_ASSERT_THROW_MES(dev_cold, "Device does not implement cold signing interface");
   if (!dev_cold->is_get_tx_key_supported())
   {
-    MDEBUG("get_tx_key not supported by the device");
+    oxen::log::debug(logcat, "get_tx_key not supported by the device");
     return false;
   }
 
@@ -12071,7 +12037,7 @@ bool wallet2::get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key, s
   dev_cold->get_tx_key(tx_keys, tx_key_data, m_account.get_keys().m_view_secret_key);
   if (tx_keys.empty())
   {
-    MDEBUG("Empty tx keys for txid: " << txid);
+    oxen::log::debug(logcat, "Empty tx keys for txid: {}", txid);
     return false;
   }
 
@@ -13000,7 +12966,7 @@ uint64_t wallet2::get_approximate_blockchain_height() const
   uint64_t approx_blockchain_height = netconf.HEIGHT_ESTIMATE_HEIGHT
     + (since_ts > 0 ? (uint64_t)since_ts / tools::to_seconds(TARGET_BLOCK_TIME) : 0)
     - BLOCKS_PER_DAY * 7; // subtract a week's worth of blocks to be conservative
-  LOG_PRINT_L2("Calculated blockchain height: " << approx_blockchain_height);
+  oxen::log::debug(logcat, "Calculated blockchain height: {}", approx_blockchain_height);
   return approx_blockchain_height;
 }
 
@@ -13135,7 +13101,7 @@ void wallet2::set_account_tag(const std::set<uint32_t> &account_indices, const s
   {
     THROW_WALLET_EXCEPTION_IF(account_index >= get_num_subaddress_accounts(), error::wallet_internal_error, "Account index out of bound");
     if (m_account_tags.second[account_index] == tag)
-      MDEBUG("This tag is already assigned to this account");
+      oxen::log::debug(logcat, "This tag is already assigned to this account");
     else
       m_account_tags.second[account_index] = tag;
   }
@@ -13178,19 +13144,19 @@ std::string wallet2::sign(std::string_view data, cryptonote::subaddress_index in
 bool wallet2::verify(std::string_view data, const cryptonote::account_public_address &address, std::string_view signature)
 {
   if (!tools::starts_with(signature, SIG_MAGIC)) {
-    LOG_PRINT_L0("Signature header check error");
+    oxen::log::warning(logcat, "Signature header check error");
     return false;
   }
   crypto::hash hash;
   crypto::cn_fast_hash(data.data(), data.size(), hash);
   std::string decoded;
   if (!tools::base58::decode(signature.substr(SIG_MAGIC.size()), decoded)) {
-    LOG_PRINT_L0("Signature decoding error");
+    oxen::log::warning(logcat, "Signature decoding error");
     return false;
   }
   crypto::signature s;
   if (sizeof(s) != decoded.size()) {
-    LOG_PRINT_L0("Signature decoding error");
+    oxen::log::warning(logcat, "Signature decoding error");
     return false;
   }
   memcpy(&s, decoded.data(), sizeof(s));
@@ -13214,19 +13180,19 @@ std::string wallet2::sign_multisig_participant(std::string_view data) const
 bool wallet2::verify_with_public_key(std::string_view data, const crypto::public_key &public_key, std::string_view signature) const
 {
   if (!tools::starts_with(signature, MULTISIG_SIGNATURE_MAGIC)) {
-    MERROR("Signature header check error");
+    oxen::log::error(logcat, "Signature header check error");
     return false;
   }
   crypto::hash hash;
   crypto::cn_fast_hash(data.data(), data.size(), hash);
   std::string decoded;
   if (!tools::base58::decode(signature.substr(MULTISIG_SIGNATURE_MAGIC.size()), decoded)) {
-    MERROR("Signature decoding error");
+    oxen::log::error(logcat, "Signature decoding error");
     return false;
   }
   crypto::signature s;
   if (sizeof(s) != decoded.size()) {
-    MERROR("Signature decoding error");
+    oxen::log::error(logcat, "Signature decoding error");
     return false;
   }
   memcpy(&s, decoded.data(), sizeof(s));
@@ -13309,7 +13275,6 @@ bool wallet2::export_key_images_to_file(const fs::path& filename, bool requested
   // [              ((transfer array offset*) (spend public key) (view public key) {(key image) (signature), ...})                              ]
   // *The offset in the wallet's transfers this exported key image file contains.
 
-  PERF_TIMER(__FUNCTION__);
   std::pair<size_t, std::vector<std::pair<crypto::key_image, crypto::signature>>> ski = export_key_images(requested_only);
   const cryptonote::account_public_address &keys = get_account().get_keys().m_account_address;
   std::string data;
@@ -13325,7 +13290,6 @@ bool wallet2::export_key_images_to_file(const fs::path& filename, bool requested
   }
 
   // encrypt data, keep magic plaintext
-  PERF_TIMER(export_key_images_encrypt);
   std::string ciphertext{KEY_IMAGE_EXPORT_FILE_MAGIC};
   ciphertext += encrypt_with_view_secret_key(data);
   return tools::dump_file(filename, ciphertext);
@@ -13334,7 +13298,6 @@ bool wallet2::export_key_images_to_file(const fs::path& filename, bool requested
 //----------------------------------------------------------------------------------------------------
 std::pair<size_t, std::vector<std::pair<crypto::key_image, crypto::signature>>> wallet2::export_key_images(bool requested_only) const
 {
-  PERF_TIMER(export_key_images_raw);
   std::vector<std::pair<crypto::key_image, crypto::signature>> ski;
 
   size_t offset = 0;
@@ -13389,7 +13352,6 @@ std::pair<size_t, std::vector<std::pair<crypto::key_image, crypto::signature>>> 
 
 uint64_t wallet2::import_key_images_from_file(const fs::path& filename, uint64_t& spent, uint64_t& unspent)
 {
-  PERF_TIMER(__FUNCTION__);
   std::string data;
   bool r = tools::slurp_file(filename, data);
 
@@ -13402,7 +13364,6 @@ uint64_t wallet2::import_key_images_from_file(const fs::path& filename, uint64_t
 
   try
   {
-    PERF_TIMER(import_key_images_decrypt);
     data = decrypt_with_view_secret_key(std::string_view{data}.substr(KEY_IMAGE_EXPORT_FILE_MAGIC.size())).view();
   }
   catch (const std::exception &e)
@@ -13450,8 +13411,6 @@ uint64_t wallet2::import_key_images_from_file(const fs::path& filename, uint64_t
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::import_key_images(const std::vector<std::pair<crypto::key_image, crypto::signature>> &signed_key_images, size_t offset, uint64_t &spent, uint64_t &unspent, bool check_spent)
 {
-  PERF_TIMER(import_key_images_lots);
-
   THROW_WALLET_EXCEPTION_IF(offset > m_transfers.size(), error::wallet_internal_error, "Offset larger than known outputs");
   THROW_WALLET_EXCEPTION_IF(signed_key_images.size() > m_transfers.size() - offset, error::wallet_internal_error,
       "The blockchain is out of date compared to the signed key images");
@@ -13466,7 +13425,6 @@ uint64_t wallet2::import_key_images(const std::vector<std::pair<crypto::key_imag
   std::vector<std::string> key_images{};
   key_images.reserve(signed_key_images.size());
 
-  PERF_TIMER_START(import_key_images_A_validate_and_extract_key_images);
   for (size_t n = 0; n < signed_key_images.size(); ++n)
   {
     const transfer_details &td = m_transfers[n + offset];
@@ -13502,9 +13460,7 @@ uint64_t wallet2::import_key_images(const std::vector<std::pair<crypto::key_imag
     }
     key_images.push_back(key_image_str);
   }
-  PERF_TIMER_STOP(import_key_images_A_validate_and_extract_key_images);
 
-  PERF_TIMER_START(import_key_images_B_update_wallet_key_images);
   for (size_t n = 0; n < signed_key_images.size(); ++n)
   {
     m_transfers[n + offset].m_key_image = signed_key_images[n].first;
@@ -13513,7 +13469,6 @@ uint64_t wallet2::import_key_images(const std::vector<std::pair<crypto::key_imag
     m_transfers[n + offset].m_key_image_request = false;
     m_transfers[n + offset].m_key_image_partial = false;
   }
-  PERF_TIMER_STOP(import_key_images_B_update_wallet_key_images);
 
   nlohmann::json req_params{
     {"key_images", key_images}
@@ -13522,7 +13477,6 @@ uint64_t wallet2::import_key_images(const std::vector<std::pair<crypto::key_imag
   nlohmann::json is_key_image_spent_response;
   if(check_spent)
   {
-    PERF_TIMER(import_key_images_RPC);
     is_key_image_spent_response = m_http_client.json_rpc("is_key_image_spent", req_params);
     THROW_WALLET_EXCEPTION_IF(is_key_image_spent_response["status"] == rpc::STATUS_BUSY, error::daemon_busy, "is_key_image_spent");
     THROW_WALLET_EXCEPTION_IF(is_key_image_spent_response["status"] != rpc::STATUS_OK, error::is_key_image_spent_error, is_key_image_spent_response["status"]);
@@ -13540,7 +13494,6 @@ uint64_t wallet2::import_key_images(const std::vector<std::pair<crypto::key_imag
                                                   // was created by sweep_all, so we can't know the spent height and other detailed info.
   std::unordered_map<crypto::key_image, crypto::hash> spent_key_images;
 
-  PERF_TIMER_START(import_key_images_C);
   for (const transfer_details &td: m_transfers)
   {
     for (const cryptonote::txin_v& in : td.m_tx.vin)
@@ -13549,7 +13502,6 @@ uint64_t wallet2::import_key_images(const std::vector<std::pair<crypto::key_imag
         spent_key_images.emplace(txin->k_image, td.m_txid);
     }
   }
-  PERF_TIMER_STOP(import_key_images_C);
 
   // accumulate outputs before the updated data
   for(size_t i = 0; i < offset; ++i)
@@ -13564,7 +13516,6 @@ uint64_t wallet2::import_key_images(const std::vector<std::pair<crypto::key_imag
       unspent += amount;
   }
 
-  PERF_TIMER_START(import_key_images_D);
   for(size_t i = 0; i < signed_key_images.size(); ++i)
   {
     const transfer_details &td = m_transfers[i + offset];
@@ -13575,8 +13526,7 @@ uint64_t wallet2::import_key_images(const std::vector<std::pair<crypto::key_imag
       spent += amount;
     else
       unspent += amount;
-    LOG_PRINT_L2("Transfer " << i << ": " << print_money(amount) << " (" << td.m_global_output_index << "): "
-        << (td.m_spent ? "spent" : "unspent") << " (key image " << key_images[i] << ")");
+    oxen::log::debug(logcat, "Transfer {}: {} ({}): {} (key image {})", i, print_money(amount), td.m_global_output_index, (td.m_spent ? "spent" : "unspent"),  key_images[i]);
 
     if (i < is_key_image_spent_response["spent_status"].size() && is_key_image_spent_response["spent_status"][i] == rpc::IS_KEY_IMAGE_SPENT::SPENT::BLOCKCHAIN)
     {
@@ -13586,22 +13536,18 @@ uint64_t wallet2::import_key_images(const std::vector<std::pair<crypto::key_imag
         spent_txids.insert(skii->second);
     }
   }
-  PERF_TIMER_STOP(import_key_images_D);
 
-  MDEBUG("Total: " << print_money(spent) << " spent, " << print_money(unspent) << " unspent");
+  oxen::log::debug(logcat, "Total: {} spent, {} unspent", print_money(spent), print_money(unspent));
 
   if (check_spent)
   {
     // query outgoing txes
-    PERF_TIMER_START(import_key_images_E);
     nlohmann::json get_transactions_params{
       {"tx_hashes", hashes_to_hex(spent_txids.begin(), spent_txids.end())}
     };
     auto gettxs_res = m_http_client.json_rpc("get_transactions", get_transactions_params);
-    PERF_TIMER_STOP(import_key_images_E);
 
     // process each outgoing tx
-    PERF_TIMER_START(import_key_images_F);
     auto spent_txid = spent_txids.begin();
     hw::device &hwdev =  m_account.get_device();
     auto it = spent_txids.begin();
@@ -13674,12 +13620,12 @@ uint64_t wallet2::import_key_images(const std::vector<std::pair<crypto::key_imag
           amount = td.amount();
           tx_money_spent_in_ins += amount;
 
-          LOG_PRINT_L0("Spent money: " << print_money(amount) << ", with tx: " << *spent_txid);
+          oxen::log::warning(logcat, "Spent money: {}, with tx: {}", print_money(amount), *spent_txid);
           set_spent(it->second, e["block_height"]);
           if (m_callback)
             m_callback->on_money_spent(e["block_height"], *spent_txid, spent_tx, amount, spent_tx, td.m_subaddr_index);
           if (subaddr_account != (uint32_t)-1 && subaddr_account != td.m_subaddr_index.major)
-            LOG_PRINT_L0("WARNING: This tx spends outputs received by different subaddress accounts, which isn't supposed to happen");
+            oxen::log::warning(logcat, "WARNING: This tx spends outputs received by different subaddress accounts, which isn't supposed to happen");
           subaddr_account = td.m_subaddr_index.major;
           subaddr_indices.insert(td.m_subaddr_index.minor);
         }
@@ -13699,9 +13645,7 @@ uint64_t wallet2::import_key_images(const std::vector<std::pair<crypto::key_imag
 
       ++spent_txid;
     }
-    PERF_TIMER_STOP(import_key_images_F);
 
-    PERF_TIMER_START(import_key_images_G);
     for (size_t n : swept_transfers)
     {
       const transfer_details& td = m_transfers[n];
@@ -13714,7 +13658,6 @@ uint64_t wallet2::import_key_images(const std::vector<std::pair<crypto::key_imag
       pd.m_pay_type = stake ? wallet::pay_type::stake : wallet::pay_type::out;
       m_confirmed_txs.emplace(spent_txid, pd);
     }
-    PERF_TIMER_STOP(import_key_images_G);
   }
 
   // this can be 0 if we do not know the height
@@ -13725,7 +13668,7 @@ bool wallet2::import_key_images(std::vector<crypto::key_image> key_images, size_
 {
   if (key_images.size() + offset > m_transfers.size())
   {
-    LOG_PRINT_L1("More key images returned that we know outputs for");
+    oxen::log::info(logcat, "More key images returned that we know outputs for");
     return false;
   }
   for (size_t ki_idx = 0; ki_idx < key_images.size(); ++ki_idx)
@@ -13736,7 +13679,7 @@ bool wallet2::import_key_images(std::vector<crypto::key_image> key_images, size_
 
     transfer_details &td = m_transfers[transfer_idx];
     if (td.m_key_image_known && !td.m_key_image_partial && td.m_key_image != key_images[ki_idx])
-      LOG_PRINT_L0("WARNING: imported key image differs from previously known key image at index " << ki_idx << ": trusting imported one");
+      oxen::log::warning(logcat, "WARNING: imported key image differs from previously known key image at index {}: trusting imported one", ki_idx);
     td.m_key_image = key_images[ki_idx];
     m_key_images[td.m_key_image] = transfer_idx;
     td.m_key_image_known = true;
@@ -13819,7 +13762,6 @@ void wallet2::import_blockchain(const std::tuple<size_t, crypto::hash, std::vect
 //----------------------------------------------------------------------------------------------------
 std::pair<size_t, std::vector<tools::wallet2::transfer_details>> wallet2::export_outputs(bool all) const
 {
-  PERF_TIMER(export_outputs);
   std::vector<tools::wallet2::transfer_details> outs;
 
   size_t offset = 0;
@@ -13840,7 +13782,6 @@ std::pair<size_t, std::vector<tools::wallet2::transfer_details>> wallet2::export
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::export_outputs_to_str(bool all) const
 {
-  PERF_TIMER(export_outputs_to_str);
 
   std::stringstream oss;
   boost::archive::portable_binary_oarchive ar(oss);
@@ -13852,7 +13793,6 @@ std::string wallet2::export_outputs_to_str(bool all) const
   header += tools::view_guts(keys.m_spend_public_key);
   header += tools::view_guts(keys.m_view_public_key);
   header += oss.str();
-  PERF_TIMER(export_outputs_encryption);
   std::string ciphertext{OUTPUT_EXPORT_FILE_MAGIC};
   ciphertext += encrypt_with_view_secret_key(header);
   return ciphertext;
@@ -13860,7 +13800,6 @@ std::string wallet2::export_outputs_to_str(bool all) const
 //----------------------------------------------------------------------------------------------------
 size_t wallet2::import_outputs(const std::pair<size_t, std::vector<tools::wallet2::transfer_details>> &outputs)
 {
-  PERF_TIMER(import_outputs);
 
   THROW_WALLET_EXCEPTION_IF(outputs.first > m_transfers.size(), error::wallet_internal_error,
       "Imported outputs omit more outputs that we know of");
@@ -13929,7 +13868,6 @@ size_t wallet2::import_outputs(const std::pair<size_t, std::vector<tools::wallet
 //----------------------------------------------------------------------------------------------------
 size_t wallet2::import_outputs_from_str(std::string data)
 {
-  PERF_TIMER(import_outputs_from_str);
   if (!tools::starts_with(data, OUTPUT_EXPORT_FILE_MAGIC))
   {
     THROW_WALLET_EXCEPTION(error::wallet_internal_error, std::string("Bad magic from outputs"));
@@ -13937,7 +13875,6 @@ size_t wallet2::import_outputs_from_str(std::string data)
 
   try
   {
-    PERF_TIMER(import_outputs_decrypt);
     data = decrypt_with_view_secret_key(std::string_view{data}.substr(OUTPUT_EXPORT_FILE_MAGIC.size())).view();
   }
   catch (const std::exception &e)
@@ -14156,7 +14093,7 @@ void wallet2::update_multisig_rescan_info(const std::vector<std::vector<rct::key
   CHECK_AND_ASSERT_THROW_MES(n < m_transfers.size(), "Bad index in update_multisig_info");
   CHECK_AND_ASSERT_THROW_MES(multisig_k.size() >= m_transfers.size(), "Mismatched sizes of multisig_k and info");
 
-  MDEBUG("update_multisig_rescan_info: updating index " << n);
+  oxen::log::debug(logcat, "update_multisig_rescan_info: updating index {}", n);
   transfer_details &td = m_transfers[n];
   td.m_multisig_info.clear();
   for (const auto &pi: info)
@@ -14197,12 +14134,12 @@ size_t wallet2::import_multisig(std::vector<std::string> blobs)
         error::wallet_internal_error, "Multisig info is for a different account");
     if (get_multisig_signer_public_key() == signer)
     {
-      MINFO("Multisig info from this wallet ignored");
+      oxen::log::info(logcat, "Multisig info from this wallet ignored");
       continue;
     }
     if (seen.find(signer) != seen.end())
     {
-      MINFO("Duplicate multisig info ignored");
+      oxen::log::info(logcat, "Duplicate multisig info ignored");
       continue;
     }
     seen.insert(signer);
@@ -14214,7 +14151,7 @@ size_t wallet2::import_multisig(std::vector<std::string> blobs)
     std::vector<wallet::multisig_info> i;
     boost::archive::portable_binary_iarchive ar(iss);
     ar >> i;
-    MINFO(i.size() << " outputs found");
+    oxen::log::info(logcat, "{} outputs found", i.size());
     info.push_back(std::move(i));
   }
 
@@ -14263,7 +14200,7 @@ size_t wallet2::import_multisig(std::vector<std::string> blobs)
     const transfer_details &td = m_transfers[n];
     if (!td.m_key_image_partial)
       continue;
-    MINFO("Multisig info importing from block height " << td.m_block_height);
+    oxen::log::info(logcat, "Multisig info importing from block height {}", td.m_block_height);
     detach_blockchain(td.m_block_height);
     break;
   }

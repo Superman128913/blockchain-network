@@ -55,7 +55,6 @@
 #include "common/command_line.h"
 #include "common/oxen.h"
 #include "common/sha256sum.h"
-#include "common/perf_timer.h"
 #include "common/random.h"
 #include "common/hex.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
@@ -71,14 +70,14 @@
 #include "rpc/common/json_bt.h"
 #include "rpc/common/rpc_command.h"
 #include <fmt/core.h>
-
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "daemon.rpc"
+#include <fmt/color.h>
 
 namespace cryptonote::rpc {
 
   using nlohmann::json;
   using oxen::json_to_bt;
+
+  static auto logcat = oxen::log::Cat("daemon.rpc");
 
   namespace {
 
@@ -172,7 +171,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_HEIGHT& get_height, rpc_context context)
   {
-    PERF_TIMER(on_get_height);
     auto [height, hash] = m_core.get_blockchain_top();
 
     ++height; // block height to chain height
@@ -191,7 +189,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_INFO& info, rpc_context context)
   {
-    PERF_TIMER(on_get_info);
 
     auto [top_height, top_hash] = m_core.get_blockchain_top();
 
@@ -295,7 +292,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_NET_STATS& get_net_stats, rpc_context context)
   {
-    PERF_TIMER(on_get_net_stats);
     get_net_stats.response["start_time"] = m_core.get_start_time();
     {
       std::lock_guard lock{epee::net_utils::network_throttle_manager::m_lock_get_global_throttle_in};
@@ -327,7 +323,6 @@ namespace cryptonote::rpc {
   {
     GET_BLOCKS_BIN::response res{};
 
-    PERF_TIMER(on_get_blocks);
     std::vector<std::pair<std::pair<std::string, crypto::hash>, std::vector<std::pair<crypto::hash, std::string> > > > bs;
 
     if(!m_core.find_blockchain_supplement(req.start_height, req.block_ids, bs, res.current_height, res.start_height, req.prune, !req.no_miner_tx, GET_BLOCKS_BIN::MAX_COUNT))
@@ -371,7 +366,7 @@ namespace cryptonote::rpc {
       }
     }
 
-    MDEBUG("on_get_blocks: " << bs.size() << " blocks, " << ntxes << " txes, size " << size);
+    oxen::log::debug(logcat, "on_get_blocks: {} blocks, {} txes, size {}", bs.size(), ntxes, size);
     res.status = STATUS_OK;
     return res;
   }
@@ -379,7 +374,6 @@ namespace cryptonote::rpc {
   {
     GET_ALT_BLOCKS_HASHES_BIN::response res{};
 
-    PERF_TIMER(on_get_alt_blocks_hashes);
     std::vector<block> blks;
 
     if(!m_core.get_alternative_blocks(blks))
@@ -395,7 +389,7 @@ namespace cryptonote::rpc {
         res.blks_hashes.push_back(tools::type_to_hex(get_block_hash(blk)));
     }
 
-    MDEBUG("on_get_alt_blocks_hashes: " << blks.size() << " blocks " );
+    oxen::log::debug(logcat, "on_get_alt_blocks_hashes: {} blocks ", blks.size());
     res.status = STATUS_OK;
     return res;
   }
@@ -403,8 +397,6 @@ namespace cryptonote::rpc {
   GET_BLOCKS_BY_HEIGHT_BIN::response core_rpc_server::invoke(GET_BLOCKS_BY_HEIGHT_BIN::request&& req, rpc_context context)
   {
     GET_BLOCKS_BY_HEIGHT_BIN::response res{};
-
-    PERF_TIMER(on_get_blocks_by_height);
 
     res.status = "Failed";
     res.blocks.clear();
@@ -436,8 +428,6 @@ namespace cryptonote::rpc {
   {
     GET_HASHES_BIN::response res{};
 
-    PERF_TIMER(on_get_hashes);
-
     res.start_height = req.start_height;
     if(!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, res.m_block_ids, res.start_height, res.current_height, false))
     {
@@ -453,8 +443,6 @@ namespace cryptonote::rpc {
   {
     GET_OUTPUTS_BIN::response res{};
 
-    PERF_TIMER(on_get_outs_bin);
-
     if (!context.admin && req.outputs.size() > GET_OUTPUTS_BIN::MAX_COUNT)
       res.status = "Too many outs requested";
     else if (m_core.get_outs(req, res))
@@ -467,7 +455,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_OUTPUTS& get_outputs, rpc_context context)
   {
-    PERF_TIMER(on_get_outs);
     if (!context.admin && get_outputs.request.output_indices.size() > GET_OUTPUTS::MAX_COUNT) {
       get_outputs.response["status"] = "Too many outs requested";
       return;
@@ -526,7 +513,6 @@ namespace cryptonote::rpc {
   {
     GET_TX_GLOBAL_OUTPUTS_INDEXES_BIN::response res{};
 
-    PERF_TIMER(on_get_indexes);
     bool r = m_core.get_tx_outputs_gindexs(req.txid, res.o_indexes);
     if(!r)
     {
@@ -534,7 +520,7 @@ namespace cryptonote::rpc {
       return res;
     }
     res.status = STATUS_OK;
-    LOG_PRINT_L2("GET_TX_GLOBAL_OUTPUTS_INDEXES: [" << res.o_indexes.size() << "]");
+    oxen::log::debug(logcat, "GET_TX_GLOBAL_OUTPUTS_INDEXES: [{}]", res.o_indexes.size());
     return res;
   }
 
@@ -748,7 +734,7 @@ namespace cryptonote::rpc {
       transaction tx;
       if (!parse_and_validate_tx_from_blob(*bd, tx))
       {
-        MERROR("Failed to parse tx from txpool");
+        oxen::log::error(logcat, "Failed to parse tx from txpool");
         // continue
         return true;
       }
@@ -794,7 +780,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_TRANSACTIONS& get, rpc_context context)
   {
-    PERF_TIMER(on_get_transactions);
     std::unordered_set<crypto::hash> missed_txs;
     using split_tx = std::tuple<crypto::hash, std::string, crypto::hash, std::string>;
     std::vector<split_tx> txs;
@@ -804,7 +789,7 @@ namespace cryptonote::rpc {
         get.response["status"] = STATUS_FAILED;
         return;
       }
-      LOG_PRINT_L2("Found " << txs.size() << "/" << get.request.tx_hashes.size() << " transactions on the blockchain");
+      oxen::log::debug(logcat, "Found {}/{} transactions on the blockchain", txs.size(), get.request.tx_hashes.size());
     }
 
     // try the pool for any missing txes
@@ -855,7 +840,7 @@ namespace cryptonote::rpc {
           }
           txs = std::move(sorted_txs);
           get.response_hex["missed_tx"] = missed_txs; // non-plural here intentional to not break existing clients
-          LOG_PRINT_L2("Found " << found_in_pool.size() << "/" << get.request.tx_hashes.size() << " transactions in the pool");
+          oxen::log::debug(logcat, "Found {}/{} transactions in the pool", found_in_pool.size(), get.request.tx_hashes.size());
         } else if (get.request.memory_pool) {
           txs.reserve(pool_txs.size());
           std::transform(pool_txs.begin(), pool_txs.end(), std::back_inserter(txs), split_mempool_tx);
@@ -869,7 +854,7 @@ namespace cryptonote::rpc {
           }
         }
       } catch (const std::exception& e) {
-        MERROR(e.what());
+        oxen::log::error(logcat, e.what());
         get.response["status"] = "Failed: "s + e.what();
         return;
       }
@@ -997,13 +982,12 @@ namespace cryptonote::rpc {
       }
     }
 
-    LOG_PRINT_L2(get.response["txs"].size() << " transactions found, " << missed_txs.size() << " not found");
+    oxen::log::debug(logcat, "{} transactions found, {} not found", get.response["txs"].size(), missed_txs.size());
     get.response["status"] = STATUS_OK;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(IS_KEY_IMAGE_SPENT& spent, rpc_context context)
   {
-    PERF_TIMER(on_is_key_image_spent);
     spent.response["status"] = STATUS_FAILED;
 
     std::vector<bool> blockchain_spent;
@@ -1019,7 +1003,7 @@ namespace cryptonote::rpc {
           try {
             kis = get_pool_kis(m_core);
           } catch (const std::exception& e) {
-            MERROR("Failed to get pool key images: " << e.what());
+            oxen::log::error(logcat, "Failed to get pool key images: {}", e.what());
             return;
           }
         }
@@ -1034,7 +1018,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(SUBMIT_TRANSACTION& tx, rpc_context context)
   {
-    PERF_TIMER(on_submit_transaction);
     if (!check_core_ready()) {
       tx.response["status"] = STATUS_BUSY;
       return;
@@ -1079,7 +1062,7 @@ namespace cryptonote::rpc {
     {
       tx.response["status"] = STATUS_FAILED;
       auto reason = print_tx_verification_context(tvc);
-      LOG_PRINT_L0("[on_send_raw_tx]: " << (tvc.m_verifivation_failed ? "tx verification failed" : "Failed to process tx") << reason);
+      oxen::log::warning(logcat, "[on_send_raw_tx]: {} {}", (tvc.m_verifivation_failed ? "tx verification failed" : "Failed to process tx"), reason);
       tx.response["reason"] = std::move(reason);
       tx.response["reason_codes"] = tx_verification_failure_codes(tvc);
       return;
@@ -1097,7 +1080,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(START_MINING& start_mining, rpc_context context)
   {
-    PERF_TIMER(on_start_mining);
     //CHECK_CORE_READY();
     if(!check_core_ready()){
       start_mining.response["status"] = STATUS_BUSY;
@@ -1107,12 +1089,12 @@ namespace cryptonote::rpc {
     cryptonote::address_parse_info info;
     if(!get_account_address_from_str(info, m_core.get_nettype(), start_mining.request.miner_address)) {
       start_mining.response["status"] = "Failed, invalid address";
-      LOG_PRINT_L0(start_mining.response["status"]);
+      oxen::log::warning(logcat, start_mining.response["status"]);
       return;
     }
     if (info.is_subaddress) {
       start_mining.response["status"] = "Mining to subaddress isn't supported yet";
-      LOG_PRINT_L0(start_mining.response["status"]);
+      oxen::log::warning(logcat, start_mining.response["status"]);
       return;
     }
 
@@ -1126,7 +1108,7 @@ namespace cryptonote::rpc {
     // then we fail and log that.
     if (start_mining.request.threads_count > max_concurrency_count) {
       start_mining.response["status"] = "Failed, too many threads relative to CPU cores.";
-      LOG_PRINT_L0(start_mining.response["status"]);
+      oxen::log::warning(logcat, start_mining.response["status"]);
       return;
     }
 
@@ -1140,7 +1122,7 @@ namespace cryptonote::rpc {
     if(!miner.start(info.address, start_mining.request.threads_count, start_mining.request.num_blocks, start_mining.request.slow_mining))
     {
       start_mining.response["status"] = "Failed, mining not started";
-      LOG_PRINT_L0(start_mining.response["status"]);
+      oxen::log::warning(logcat, start_mining.response["status"]);
       return;
     }
 
@@ -1149,18 +1131,17 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(STOP_MINING& stop_mining, rpc_context context)
   {
-    PERF_TIMER(on_stop_mining);
     cryptonote::miner &miner= m_core.get_miner();
     if(!miner.is_mining())
     {
       stop_mining.response["status"] = "Mining never started";
-      LOG_PRINT_L0(stop_mining.response["status"]);
+      oxen::log::warning(logcat, stop_mining.response["status"]);
       return;
     }
     if(!miner.stop())
     {
       stop_mining.response["status"] = "Failed, mining not stopped";
-      LOG_PRINT_L0(stop_mining.response["status"]);
+      oxen::log::warning(logcat, stop_mining.response["status"]);
       return;
     }
 
@@ -1169,8 +1150,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(MINING_STATUS& mining_status, rpc_context context)
   {
-    PERF_TIMER(on_mining_status);
-
     const miner& lMiner = m_core.get_miner();
     mining_status.response["active"] = lMiner.is_mining();
     mining_status.response["block_target"] = tools::to_seconds(TARGET_BLOCK_TIME);
@@ -1195,11 +1174,10 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(SAVE_BC& save_bc, rpc_context context)
   {
-    PERF_TIMER(on_save_bc);
     if( !m_core.get_blockchain_storage().store_blockchain() )
     {
       save_bc.response["status"] = "Error while storing blockchain";
-      LOG_PRINT_L0(save_bc.response["status"]);
+      oxen::log::warning(logcat, save_bc.response["status"]);
       return;
     }
     save_bc.response["status"] = STATUS_OK;
@@ -1220,9 +1198,7 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_PEER_LIST& pl, rpc_context context)
   {
-    PERF_TIMER(on_get_peer_list);
     std::vector<nodetool::peerlist_entry> white_list, gray_list;
-
     if (pl.request.public_only)
       m_p2p.get_public_peerlist(gray_list, white_list);
     else
@@ -1236,21 +1212,20 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(SET_LOG_LEVEL& set_log_level, rpc_context context)
   {
-    PERF_TIMER(on_set_log_level);
     if (set_log_level.request.level < 0 || set_log_level.request.level > 4)
     {
       set_log_level.response["status"] = "Error: log level not valid";
       return;
     }
-    mlog_set_log_level(set_log_level.request.level);
+    auto log_level = oxen::logging::parse_level(set_log_level.request.level);
+    if (log_level.has_value())
+      oxen::log::reset_level(*log_level);
     set_log_level.response["status"] = STATUS_OK;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(SET_LOG_CATEGORIES& set_log_categories, rpc_context context)
   {
-    PERF_TIMER(on_set_log_categories);
-    mlog_set_log(set_log_categories.request.categories.c_str());
-    set_log_categories.response["categories"] = mlog_get_categories();
+    oxen::logging::process_categories_string(set_log_categories.request.categories.c_str());
     set_log_categories.response["status"] = STATUS_OK;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -1258,7 +1233,6 @@ namespace cryptonote::rpc {
   {
     GET_TRANSACTION_POOL_HASHES_BIN::response res{};
 
-    PERF_TIMER(on_get_transaction_pool_hashes);
     std::vector<crypto::hash> tx_pool_hashes;
     m_core.get_pool().get_transaction_hashes(tx_pool_hashes, context.admin, req.blinked_txs_only);
 
@@ -1269,7 +1243,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_TRANSACTION_POOL_HASHES& get_transaction_pool_hashes, rpc_context context)
   {
-    PERF_TIMER(on_get_transaction_pool_hashes);
     std::vector<crypto::hash> tx_hashes;
     m_core.get_pool().get_transaction_hashes(tx_hashes, context.admin);
     get_transaction_pool_hashes.response_hex["tx_hashes"] = tx_hashes;
@@ -1278,7 +1251,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_TRANSACTION_POOL_STATS& stats, rpc_context context)
   {
-    PERF_TIMER(on_get_transaction_pool_stats);
     auto txpool = m_core.get_pool().get_transaction_stats(stats.request.include_unrelayed);
     json pool_stats{
         {"bytes_total", txpool.bytes_total},
@@ -1305,12 +1277,10 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(STOP_DAEMON& stop_daemon, rpc_context context)
   {
-    PERF_TIMER(on_stop_daemon);
     m_p2p.send_stop_signal();
     stop_daemon.response["status"] = STATUS_OK;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-
   //
   // Oxen
   //
@@ -1318,7 +1288,6 @@ namespace cryptonote::rpc {
   {
     GET_OUTPUT_BLACKLIST_BIN::response res{};
 
-    PERF_TIMER(on_get_output_blacklist_bin);
     try
     {
       m_core.get_output_blacklist(res.blacklist);
@@ -1335,20 +1304,17 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_BLOCK_COUNT& get, rpc_context context)
   {
-    PERF_TIMER(on_getblockcount);
     get.response["count"] = m_core.get_current_blockchain_height();
     get.response["status"] = STATUS_OK;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_BLOCK_HASH& get, rpc_context context)
   {
-    PERF_TIMER(on_getblockhash);
     auto curr_height = m_core.get_current_blockchain_height();
     for (auto h : get.request.heights) {
       if (h >= curr_height)
         throw rpc_error{ERROR_TOO_BIG_HEIGHT,
           "Requested block height: " + tools::int_to_string(h) + " greater than current top block height: " +  tools::int_to_string(curr_height - 1)};
-
       get.response_hex[tools::int_to_string(h)] = m_core.get_block_id_by_height(h);
     }
     get.response["status"] = STATUS_OK;
@@ -1366,7 +1332,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::fill_block_header_response(const block& blk, bool orphan_status, uint64_t height, const crypto::hash& hash, block_header_response& response, bool fill_pow_hash, bool get_tx_hashes)
   {
-    PERF_TIMER(fill_block_header_response);
     response.major_version = static_cast<uint8_t>(blk.major_version);
     response.minor_version = blk.minor_version;
     response.timestamp = blk.timestamp;
@@ -1396,13 +1361,9 @@ namespace cryptonote::rpc {
         response.tx_hashes.push_back(tools::type_to_hex(tx_hash));
     }
   }
-
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_LAST_BLOCK_HEADER& get_last_block_header, rpc_context context)
   {
-
-    PERF_TIMER(on_get_last_block_header);
-
     if(!check_core_ready())
     { 
       get_last_block_header.response["status"] = STATUS_BUSY;
@@ -1426,9 +1387,6 @@ namespace cryptonote::rpc {
   
   void core_rpc_server::invoke(GET_BLOCK_HEADER_BY_HASH& get_block_header_by_hash, rpc_context context)
   {
-
-    PERF_TIMER(on_get_block_header_by_hash);
-
     auto get = [this, &get_block_header_by_hash, admin=context.admin](const std::string &hash, block_header_response &block_header) {
       crypto::hash block_hash;
       if (!tools::hex_to_type(hash, block_hash))
@@ -1462,7 +1420,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_BLOCK_HEADERS_RANGE& get_block_headers_range, rpc_context context)
   {
-    PERF_TIMER(on_get_block_headers_range);
     const uint64_t bc_height = m_core.get_current_blockchain_height();
     uint64_t start_height = get_block_headers_range.request.start_height;
     uint64_t end_height = get_block_headers_range.request.end_height;
@@ -1491,7 +1448,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_BLOCK_HEADER_BY_HEIGHT& get_block_header_by_height, rpc_context context)
   {
-    PERF_TIMER(on_get_block_header_by_height);
     auto get = [this, curr_height=m_core.get_current_blockchain_height(), pow=get_block_header_by_height.request.fill_pow_hash && context.admin, tx_hashes=get_block_header_by_height.request.get_tx_hashes]
         (uint64_t height, block_header_response& bhr) {
       if (height >= curr_height)
@@ -1524,7 +1480,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_BLOCK& get_block, rpc_context context)
   {
-    PERF_TIMER(on_get_block);
     block blk;
     uint64_t block_height;
     bool orphan = false;
@@ -1593,7 +1548,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_CONNECTIONS& get_connections, rpc_context context)
   {
-    PERF_TIMER(on_get_connections);
     auto& c = get_connections.response["connections"];
     c = json::array();
     for (auto& ci : m_p2p.get_payload_object().get_connections())
@@ -1603,8 +1557,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(HARD_FORK_INFO& hfinfo, rpc_context context)
   {
-    PERF_TIMER(on_hard_fork_info);
-
     const auto& blockchain = m_core.get_blockchain_storage();
     auto version =
       hfinfo.request.version > 0 ? static_cast<hf>(hfinfo.request.version) :
@@ -1622,8 +1574,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GETBANS& get_bans, rpc_context context)
   {
-    PERF_TIMER(on_get_bans);
-
     auto now = time(nullptr);
     std::map<std::string, time_t> blocked_hosts = m_p2p.get_blocked_hosts();
     for (std::map<std::string, time_t>::const_iterator i = blocked_hosts.begin(); i != blocked_hosts.end(); ++i)
@@ -1657,8 +1607,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(BANNED& banned, rpc_context context)
   {
-    PERF_TIMER(on_banned);
-
     auto na_parsed = net::get_network_address(banned.request.address, 0);
     if (!na_parsed)
       throw rpc_error{ERROR_WRONG_PARAM, "Unsupported host type"};
@@ -1681,10 +1629,7 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(SETBANS& set_bans, rpc_context context)
   {
-    PERF_TIMER(on_set_bans);
-
     epee::net_utils::network_address na;
-
     // try subnet first
     if (!set_bans.request.host.empty())
     {
@@ -1723,8 +1668,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(FLUSH_TRANSACTION_POOL& flush_transaction_pool, rpc_context context)
   {
-    PERF_TIMER(on_flush_txpool);
-
     bool failed = false;
     std::vector<crypto::hash> txids;
     if (flush_transaction_pool.request.txids.empty())
@@ -1763,8 +1706,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_OUTPUT_HISTOGRAM& get_output_histogram, rpc_context context)
   {
-    PERF_TIMER(on_get_output_histogram);
-
     if (!context.admin && get_output_histogram.request.recent_cutoff > 0 && get_output_histogram.request.recent_cutoff < (uint64_t)time(NULL) - OUTPUT_HISTOGRAM_RECENT_CUTOFF_RESTRICTION)
     {
       get_output_histogram.response["status"] = "Recent cutoff is too old";
@@ -1804,7 +1745,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_VERSION& version, rpc_context context)
   {
-    PERF_TIMER(on_get_version);
     version.response["version"] = pack_version(VERSION);
     version.response["status"] = STATUS_OK;
   }
@@ -1843,7 +1783,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_COINBASE_TX_SUM& get_coinbase_tx_sum, rpc_context context)
   {
-    PERF_TIMER(on_get_coinbase_tx_sum);
     if (auto sums = m_core.get_coinbase_tx_sum(get_coinbase_tx_sum.request.height, get_coinbase_tx_sum.request.count)) {
         std::tie(get_coinbase_tx_sum.response["emission_amount"], get_coinbase_tx_sum.response["fee_amount"], get_coinbase_tx_sum.response["burn_amount"]) = *sums;
         get_coinbase_tx_sum.response["status"] = STATUS_OK;
@@ -1854,7 +1793,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_BASE_FEE_ESTIMATE& get_base_fee_estimate, rpc_context context)
   {
-    PERF_TIMER(on_get_base_fee_estimate);
     auto fees = m_core.get_blockchain_storage().get_dynamic_base_fee_estimate(get_base_fee_estimate.request.grace_blocks);
     get_base_fee_estimate.response["fee_per_byte"] = fees.first;
     get_base_fee_estimate.response["fee_per_output"] = fees.second;
@@ -1868,7 +1806,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_ALTERNATE_CHAINS& get_alternate_chains, rpc_context context)
   {
-    PERF_TIMER(on_get_alternate_chains);
     try
     {
       std::vector<GET_ALTERNATE_CHAINS::chain_info> chains;
@@ -1901,8 +1838,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_LIMIT& limit, rpc_context context)
   {
-    PERF_TIMER(on_get_limit);
-
     limit.response = {
       {"limit_down", epee::net_utils::connection_basic::get_rate_down_limit()},
       {"limit_up", epee::net_utils::connection_basic::get_rate_up_limit()},
@@ -1911,8 +1846,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(SET_LIMIT& limit, rpc_context context)
   {
-    PERF_TIMER(on_set_limit);
-
     // -1 = reset to default
     //  0 = do not modify
     if (limit.request.limit_down != 0)
@@ -1931,7 +1864,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(OUT_PEERS& out_peers, rpc_context context)
   {
-    PERF_TIMER(on_out_peers);
     if (out_peers.request.set)
       m_p2p.change_max_out_public_peers(out_peers.request.out_peers);
     out_peers.response["status"] = STATUS_OK;
@@ -1939,7 +1871,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(IN_PEERS& in_peers, rpc_context context)
   {
-    PERF_TIMER(on_in_peers);
     if (in_peers.request.set)
       m_p2p.change_max_in_public_peers(in_peers.request.in_peers);
     in_peers.response["status"] = STATUS_OK;
@@ -1947,8 +1878,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(POP_BLOCKS& pop_blocks, rpc_context context)
   {
-    PERF_TIMER(on_pop_blocks);
-
     m_core.get_blockchain_storage().pop_blocks(pop_blocks.request.nblocks);
 
     pop_blocks.response["height"] = m_core.get_current_blockchain_height();
@@ -1957,8 +1886,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(RELAY_TX& relay_tx, rpc_context context)
   {
-    PERF_TIMER(on_relay_tx);
-
     std::string status = "";
     for (const auto& txid_hex: relay_tx.request.txids)
     {
@@ -1994,8 +1921,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(SYNC_INFO& sync, rpc_context context)
   {
-    PERF_TIMER(on_sync_info);
-
     auto [top_height, top_hash] = m_core.get_blockchain_top();
     sync.response["height"] = top_height + 1; // turn top block height into blockchain height
     if (auto target_height = m_core.get_target_blockchain_height(); target_height > top_height + 1)
@@ -2022,7 +1947,6 @@ namespace cryptonote::rpc {
         return true;
     });
     sync.response["overview"] = block_queue.get_overview(top_height + 1);
-
     sync.response["status"] = STATUS_OK;
   }
 
@@ -2141,8 +2065,6 @@ namespace cryptonote::rpc {
   GET_OUTPUT_DISTRIBUTION::response core_rpc_server::invoke(GET_OUTPUT_DISTRIBUTION::request&& req, rpc_context context, bool binary)
   {
     GET_OUTPUT_DISTRIBUTION::response res{};
-
-    PERF_TIMER(on_get_output_distribution);
     try
     {
       // 0 is placeholder for the whole chain
@@ -2179,7 +2101,6 @@ namespace cryptonote::rpc {
   {
     GET_OUTPUT_DISTRIBUTION_BIN::response res{};
 
-    PERF_TIMER(on_get_output_distribution_bin);
 
     if (!req.binary)
     {
@@ -2212,8 +2133,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_QUORUM_STATE& get_quorum_state, rpc_context context)
   {
-    PERF_TIMER(on_get_quorum_state);
-
     uint8_t quorum_type = get_quorum_state.request.quorum_type;
 
     if (quorum_type >= tools::enum_count<service_nodes::quorum_type> &&
@@ -2368,8 +2287,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_SERVICE_NODE_REGISTRATION_CMD_RAW& get_service_node_registration_cmd_raw, rpc_context context)
   {
-    PERF_TIMER(on_get_service_node_registration_cmd_raw);
-
     if (!m_core.service_node())
       throw rpc_error{ERROR_WRONG_PARAM, "Daemon has not been started in service node mode, please relaunch with --service-node flag."};
 
@@ -2393,8 +2310,6 @@ namespace cryptonote::rpc {
   {
     GET_SERVICE_NODE_REGISTRATION_CMD::response res{};
 
-    PERF_TIMER(on_get_service_node_registration_cmd);
-
     std::vector<std::string> args;
 
     std::optional<uint64_t> height = m_core.get_current_blockchain_height();
@@ -2406,7 +2321,7 @@ namespace cryptonote::rpc {
         args.emplace_back(std::to_string(service_nodes::percent_to_basis_points(req.operator_cut)));
       } catch(const std::exception &e) {
         res.status = "Invalid value: "s + e.what();
-        MERROR(res.status);
+        oxen::log::error(logcat, res.status);
         return res;
       }
     }
@@ -2431,7 +2346,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES& get_service_node_blacklisted_key_images, rpc_context context)
   {
-    PERF_TIMER(on_get_service_node_blacklisted_key_images);
     auto &blacklist = m_core.get_service_node_blacklisted_key_images();
 
     get_service_node_blacklisted_key_images.response["status"] = STATUS_OK;
@@ -2441,7 +2355,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_SERVICE_KEYS& get_service_keys, rpc_context context)
   {
-    PERF_TIMER(on_get_service_node_key);
     const auto& keys = m_core.get_service_keys();
     if (keys.pub)
       get_service_keys.response["service_node_pubkey"] = tools::type_to_hex(keys.pub);
@@ -2453,7 +2366,6 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_SERVICE_PRIVKEYS& get_service_privkeys, rpc_context context)
   {
-    PERF_TIMER(on_get_service_node_key);
     const auto& keys = m_core.get_service_keys();
     if (keys.key != crypto::null_skey)
       get_service_privkeys.response["service_node_privkey"] = tools::type_to_hex(keys.key.data);
@@ -2739,20 +2651,20 @@ namespace cryptonote::rpc {
         status = fmt::format("Outdated {}. Current: {}.{}.{} Required: {}.{}.{}", name,
             cur_version[0], cur_version[1], cur_version[2],
             required[0], required[1], required[2]);
-        MERROR(status);
+        oxen::log::error(logcat, status);
       } else if (!ed25519_pubkey.empty() // TODO: once lokinet & ss are always sending this we can remove this empty bypass
           && ed25519_pubkey != our_ed25519_pubkey) {
         status = fmt::format("Invalid {} pubkey: expected {}, received {}", name, our_ed25519_pubkey, ed25519_pubkey);
-        MERROR(status);
+        oxen::log::error(logcat, status);
       } else {
         auto now = std::time(nullptr);
         auto old = update.exchange(now);
         bool significant = std::chrono::seconds{now - old} > lifetime; // Print loudly for the first ping after startup/expiry
         auto msg = fmt::format("Received ping from {} {}.{}.{}", name, cur_version[0], cur_version[1], cur_version[2]);
         if (significant)
-          MGINFO_GREEN(msg);
+          oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::green), msg));
         else
-          MDEBUG(msg);
+          oxen::log::debug(logcat, msg);
         success(significant);
         status = STATUS_OK;
       }
@@ -2790,9 +2702,7 @@ namespace cryptonote::rpc {
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(GET_STAKING_REQUIREMENT& get_staking_requirement, rpc_context context)
   {
-    PERF_TIMER(on_get_staking_requirement);
     get_staking_requirement.response["height"] = get_staking_requirement.request.height > 0 ? get_staking_requirement.request.height : m_core.get_current_blockchain_height();
-
     get_staking_requirement.response["staking_requirement"] = service_nodes::get_staking_requirement(nettype(), get_staking_requirement.request.height);
     get_staking_requirement.response["status"] = STATUS_OK;
     return;
@@ -2878,7 +2788,7 @@ namespace cryptonote::rpc {
       blobs.clear();
       if (!db.get_transactions_blobs(block.second.tx_hashes, blobs))
       {
-        MERROR("Could not query block at requested height: " << cryptonote::get_block_height(block.second));
+        oxen::log::error(logcat, "Could not query block at requested height: {}", cryptonote::get_block_height(block.second));
         continue;
       }
       const auto hard_fork_version = block.second.major_version;
@@ -2887,7 +2797,7 @@ namespace cryptonote::rpc {
         cryptonote::transaction tx;
         if (!cryptonote::parse_and_validate_tx_from_blob(blob, tx))
         {
-          MERROR("tx could not be validated from blob, possibly corrupt blockchain");
+          oxen::log::error(logcat, "tx could not be validated from blob, possibly corrupt blockchain");
           continue;
         }
         if (tx.type == cryptonote::txtype::state_change)
@@ -2895,7 +2805,7 @@ namespace cryptonote::rpc {
           cryptonote::tx_extra_service_node_state_change state_change;
           if (!cryptonote::get_service_node_state_change_from_tx_extra(tx.extra, state_change, hard_fork_version))
           {
-            LOG_ERROR("Could not get state change from tx, possibly corrupt tx, hf_version "<< static_cast<int>(hard_fork_version));
+            oxen::log::error(logcat, "Could not get state change from tx, possibly corrupt tx, hf_version {}", static_cast<int>(hard_fork_version));
             continue;
           }
 
@@ -2917,7 +2827,7 @@ namespace cryptonote::rpc {
               break;
 
             default:
-              MERROR("Unhandled state in on_get_service_nodes_state_changes");
+              oxen::log::error(logcat, "Unhandled state in on_get_service_nodes_state_changes");
               break;
           }
         }
@@ -2941,7 +2851,7 @@ namespace cryptonote::rpc {
   {
     crypto::public_key pubkey;
     if (!tools::hex_to_type(report_peer_status.request.pubkey, pubkey)) {
-      MERROR("Could not parse public key: " << report_peer_status.request.pubkey);
+      oxen::log::error(logcat, "Could not parse public key: {}", report_peer_status.request.pubkey);
       throw rpc_error{ERROR_WRONG_PARAM, "Could not parse public key"};
     }
 

@@ -39,10 +39,9 @@
 #include "version.h"
 #include "common/fs.h"
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "WalletAPI"
-
 namespace Wallet {
+
+  static auto logcat = oxen::log::Cat("WalletAPI");
 
 EXPORT
 Wallet* WalletManagerImpl::createWallet(std::string_view path, const std::string &password,
@@ -191,13 +190,13 @@ std::vector<std::string> WalletManagerImpl::findWallets(std::string_view path_)
             continue;
         auto filename = p.path();
 
-        LOG_PRINT_L3("Checking filename: " << filename);
+        oxen::log::trace(logcat, "Checking filename: {}", filename);
 
         if (filename.extension() == ".keys") {
             // if keys file found, checking if there's wallet file itself
             filename.replace_extension();
             if (fs::exists(filename)) {
-                LOG_PRINT_L3("Found wallet: " << filename);
+                oxen::log::trace(logcat, "Found wallet: {}", filename);
                 result.push_back(filename.u8string());
             }
         }

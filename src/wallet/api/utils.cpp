@@ -41,7 +41,7 @@ bool isAddressLocal(const std::string &address)
     try {
         return tools::is_local_address(address);
     } catch (const std::exception &e) {
-        MERROR("error: " << e.what());
+        oxen::log::error(logcat, "error: {}", e.what());
         return false;
     }
 }

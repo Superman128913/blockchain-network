@@ -36,8 +36,7 @@
 #include "version.h"
 #include <oxenc/hex.h>
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "debugtools.deserialize"
+static auto logcat = oxen::log::Cat("debugtools.deserialize");
 
 namespace po = boost::program_options;
 
@@ -135,14 +134,14 @@ constexpr static std::string_view network_type_str(network_type nettype)
 
 int main(int argc, char* argv[])
 {
-  uint32_t log_level = 0;
+  uint32_t default_log_level = 0;
   std::string input;
 
   tools::on_startup();
 
   po::options_description desc_cmd_only("Command line options");
   po::options_description desc_cmd_sett("Command line options and settings options");
-  const command_line::arg_descriptor<uint32_t> arg_log_level = {"log-level", "", log_level};
+  const command_line::arg_descriptor<uint32_t> arg_log_level = {"log-level", "", default_log_level};
   const command_line::arg_descriptor<std::string> arg_input  = {
       "input", "Specify a wallet address or hex string of a Cryptonote type for decoding, supporting\n"
                " - TX Extra\n"
@@ -175,7 +174,6 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-  log_level    = command_line::get_arg(vm, arg_log_level);
   input        = command_line::get_arg(vm, arg_input);
   if (input.empty())
   {
@@ -183,7 +181,16 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-  mlog_configure("", true);
+  auto log_file_path = "cn_deserialize.log";
+  oxen::log::Level log_level;
+  if(auto level = oxen::logging::parse_level(command_line::get_arg(vm, arg_log_level))) {
+    log_level = *level;
+  } else {
+      std::cerr << "Incorrect log level: " << command_line::get_arg(vm, arg_log_level) << std::endl;
+      throw std::runtime_error{"Incorrect log level"};
+  }
+  oxen::logging::init(log_file_path, log_level);
+  oxen::log::warning(logcat, "Starting...");
 
   if (oxenc::is_hex(input))
   {

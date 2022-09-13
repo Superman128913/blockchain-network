@@ -73,8 +73,7 @@ int main(int argc, char* argv[])
   epee::string_tools::set_module_name_and_folder(argv[0]);
 
   //set up logging options
-  mlog_configure(mlog_get_default_log_path("core_proxy.log"), true);
-  mlog_set_log_level(2);
+  oxen::logging::init("core_proxy.log", oxen::log::Level::debug);
 
 
   po::options_description desc("Allowed options");
@@ -92,8 +91,8 @@ int main(int argc, char* argv[])
   if (!r)
     return 1;
 
-  MGINFO("Module folder: " << argv[0]);
-  MGINFO("Node starting ...");
+  oxen::log::info(logcat, "Module folder: {}", argv[0]);
+  oxen::log::info(logcat, "Node starting ...");
 
 
   //create objects and link them
@@ -108,32 +107,32 @@ int main(int argc, char* argv[])
 
   //initialize objects
 
-  MGINFO("Initializing p2p server...");
+  oxen::log::info(logcat, "Initializing p2p server...");
   bool res = p2psrv.init(vm);
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize p2p server.");
-  MGINFO("P2p server initialized OK");
+  oxen::log::info(logcat, "P2p server initialized OK");
 
-  MGINFO("Initializing cryptonote protocol...");
+  oxen::log::info(logcat, "Initializing cryptonote protocol...");
   res = cprotocol.init(vm);
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize cryptonote protocol.");
-  MGINFO("Cryptonote protocol initialized OK");
+  oxen::log::info(logcat, "Cryptonote protocol initialized OK");
 
   //initialize core here
-  MGINFO("Initializing proxy core...");
+  oxen::log::info(logcat, "Initializing proxy core...");
   res = pr_core.init(vm);
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core");  
-  MGINFO("Core initialized OK");
+  oxen::log::info(logcat, "Core initialized OK");
 
-  MGINFO("Starting p2p net loop...");
+  oxen::log::info(logcat, "Starting p2p net loop...");
   p2psrv.run();
-  MGINFO("p2p net loop stopped");
+  oxen::log::info(logcat, "p2p net loop stopped");
 
   //deinitialize components  
-  MGINFO("Deinitializing core...");
+  oxen::log::info(logcat, "Deinitializing core...");
   pr_core.deinit();
-  MGINFO("Deinitializing cryptonote_protocol...");
+  oxen::log::info(logcat, "Deinitializing cryptonote_protocol...");
   cprotocol.deinit();
-  MGINFO("Deinitializing p2p...");
+  oxen::log::info(logcat, "Deinitializing p2p...");
   p2psrv.deinit();
 
 
@@ -141,7 +140,7 @@ int main(int argc, char* argv[])
   cprotocol.set_p2p_endpoint(NULL);
 
 
-  MGINFO("Node stopped.");
+  oxen::log::info(logcat, "Node stopped.");
   return 0;
 
   CATCH_ENTRY_L0("main", 1);

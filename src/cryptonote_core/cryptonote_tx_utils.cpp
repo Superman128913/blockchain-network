@@ -41,6 +41,7 @@
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
+#include "crypto/fmt.h"
 #include "ringct/rctSigs.h"
 #include "multisig/multisig.h"
 #include "epee/int-util.h"
@@ -77,7 +78,7 @@ namespace cryptonote
         }
       }
     }
-    LOG_PRINT_L2("destinations include " << num_stdaddresses << " standard addresses and " << num_subaddresses << " subaddresses");
+    oxen::log::debug(globallogcat, "destinations include {} standard addresses and {} subaddresses", num_stdaddresses, num_subaddresses);
   }
 
   keypair get_deterministic_keypair_from_height(uint64_t height)
@@ -126,7 +127,7 @@ namespace cryptonote
 
     if (!get_deterministic_output_key(governance_wallet_address.address, gov_key, output_index, correct_key))
     {
-      MERROR("Failed to generate deterministic output key for governance wallet output validation");
+      oxen::log::error(globallogcat, "Failed to generate deterministic output key for governance wallet output validation");
       return false;
     }
 
@@ -288,7 +289,7 @@ namespace cryptonote
     block_reward_parts reward_parts{};
     if(!get_oxen_block_reward(median_weight, current_block_weight, already_generated_coins, hard_fork_version, reward_parts, block_reward_context))
     {
-      LOG_PRINT_L0("Failed to calculate block reward");
+      oxen::log::warning(globallogcat, "Failed to calculate block reward");
       return std::make_pair(false, block_rewards);
     }
 
@@ -458,7 +459,7 @@ namespace cryptonote
 
       if (!get_deterministic_output_key(address, derivation_pair, it - rewards.begin(), out_eph_public_key))
       {
-        MERROR("Failed to generate output one-time public key");
+        oxen::log::error(globallogcat, "Failed to generate output one-time public key");
         return std::make_pair(false, block_rewards);
       }
 
@@ -514,13 +515,13 @@ namespace cryptonote
     uint64_t base_reward, base_reward_unpenalized;
     if (!get_base_block_reward(median_weight, current_block_weight, already_generated_coins, base_reward, base_reward_unpenalized, hard_fork_version, oxen_context.height))
     {
-      MERROR("Failed to calculate base block reward");
+      oxen::log::error(globallogcat, "Failed to calculate base block reward");
       return false;
     }
 
     if (base_reward == 0)
     {
-      MERROR("Unexpected base reward of 0");
+      oxen::log::error(globallogcat, "Unexpected base reward of 0");
       return false;
     }
 
@@ -574,9 +575,9 @@ namespace cryptonote
       if (allocated > base_reward_unpenalized || remainder != 0)
       {
         if (allocated > base_reward_unpenalized)
-          MERROR("We allocated more reward " << cryptonote::print_money(allocated) << " than what was available " << cryptonote::print_money(base_reward_unpenalized));
+          oxen::log::error(globallogcat, "We allocated more reward {} than what was available {}", cryptonote::print_money(allocated), cryptonote::print_money(base_reward_unpenalized));
         else
-          MERROR("We allocated reward but there was still " << cryptonote::print_money(remainder) << " oxen left to distribute.");
+          oxen::log::error(globallogcat, "We allocated reward but there was still {} oxen left to distribute.", cryptonote::print_money(remainder));
         return false;
       }
     }
@@ -617,7 +618,7 @@ namespace cryptonote
 
     if (sources.empty())
     {
-      LOG_ERROR("Empty sources");
+      oxen::log::error(globallogcat, "Empty sources");
       return false;
     }
 
@@ -639,7 +640,7 @@ namespace cryptonote
 
     if (tx_params.burn_percent)
     {
-      LOG_ERROR("cannot construct tx: internal error: burn percent must be converted to fixed burn amount in the wallet");
+      oxen::log::error(globallogcat, "cannot construct tx: internal error: burn percent must be converted to fixed burn amount in the wallet");
       return false;
     }
 
@@ -648,9 +649,11 @@ namespace cryptonote
 
     if (tx.type == txtype::stake) {
       crypto::secret_key tx_sk{tx_key};
-      bool added = hwdev.update_staking_tx_secret_key(tx_sk);
-      CHECK_AND_NO_ASSERT_MES(added, false, "Failed to add tx secret key to stake transaction");
-
+      if (!hwdev.update_staking_tx_secret_key(tx_sk))
+      {
+        oxen::log::warning(globallogcat, "Failed to add tx secret key to stake transaction");
+        return false;
+      }
       cryptonote::add_tx_secret_key_to_tx_extra(tx.extra, tx_sk);
     }
 
@@ -667,17 +670,17 @@ namespace cryptonote
         crypto::hash8 payment_id8 = null_hash8;
         if (get_encrypted_payment_id_from_tx_extra_nonce(extra_nonce.nonce, payment_id8))
         {
-          LOG_PRINT_L2("Encrypting payment id " << payment_id8);
+          oxen::log::debug(globallogcat, "Encrypting payment id {}", payment_id8);
           crypto::public_key view_key_pub = get_destination_view_key_pub(destinations, change_addr);
           if (view_key_pub == null_pkey)
           {
-            LOG_ERROR("Destinations have to have exactly one output to support encrypted payment ids");
+            oxen::log::error(globallogcat, "Destinations have to have exactly one output to support encrypted payment ids");
             return false;
           }
 
           if (!hwdev.encrypt_payment_id(payment_id8, view_key_pub, tx_key))
           {
-            LOG_ERROR("Failed to encrypt payment id");
+            oxen::log::error(globallogcat, "Failed to encrypt payment id");
             return false;
           }
 
@@ -686,10 +689,10 @@ namespace cryptonote
           remove_field_from_tx_extra<tx_extra_nonce>(tx.extra);
           if (!add_extra_nonce_to_tx_extra(tx.extra, extra_nonce))
           {
-            LOG_ERROR("Failed to add encrypted payment id to tx extra");
+            oxen::log::error(globallogcat, "Failed to add encrypted payment id to tx extra");
             return false;
           }
-          LOG_PRINT_L1("Encrypted payment ID: " << payment_id8);
+          oxen::log::info(globallogcat, "Encrypted payment ID: {}", payment_id8);
           add_dummy_payment_id = false;
         }
         else if (get_payment_id_from_tx_extra_nonce(extra_nonce.nonce, payment_id))
@@ -711,7 +714,7 @@ namespace cryptonote
         crypto::public_key view_key_pub = get_destination_view_key_pub(destinations, change_addr);
         if (view_key_pub == null_pkey)
         {
-          LOG_ERROR("Failed to get key to encrypt dummy payment id with");
+          oxen::log::error(globallogcat, "Failed to get key to encrypt dummy payment id with");
         }
         else
         {
@@ -719,7 +722,7 @@ namespace cryptonote
           set_encrypted_payment_id_to_tx_extra_nonce(extra_nonce, payment_id8);
           if (!add_extra_nonce_to_tx_extra(tx.extra, extra_nonce))
           {
-            LOG_ERROR("Failed to add dummy encrypted payment id to tx extra");
+            oxen::log::error(globallogcat, "Failed to add dummy encrypted payment id to tx extra");
             // continue anyway
           }
         }
@@ -727,7 +730,7 @@ namespace cryptonote
     }
     else
     {
-      MWARNING("Failed to parse tx extra");
+      oxen::log::warning(globallogcat, "Failed to parse tx extra");
       tx_extra_fields.clear();
     }
 
@@ -745,7 +748,7 @@ namespace cryptonote
       ++idx;
       if(src_entr.real_output >= src_entr.outputs.size())
       {
-        LOG_ERROR("real_output index (" << src_entr.real_output << ")bigger than output_keys.size()=" << src_entr.outputs.size());
+        oxen::log::error(globallogcat, "real_output index ({})bigger than output_keys.size()={}", src_entr.real_output, src_entr.outputs.size());
         return false;
       }
       summary_inputs_money += src_entr.amount;
@@ -757,18 +760,16 @@ namespace cryptonote
       const auto& out_key = reinterpret_cast<const crypto::public_key&>(src_entr.outputs[src_entr.real_output].second.dest);
       if(!generate_key_image_helper(sender_account_keys, subaddresses, out_key, src_entr.real_out_tx_key, src_entr.real_out_additional_tx_keys, src_entr.real_output_in_tx_index, in_ephemeral,img, hwdev))
       {
-        LOG_ERROR("Key image generation failed!");
+        oxen::log::error(globallogcat, "Key image generation failed!");
         return false;
       }
 
       //check that derivated key is equal with real output key (if non multisig)
       if(!msout && !(in_ephemeral.pub == src_entr.outputs[src_entr.real_output].second.dest) )
       {
-        LOG_ERROR("derived public key mismatch with output public key at index " << idx << ", real out " << src_entr.real_output << "!\nderived_key:"
-          << tools::type_to_hex(in_ephemeral.pub) << "\nreal output_public_key:"
-          << tools::type_to_hex(src_entr.outputs[src_entr.real_output].second.dest) );
-        LOG_ERROR("amount " << src_entr.amount << ", rct " << src_entr.rct);
-        LOG_ERROR("tx pubkey " << src_entr.real_out_tx_key << ", real_output_in_tx_index " << src_entr.real_output_in_tx_index);
+        oxen::log::error(globallogcat, "derived public key mismatch with output public key at index {}, real out {}!\nderived_key: {}\nreal output_public_key: {}", idx, src_entr.real_output, tools::type_to_hex(in_ephemeral.pub), tools::type_to_hex(src_entr.outputs[src_entr.real_output].second.dest));
+        oxen::log::error(globallogcat, "amount {}, rct {}", src_entr.amount, src_entr.rct);
+        oxen::log::error(globallogcat, "tx pubkey {}, real_output_in_tx_index {}", src_entr.real_out_tx_key, src_entr.real_output_in_tx_index);
         return false;
       }
 
@@ -873,7 +874,7 @@ namespace cryptonote
           keypair ephemeral_keys{};
           if(!generate_key_image_helper(sender_account_keys, subaddresses, out_eph_public_key, txkey_pub, additional_tx_public_keys, output_index, ephemeral_keys, proof.key_image, hwdev))
           {
-            LOG_ERROR("Key image generation failed for staking TX!");
+            oxen::log::error(globallogcat, "Key image generation failed for staking TX!");
             return false;
           }
 
@@ -903,12 +904,12 @@ namespace cryptonote
 
     remove_field_from_tx_extra<tx_extra_additional_pub_keys>(tx.extra);
 
-    LOG_PRINT_L2("tx pubkey: " << txkey_pub);
+    oxen::log::debug(globallogcat, "tx pubkey: {}", txkey_pub);
     if (need_additional_txkeys)
     {
-      LOG_PRINT_L2("additional tx pubkeys: ");
+      oxen::log::debug(globallogcat, "additional tx pubkeys: ");
       for (size_t i = 0; i < additional_tx_public_keys.size(); ++i)
-        LOG_PRINT_L2(additional_tx_public_keys[i]);
+        oxen::log::debug(globallogcat, "{}", additional_tx_public_keys[i]);
       add_additional_tx_pub_keys_to_extra(tx.extra, additional_tx_public_keys);
     }
 
@@ -918,7 +919,7 @@ namespace cryptonote
     //check money
     if(summary_outs_money > summary_inputs_money )
     {
-      LOG_ERROR("Transaction inputs money ("<< summary_inputs_money << ") less than outputs money (" << summary_outs_money << ")");
+      oxen::log::error(globallogcat, "Transaction inputs money ({}) less than outputs money ({})", summary_inputs_money, summary_outs_money);
       return false;
     }
 
@@ -928,7 +929,7 @@ namespace cryptonote
       zero_secret_key &= (sender_account_keys.m_spend_secret_key.data[i] == 0);
     if (zero_secret_key)
     {
-      MDEBUG("Null secret key, skipping signatures");
+      oxen::log::debug(globallogcat, "Null secret key, skipping signatures");
     }
 
     uint64_t amount_in = 0, amount_out = 0;
@@ -978,13 +979,13 @@ namespace cryptonote
     {
       if (amount_in < amount_out + tx_params.burn_fixed)
       {
-        LOG_ERROR("invalid burn amount: tx does not have enough unspent funds available; amount_in: " << std::to_string(amount_in) << "; amount_out + tx_params.burn_fixed: " << std::to_string(amount_out) << " + " << std::to_string(tx_params.burn_fixed));
+        oxen::log::error(globallogcat, "invalid burn amount: tx does not have enough unspent funds available; amount_in: {}; amount_out + tx_params.burn_fixed: {} + {}", std::to_string(amount_in), std::to_string(amount_out), std::to_string(tx_params.burn_fixed));
         return false;
       }
       remove_field_from_tx_extra<tx_extra_burn>(tx.extra); // doesn't have to be present (but the wallet puts a dummy here as a safety to avoid growing the tx)
       if (!add_burned_amount_to_tx_extra(tx.extra, tx_params.burn_fixed))
       {
-        LOG_ERROR("failed to add burn amount to tx extra");
+        oxen::log::error(globallogcat, "failed to add burn amount to tx extra");
         return false;
       }
     }
@@ -1006,7 +1007,7 @@ namespace cryptonote
 
     CHECK_AND_ASSERT_MES(tx.vout.size() == outSk.size(), false, "outSk size does not match vout");
 
-    MCINFO("construct_tx", "transaction_created: " << get_transaction_hash(tx) << "\n" << obj_to_json_str(tx) << "\n");
+    oxen::log::info(oxen::log::Cat("construct_tx"), "transaction_created: {}\n{}\n", get_transaction_hash(tx), obj_to_json_str(tx));
 
     tx.invalidate_hashes();
 

@@ -238,7 +238,7 @@ bool gen_rct_tx_validation_base::generate_with_full(std::vector<test_event_entry
   if (!valid)
     DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(tx);
-  LOG_PRINT_L0("Test tx: " << obj_to_json_str(tx));
+  oxen::log::warning(globallogcat, "Test tx: {}", obj_to_json_str(tx));
 
   return true;
 }

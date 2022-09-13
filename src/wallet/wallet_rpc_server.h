@@ -44,11 +44,10 @@
 #include "wallet2.h"
 #include "rpc/common/http_server_base.h"
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "wallet.rpc"
-
 namespace tools
 {
+  static auto logcat = oxen::log::Cat("wallet.rpc");
+
   using HttpRequest = uWS::HttpRequest;
   using HttpResponse = uWS::HttpResponse<false/*SSL*/>;
 

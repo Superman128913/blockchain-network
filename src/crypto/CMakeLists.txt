@@ -66,6 +66,7 @@ target_link_libraries(cncrypto
     Boost::thread
     sodium
   PRIVATE
+    logging
     extra)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES Clang OR CMAKE_CXX_COMPILER_ID STREQUAL GNU)
