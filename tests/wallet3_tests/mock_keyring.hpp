@@ -18,7 +18,7 @@ class MockKeyring : public Keyring
         : Keyring(_spend_private_key, _spend_public_key, _view_private_key, _view_public_key)
     {}
 
-    std::vector<std::tuple<crypto::public_key, uint64_t, uint64_t, cryptonote::subaddress_index> > ours;
+    std::vector<std::tuple<crypto::public_key, uint64_t, uint64_t, cryptonote::subaddress_index, rct::key> > ours;
     std::vector<crypto::secret_key> predetermined_tx_keys{};
     int64_t next_tx_key = 0;
 
@@ -28,9 +28,10 @@ class MockKeyring : public Keyring
         const crypto::public_key& key,
         const uint64_t index,
         const uint64_t amount,
-        const cryptonote::subaddress_index& sub_index)
+        const cryptonote::subaddress_index& sub_index,
+        const rct::key mask)
     {
-      ours.push_back({key, index, amount, sub_index});
+      ours.push_back({key, index, amount, sub_index, mask});
     }
 
     virtual crypto::key_derivation
@@ -64,7 +65,7 @@ class MockKeyring : public Keyring
         const crypto::public_key& output_key,
         uint64_t output_index) override
     {
-      for (const auto& [our_key, our_index, our_amount, sub_index] : ours)
+      for (const auto& [our_key, our_index, our_amount, sub_index, our_mask] : ours)
       {
         if (our_key == output_key && our_index == output_index)
           return sub_index;
@@ -82,19 +83,18 @@ class MockKeyring : public Keyring
       return {};
     }
 
-    virtual uint64_t
-    output_amount(
+    virtual std::pair<uint64_t, rct::key>
+    output_amount_and_mask(
         const rct::rctSig& rv,
         const crypto::key_derivation& derivation,
-        unsigned int i,
-        rct::key& mask) override
+        unsigned int i) override
     {
-      for (const auto& [our_key, our_index, our_amount, sub_index] : ours)
+      for (const auto& [our_key, our_index, our_amount, sub_index, our_mask] : ours)
       {
         if (our_key == reinterpret_cast<const crypto::public_key&>(derivation) && our_index == i)
-          return our_amount;
+          return {our_amount, our_mask};
       }
-      return 0;
+      throw std::invalid_argument{"mock_keyring, output_amount_and_mask called on output that isn't ours"};
     }
 
     void
@@ -107,7 +107,7 @@ class MockKeyring : public Keyring
 
 
     crypto::secret_key
-    generate_tx_key(uint8_t hf_version)
+    generate_tx_key(cryptonote::hf hf_version)
     {
       if (predetermined_tx_keys.size() > 0)
       {

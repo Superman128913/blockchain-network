@@ -31,7 +31,7 @@ namespace wallet
 
    public:
 
-    DefaultDaemonComms(std::shared_ptr<oxenmq::OxenMQ> omq, DaemonCommsConfig& cfg);
+    DefaultDaemonComms(std::shared_ptr<oxenmq::OxenMQ> omq, DaemonCommsConfig cfg = {});
 
     void
     set_remote(std::string_view address);

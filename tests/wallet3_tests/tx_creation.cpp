@@ -41,7 +41,7 @@ class MockSigningKeyring : public Keyring
 
 
     crypto::secret_key
-    generate_tx_key(uint8_t hf_version)
+    generate_tx_key(cryptonote::hf hf_version)
     {
       if (predetermined_tx_keys.size() > 0)
       {
@@ -63,7 +63,7 @@ TEST_CASE("Transaction Creation", "[wallet,tx]")
   auto wallet = wallet::MockWallet();
   auto comms = std::make_shared<wallet::MockDaemonComms>();
   cryptonote::address_parse_info senders_address{};
-  cryptonote::get_account_address_from_str(senders_address, cryptonote::TESTNET, "T6Td9RNPPsMMApoxc59GLiVDS9a82FL2cNEwdMUCGWDLYTLv7e7rvi99aWdF4M2V1zN7q1Vdf1mage87SJ9gcgSu1wJZu3rFs");
+  cryptonote::get_account_address_from_str(senders_address, cryptonote::network_type::TESTNET, "T6Td9RNPPsMMApoxc59GLiVDS9a82FL2cNEwdMUCGWDLYTLv7e7rvi99aWdF4M2V1zN7q1Vdf1mage87SJ9gcgSu1wJZu3rFs");
   auto ctor = wallet::TransactionConstructor(wallet.get_db(), comms, senders_address);
   ctor.fee_per_byte = 0;
   ctor.fee_per_output  = 0;
@@ -72,7 +72,7 @@ TEST_CASE("Transaction Creation", "[wallet,tx]")
     std::vector<cryptonote::tx_destination_entry> recipients;
     recipients.emplace_back(cryptonote::tx_destination_entry{});
     recipients.back().amount = 4;
-    REQUIRE_THROWS(ctor.create_transaction(recipients));
+    REQUIRE_THROWS(ctor.create_transaction(recipients, recipients[0]));
   }
 
   wallet.store_test_transaction(5);
@@ -82,7 +82,7 @@ TEST_CASE("Transaction Creation", "[wallet,tx]")
     std::vector<cryptonote::tx_destination_entry> recipients;
     recipients.emplace_back(cryptonote::tx_destination_entry{});
     recipients.back().amount = 4;
-    wallet::PendingTransaction ptx = ctor.create_transaction(recipients);
+    wallet::PendingTransaction ptx = ctor.create_transaction(recipients, recipients[0]);
     REQUIRE(ptx.recipients.size() == 1);
     REQUIRE(ptx.chosen_outputs.size() == 1);
     REQUIRE(ptx.change.amount == 1);
@@ -96,7 +96,7 @@ TEST_CASE("Transaction Creation", "[wallet,tx]")
     std::vector<cryptonote::tx_destination_entry> recipients;
     recipients.emplace_back(cryptonote::tx_destination_entry{});
     recipients.back().amount = 6;
-    REQUIRE_THROWS(ctor.create_transaction(recipients));
+    REQUIRE_THROWS(ctor.create_transaction(recipients, recipients[0]));
   }
 
   wallet.store_test_transaction(5);
@@ -106,7 +106,7 @@ TEST_CASE("Transaction Creation", "[wallet,tx]")
     std::vector<cryptonote::tx_destination_entry> recipients;
     recipients.emplace_back(cryptonote::tx_destination_entry{});
     recipients.back().amount = 6;
-    wallet::PendingTransaction ptx = ctor.create_transaction(recipients);
+    wallet::PendingTransaction ptx = ctor.create_transaction(recipients, recipients[0]);
     REQUIRE(ptx.recipients.size() == 1);
     REQUIRE(ptx.chosen_outputs.size() == 1);
     REQUIRE(ptx.change.amount == 1);
@@ -120,7 +120,7 @@ TEST_CASE("Transaction Creation", "[wallet,tx]")
     std::vector<cryptonote::tx_destination_entry> recipients;
     recipients.emplace_back(cryptonote::tx_destination_entry{});
     recipients.back().amount = 8;
-    wallet::PendingTransaction ptx = ctor.create_transaction(recipients);
+    wallet::PendingTransaction ptx = ctor.create_transaction(recipients, recipients[0]);
     REQUIRE(ptx.recipients.size() == 1);
     REQUIRE(ptx.chosen_outputs.size() == 2);
     REQUIRE(ptx.decoys.size() == ptx.chosen_outputs.size());
@@ -137,7 +137,7 @@ TEST_CASE("Transaction Creation", "[wallet,tx]")
     std::vector<cryptonote::tx_destination_entry> recipients;
     recipients.emplace_back(cryptonote::tx_destination_entry{});
     recipients.back().amount = 4001;
-    wallet::PendingTransaction ptx = ctor.create_transaction(recipients);
+    wallet::PendingTransaction ptx = ctor.create_transaction(recipients, recipients[0]);
     REQUIRE(ptx.recipients.size() == 1);
     REQUIRE(ptx.chosen_outputs.size() == 2);
     // 8000 (Inputs) - 4001 (Recipient) - 1857 bytes x 1 oxen (Fee)
@@ -153,7 +153,7 @@ TEST_CASE("Transaction Creation", "[wallet,tx]")
     std::vector<cryptonote::tx_destination_entry> recipients;
     recipients.emplace_back(cryptonote::tx_destination_entry{});
     recipients.back().amount = 4001;
-    wallet::PendingTransaction ptx = ctor.create_transaction(recipients);
+    wallet::PendingTransaction ptx = ctor.create_transaction(recipients, recipients[0]);
     REQUIRE(ptx.recipients.size() == 1);
     REQUIRE(ptx.chosen_outputs.size() == 2);
     // 8000 (Inputs) - 4001 (Recipient) - 1857 bytes x 1 oxen (Fee) - 100 (Fee for 2x outputs @ 50 oxen) 
@@ -205,7 +205,7 @@ TEST_CASE("Transaction Signing", "[wallet,tx]")
     keys->add_tx_key("3d6035889b8dd0b5ecff1c7f37acb7fb7129a5d6bcecc9c69af56d4f2a2c910b");
 
     cryptonote::address_parse_info senders_address{};
-    cryptonote::get_account_address_from_str(senders_address, cryptonote::TESTNET, "T6Td9RNPPsMMApoxc59GLiVDS9a82FL2cNEwdMUCGWDLYTLv7e7rvi99aWdF4M2V1zN7q1Vdf1mage87SJ9gcgSu1wJZu3rFs");
+    cryptonote::get_account_address_from_str(senders_address, cryptonote::network_type::TESTNET, "T6Td9RNPPsMMApoxc59GLiVDS9a82FL2cNEwdMUCGWDLYTLv7e7rvi99aWdF4M2V1zN7q1Vdf1mage87SJ9gcgSu1wJZu3rFs");
     auto ctor_for_signing = wallet::TransactionConstructor(wallet_with_valid_inputs.get_db(), comms_with_decoys, senders_address);
 
     auto decoy_selector = std::make_unique<wallet::MockDecoySelector>();
@@ -233,9 +233,9 @@ TEST_CASE("Transaction Signing", "[wallet,tx]")
     std::vector<cryptonote::tx_destination_entry> recipients;
 
     cryptonote::address_parse_info recipient_address{};
-    cryptonote::get_account_address_from_str(recipient_address, cryptonote::TESTNET, "T6Sv1u1q5yTLaWCjASLPbkFz8ZFZJXQTn97tUZKDX8XaGFFEqJ5C4CC9aw1XGGfKAe8RzojvN5Mf7APr7Bpo6etb2ffiNBaSs");
+    cryptonote::get_account_address_from_str(recipient_address, cryptonote::network_type::TESTNET, "T6Sv1u1q5yTLaWCjASLPbkFz8ZFZJXQTn97tUZKDX8XaGFFEqJ5C4CC9aw1XGGfKAe8RzojvN5Mf7APr7Bpo6etb2ffiNBaSs");
     recipients.emplace_back(cryptonote::tx_destination_entry(50000000000, recipient_address.address, recipient_address.is_subaddress));
-    wallet::PendingTransaction ptx = ctor_for_signing.create_transaction(recipients);
+    wallet::PendingTransaction ptx = ctor_for_signing.create_transaction(recipients, recipients[0]);
     REQUIRE(ptx.finalise());
 
 
