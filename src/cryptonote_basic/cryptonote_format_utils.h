@@ -273,8 +273,7 @@ namespace cryptonote
       return true;
     } catch (const std::exception& e) {
       LOG_ERROR("Serialization of " << tools::type_name(typeid(T)) << " failed: " << e.what());
-      throw;
-//      return false;
+      return false;
     }
   }
   //---------------------------------------------------------------
