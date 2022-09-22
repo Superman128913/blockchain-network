@@ -1860,7 +1860,7 @@ namespace cryptonote::rpc {
   /// Outputs:
   ///
   ///  - \p balances a dict of {address: balance}
-  struct GET_ACCRUED_BATCHED_EARNINGS : RPC_COMMAND
+  struct GET_ACCRUED_BATCHED_EARNINGS : PUBLIC
   {
     static constexpr auto names() { return NAMES("get_accrued_batched_earnings"); }
 
