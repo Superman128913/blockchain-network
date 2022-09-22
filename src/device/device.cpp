@@ -29,6 +29,7 @@
 
 #include "device.hpp"
 #include "device_default.hpp"
+#include "logging/oxen_logger.h"
 #ifdef WITH_DEVICE_LEDGER
 #include "device_ledger.hpp"
 #endif
