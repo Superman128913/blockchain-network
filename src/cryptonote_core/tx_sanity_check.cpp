@@ -37,7 +37,7 @@
 namespace cryptonote
 {
 
-static auto logcat = oxen::log::Cat("verify");
+static auto logcat = log::Cat("verify");
 
 bool tx_sanity_check(const std::string &tx_blob, uint64_t rct_outs_available)
 {
@@ -45,13 +45,13 @@ bool tx_sanity_check(const std::string &tx_blob, uint64_t rct_outs_available)
 
   if (!cryptonote::parse_and_validate_tx_from_blob(tx_blob, tx))
   {
-    oxen::log::error(logcat, "Failed to parse transaction");
+    log::error(logcat, "Failed to parse transaction");
     return false;
   }
 
   if (cryptonote::is_coinbase(tx))
   {
-    oxen::log::error(logcat, "Transaction is coinbase");
+    log::error(logcat, "Transaction is coinbase");
     return false;
   }
   std::set<uint64_t> rct_indices;
@@ -76,7 +76,7 @@ bool tx_sanity_check(const std::set<uint64_t> &rct_indices, size_t n_indices, ui
 {
   if (n_indices <= 10)
   {
-    oxen::log::debug(logcat, "n_indices is only {}, not checking", n_indices);
+    log::debug(logcat, "n_indices is only {}, not checking", n_indices);
     return true;
   }
 
@@ -85,7 +85,7 @@ bool tx_sanity_check(const std::set<uint64_t> &rct_indices, size_t n_indices, ui
 
   if (rct_indices.size() < n_indices * 8 / 10)
   {
-    oxen::log::error(logcat, "amount of unique indices is too low (amount of rct indices is {}, out of total {} indices)", rct_indices.size(), n_indices);
+    log::error(logcat, "amount of unique indices is too low (amount of rct indices is {}, out of total {} indices)", rct_indices.size(), n_indices);
     return false;
   }
 
@@ -93,7 +93,7 @@ bool tx_sanity_check(const std::set<uint64_t> &rct_indices, size_t n_indices, ui
   uint64_t median = tools::median(std::move(offsets));
   if (median < rct_outs_available * 6 / 10)
   {
-    oxen::log::error(logcat, "median offset index is too low (median is {} out of total {}offsets). Transactions should contain a higher fraction of recent outputs.", median, rct_outs_available);
+    log::error(logcat, "median offset index is too low (median is {} out of total {}offsets). Transactions should contain a higher fraction of recent outputs.", median, rct_outs_available);
     return false;
   }
 

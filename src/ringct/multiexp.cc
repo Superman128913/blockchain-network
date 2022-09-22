@@ -95,7 +95,7 @@ extern "C"
 namespace rct
 {
 
-static auto logcat = oxen::log::Cat("multiexp");
+static auto logcat = log::Cat("multiexp");
 
 static inline bool operator<(const rct::key &k0, const rct::key&k1)
 {

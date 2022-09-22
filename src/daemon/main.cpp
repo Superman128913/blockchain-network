@@ -51,11 +51,13 @@
 
 namespace po = boost::program_options;
 
+namespace Log = oxen::log; // capital Log to avoid conflict with math.h log()
+
 using namespace std::literals;
 
 namespace {
 
-  static auto logcat = oxen::log::Cat("daemon");
+  auto logcat = Log::Cat("daemon");
 
   // Some ANSI color sequences that we use here (before the log system is initialized):
   constexpr auto RESET = "\033[0m";
@@ -295,7 +297,7 @@ int main(int argc, char const * argv[])
     //   if log-file argument given:
     //     absolute path
     //     relative path: relative to data_dir
-    oxen::log::Level log_level;
+    Log::Level log_level;
     if (auto level = oxen::logging::parse_level(command_line::get_arg(vm, daemon_args::arg_log_level).c_str())) {
         log_level = *level;
     } else {
@@ -317,7 +319,7 @@ int main(int argc, char const * argv[])
 
     // logging is now set up
     // FIXME: only print this when starting up as a daemon but not when running rpc commands
-    oxen::log::info(logcat, "Oxen '{}' (v{})", OXEN_RELEASE_NAME, OXEN_VERSION_FULL);
+    Log::info(logcat, "Oxen '{}' (v{})", OXEN_RELEASE_NAME, OXEN_VERSION_FULL);
 
     // If there are positional options, we're running a daemon command
     {
@@ -354,7 +356,7 @@ int main(int argc, char const * argv[])
       }
     }
 
-    oxen::log::info(logcat, "Moving from main() into the daemonize now.");
+    Log::info(logcat, "Moving from main() into the daemonize now.");
 
     return daemonizer::daemonize<daemonize::daemon>("Oxen Daemon", argc, argv, std::move(vm))
         ? 0 : 1;
@@ -362,14 +364,14 @@ int main(int argc, char const * argv[])
   catch (std::exception const & ex)
   {
     if (logs_initialized)
-      oxen::log::error(logcat, "Exception in main! {}", ex.what());
+      Log::error(logcat, "Exception in main! {}", ex.what());
     else
       std::cerr << RED << "Exception in main! " << ex.what() << RESET << "\n";
   }
   catch (...)
   {
     if (logs_initialized)
-      oxen::log::error(logcat, "Exception in main! (unknown exception type)");
+      Log::error(logcat, "Exception in main! (unknown exception type)");
     else
       std::cerr << RED << "Exception in main! (unknown exception type)" << RESET << "\n";
   }

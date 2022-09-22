@@ -50,9 +50,14 @@
 #define DEFAULT_MAX_CONCURRENCY 0
 #endif
 
+namespace wallet_args
+{
+
+  namespace log = oxen::log;
+
 namespace
 {
-  static auto logcat = oxen::log::Cat("wallet.wallet2");
+  static auto logcat = log::Cat("wallet.wallet2");
 
   class Print
   {
@@ -66,8 +71,6 @@ namespace
   };
 }
 
-namespace wallet_args
-{
   // Create on-demand to prevent static initialization order fiasco issues.
   command_line::arg_descriptor<std::string> arg_generate_from_json()
   {
@@ -168,7 +171,7 @@ namespace wallet_args
         }
         else
         {
-          oxen::log::error(logcat, "{}{}", wallet_args::tr("Can't find config file "), config);
+          log::error(logcat, "{}{}", wallet_args::tr("Can't find config file "), config);
           return false;
         }
       }
@@ -187,7 +190,7 @@ namespace wallet_args
       log_path = command_line::get_arg(vm, arg_log_file);
     else
       log_path = epee::string_tools::get_current_module_name() + ".log";
-    oxen::log::Level log_level;
+    log::Level log_level;
     if (auto level = oxen::logging::parse_level(command_line::get_arg(vm, arg_log_level).c_str())) {
         log_level = *level;
     } else {
@@ -206,13 +209,13 @@ namespace wallet_args
     Print(print) << "Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")";
 
     if (!command_line::is_arg_defaulted(vm, arg_log_level))
-      oxen::log::info(logcat, "Setting log level = {}", command_line::get_arg(vm, arg_log_level));
+      log::info(logcat, "Setting log level = {}", command_line::get_arg(vm, arg_log_level));
     else
     {
       const char *logs = getenv("OXEN_LOGS");
-      oxen::log::info(logcat, "Setting log levels = {}", (logs ? logs : "<default>"));
+      log::info(logcat, "Setting log levels = {}", (logs ? logs : "<default>"));
     }
-    //oxen::log::info(logcat, "{}{}", wallet_args::tr("Logging to: "), log_path);
+    //log::info(logcat, "{}{}", wallet_args::tr("Logging to: "), log_path);
 
     //Print(print) << boost::format(wallet_args::tr("Logging to %s")) % log_path;
 

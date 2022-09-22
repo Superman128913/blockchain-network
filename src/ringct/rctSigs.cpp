@@ -37,11 +37,10 @@
 #include "cryptonote_config.h"
 
 
-namespace
-{
-    static auto logcat = oxen::log::Cat("ringct");
+namespace rct {
+    static auto logcat = log::Cat("ringct");
 
-    rct::Bulletproof make_dummy_bulletproof(const std::vector<uint64_t> &outamounts, rct::keyV &C, rct::keyV &masks)
+    static rct::Bulletproof make_dummy_bulletproof(const std::vector<uint64_t> &outamounts, rct::keyV &C, rct::keyV &masks)
     {
         const size_t n_outs = outamounts.size();
         const rct::key I = rct::identity();
@@ -71,9 +70,7 @@ namespace
 
         return rct::Bulletproof{rct::keyV(n_outs, I), I, I, I, I, I, I, rct::keyV(nrl, I), rct::keyV(nrl, I), I, I, I};
     }
-}
 
-namespace rct {
     Bulletproof proveRangeBulletproof(keyV &C, keyV &masks, const std::vector<uint64_t> &amounts, epee::span<const key> sk, hw::device &hwdev)
     {
         CHECK_AND_ASSERT_THROW_MES(amounts.size() == sk.size(), "Invalid amounts/sk sizes");
@@ -123,7 +120,7 @@ namespace rct {
       for (size_t i = 0 ; i < 64 ; ++i) {
         if (ge_frombytes_vartime(&P1_p3[i], P1[i].bytes) != 0 || ge_frombytes_vartime(&P2_p3[i], P2[i].bytes) != 0)
         {
-          oxen::log::info(oxen::log::Cat("verify"), "point conv failed");
+          log::info(log::Cat("verify"), "point conv failed");
           return false;
         }
       }
@@ -384,13 +381,13 @@ namespace rct {
             ge_p1p1 p1;
             if (ge_frombytes_vartime(&p3, H2[i].bytes) != 0)
             {
-              oxen::log::info(oxen::log::Cat("verify"), "point conv failed");
+              log::info(log::Cat("verify"), "point conv failed");
               return false;
             }
             ge_p3_to_cached(&cached, &p3);
             if (ge_frombytes_vartime(&asCi[i], as.Ci[i].bytes) != 0)
             {
-              oxen::log::info(oxen::log::Cat("verify"), "point conv failed");
+              log::info(log::Cat("verify"), "point conv failed");
               return false;
             }
             ge_sub(&p1, &asCi[i], &cached);
@@ -564,7 +561,7 @@ namespace rct {
             ge_p3 Cp3;
             if (ge_frombytes_vartime(&Cp3, C.bytes) != 0)
             {
-              oxen::log::info(oxen::log::Cat("verify"), "point conv failed");
+              log::info(log::Cat("verify"), "point conv failed");
               return false;
             }
             ge_cached Ccached;
@@ -576,7 +573,7 @@ namespace rct {
                     ge_p3 p3;
                     if (ge_frombytes_vartime(&p3, pubs[i].mask.bytes) != 0)
                     {
-                      oxen::log::info(oxen::log::Cat("verify"), "point conv failed");
+                      log::info(log::Cat("verify"), "point conv failed");
                       return false;
                     }
                     ge_sub(&p1, &p3, &Ccached);
@@ -933,7 +930,7 @@ namespace rct {
 
             for (size_t i = 0; i < results.size(); ++i) {
               if (!results[i]) {
-                oxen::log::info(logcat, "Range proof verified failed for proof {}", i);
+                log::info(logcat, "Range proof verified failed for proof {}", i);
                 return false;
               }
             }
@@ -946,7 +943,7 @@ namespace rct {
             DP("mg sig verified?");
             DP(mgVerd);
             if (!mgVerd) {
-              oxen::log::info(logcat, "MG signature verification failed");
+              log::info(logcat, "MG signature verification failed");
               return false;
             }
           }
@@ -955,12 +952,12 @@ namespace rct {
         }
         catch (const std::exception &e)
         {
-          oxen::log::info(logcat, "Error in verRct: {}", e.what());
+          log::info(logcat, "Error in verRct: {}", e.what());
           return false;
         }
         catch (...)
         {
-          oxen::log::info(logcat, "Error in verRct, but not an actual exception");
+          log::info(logcat, "Error in verRct, but not an actual exception");
           return false;
         }
     }
@@ -1032,7 +1029,7 @@ namespace rct {
 
           //check pseudoOuts vs Outs..
           if (!equalKeys(sumPseudoOuts, sumOutpks)) {
-            oxen::log::info(logcat, "Sum check failed");
+            log::info(logcat, "Sum check failed");
             return false;
           }
 
@@ -1050,14 +1047,14 @@ namespace rct {
         }
         if (!proofs.empty() && !verBulletproof(proofs))
         {
-          oxen::log::info(logcat, "Aggregate range proof verified failed");
+          log::info(logcat, "Aggregate range proof verified failed");
           return false;
         }
 
         waiter.wait(&tpool);
         for (size_t i = 0; i < results.size(); ++i) {
           if (!results[i]) {
-            oxen::log::info(logcat, "Range proof verified failed for proof {}", i);
+            log::info(logcat, "Range proof verified failed for proof {}", i);
             return false;
           }
         }
@@ -1067,12 +1064,12 @@ namespace rct {
       // we can get deep throws from ge_frombytes_vartime if input isn't valid
       catch (const std::exception &e)
       {
-        oxen::log::info(logcat, "Error in verRctSemanticsSimple: {}", e.what());
+        log::info(logcat, "Error in verRctSemanticsSimple: {}", e.what());
         return false;
       }
       catch (...)
       {
-        oxen::log::info(logcat, "Error in verRctSemanticsSimple, but not an actual exception");
+        log::info(logcat, "Error in verRctSemanticsSimple, but not an actual exception");
         return false;
       }
     }
@@ -1120,7 +1117,7 @@ namespace rct {
 
         for (size_t i = 0; i < results.size(); ++i) {
           if (!results[i]) {
-            oxen::log::info(logcat, "verRctMGSimple/verRctCLSAGSimple failed for input {}", i);
+            log::info(logcat, "verRctMGSimple/verRctCLSAGSimple failed for input {}", i);
             return false;
           }
         }
@@ -1130,12 +1127,12 @@ namespace rct {
       // we can get deep throws from ge_frombytes_vartime if input isn't valid
       catch (const std::exception &e)
       {
-        oxen::log::info(logcat, "Error in verRctNonSemanticsSimple: {}", e.what());
+        log::info(logcat, "Error in verRctNonSemanticsSimple: {}", e.what());
         return false;
       }
       catch (...)
       {
-        oxen::log::info(logcat, "Error in verRctNonSemanticsSimple, but not an actual exception");
+        log::info(logcat, "Error in verRctNonSemanticsSimple, but not an actual exception");
         return false;
       }
     }

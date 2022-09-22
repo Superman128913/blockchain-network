@@ -39,9 +39,6 @@ using namespace std;
 
 namespace cryptonote
 {
-  
-  static auto logcat = oxen::log::Cat("multisig");
-
   //-----------------------------------------------------------------
   crypto::secret_key get_multisig_blinded_secret_key(const crypto::secret_key &key)
   {

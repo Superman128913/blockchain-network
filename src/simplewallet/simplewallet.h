@@ -61,8 +61,6 @@
  */
 namespace cryptonote
 {
-  static auto logcat = oxen::log::Cat("wallet.simplewallet");
-
   enum class Transfer {
     Normal,
     Locked
@@ -397,7 +395,7 @@ namespace cryptonote
         }
         else
         {
-          oxen::log::error(logcat, "Failed to get current blockchain height: {}", err);
+          log::error(log::Cat("wallet.simplewallet"), "Failed to get current blockchain height: {}", err);
         }
       }
 

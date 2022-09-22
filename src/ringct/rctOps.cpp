@@ -36,7 +36,9 @@
 using namespace crypto;
 using namespace std;
 
-#define CHECK_AND_ASSERT_THROW_MES_L1(expr, message) {if(!(expr)) {oxen::log::warning(oxen::log::Cat("ringct"), message); throw std::runtime_error(message);}}
+auto logcat = oxen::log::Cat("ringct");
+
+#define CHECK_AND_ASSERT_THROW_MES_L1(expr, message) {if(!(expr)) {oxen::log::warning(logcat, message); throw std::runtime_error(message);}}
 
 struct zero_commitment { uint64_t amount; rct::key commitment; };
 static const zero_commitment zero_commitments[] = {

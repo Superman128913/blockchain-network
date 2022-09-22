@@ -58,8 +58,6 @@ using namespace cryptonote;
 
 namespace Wallet {
 
-  static auto logcat = oxen::log::Cat("WalletAPI");
-
 namespace {
     static const int    DEFAULT_REFRESH_INTERVAL_MILLIS = 1000 * 10;
     // limit maximum refresh interval as one minute
@@ -143,7 +141,7 @@ struct Wallet2CallbackImpl : public tools::i_wallet2_callback
         // created or the restore height specified when wallet was recovered
         // 
         if(height >= m_wallet->m_wallet_ptr->get_refresh_from_block_height() || height % 1000 == 0) {
-            // oxen::log::trace(logcat, "{}: new block. height: {}", __FUNCTION__, height);
+            // log::trace(logcat, "{}: new block. height: {}", __FUNCTION__, height);
             if (m_listener) {
                 m_listener->newBlock(height);
             }
@@ -155,7 +153,7 @@ struct Wallet2CallbackImpl : public tools::i_wallet2_callback
     {
         std::string tx_hash = tools::type_to_hex(txid);
 
-        oxen::log::trace(logcat, "{}: money received.{}{}", __FUNCTION__, (blink ? "blink: " : "height: "), height
+        log::trace(logcat, "{}: money received.{}{}", __FUNCTION__, (blink ? "blink: " : "height: "), height
                      << ", tx: " << tx_hash
                      << ", amount: " << print_money(amount)
                      << ", idx: " << subaddr_index);
@@ -172,7 +170,7 @@ struct Wallet2CallbackImpl : public tools::i_wallet2_callback
 
         std::string tx_hash = tools::type_to_hex(txid);
 
-        oxen::log::trace(logcat, "{}: unconfirmed money received. height:  {}", __FUNCTION__, height
+        log::trace(logcat, "{}: unconfirmed money received. height:  {}", __FUNCTION__, height
                      << ", tx: " << tx_hash
                      << ", amount: " << print_money(amount)
                      << ", idx: " << subaddr_index);
@@ -193,7 +191,7 @@ struct Wallet2CallbackImpl : public tools::i_wallet2_callback
     {
         // TODO;
         std::string tx_hash = tools::type_to_hex(txid);
-        oxen::log::trace(logcat, "{}: money spent. height:  {}", __FUNCTION__, height
+        log::trace(logcat, "{}: money spent. height:  {}", __FUNCTION__, height
                      << ", tx: " << tx_hash
                      << ", amount: " << print_money(amount)
                      << ", idx: " << subaddr_index);
@@ -416,17 +414,17 @@ void Wallet::init(const char *argv0, const char *default_log_base_name, const st
 
 EXPORT
 void Wallet::debug(const std::string &category, const std::string &str) {
-    oxen::log::debug(category.empty() ? logcat : oxenlog::Category(category.c_str()), str);
+    log::debug(category.empty() ? logcat : oxenlog::Category(category.c_str()), str);
 }
 
 EXPORT
 void Wallet::info(const std::string &category, const std::string &str) {
-    oxen::log::info(category.empty() ? logcat : oxenlog::Category(category.c_str()), str);
+    log::info(category.empty() ? logcat : oxenlog::Category(category.c_str()), str);
 }
 
 EXPORT
 void Wallet::warning(const std::string &category, const std::string &str) {
-    oxen::log::warning(category.empty() ? logcat : oxenlog::Category(category.c_str()), str);
+    log::warning(category.empty() ? logcat : oxenlog::Category(category.c_str()), str);
 }
 
 EXPORT
@@ -481,7 +479,7 @@ EXPORT
 WalletImpl::~WalletImpl()
 {
 
-    oxen::log::info(__FUNCTION__);
+    log::info(__FUNCTION__);
     m_wallet_ptr->callback(nullptr);
     // Stop refresh and long poll threads
     stopRefresh();
@@ -496,7 +494,7 @@ WalletImpl::~WalletImpl()
       m_wallet2Callback->getListener()->onSetWallet(nullptr);
     }
 
-    oxen::log::info(logcat, "{} finished", __FUNCTION__);
+    log::info(logcat, "{} finished", __FUNCTION__);
 }
 
 EXPORT
@@ -510,15 +508,15 @@ bool WalletImpl::create(std::string_view path_, const std::string &password, con
     bool keys_file_exists;
     bool wallet_file_exists;
     tools::wallet2::wallet_exists(path, keys_file_exists, wallet_file_exists);
-    oxen::log::trace(logcat, "wallet_path: {}", path);
-    oxen::log::trace(logcat, "keys_file_exists: {}{}{}", std::boolalpha, keys_file_exists, std::noboolalpha
+    log::trace(logcat, "wallet_path: {}", path);
+    log::trace(logcat, "keys_file_exists: {}{}{}", std::boolalpha, keys_file_exists, std::noboolalpha
                  << "  wallet_file_exists: " << std::boolalpha << wallet_file_exists << std::noboolalpha);
 
 
     // add logic to error out if new wallet requested but named wallet file exists
     if (keys_file_exists || wallet_file_exists) {
         std::string error = "attempting to generate or restore wallet, but specified file(s) exist.  Exiting to not risk overwriting.";
-        oxen::log::error(error);
+        log::error(error);
         setStatusCritical(error);
         return false;
     }
@@ -531,7 +529,7 @@ bool WalletImpl::create(std::string_view path_, const std::string &password, con
         m_password = password;
         clearStatus();
     } catch (const std::exception &e) {
-        oxen::log::error(logcat, "Error creating wallet: {}", e.what());
+        log::error(logcat, "Error creating wallet: {}", e.what());
         setStatusCritical(e.what());
         return false;
     }
@@ -553,14 +551,14 @@ bool WalletImpl::createWatchOnly(std::string_view path_, const std::string &pass
     bool keys_file_exists;
     bool wallet_file_exists;
     tools::wallet2::wallet_exists(path, keys_file_exists, wallet_file_exists);
-    oxen::log::trace(logcat, "wallet_path: {}", path);
-    oxen::log::trace(logcat, "keys_file_exists: {}{}{}", std::boolalpha, keys_file_exists, std::noboolalpha
+    log::trace(logcat, "wallet_path: {}", path);
+    log::trace(logcat, "keys_file_exists: {}{}{}", std::boolalpha, keys_file_exists, std::noboolalpha
                  << "  wallet_file_exists: " << std::boolalpha << wallet_file_exists << std::noboolalpha);
 
     // add logic to error out if new wallet requested but named wallet file exists
     if (keys_file_exists || wallet_file_exists) {
         std::string error = "attempting to generate view only wallet, but specified file(s) exist.  Exiting to not risk overwriting.";
-        oxen::log::error(error);
+        log::error(error);
         setStatusError(error);
         return false;
     }
@@ -599,7 +597,7 @@ bool WalletImpl::createWatchOnly(std::string_view path_, const std::string &pass
         view_wallet->import_key_images(key_images.second, key_images.first, spent, unspent, false);
         clearStatus();
     } catch (const std::exception &e) {
-        oxen::log::error(logcat, "Error creating view only wallet: {}", e.what());
+        log::error(logcat, "Error creating view only wallet: {}", e.what());
         setStatusError(e.what());
         return false;
     }
@@ -680,16 +678,16 @@ bool WalletImpl::recoverFromKeysWithPassword(std::string_view path_,
         auto w = wallet();
         if (has_spendkey && has_viewkey) {
             w->generate(path, password, info.address, spendkey, viewkey);
-            oxen::log::info(logcat, "Generated new wallet from spend key and view key");
+            log::info(logcat, "Generated new wallet from spend key and view key");
         }
         if(!has_spendkey && has_viewkey) {
             w->generate(path, password, info.address, viewkey);
-            oxen::log::info(logcat, "Generated new view only wallet from keys");
+            log::info(logcat, "Generated new view only wallet from keys");
         }
         if(has_spendkey && !has_viewkey) {
             w->generate(path, password, spendkey, true, false);
             setSeedLanguage(language);
-            oxen::log::info(logcat, "Generated deterministic wallet from spend key with seed language: " + language);
+            log::info(logcat, "Generated deterministic wallet from spend key with seed language: " + language);
         }
         
     }
@@ -711,7 +709,7 @@ bool WalletImpl::recoverFromDevice(std::string_view path_, const std::string &pa
     try
     {
         w->restore_from_device(path, password, device_name);
-        oxen::log::info(logcat, "Generated new wallet from device: " + device_name);
+        log::info(logcat, "Generated new wallet from device: " + device_name);
     }
     catch (const std::exception& e) {
         setStatusError(std::string(tr("failed to generate new wallet: ")) + e.what());
@@ -749,7 +747,7 @@ bool WalletImpl::open(std::string_view path_, const std::string &password)
 
         m_password = password;
     } catch (const std::exception &e) {
-        oxen::log::error(logcat, "Error opening wallet: {}", e.what());
+        log::error(logcat, "Error opening wallet: {}", e.what());
         setStatusCritical(e.what());
     }
     return good();
@@ -761,7 +759,7 @@ bool WalletImpl::recover(std::string_view path_, const std::string &password, co
     auto path = fs::u8path(path_);
     clearStatus();
     if (seed.empty()) {
-        oxen::log::error(logcat, "Electrum seed is empty");
+        log::error(logcat, "Electrum seed is empty");
         setStatusError(tr("Electrum seed is empty"));
         return false;
     }
@@ -798,7 +796,7 @@ bool WalletImpl::close(bool store)
 {
 
     bool result = false;
-    oxen::log::info(logcat, "closing wallet...");
+    log::info(logcat, "closing wallet...");
     try {
         auto w = wallet();
         if (store) {
@@ -807,18 +805,18 @@ bool WalletImpl::close(bool store)
             if (status().first != Status_Critical)
                 w->store();
             else
-                oxen::log::error(logcat, "Status_Critical - not saving wallet");
-            oxen::log::info(logcat, "wallet::store done");
+                log::error(logcat, "Status_Critical - not saving wallet");
+            log::info(logcat, "wallet::store done");
         }
-        oxen::log::info(logcat, "Calling wallet::stop...");
+        log::info(logcat, "Calling wallet::stop...");
         w->stop();
-        oxen::log::info(logcat, "wallet::stop done");
+        log::info(logcat, "wallet::stop done");
         w->deinit();
         result = true;
         clearStatus();
     } catch (const std::exception &e) {
         setStatusCritical(e.what());
-        oxen::log::error(logcat, "Error closing wallet: {}", e.what());
+        log::error(logcat, "Error closing wallet: {}", e.what());
     }
     return result;
 }
@@ -961,7 +959,7 @@ bool WalletImpl::store(std::string_view path_)
             wallet()->store_to(path, m_password);
         }
     } catch (const std::exception &e) {
-        oxen::log::error(logcat, "Error saving wallet: {}", e.what());
+        log::error(logcat, "Error saving wallet: {}", e.what());
         setStatusError(e.what());
         return false;
     }
@@ -1019,7 +1017,7 @@ bool WalletImpl::lightWalletImportWalletRequest(std::string &payment_id, uint64_
   }
   catch (const std::exception &e)
   {
-    oxen::log::error(logcat, "Error sending import wallet request: {}", e.what());
+    log::error(logcat, "Error sending import wallet request: {}", e.what());
     setStatusError(e.what());
     return false;
   }
@@ -1139,7 +1137,7 @@ uint64_t WalletImpl::daemonBlockChainHeight() const
     std::string err;
     uint64_t result = w->get_daemon_blockchain_height(err);
     if (!err.empty()) {
-        oxen::log::error(logcat, "{}: {}", __FUNCTION__, err);
+        log::error(logcat, "{}: {}", __FUNCTION__, err);
         result = 0;
         setStatusError(err);
     } else {
@@ -1165,7 +1163,7 @@ uint64_t WalletImpl::daemonBlockChainTargetHeight() const
     std::string err;
     uint64_t result = w->get_daemon_blockchain_target_height(err);
     if (!err.empty()) {
-        oxen::log::error(logcat, "{}: {}", __FUNCTION__, err);
+        log::error(logcat, "{}: {}", __FUNCTION__, err);
         result = 0;
         setStatusError(err);
     } else {
@@ -1205,7 +1203,7 @@ bool WalletImpl::refresh()
 EXPORT
 void WalletImpl::refreshAsync()
 {
-    oxen::log::trace(logcat, "{}: Refreshing asynchronously..", __FUNCTION__);
+    log::trace(logcat, "{}: Refreshing asynchronously..", __FUNCTION__);
     clearStatus();
     m_refreshCV.notify_one();
 }
@@ -1236,7 +1234,7 @@ EXPORT
 void WalletImpl::setAutoRefreshInterval(int millis)
 {
     if (millis > MAX_REFRESH_INTERVAL_MILLIS) {
-        oxen::log::error(logcat, "{}: invalid refresh interval {}", __FUNCTION__, millis
+        log::error(logcat, "{}: invalid refresh interval {}", __FUNCTION__, millis
                   << " ms, maximum allowed is " << MAX_REFRESH_INTERVAL_MILLIS << " ms");
         m_refreshIntervalMillis = MAX_REFRESH_INTERVAL_MILLIS;
     } else {
@@ -1313,7 +1311,7 @@ bool WalletImpl::exportKeyImages(std::string_view filename_)
   }
   catch (const std::exception &e)
   {
-    oxen::log::error(logcat, "Error exporting key images: {}", e.what());
+    log::error(logcat, "Error exporting key images: {}", e.what());
     setStatusError(e.what());
     return false;
   }
@@ -1332,12 +1330,12 @@ bool WalletImpl::importKeyImages(std::string_view filename_)
   {
     uint64_t spent = 0, unspent = 0;
     uint64_t height = wallet()->import_key_images_from_file(filename, spent, unspent);
-    oxen::log::debug(logcat, "Signed key images imported to height {}, ", height
+    log::debug(logcat, "Signed key images imported to height {}, ", height
         << print_money(spent) << " spent, " << print_money(unspent) << " unspent");
   }
   catch (const std::exception &e)
   {
-    oxen::log::error(logcat, "Error exporting key images: {}", e.what());
+    log::error(logcat, "Error exporting key images: {}", e.what());
     setStatusError(std::string(tr("Failed to import key images: ")) + e.what());
     return false;
   }
@@ -1374,7 +1372,7 @@ std::string WalletImpl::getSubaddressLabel(uint32_t accountIndex, uint32_t addre
     }
     catch (const std::exception &e)
     {
-        oxen::log::error(logcat, "Error getting subaddress label: {}", e.what());
+        log::error(logcat, "Error getting subaddress label: {}", e.what());
         setStatusError(std::string(tr("Failed to get subaddress label: ")) + e.what());
         return "";
     }
@@ -1388,7 +1386,7 @@ void WalletImpl::setSubaddressLabel(uint32_t accountIndex, uint32_t addressIndex
     }
     catch (const std::exception &e)
     {
-        oxen::log::error(logcat, "Error setting subaddress label: {}", e.what());
+        log::error(logcat, "Error setting subaddress label: {}", e.what());
         setStatusError(std::string(tr("Failed to set subaddress label: ")) + e.what());
     }
 }
@@ -1411,7 +1409,7 @@ std::string WalletImpl::getMultisigInfo() const {
         clearStatus();
         return wallet()->get_multisig_info();
     } catch (const std::exception& e) {
-        oxen::log::error(logcat, "Error on generating multisig info: {}", e.what());
+        log::error(logcat, "Error on generating multisig info: {}", e.what());
         setStatusError(std::string(tr("Failed to get multisig info: ")) + e.what());
     }
 
@@ -1429,7 +1427,7 @@ std::string WalletImpl::makeMultisig(const std::vector<std::string>& info, uint3
 
         return w->make_multisig(epee::wipeable_string(m_password), info, threshold);
     } catch (const std::exception& e) {
-        oxen::log::error(logcat, "Error on making multisig wallet: {}", e.what());
+        log::error(logcat, "Error on making multisig wallet: {}", e.what());
         setStatusError(std::string(tr("Failed to make multisig: ")) + e.what());
     }
 
@@ -1445,7 +1443,7 @@ std::string WalletImpl::exchangeMultisigKeys(const std::vector<std::string> &inf
 
         return w->exchange_multisig_keys(epee::wipeable_string(m_password), info);
     } catch (const std::exception& e) {
-        oxen::log::error(logcat, "Error on exchanging multisig keys: {}", e.what());
+        log::error(logcat, "Error on exchanging multisig keys: {}", e.what());
         setStatusError(std::string(tr("Failed to make multisig: ")) + e.what());
     }
 
@@ -1465,7 +1463,7 @@ bool WalletImpl::finalizeMultisig(const std::vector<std::string>& extraMultisigI
 
         setStatusError(tr("Failed to finalize multisig wallet creation"));
     } catch (const std::exception& e) {
-        oxen::log::error(logcat, "Error on finalizing multisig wallet creation: {}", e.what());
+        log::error(logcat, "Error on finalizing multisig wallet creation: {}", e.what());
         setStatusError(std::string(tr("Failed to finalize multisig wallet creation: ")) + e.what());
     }
 
@@ -1483,7 +1481,7 @@ bool WalletImpl::exportMultisigImages(std::string& images) {
         images = oxenc::to_hex(blob);
         return true;
     } catch (const std::exception& e) {
-        oxen::log::error(logcat, "Error on exporting multisig images: {}", e.what());
+        log::error(logcat, "Error on exporting multisig images: {}", e.what());
         setStatusError(std::string(tr("Failed to export multisig images: ")) + e.what());
     }
 
@@ -1502,7 +1500,7 @@ size_t WalletImpl::importMultisigImages(const std::vector<std::string>& images) 
 
         for (const auto& image: images) {
             if (!oxenc::is_hex(image)) {
-                oxen::log::error(logcat, "Failed to parse imported multisig images");
+                log::error(logcat, "Failed to parse imported multisig images");
                 setStatusError(tr("Failed to parse imported multisig images"));
                 return 0;
             }
@@ -1512,7 +1510,7 @@ size_t WalletImpl::importMultisigImages(const std::vector<std::string>& images) 
 
         return w->import_multisig(blobs);
     } catch (const std::exception& e) {
-        oxen::log::error(logcat, "Error on importing multisig images: {}", e.what());
+        log::error(logcat, "Error on importing multisig images: {}", e.what());
         setStatusError(std::string(tr("Failed to import multisig images: ")) + e.what());
     }
 
@@ -1528,7 +1526,7 @@ bool WalletImpl::hasMultisigPartialKeyImages() const {
 
         return w->has_multisig_partial_key_images();
     } catch (const std::exception& e) {
-        oxen::log::error(logcat, "Error on checking for partial multisig key images: {}", e.what());
+        log::error(logcat, "Error on checking for partial multisig key images: {}", e.what());
         setStatusError(std::string(tr("Failed to check for partial multisig key images: ")) + e.what());
     }
 
@@ -1555,7 +1553,7 @@ PendingTransaction* WalletImpl::restoreMultisigTransaction(const std::string& si
 
         return ptx;
     } catch (std::exception& e) {
-        oxen::log::error(logcat, "Error on restoring multisig transaction: {}", e.what());
+        log::error(logcat, "Error on restoring multisig transaction: {}", e.what());
         setStatusError(std::string(tr("Failed to restore multisig transaction: ")) + e.what());
     }
 
@@ -2272,14 +2270,14 @@ bool WalletImpl::setStatus(int status, std::string message) const
 EXPORT
 void WalletImpl::refreshThreadFunc()
 {
-    oxen::log::trace(logcat, "{}: starting refresh thread", __FUNCTION__);
+    log::trace(logcat, "{}: starting refresh thread", __FUNCTION__);
 
     while (true) {
         std::unique_lock lock{m_refreshMutex};
         if (m_refreshThreadDone) {
             break;
         }
-        oxen::log::trace(logcat, "{}: waiting for refresh...", __FUNCTION__);
+        log::trace(logcat, "{}: waiting for refresh...", __FUNCTION__);
         // if auto refresh enabled, we wait for the "m_refreshIntervalSeconds" interval.
         // if not - we wait forever
         if (std::chrono::milliseconds max_delay{m_refreshIntervalMillis.load()};
@@ -2289,17 +2287,17 @@ void WalletImpl::refreshThreadFunc()
             m_refreshCV.wait(lock);
         }
 
-        oxen::log::trace(logcat, "{}: refresh lock acquired...", __FUNCTION__);
-        oxen::log::trace(logcat, "{}: m_refreshEnabled: {}", __FUNCTION__, m_refreshEnabled);
+        log::trace(logcat, "{}: refresh lock acquired...", __FUNCTION__);
+        log::trace(logcat, "{}: m_refreshEnabled: {}", __FUNCTION__, m_refreshEnabled);
         auto st = status();
-        oxen::log::trace(logcat, "{}: m_status: {}: {}", __FUNCTION__, st.first, st.second);
-        oxen::log::trace(logcat, "{}: m_refreshShouldRescan: {}", __FUNCTION__, m_refreshShouldRescan);
+        log::trace(logcat, "{}: m_status: {}: {}", __FUNCTION__, st.first, st.second);
+        log::trace(logcat, "{}: m_refreshShouldRescan: {}", __FUNCTION__, m_refreshShouldRescan);
         if (m_refreshEnabled) {
-            oxen::log::trace(logcat, "{}: refreshing...", __FUNCTION__);
+            log::trace(logcat, "{}: refreshing...", __FUNCTION__);
             doRefresh();
         }
     }
-    oxen::log::trace(logcat, "{}: refresh thread stopped", __FUNCTION__);
+    log::trace(logcat, "{}: refresh thread stopped", __FUNCTION__);
 }
 
 EXPORT
@@ -2310,7 +2308,7 @@ void WalletImpl::doRefresh()
     std::lock_guard guard{m_refreshMutex2};
     do {
         try {
-            oxen::log::trace(logcat, "{}: doRefresh, rescan = {}", __FUNCTION__, rescan);
+            log::trace(logcat, "{}: doRefresh, rescan = {}", __FUNCTION__, rescan);
             auto w = wallet();
 
             // Syncing daemon and refreshing wallet simultaneously is very resource intensive.
@@ -2334,7 +2332,7 @@ void WalletImpl::doRefresh()
                 }
                 w->find_and_save_rings(false);
             } else {
-               oxen::log::trace(logcat, "{}: skipping refresh - daemon is not synced", __FUNCTION__);
+               log::trace(logcat, "{}: skipping refresh - daemon is not synced", __FUNCTION__);
             }
         } catch (const std::exception &e) {
             setStatusError(e.what());
@@ -2352,7 +2350,7 @@ EXPORT
 void WalletImpl::startRefresh()
 {
     if (!m_refreshEnabled) {
-        oxen::log::debug(logcat, "{}: refresh started/resumed...", __FUNCTION__);
+        log::debug(logcat, "{}: refresh started/resumed...", __FUNCTION__);
         m_refreshEnabled = true;
         m_refreshCV.notify_one();
     }
@@ -2374,7 +2372,7 @@ void WalletImpl::stopRefresh()
 EXPORT
 void WalletImpl::pauseRefresh()
 {
-    oxen::log::debug(logcat, "{}: refresh paused...", __FUNCTION__);
+    log::debug(logcat, "{}: refresh paused...", __FUNCTION__);
     // TODO synchronize access
     if (!m_refreshThreadDone) {
         m_refreshEnabled = false;
@@ -2420,12 +2418,12 @@ bool WalletImpl::doInit(const std::string &daemon_address, uint64_t upper_transa
     // If daemon isn't synced a calculated block height will be used instead
     //TODO: Handle light wallet scenario where block height = 0.
     if (isNewWallet() && daemonSynced()) {
-        oxen::log::debug(logcat, "{}:New Wallet - fast refresh until {}", __FUNCTION__, daemonBlockChainHeight());
+        log::debug(logcat, "{}:New Wallet - fast refresh until {}", __FUNCTION__, daemonBlockChainHeight());
         w->set_refresh_from_block_height(daemonBlockChainHeight());
     }
 
     if (m_rebuildWalletCache)
-      oxen::log::debug(logcat, "{}: Rebuilding wallet cache, fast refresh until block {}", __FUNCTION__, w->get_refresh_from_block_height());
+      log::debug(logcat, "{}: Rebuilding wallet cache, fast refresh until block {}", __FUNCTION__, w->get_refresh_from_block_height());
 
     if (Utils::isAddressLocal(daemon_address)) {
         this->setTrustedDaemon(true);
@@ -2460,7 +2458,7 @@ bool WalletImpl::rescanSpent()
   try {
       wallet()->rescan_spent();
   } catch (const std::exception &e) {
-      oxen::log::error(logcat, "{} error: {}", __FUNCTION__, e.what());
+      log::error(logcat, "{} error: {}", __FUNCTION__, e.what());
       setStatusError(e.what());
       return false;
   }
@@ -2680,7 +2678,7 @@ PendingTransaction* WalletImpl::stakePending(const std::string& sn_key_str, cons
   if (!tools::hex_to_type(sn_key_str, sn_key))
   {
     error_msg = "Failed to parse service node pubkey";
-    oxen::log::error(error_msg);
+    log::error(error_msg);
     transaction->setError(error_msg);
     return transaction;
   }
@@ -2689,7 +2687,7 @@ PendingTransaction* WalletImpl::stakePending(const std::string& sn_key_str, cons
   if (stake_result.status != tools::wallet2::stake_result_status::success)
   {
     error_msg = "Failed to create a stake transaction: " + stake_result.msg;
-    oxen::log::error(error_msg);
+    log::error(error_msg);
     transaction->setError(error_msg);
     return transaction;
   }

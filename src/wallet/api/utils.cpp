@@ -31,6 +31,7 @@
 #include "common_defines.h"
 #include "epee/misc_log_ex.h"
 #include "common/util.h"
+#include "wallet.h"
 
 namespace Wallet {
 namespace Utils {
@@ -41,7 +42,7 @@ bool isAddressLocal(const std::string &address)
     try {
         return tools::is_local_address(address);
     } catch (const std::exception &e) {
-        oxen::log::error(logcat, "error: {}", e.what());
+        log::error(logcat, "error: {}", e.what());
         return false;
     }
 }

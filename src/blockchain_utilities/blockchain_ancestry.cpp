@@ -49,10 +49,10 @@
 #include "cryptonote_core/uptime_proof.h"
 #include <fmt/std.h>
 
-static auto logcat = oxen::log::Cat("bcutil");
-
 namespace po = boost::program_options;
 using namespace cryptonote;
+
+static auto logcat = log::Cat("bcutil");
 
 static bool stop_requested = false;
 static uint64_t cached_txes = 0, cached_blocks = 0, cached_outputs = 0, total_txes = 0, total_blocks = 0, total_outputs = 0;
@@ -103,7 +103,7 @@ struct tx_data_t
           vin.push_back(std::make_pair(txin->amount, cryptonote::relative_output_offsets_to_absolute(txin->key_offsets)));
         else
         {
-          oxen::log::warning(logcat, "Bad vin type in txid {}", get_transaction_hash(tx));
+          log::warning(logcat, "Bad vin type in txid {}", get_transaction_hash(tx));
           throw std::runtime_error("Bad vin type");
         }
       }
@@ -117,7 +117,7 @@ struct tx_data_t
       }
       else
       {
-        oxen::log::warning(logcat, "Bad vout type in txid {}", get_transaction_hash(tx));
+        log::warning(logcat, "Bad vout type in txid {}", get_transaction_hash(tx));
         throw std::runtime_error("Bad vout type");
       }
     }
@@ -216,7 +216,7 @@ static std::unordered_set<ancestor> get_ancestry(const std::unordered_map<crypto
   std::unordered_map<crypto::hash, std::unordered_set<ancestor>>::const_iterator i = ancestry.find(txid);
   if (i == ancestry.end())
   {
-    //oxen::log::error(logcat, "txid ancestry not found: {}", txid);
+    //log::error(logcat, "txid ancestry not found: {}", txid);
     //throw std::runtime_error("txid ancestry not found");
     return std::unordered_set<ancestor>();
   }
@@ -235,7 +235,7 @@ static bool get_block_from_height(ancestry_state_t &state, BlockchainDB *db, uin
   std::string bd = db->get_block_blob_from_height(height);
   if (!cryptonote::parse_and_validate_block_from_blob(bd, b))
   {
-    oxen::log::warning(logcat, "Bad block from db");
+    log::warning(logcat, "Bad block from db");
     return false;
   }
   if (opt_cache_blocks)
@@ -260,13 +260,13 @@ static bool get_transaction(ancestry_state_t &state, BlockchainDB *db, const cry
   std::string bd;
   if (!db->get_pruned_tx_blob(txid, bd))
   {
-    oxen::log::warning(logcat, "Failed to get txid {} from db", txid);
+    log::warning(logcat, "Failed to get txid {} from db", txid);
     return false;
   }
   cryptonote::transaction tx;
   if (!cryptonote::parse_and_validate_tx_base_from_blob(bd, tx))
   {
-    oxen::log::warning(logcat, "Bad tx: {}", txid);
+    log::warning(logcat, "Bad tx: {}", txid);
     return false;
   }
   tx_data = ::tx_data_t(tx);
@@ -305,7 +305,7 @@ static bool get_output_txid(ancestry_state_t &state, BlockchainDB *db, uint64_t 
     }
     else
     {
-      oxen::log::warning(logcat, "Bad vout type in txid {}", cryptonote::get_transaction_hash(b.miner_tx));
+      log::warning(logcat, "Bad vout type in txid {}", cryptonote::get_transaction_hash(b.miner_tx));
       return false;
     }
   }
@@ -389,7 +389,7 @@ int main(int argc, char* argv[])
   }
   auto m_config_folder = command_line::get_arg(vm, cryptonote::arg_data_dir);
   auto log_file_path = m_config_folder + "oxen-blockchain-ancestry.log";
-  oxen::log::Level log_level;
+  log::Level log_level;
   if(auto level = oxen::logging::parse_level(command_line::get_arg(vm, arg_log_level).c_str())) {
     log_level = *level;
   } else {
@@ -397,7 +397,7 @@ int main(int argc, char* argv[])
       throw std::runtime_error{"Incorrect log level"};
   }
   oxen::logging::init(log_file_path, log_level);
-  oxen::log::warning(logcat, "Starting...");
+  log::warning(logcat, "Starting...");
 
   std::string opt_data_dir = command_line::get_arg(vm, cryptonote::arg_data_dir);
   bool opt_testnet = command_line::get_arg(vm, cryptonote::arg_testnet_on);
@@ -437,19 +437,19 @@ int main(int argc, char* argv[])
     }
   }
 
-  oxen::log::warning(logcat, "Initializing source blockchain (BlockchainDB)");
+  log::warning(logcat, "Initializing source blockchain (BlockchainDB)");
   blockchain_objects_t blockchain_objects = {};
   Blockchain *core_storage = &blockchain_objects.m_blockchain;
   BlockchainDB *db = new_db();
   if (db == NULL)
   {
-    oxen::log::error(logcat, "Failed to initialize a database");
+    log::error(logcat, "Failed to initialize a database");
     throw std::runtime_error("Failed to initialize a database");
   }
-  oxen::log::warning(logcat, "database: LMDB");
+  log::warning(logcat, "database: LMDB");
 
   fs::path filename = fs::u8path(opt_data_dir) / db->get_db_name();
-  oxen::log::warning(logcat, "Loading blockchain from folder {} ...", filename);
+  log::warning(logcat, "Loading blockchain from folder {} ...", filename);
 
   try
   {
@@ -457,20 +457,20 @@ int main(int argc, char* argv[])
   }
   catch (const std::exception& e)
   {
-    oxen::log::warning(logcat, "Error opening database: {}", e.what());
+    log::warning(logcat, "Error opening database: {}", e.what());
     return 1;
   }
   r = core_storage->init(db, nullptr /*ons_db*/, nullptr, net_type);
 
   CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize source blockchain storage");
-  oxen::log::warning(logcat, "Source blockchain storage initialized OK");
+  log::warning(logcat, "Source blockchain storage initialized OK");
 
   std::vector<crypto::hash> start_txids;
 
   ancestry_state_t state;
 
   fs::path state_file_path = fs::u8path(opt_data_dir) / "ancestry-state.bin";
-  oxen::log::warning(logcat, "Loading state data from {}", state_file_path);
+  log::warning(logcat, "Loading state data from {}", state_file_path);
   fs::ifstream state_data_in;
   state_data_in.open(state_file_path, std::ios_base::binary | std::ios_base::in);
   if (!state_data_in.fail())
@@ -482,7 +482,7 @@ int main(int argc, char* argv[])
     }
     catch (const std::exception &e)
     {
-      oxen::log::error(logcat, "Failed to load state data from {}, restarting from scratch", state_file_path);
+      log::error(logcat, "Failed to load state data from {}, restarting from scratch", state_file_path);
       state = ancestry_state_t();
     }
     state_data_in.close();
@@ -496,7 +496,7 @@ int main(int argc, char* argv[])
   const uint64_t db_height = db->height();
   if (opt_refresh)
   {
-    oxen::log::info(logcat, "Starting from height {}", state.height);
+    log::info(logcat, "Starting from height {}", state.height);
     state.block_cache.reserve(db_height);
     for (uint64_t h = state.height; h < db_height; ++h)
     {
@@ -506,7 +506,7 @@ int main(int argc, char* argv[])
       cryptonote::block b;
       if (!cryptonote::parse_and_validate_block_from_blob(bd, b))
       {
-        oxen::log::warning(logcat, "Bad block from db");
+        log::warning(logcat, "Bad block from db");
         return 1;
       }
       if (opt_cache_blocks)
@@ -537,13 +537,13 @@ int main(int argc, char* argv[])
           std::string bd;
           if (!db->get_pruned_tx_blob(txid, bd))
           {
-            oxen::log::warning(logcat, "Failed to get txid {} from db", txid);
+            log::warning(logcat, "Failed to get txid {} from db", txid);
             return 1;
           }
           cryptonote::transaction tx;
           if (!cryptonote::parse_and_validate_tx_base_from_blob(bd, tx))
           {
-            oxen::log::warning(logcat, "Bad tx: {}", txid);
+            log::warning(logcat, "Bad tx: {}", txid);
             return 1;
           }
           tx_data = ::tx_data_t(tx);
@@ -568,7 +568,7 @@ int main(int argc, char* argv[])
               crypto::hash output_txid;
               if (!get_output_txid(state, db, amount, offset, output_txid))
               {
-                oxen::log::warning(logcat, "Output originating transaction not found");
+                log::warning(logcat, "Output originating transaction not found");
                 return 1;
               }
               add_ancestry(state.ancestry, txid, get_ancestry(state.ancestry, output_txid));
@@ -577,19 +577,19 @@ int main(int argc, char* argv[])
         }
         const size_t ancestry_size = get_ancestry(state.ancestry, txid).size();
         block_ancestry_size += ancestry_size;
-        oxen::log::info(logcat, "{}: {}", txid, ancestry_size);
+        log::info(logcat, "{}: {}", txid, ancestry_size);
       }
       if (!txids.empty())
       {
         std::string stats_msg;
-        oxen::log::info(logcat, "Height {}: {} average over {}{}", h, (block_ancestry_size / txids.size()), txids.size(), stats_msg);
+        log::info(logcat, "Height {}: {} average over {}{}", h, (block_ancestry_size / txids.size()), txids.size(), stats_msg);
       }
       state.height = h;
       if (stop_requested)
         break;
     }
 
-    oxen::log::warning(logcat, "Saving state data to {}", state_file_path);
+    log::warning(logcat, "Saving state data to {}", state_file_path);
     std::ofstream state_data_out;
     state_data_out.open(state_file_path, std::ios_base::binary | std::ios_base::out | std::ios::trunc);
     if (!state_data_out.fail())
@@ -601,7 +601,7 @@ int main(int argc, char* argv[])
       }
       catch (const std::exception &e)
       {
-        oxen::log::error(logcat, "Failed to save state data to {}", state_file_path);
+        log::error(logcat, "Failed to save state data to {}", state_file_path);
       }
       state_data_out.close();
     }
@@ -610,8 +610,8 @@ int main(int argc, char* argv[])
   {
     if (state.height < db_height)
     {
-      oxen::log::warning(logcat, "The state file is only built up to height {}, but the blockchain reached height {}", state.height, db_height);
-      oxen::log::warning(logcat, "You may want to run with --refresh if you want to get ancestry for newer data");
+      log::warning(logcat, "The state file is only built up to height {}, but the blockchain reached height {}", state.height, db_height);
+      log::warning(logcat, "You may want to run with --refresh if you want to get ancestry for newer data");
     }
   }
 
@@ -624,7 +624,7 @@ int main(int argc, char* argv[])
     crypto::hash txid;
     if (!get_output_txid(state, db, output_amount, output_offset, txid))
     {
-      oxen::log::warning(logcat, "Output not found in db");
+      log::warning(logcat, "Output not found in db");
       return 1;
     }
     start_txids.push_back(txid);
@@ -635,7 +635,7 @@ int main(int argc, char* argv[])
     cryptonote::block b;
     if (!cryptonote::parse_and_validate_block_from_blob(bd, b))
     {
-      oxen::log::warning(logcat, "Bad block from db");
+      log::warning(logcat, "Bad block from db");
       return 1;
     }
     for (const crypto::hash &txid: b.tx_hashes)
@@ -644,13 +644,13 @@ int main(int argc, char* argv[])
 
   if (start_txids.empty())
   {
-    oxen::log::warning(logcat, "No transaction(s) to check");
+    log::warning(logcat, "No transaction(s) to check");
     return 1;
   }
 
   for (const crypto::hash &start_txid: start_txids)
   {
-    oxen::log::warning(logcat, "Checking ancestry for txid {}", start_txid);
+    log::warning(logcat, "Checking ancestry for txid {}", start_txid);
 
     std::unordered_map<ancestor, unsigned int> ancestry;
 
@@ -686,22 +686,22 @@ int main(int argc, char* argv[])
             crypto::hash output_txid;
             if (!get_output_txid(state, db, amount, offset, output_txid))
             {
-              oxen::log::warning(logcat, "Output originating transaction not found");
+              log::warning(logcat, "Output originating transaction not found");
               return 1;
             }
 
             add_ancestry(state.ancestry, txid, get_ancestry(state.ancestry, output_txid));
             txids.push_back(output_txid);
-            oxen::log::debug(logcat, "adding txid: {}", output_txid);
+            log::debug(logcat, "adding txid: {}", output_txid);
           }
         }
       }
     }
 
-    oxen::log::info(logcat, "Ancestry for {}: {} / {}", start_txid, get_deduplicated_ancestry(ancestry), get_full_ancestry(ancestry));
+    log::info(logcat, "Ancestry for {}: {} / {}", start_txid, get_deduplicated_ancestry(ancestry), get_full_ancestry(ancestry));
     for (const auto &i: ancestry)
     {
-      oxen::log::info(logcat, "{}/{}: {}", cryptonote::print_money(i.first.amount), i.first.offset, i.second);
+      log::info(logcat, "{}/{}: {}", cryptonote::print_money(i.first.amount), i.first.offset, i.second);
     }
   }
 
@@ -709,7 +709,7 @@ done:
   core_storage->deinit();
 
   if (opt_show_cache_stats)
-  oxen::log::info(logcat, "cache: txes {}%, blocks {}%, outputs {}%", std::to_string(cached_txes*100./total_txes), std::to_string(cached_blocks*100./total_blocks), std::to_string(cached_outputs*100./total_outputs));
+  log::info(logcat, "cache: txes {}%, blocks {}%, outputs {}%", std::to_string(cached_txes*100./total_txes), std::to_string(cached_blocks*100./total_blocks), std::to_string(cached_outputs*100./total_outputs));
 
   return 0;
 

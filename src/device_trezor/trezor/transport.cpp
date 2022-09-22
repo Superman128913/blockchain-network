@@ -302,12 +302,12 @@ namespace trezor{
 
   bool Transport::pre_open(){
     if (m_open_counter > 0){
-      oxen::log::trace(logcat, "Already opened, count: {}", m_open_counter);
+      log::trace(logcat, "Already opened, count: {}", m_open_counter);
       m_open_counter += 1;
       return false;
 
     } else if (m_open_counter < 0){
-      oxen::log::trace(logcat, "Negative open value: {}", m_open_counter);
+      log::trace(logcat, "Negative open value: {}", m_open_counter);
 
     }
 
@@ -320,7 +320,7 @@ namespace trezor{
     m_open_counter -= 1;
 
     if (m_open_counter < 0){
-      oxen::log::debug(logcat, "Already closed. Counter {}", m_open_counter);
+      log::debug(logcat, "Already closed. Counter {}", m_open_counter);
 
     } else if (m_open_counter == 0) {
       return true;
@@ -353,7 +353,7 @@ namespace trezor{
       }
       else if (!tools::starts_with(m_bridge_url, "http://") && !tools::starts_with(m_bridge_url, "https://"))
         m_bridge_url.insert(0, "http://");
-      oxen::log::debug(logcat, "Bridge host: {}", m_bridge_url);
+      log::debug(logcat, "Bridge host: {}", m_bridge_url);
   }
 
   std::string BridgeTransport::get_path() const {
@@ -386,11 +386,11 @@ namespace trezor{
           const auto id_product = (uint16_t) itr_product->value.GetUint64();
           const auto device_idx = get_device_idx(id_vendor, id_product);
           if (!is_device_supported(device_idx)){
-            oxen::log::debug(logcat, "Device with idx {} is not supported. Vendor: {}, product: {}", device_idx, id_vendor, id_product);
+            log::debug(logcat, "Device with idx {} is not supported. Vendor: {}, product: {}", device_idx, id_vendor, id_product);
             continue;
           }
         } catch(const std::exception &e){
-          oxen::log::error(logcat, "Could not detect vendor & product: {}", e.what());
+          log::error(logcat, "Could not detect vendor & product: {}", e.what());
         }
       }
 
@@ -426,7 +426,7 @@ namespace trezor{
       return;
     }
 
-    oxen::log::trace(logcat, "Closing Trezor:BridgeTransport");
+    log::trace(logcat, "Closing Trezor:BridgeTransport");
     if (!m_device_path || !m_session){
       throw exc::CommunicationException("Device not open");
     }
@@ -580,7 +580,7 @@ namespace trezor{
       parse_udp_path(m_device_host, m_device_port, *device_path);
     } else if ((env_trezor_path = getenv("TREZOR_PATH")) != nullptr && tools::starts_with(env_trezor_path, UdpTransport::PATH_PREFIX)){
       parse_udp_path(m_device_host, m_device_port, std::string(env_trezor_path));
-      oxen::log::debug(logcat, "Applied TREZOR_PATH: {}:{}", m_device_host, m_device_port);
+      log::debug(logcat, "Applied TREZOR_PATH: {}:{}", m_device_host, m_device_port);
     } else {
       m_device_host = DEFAULT_HOST;
     }
@@ -664,7 +664,7 @@ namespace trezor{
       return;
     }
 
-    oxen::log::trace(logcat, "Closing Trezor:UdpTransport");
+    log::trace(logcat, "Closing Trezor:UdpTransport");
     if (!m_socket) {
       throw exc::CommunicationException("Socket is already closed");
     }
@@ -682,7 +682,7 @@ namespace trezor{
     t->m_device_port = m_device_port + 1;
     return t;
 #else
-    oxen::log::info(logcat, "Debug link is disabled in production");
+    log::info(logcat, "Debug link is disabled in production");
     return nullptr;
 #endif
   }
@@ -726,7 +726,7 @@ namespace trezor{
       } catch(exc::CommunicationException const& e){
         throw;
       } catch(std::exception const& e){
-        oxen::log::warning(logcat, "Error reading chunk, reason: {}", e.what());
+        log::warning(logcat, "Error reading chunk, reason: {}", e.what());
         throw exc::CommunicationException(std::string("Chunk read error: ") + std::string(e.what()));
       }
     }
@@ -774,7 +774,7 @@ namespace trezor{
       throw exc::TimeoutException();
 
     } else if (ec) {
-      oxen::log::warning(logcat, "Reading from UDP socket failed: {}", ec.message());
+      log::warning(logcat, "Reading from UDP socket failed: {}", ec.message());
       throw exc::CommunicationException();
 
     }
@@ -945,13 +945,13 @@ namespace trezor{
       throw std::runtime_error("Unable to enumerate libusb devices");
     }
 
-    oxen::log::trace(logcat, "Libusb devices: {}", cnt);
+    log::trace(logcat, "Libusb devices: {}", cnt);
 
     for(ssize_t i = 0; i < cnt; i++) {
       libusb_device_descriptor desc{};
       r = libusb_get_device_descriptor(devs[i], &desc);
       if (r < 0){
-        oxen::log::error(logcat, "Unable to get libusb device descriptor {}", i);
+        log::error(logcat, "Unable to get libusb device descriptor {}", i);
         continue;
       }
 
@@ -960,7 +960,7 @@ namespace trezor{
         continue;
       }
 
-      oxen::log::trace(logcat, "Found Trezor device: {}:{} dev_idx {}", desc.idVendor, desc.idProduct, (int)trezor_dev_idx);
+      log::trace(logcat, "Found Trezor device: {}:{} dev_idx {}", desc.idVendor, desc.idProduct, (int)trezor_dev_idx);
 
       auto t = std::make_shared<WebUsbTransport>(std::make_optional(&desc));
       t->m_bus_id = libusb_get_bus_number(devs[i]);
@@ -1016,7 +1016,7 @@ namespace trezor{
       libusb_device_descriptor desc{};
       r = libusb_get_device_descriptor(devs[i], &desc);
       if (r < 0){
-        oxen::log::error(logcat, "Unable to get libusb device descriptor {}", i);
+        log::error(logcat, "Unable to get libusb device descriptor {}", i);
         continue;
       }
 
@@ -1031,7 +1031,7 @@ namespace trezor{
       // Port resolution may fail. Non-critical error, just addressing precision is decreased.
       get_libusb_ports(devs[i], path);
 
-      oxen::log::trace(logcat, "Found Trezor device: {}:{}", desc.idVendor, desc.idProduct
+      log::trace(logcat, "Found Trezor device: {}:{}", desc.idVendor, desc.idProduct
                                      << ", dev_idx: " << (int)trezor_dev_idx
                                      << ". path: " << get_usb_path(bus_id, path));
 
@@ -1077,12 +1077,12 @@ namespace trezor{
       return;
     }
 
-    oxen::log::trace(logcat, "Closing Trezor:WebUsbTransport");
+    log::trace(logcat, "Closing Trezor:WebUsbTransport");
     m_proto->session_end(*this);
 
     int r = libusb_release_interface(m_usb_device_handle, get_interface());
     if (r != 0){
-      oxen::log::error(logcat, "Could not release libusb interface: {}", r);
+      log::error(logcat, "Could not release libusb interface: {}", r);
     }
 
     m_usb_device = nullptr;
@@ -1107,7 +1107,7 @@ namespace trezor{
     t->m_debug_mode = true;
     return t;
 #else
-      oxen::log::info(logcat, "Debug link is disabled in production");
+      log::info(logcat, "Debug link is disabled in production");
       return nullptr;
 #endif
     }
@@ -1199,7 +1199,7 @@ namespace trezor{
     try{
       bt.enumerate(res);
     } catch (const std::exception & e){
-      oxen::log::error(logcat, "BridgeTransport enumeration failed:{}", e.what());
+      log::error(logcat, "BridgeTransport enumeration failed:{}", e.what());
     }
 
 #ifdef WITH_DEVICE_TREZOR_WEBUSB
@@ -1207,7 +1207,7 @@ namespace trezor{
     try{
       btw.enumerate(res);
     } catch (const std::exception & e){
-      oxen::log::error(logcat, "WebUsbTransport enumeration failed:{}", e.what());
+      log::error(logcat, "WebUsbTransport enumeration failed:{}", e.what());
     }
 #endif
 
@@ -1216,7 +1216,7 @@ namespace trezor{
     try{
       btu.enumerate(res);
     } catch (const std::exception & e){
-      oxen::log::error(logcat, "UdpTransport enumeration failed:{}", e.what());
+      log::error(logcat, "UdpTransport enumeration failed:{}", e.what());
     }
 #endif
   }

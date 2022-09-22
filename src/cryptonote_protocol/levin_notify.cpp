@@ -45,7 +45,7 @@
 
 namespace cryptonote::levin
 {
-  static auto logcat = oxen::log::Cat("net.p2p.tx");
+  static auto logcat = log::Cat("net.p2p.tx");
 
   namespace
   {
@@ -236,7 +236,7 @@ namespace cryptonote::levin
         if (!channel.connection.is_nil())
           channel.queue.push_back(std::move(message_));
         else if (destination_ == 0 && zone_->connection_count == 0)
-          oxen::log::warning(logcat, "Unable to send transaction(s) over anonymity network - no available outbound connections");
+          log::warning(logcat, "Unable to send transaction(s) over anonymity network - no available outbound connections");
       }
     };
 
@@ -439,7 +439,7 @@ namespace cryptonote::levin
 
             auto connections = get_out_connections(*zone_->p2p);
             if (connections.empty())
-              oxen::log::warning(logcat, "Lost all outbound connections to anonymity network - currently unable to send transaction(s)");
+              log::warning(logcat, "Lost all outbound connections to anonymity network - currently unable to send transaction(s)");
 
             zone_->strand.post(update_channels{zone_, std::move(connections)});
           }
@@ -553,7 +553,7 @@ namespace cryptonote::levin
       )};
       if (MAX_FRAGMENTS * zone_->noise.size() < message.size())
       {
-        oxen::log::error(logcat, "notify::send_txs provided message exceeding covert fragment size");
+        log::error(logcat, "notify::send_txs provided message exceeding covert fragment size");
         return false;
       }
 

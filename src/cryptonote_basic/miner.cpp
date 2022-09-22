@@ -53,7 +53,7 @@ extern "C" void rx_slow_hash_free_state();
 
 namespace cryptonote
 {
-  static auto logcat = oxen::log::Cat("miner");
+  static auto logcat = log::Cat("miner");
 
   namespace
   {
@@ -103,7 +103,7 @@ namespace cryptonote
 
     if(!m_phandler->create_next_miner_block_template(bl, m_mine_address, di, height, expected_reward, ""s))
     {
-      oxen::log::error(logcat, "Failed to get_block_template(), stopping mining");
+      log::error(logcat, "Failed to get_block_template(), stopping mining");
       return false;
     }
     set_block_template(bl, di, height, expected_reward);
@@ -148,7 +148,7 @@ namespace cryptonote
       address_parse_info info;
       if(!cryptonote::get_account_address_from_str(info, nettype, command_line::get_arg(vm, arg_start_mining)) || info.is_subaddress)
       {
-        oxen::log::error(logcat, "Target account address {} has wrong format, starting daemon canceled", command_line::get_arg(vm, arg_start_mining));
+        log::error(logcat, "Target account address {} has wrong format, starting daemon canceled", command_line::get_arg(vm, arg_start_mining));
         return false;
       }
       m_mine_address = info.address;
@@ -185,13 +185,13 @@ namespace cryptonote
     std::unique_lock lock{m_threads_lock};
     if(is_mining())
     {
-      oxen::log::error(logcat, "Starting miner but it's already started");
+      log::error(logcat, "Starting miner but it's already started");
       return false;
     }
 
     if(!m_threads.empty())
     {
-      oxen::log::error(logcat, "Unable to start miner because there are active mining threads");
+      log::error(logcat, "Unable to start miner because there are active mining threads");
       return false;
     }
 
@@ -200,12 +200,12 @@ namespace cryptonote
     m_stop = false;
     m_stop_height = stop_after > 0 ? m_height + stop_after : std::numeric_limits<uint64_t>::max();
     if (stop_after > 0)
-      oxen::log::info(logcat, "Mining until height {}", m_stop_height);
+      log::info(logcat, "Mining until height {}", m_stop_height);
     
     for (int i = 0; i < m_threads_total; i++)
       m_threads.emplace_back([=] { return worker_thread(i, slow_mining); });
 
-    oxen::log::info(logcat, "Mining has started with {} threads, good luck!", m_threads_total);
+    log::info(logcat, "Mining has started with {} threads, good luck!", m_threads_total);
 
     return true;
   }
@@ -223,13 +223,13 @@ namespace cryptonote
   //-----------------------------------------------------------------------------------------------------
   bool miner::stop()
   {
-    oxen::log::trace(logcat, "Miner has received stop signal");
+    log::trace(logcat, "Miner has received stop signal");
 
     std::unique_lock lock{m_threads_lock};
     bool mining = !m_threads.empty();
     if (!mining)
     {
-      oxen::log::trace(logcat, "Not mining - nothing to stop" );
+      log::trace(logcat, "Not mining - nothing to stop" );
       return true;
     }
 
@@ -238,7 +238,7 @@ namespace cryptonote
       if (th.joinable())
         th.join();
 
-    oxen::log::info(logcat, "Mining has been stopped, {} finished", m_threads.size());
+    log::info(logcat, "Mining has been stopped, {} finished", m_threads.size());
     m_threads.clear();
     rx_stop_mining();
     return true;
@@ -272,29 +272,29 @@ namespace cryptonote
   void miner::pause()
   {
     std::unique_lock lock{m_miners_count_mutex};
-    oxen::log::debug(logcat, "miner::pause: {} -> {}", m_pausers_count, (m_pausers_count + 1));
+    log::debug(logcat, "miner::pause: {} -> {}", m_pausers_count, (m_pausers_count + 1));
     ++m_pausers_count;
     if(m_pausers_count == 1 && is_mining())
-      oxen::log::debug(logcat, "MINING PAUSED");
+      log::debug(logcat, "MINING PAUSED");
   }
   //-----------------------------------------------------------------------------------------------------
   void miner::resume()
   {
     std::unique_lock lock{m_miners_count_mutex};
-    oxen::log::debug(logcat, "miner::resume: {} -> {}", m_pausers_count, (m_pausers_count - 1));
+    log::debug(logcat, "miner::resume: {} -> {}", m_pausers_count, (m_pausers_count - 1));
     --m_pausers_count;
     if(m_pausers_count < 0)
     {
       m_pausers_count = 0;
-      oxen::log::error(logcat, "Unexpected miner::resume() called");
+      log::error(logcat, "Unexpected miner::resume() called");
     }
     if(!m_pausers_count && is_mining())
-      oxen::log::debug(logcat, "MINING RESUMED");
+      log::debug(logcat, "MINING RESUMED");
   }
   //-----------------------------------------------------------------------------------------------------
   bool miner::worker_thread(uint32_t index, bool slow_mining)
   {
-    oxen::log::info(logcat, "Miner thread was started [{}]", index);
+    log::info(logcat, "Miner thread was started [{}]", index);
     uint32_t nonce = m_starter_nonce + index;
     uint64_t height = 0;
     difficulty_type local_diff = 0;
@@ -325,7 +325,7 @@ namespace cryptonote
 
       if(!local_template_ver)//no any set_block_template call
       {
-        oxen::log::debug(logcat, "Block template not set yet");
+        log::debug(logcat, "Block template not set yet");
         std::this_thread::sleep_for(1s);
         continue;
       }
@@ -345,7 +345,7 @@ namespace cryptonote
       if(check_hash(h, local_diff))
       {
         //we lucky!
-        oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Found block {} at height {} for difficulty: {}", get_block_hash(b), height, local_diff));
+        log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Found block {} at height {} for difficulty: {}", get_block_hash(b), height, local_diff));
         cryptonote::block_verification_context bvc;
         m_phandler->handle_block_found(b, bvc);
       }
@@ -354,7 +354,7 @@ namespace cryptonote
       ++m_hashes;
     }
     rx_slow_hash_free_state();
-    oxen::log::info(logcat, "Miner thread stopped [{}]", index);
+    log::info(logcat, "Miner thread stopped [{}]", index);
     if (call_stop)
         // Call in a detached thread because the thread calling stop() needs to be able to join this
         // worker thread.

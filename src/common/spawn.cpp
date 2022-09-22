@@ -46,7 +46,7 @@
 namespace tools
 {
 
-  static auto logcat = oxen::log::Cat("spawn");
+  static auto logcat = log::Cat("spawn");
 
 #ifndef _WIN32
 static void closefrom(int fd)
@@ -83,7 +83,7 @@ int spawn(const fs::path& filename, const std::vector<std::string>& args, bool w
   // wchar_t* but out input is utf-8).  Shame on you for this garbage API, Windows.
   if (!CreateProcessA(filename.string().c_str(), commandLine, nullptr, nullptr, false, 0, nullptr, nullptr, &si, &pi))
   {
-    oxen::log::error(logcat, "CreateProcess failed. Error code {}", GetLastError());
+    log::error(logcat, "CreateProcess failed. Error code {}", GetLastError());
     return -1;
   }
 
@@ -100,18 +100,18 @@ int spawn(const fs::path& filename, const std::vector<std::string>& args, bool w
   DWORD result = WaitForSingleObject(pi.hProcess, INFINITE);
   if (result != WAIT_OBJECT_0)
   {
-    oxen::log::error(logcat, "WaitForSingleObject failed. Result {}, error code {}", result, GetLastError());
+    log::error(logcat, "WaitForSingleObject failed. Result {}, error code {}", result, GetLastError());
     return -1;
   }
 
   DWORD exitCode;
   if (!GetExitCodeProcess(pi.hProcess, &exitCode))
   {
-    oxen::log::error(logcat, "GetExitCodeProcess failed. Error code {}", GetLastError());
+    log::error(logcat, "GetExitCodeProcess failed. Error code {}", GetLastError());
     return -1;
   }
 
-  oxen::log::info(logcat, "Child exited with {}", exitCode);
+  log::info(logcat, "Child exited with {}", exitCode);
   return static_cast<int>(exitCode);
 #else
   std::vector<char*> argv(args.size() + 1);
@@ -122,7 +122,7 @@ int spawn(const fs::path& filename, const std::vector<std::string>& args, bool w
   pid_t pid = fork();
   if (pid < 0)
   {
-    oxen::log::error(logcat, "Error forking: {}", strerror(errno));
+    log::error(logcat, "Error forking: {}", strerror(errno));
     return -1;
   }
 
@@ -133,7 +133,7 @@ int spawn(const fs::path& filename, const std::vector<std::string>& args, bool w
     close(0);
     char *envp[] = {NULL};
     execve(filename.c_str(), argv.data(), envp);
-    oxen::log::error(logcat, "Failed to execve: {}", strerror(errno));
+    log::error(logcat, "Failed to execve: {}", strerror(errno));
     return -1;
   }
 
@@ -151,22 +151,22 @@ int spawn(const fs::path& filename, const std::vector<std::string>& args, bool w
       int wstatus = 0;
       pid_t w = waitpid(pid, &wstatus, WUNTRACED | WCONTINUED);
       if (w  < 0) {
-        oxen::log::error(logcat, "Error waiting for child: {}", strerror(errno));
+        log::error(logcat, "Error waiting for child: {}", strerror(errno));
         return -1;
       }
       if (WIFEXITED(wstatus))
       {
-        oxen::log::info(logcat, "Child exited with {}", WEXITSTATUS(wstatus));
+        log::info(logcat, "Child exited with {}", WEXITSTATUS(wstatus));
         return WEXITSTATUS(wstatus);
       }
       if (WIFSIGNALED(wstatus))
       {
-        oxen::log::info(logcat, "Child killed by {}", WEXITSTATUS(wstatus));
+        log::info(logcat, "Child killed by {}", WEXITSTATUS(wstatus));
         return WEXITSTATUS(wstatus);
       }
     }
   }
-  oxen::log::error(logcat, "Secret passage found");
+  log::error(logcat, "Secret passage found");
   return -1;
 #endif
 }

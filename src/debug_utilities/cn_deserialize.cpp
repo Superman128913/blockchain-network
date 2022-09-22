@@ -36,11 +36,11 @@
 #include "version.h"
 #include <oxenc/hex.h>
 
-static auto logcat = oxen::log::Cat("debugtools.deserialize");
-
 namespace po = boost::program_options;
 
 using namespace cryptonote;
+
+static auto logcat = log::Cat("debugtools.deserialize");
 
 static std::string extra_nonce_to_string(const cryptonote::tx_extra_nonce &extra_nonce)
 {
@@ -182,7 +182,7 @@ int main(int argc, char* argv[])
   }
 
   auto log_file_path = "cn_deserialize.log";
-  oxen::log::Level log_level;
+  log::Level log_level;
   if(auto level = oxen::logging::parse_level(command_line::get_arg(vm, arg_log_level))) {
     log_level = *level;
   } else {
@@ -190,7 +190,7 @@ int main(int argc, char* argv[])
       throw std::runtime_error{"Incorrect log level"};
   }
   oxen::logging::init(log_file_path, log_level);
-  oxen::log::warning(logcat, "Starting...");
+  log::warning(logcat, "Starting...");
 
   if (oxenc::is_hex(input))
   {

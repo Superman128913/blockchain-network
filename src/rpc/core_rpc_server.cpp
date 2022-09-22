@@ -77,7 +77,7 @@ namespace cryptonote::rpc {
   using nlohmann::json;
   using oxen::json_to_bt;
 
-  static auto logcat = oxen::log::Cat("daemon.rpc");
+  static auto logcat = log::Cat("daemon.rpc");
 
   namespace {
 
@@ -366,7 +366,7 @@ namespace cryptonote::rpc {
       }
     }
 
-    oxen::log::debug(logcat, "on_get_blocks: {} blocks, {} txes, size {}", bs.size(), ntxes, size);
+    log::debug(logcat, "on_get_blocks: {} blocks, {} txes, size {}", bs.size(), ntxes, size);
     res.status = STATUS_OK;
     return res;
   }
@@ -389,7 +389,7 @@ namespace cryptonote::rpc {
         res.blks_hashes.push_back(tools::type_to_hex(get_block_hash(blk)));
     }
 
-    oxen::log::debug(logcat, "on_get_alt_blocks_hashes: {} blocks ", blks.size());
+    log::debug(logcat, "on_get_alt_blocks_hashes: {} blocks ", blks.size());
     res.status = STATUS_OK;
     return res;
   }
@@ -520,7 +520,7 @@ namespace cryptonote::rpc {
       return res;
     }
     res.status = STATUS_OK;
-    oxen::log::debug(logcat, "GET_TX_GLOBAL_OUTPUTS_INDEXES: [{}]", res.o_indexes.size());
+    log::debug(logcat, "GET_TX_GLOBAL_OUTPUTS_INDEXES: [{}]", res.o_indexes.size());
     return res;
   }
 
@@ -734,7 +734,7 @@ namespace cryptonote::rpc {
       transaction tx;
       if (!parse_and_validate_tx_from_blob(*bd, tx))
       {
-        oxen::log::error(logcat, "Failed to parse tx from txpool");
+        log::error(logcat, "Failed to parse tx from txpool");
         // continue
         return true;
       }
@@ -789,7 +789,7 @@ namespace cryptonote::rpc {
         get.response["status"] = STATUS_FAILED;
         return;
       }
-      oxen::log::debug(logcat, "Found {}/{} transactions on the blockchain", txs.size(), get.request.tx_hashes.size());
+      log::debug(logcat, "Found {}/{} transactions on the blockchain", txs.size(), get.request.tx_hashes.size());
     }
 
     // try the pool for any missing txes
@@ -840,7 +840,7 @@ namespace cryptonote::rpc {
           }
           txs = std::move(sorted_txs);
           get.response_hex["missed_tx"] = missed_txs; // non-plural here intentional to not break existing clients
-          oxen::log::debug(logcat, "Found {}/{} transactions in the pool", found_in_pool.size(), get.request.tx_hashes.size());
+          log::debug(logcat, "Found {}/{} transactions in the pool", found_in_pool.size(), get.request.tx_hashes.size());
         } else if (get.request.memory_pool) {
           txs.reserve(pool_txs.size());
           std::transform(pool_txs.begin(), pool_txs.end(), std::back_inserter(txs), split_mempool_tx);
@@ -854,7 +854,7 @@ namespace cryptonote::rpc {
           }
         }
       } catch (const std::exception& e) {
-        oxen::log::error(logcat, e.what());
+        log::error(logcat, e.what());
         get.response["status"] = "Failed: "s + e.what();
         return;
       }
@@ -982,7 +982,7 @@ namespace cryptonote::rpc {
       }
     }
 
-    oxen::log::debug(logcat, "{} transactions found, {} not found", get.response["txs"].size(), missed_txs.size());
+    log::debug(logcat, "{} transactions found, {} not found", get.response["txs"].size(), missed_txs.size());
     get.response["status"] = STATUS_OK;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -1003,7 +1003,7 @@ namespace cryptonote::rpc {
           try {
             kis = get_pool_kis(m_core);
           } catch (const std::exception& e) {
-            oxen::log::error(logcat, "Failed to get pool key images: {}", e.what());
+            log::error(logcat, "Failed to get pool key images: {}", e.what());
             return;
           }
         }
@@ -1062,7 +1062,7 @@ namespace cryptonote::rpc {
     {
       tx.response["status"] = STATUS_FAILED;
       auto reason = print_tx_verification_context(tvc);
-      oxen::log::warning(logcat, "[on_send_raw_tx]: {} {}", (tvc.m_verifivation_failed ? "tx verification failed" : "Failed to process tx"), reason);
+      log::warning(logcat, "[on_send_raw_tx]: {} {}", (tvc.m_verifivation_failed ? "tx verification failed" : "Failed to process tx"), reason);
       tx.response["reason"] = std::move(reason);
       tx.response["reason_codes"] = tx_verification_failure_codes(tvc);
       return;
@@ -1089,12 +1089,12 @@ namespace cryptonote::rpc {
     cryptonote::address_parse_info info;
     if(!get_account_address_from_str(info, m_core.get_nettype(), start_mining.request.miner_address)) {
       start_mining.response["status"] = "Failed, invalid address";
-      oxen::log::warning(logcat, start_mining.response["status"]);
+      log::warning(logcat, start_mining.response["status"]);
       return;
     }
     if (info.is_subaddress) {
       start_mining.response["status"] = "Mining to subaddress isn't supported yet";
-      oxen::log::warning(logcat, start_mining.response["status"]);
+      log::warning(logcat, start_mining.response["status"]);
       return;
     }
 
@@ -1108,7 +1108,7 @@ namespace cryptonote::rpc {
     // then we fail and log that.
     if (start_mining.request.threads_count > max_concurrency_count) {
       start_mining.response["status"] = "Failed, too many threads relative to CPU cores.";
-      oxen::log::warning(logcat, start_mining.response["status"]);
+      log::warning(logcat, start_mining.response["status"]);
       return;
     }
 
@@ -1122,7 +1122,7 @@ namespace cryptonote::rpc {
     if(!miner.start(info.address, start_mining.request.threads_count, start_mining.request.num_blocks, start_mining.request.slow_mining))
     {
       start_mining.response["status"] = "Failed, mining not started";
-      oxen::log::warning(logcat, start_mining.response["status"]);
+      log::warning(logcat, start_mining.response["status"]);
       return;
     }
 
@@ -1135,13 +1135,13 @@ namespace cryptonote::rpc {
     if(!miner.is_mining())
     {
       stop_mining.response["status"] = "Mining never started";
-      oxen::log::warning(logcat, stop_mining.response["status"]);
+      log::warning(logcat, stop_mining.response["status"]);
       return;
     }
     if(!miner.stop())
     {
       stop_mining.response["status"] = "Failed, mining not stopped";
-      oxen::log::warning(logcat, stop_mining.response["status"]);
+      log::warning(logcat, stop_mining.response["status"]);
       return;
     }
 
@@ -1177,7 +1177,7 @@ namespace cryptonote::rpc {
     if( !m_core.get_blockchain_storage().store_blockchain() )
     {
       save_bc.response["status"] = "Error while storing blockchain";
-      oxen::log::warning(logcat, save_bc.response["status"]);
+      log::warning(logcat, save_bc.response["status"]);
       return;
     }
     save_bc.response["status"] = STATUS_OK;
@@ -1219,7 +1219,7 @@ namespace cryptonote::rpc {
     }
     auto log_level = oxen::logging::parse_level(set_log_level.request.level);
     if (log_level.has_value())
-      oxen::log::reset_level(*log_level);
+      log::reset_level(*log_level);
     set_log_level.response["status"] = STATUS_OK;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -2321,7 +2321,7 @@ namespace cryptonote::rpc {
         args.emplace_back(std::to_string(service_nodes::percent_to_basis_points(req.operator_cut)));
       } catch(const std::exception &e) {
         res.status = "Invalid value: "s + e.what();
-        oxen::log::error(logcat, res.status);
+        log::error(logcat, res.status);
         return res;
       }
     }
@@ -2651,20 +2651,20 @@ namespace cryptonote::rpc {
         status = fmt::format("Outdated {}. Current: {}.{}.{} Required: {}.{}.{}", name,
             cur_version[0], cur_version[1], cur_version[2],
             required[0], required[1], required[2]);
-        oxen::log::error(logcat, status);
+        log::error(logcat, status);
       } else if (!ed25519_pubkey.empty() // TODO: once lokinet & ss are always sending this we can remove this empty bypass
           && ed25519_pubkey != our_ed25519_pubkey) {
         status = fmt::format("Invalid {} pubkey: expected {}, received {}", name, our_ed25519_pubkey, ed25519_pubkey);
-        oxen::log::error(logcat, status);
+        log::error(logcat, status);
       } else {
         auto now = std::time(nullptr);
         auto old = update.exchange(now);
         bool significant = std::chrono::seconds{now - old} > lifetime; // Print loudly for the first ping after startup/expiry
         auto msg = fmt::format("Received ping from {} {}.{}.{}", name, cur_version[0], cur_version[1], cur_version[2]);
         if (significant)
-          oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::green), msg));
+          log::info(logcat, fmt::format(fg(fmt::terminal_color::green), msg));
         else
-          oxen::log::debug(logcat, msg);
+          log::debug(logcat, msg);
         success(significant);
         status = STATUS_OK;
       }
@@ -2788,7 +2788,7 @@ namespace cryptonote::rpc {
       blobs.clear();
       if (!db.get_transactions_blobs(block.second.tx_hashes, blobs))
       {
-        oxen::log::error(logcat, "Could not query block at requested height: {}", cryptonote::get_block_height(block.second));
+        log::error(logcat, "Could not query block at requested height: {}", cryptonote::get_block_height(block.second));
         continue;
       }
       const auto hard_fork_version = block.second.major_version;
@@ -2797,7 +2797,7 @@ namespace cryptonote::rpc {
         cryptonote::transaction tx;
         if (!cryptonote::parse_and_validate_tx_from_blob(blob, tx))
         {
-          oxen::log::error(logcat, "tx could not be validated from blob, possibly corrupt blockchain");
+          log::error(logcat, "tx could not be validated from blob, possibly corrupt blockchain");
           continue;
         }
         if (tx.type == cryptonote::txtype::state_change)
@@ -2805,7 +2805,7 @@ namespace cryptonote::rpc {
           cryptonote::tx_extra_service_node_state_change state_change;
           if (!cryptonote::get_service_node_state_change_from_tx_extra(tx.extra, state_change, hard_fork_version))
           {
-            oxen::log::error(logcat, "Could not get state change from tx, possibly corrupt tx, hf_version {}", static_cast<int>(hard_fork_version));
+            log::error(logcat, "Could not get state change from tx, possibly corrupt tx, hf_version {}", static_cast<int>(hard_fork_version));
             continue;
           }
 
@@ -2827,7 +2827,7 @@ namespace cryptonote::rpc {
               break;
 
             default:
-              oxen::log::error(logcat, "Unhandled state in on_get_service_nodes_state_changes");
+              log::error(logcat, "Unhandled state in on_get_service_nodes_state_changes");
               break;
           }
         }
@@ -2851,7 +2851,7 @@ namespace cryptonote::rpc {
   {
     crypto::public_key pubkey;
     if (!tools::hex_to_type(report_peer_status.request.pubkey, pubkey)) {
-      oxen::log::error(logcat, "Could not parse public key: {}", report_peer_status.request.pubkey);
+      log::error(logcat, "Could not parse public key: {}", report_peer_status.request.pubkey);
       throw rpc_error{ERROR_WRONG_PARAM, "Could not parse public key"};
     }
 

@@ -41,8 +41,6 @@
 
 namespace Wallet {
 
-  static auto logcat = oxen::log::Cat("WalletAPI");
-
 EXPORT
 Wallet* WalletManagerImpl::createWallet(std::string_view path, const std::string &password,
                                     const std::string &language, NetworkType nettype, uint64_t kdf_rounds)
@@ -190,13 +188,13 @@ std::vector<std::string> WalletManagerImpl::findWallets(std::string_view path_)
             continue;
         auto filename = p.path();
 
-        oxen::log::trace(logcat, "Checking filename: {}", filename);
+        log::trace(logcat, "Checking filename: {}", filename);
 
         if (filename.extension() == ".keys") {
             // if keys file found, checking if there's wallet file itself
             filename.replace_extension();
             if (fs::exists(filename)) {
-                oxen::log::trace(logcat, "Found wallet: {}", filename);
+                log::trace(logcat, "Found wallet: {}", filename);
                 result.push_back(filename.u8string());
             }
         }

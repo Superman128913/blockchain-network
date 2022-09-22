@@ -18,7 +18,15 @@ extern "C"
 #include <sodium/crypto_generichash.h>
 };
 
-static auto logcat = oxen::log::Cat("pulse");
+namespace pulse
+{
+
+namespace log = oxen::log;
+
+namespace
+{
+
+auto logcat = log::Cat("pulse");
 
 // Deliberately makes pulse communications flakey for testing purposes:
 //#define PULSE_TEST_CODE
@@ -214,9 +222,7 @@ struct round_context
   round_state state;
 };
 
-static round_context context;
-namespace
-{
+round_context context;
 
 crypto::hash blake2b_hash(void const *data, size_t size)
 {
@@ -456,7 +462,7 @@ bool enforce_validator_participation_and_timeouts(round_context const &context,
 
   if (timed_out && !all_received)
   {
-    oxen::log::debug(logcat, "{}Stage timed out: insufficient responses. Expected ({}) {} received ({}) {}", log_prefix(context), bitset_view16(validator_bitset).count(), bitset_view16(validator_bitset).to_string(), bitset_view16(stage.bitset).count(), bitset_view16(stage.bitset).to_string());
+    log::debug(logcat, "{}Stage timed out: insufficient responses. Expected ({}) {} received ({}) {}", log_prefix(context), bitset_view16(validator_bitset).count(), bitset_view16(validator_bitset).to_string(), bitset_view16(stage.bitset).count(), bitset_view16(stage.bitset).to_string());
     return false;
   }
 
@@ -466,7 +472,7 @@ bool enforce_validator_participation_and_timeouts(round_context const &context,
   bool unexpected_items = (stage.bitset | validator_bitset) != validator_bitset;
   if (stage.msgs_received == 0 || unexpected_items)
   {
-    oxen::log::error(logcat, "{}Internal error: expected bitset {}, but accepted and received {}", log_prefix(context), bitset_view16(validator_bitset).to_string(), bitset_view16(stage.bitset).to_string());
+    log::error(logcat, "{}Internal error: expected bitset {}, but accepted and received {}", log_prefix(context), bitset_view16(validator_bitset).to_string(), bitset_view16(stage.bitset).to_string());
     return false;
   }
 
@@ -475,7 +481,7 @@ bool enforce_validator_participation_and_timeouts(round_context const &context,
 
 } // anonymous namespace
 
-void pulse::handle_message(void *quorumnet_state, pulse::message const &msg)
+void handle_message(void *quorumnet_state, pulse::message const &msg)
 {
   if (context.state < round_state::wait_for_round)
   {
@@ -520,13 +526,13 @@ void pulse::handle_message(void *quorumnet_state, pulse::message const &msg)
         // marked an error, just ignored.
 
         print_err = false;
-        oxen::log::trace(logcat, "{}Received valid message from the past (round {}), ignoring", log_prefix(context), +msg.round);
+        log::trace(logcat, "{}Received valid message from the past (round {}), ignoring", log_prefix(context), +msg.round);
         break;
       } // else: Message has unknown origins, it is not something we know how to validate.
     }
 
     if (print_err)
-      oxen::log::error(logcat, sig_check_err);
+      log::error(logcat, sig_check_err);
 
     return;
   }
@@ -536,7 +542,7 @@ void pulse::handle_message(void *quorumnet_state, pulse::message const &msg)
   {
     case pulse::message_type::invalid:
     {
-      oxen::log::trace(logcat, "{}Received invalid message type, dropped", log_prefix(context));
+      log::trace(logcat, "{}Received invalid message type, dropped", log_prefix(context));
       return;
     }
 
@@ -565,7 +571,7 @@ void pulse::handle_message(void *quorumnet_state, pulse::message const &msg)
     auto &[entry, queued] = stage->queue.buffer[msg.quorum_position];
     if (queued == queueing_state::empty)
     {
-      oxen::log::trace(logcat, "{}Message received early {}, queueing until we're ready.", log_prefix(context), msg_source_string(context, msg));
+      log::trace(logcat, "{}Message received early {}, queueing until we're ready.", log_prefix(context), msg_source_string(context, msg));
       stage->queue.count++;
       entry  = std::move(msg);
       queued = queueing_state::received;
@@ -583,14 +589,14 @@ void pulse::handle_message(void *quorumnet_state, pulse::message const &msg)
     if ((validator_bit & context.transient.wait_for_handshake_bitsets.best_bitset) == 0)
     {
       auto bitset_view = bitset_view16(context.transient.wait_for_handshake_bitsets.best_bitset).to_string();
-      oxen::log::trace(logcat, "{}Dropping {}. Not a locked in participant, bitset is {}", log_prefix(context), msg_source_string(context, msg), bitset_view);
+      log::trace(logcat, "{}Dropping {}. Not a locked in participant, bitset is {}", log_prefix(context), msg_source_string(context, msg), bitset_view);
       return;
     }
   }
 
   if (msg.quorum_position >= service_nodes::PULSE_QUORUM_NUM_VALIDATORS)
   {
-    oxen::log::trace(logcat, "{}Dropping {}. Message quorum position indexes oob", log_prefix(context), msg_source_string(context, msg));
+    log::trace(logcat, "{}Dropping {}. Message quorum position indexes oob", log_prefix(context), msg_source_string(context, msg));
     return;
   }
 
@@ -608,7 +614,7 @@ void pulse::handle_message(void *quorumnet_state, pulse::message const &msg)
       auto &quorum = context.transient.send_and_wait_for_handshakes.data;
       if (quorum[msg.quorum_position]) return;
       quorum[msg.quorum_position] = true;
-      oxen::log::trace(logcat, "{}Received handshake with quorum position bit ({}) {} saved to bitset {}", log_prefix(context), msg.quorum_position, bitset_view16(validator_bit).to_string(), bitset_view16(stage->bitset).to_string());
+      log::trace(logcat, "{}Received handshake with quorum position bit ({}) {} saved to bitset {}", log_prefix(context), msg.quorum_position, bitset_view16(validator_bit).to_string(), bitset_view16(stage->bitset).to_string());
     }
     break;
 
@@ -629,13 +635,13 @@ void pulse::handle_message(void *quorumnet_state, pulse::message const &msg)
       cryptonote::block block = {};
       if (!cryptonote::t_serializable_object_from_blob(block, msg.block_template.blob))
       {
-        oxen::log::trace(logcat, "{}Received unparsable pulse block template blob", log_prefix(context));
+        log::trace(logcat, "{}Received unparsable pulse block template blob", log_prefix(context));
         return;
       }
 
       if (block.pulse.round != context.prepare_for_round.round)
       {
-        oxen::log::trace(logcat, "{}Received pulse block template specifying different round {}, expected {}", log_prefix(context), +block.pulse.round, +context.prepare_for_round.round);
+        log::trace(logcat, "{}Received pulse block template specifying different round {}, expected {}", log_prefix(context), +block.pulse.round, +context.prepare_for_round.round);
         return;
       }
 
@@ -643,7 +649,7 @@ void pulse::handle_message(void *quorumnet_state, pulse::message const &msg)
       {
         auto block_bitset = bitset_view16(block.pulse.validator_bitset);
         auto our_bitset   = bitset_view16(context.transient.wait_for_handshake_bitsets.best_bitset);
-        oxen::log::trace(logcat, "{}Received pulse block template specifying different validator handshake bitsets {}, expected {}", log_prefix(context), block_bitset.to_string(), our_bitset.to_string());
+        log::trace(logcat, "{}Received pulse block template specifying different validator handshake bitsets {}, expected {}", log_prefix(context), block_bitset.to_string(), our_bitset.to_string());
         return;
       }
 
@@ -671,7 +677,7 @@ void pulse::handle_message(void *quorumnet_state, pulse::message const &msg)
         auto derived = blake2b_hash(msg.random_value.value.data, sizeof(msg.random_value.value.data));
         if (derived != *hash)
         {
-          oxen::log::trace(logcat, "{}Dropping {}. Rederived random value hash {} does not match original hash {}", log_prefix(context), msg_source_string(context, msg), derived, *hash);
+          log::trace(logcat, "{}Dropping {}. Rederived random value hash {} does not match original hash {}", log_prefix(context), msg_source_string(context, msg), derived, *hash);
           return;
         }
       }
@@ -692,7 +698,7 @@ void pulse::handle_message(void *quorumnet_state, pulse::message const &msg)
       crypto::public_key const &validator_key = context.prepare_for_round.quorum.validators[msg.quorum_position];
       if (!crypto::check_signature(final_block_hash, validator_key, msg.signed_block.signature_of_final_block_hash))
       {
-        oxen::log::trace(logcat, "{}Dropping {}. Signature signing final block hash {} does not validate with the Service Node", log_prefix(context), msg_source_string(context, msg), msg.signed_block.signature_of_final_block_hash);
+        log::trace(logcat, "{}Dropping {}. Signature signing final block hash {} does not validate with the Service Node", log_prefix(context), msg_source_string(context, msg), msg.signed_block.signature_of_final_block_hash);
         return;
       }
 
@@ -712,7 +718,7 @@ void pulse::handle_message(void *quorumnet_state, pulse::message const &msg)
 }
 
 // TODO(doyle): Update pulse::perpare_for_round with this function after the hard fork and sanity check it on testnet.
-bool pulse::convert_time_to_round(pulse::time_point const& time, pulse::time_point const& r0_timestamp, uint8_t* round)
+bool convert_time_to_round(pulse::time_point const& time, pulse::time_point const& r0_timestamp, uint8_t* round)
 {
   const auto time_since_round_started = time <= r0_timestamp ? 0s : (time - r0_timestamp);
   size_t result_usize                 = time_since_round_started / service_nodes::PULSE_ROUND_TIME;
@@ -720,7 +726,7 @@ bool pulse::convert_time_to_round(pulse::time_point const& time, pulse::time_poi
   return result_usize <= 255;
 }
 
-bool pulse::get_round_timings(cryptonote::Blockchain const &blockchain, uint64_t block_height, uint64_t prev_timestamp, pulse::timings &times)
+bool get_round_timings(cryptonote::Blockchain const &blockchain, uint64_t block_height, uint64_t prev_timestamp, pulse::timings &times)
 {
   times = {};
   auto hf16 = hard_fork_begins(blockchain.nettype(), cryptonote::hf::hf16_pulse);
@@ -748,6 +754,8 @@ bool pulse::get_round_timings(cryptonote::Blockchain const &blockchain, uint64_t
   times.miner_fallback_timestamp = times.r0_timestamp + (service_nodes::PULSE_ROUND_TIME * 255);
   return true;
 }
+
+namespace {
 
 /*
   Pulse progresses via a state-machine that is iterated through job submissions
@@ -1042,7 +1050,7 @@ round_state wait_for_next_block(uint64_t hf16_height, round_context &context, cr
   if (context.wait_for_next_block.height == chain_height)
   {
     for (static uint64_t last_height = 0; last_height != chain_height; last_height = chain_height)
-      oxen::log::debug(logcat, "{}Network is currently producing block {}, waiting until next block", log_prefix(context), chain_height);
+      log::debug(logcat, "{}Network is currently producing block {}, waiting until next block", log_prefix(context), chain_height);
     return round_state::wait_for_next_block;
   }
 
@@ -1050,7 +1058,7 @@ round_state wait_for_next_block(uint64_t hf16_height, round_context &context, cr
   if (prev_hash == crypto::null_hash)
   {
     for (static uint64_t last_height = 0; last_height != chain_height; last_height = chain_height)
-      oxen::log::debug(logcat, "{}Failed to query the block hash for height {}", log_prefix(context), chain_height - 1);
+      log::debug(logcat, "{}Failed to query the block hash for height {}", log_prefix(context), chain_height - 1);
     return round_state::wait_for_next_block;
   }
 
@@ -1062,7 +1070,7 @@ round_state wait_for_next_block(uint64_t hf16_height, round_context &context, cr
   catch(std::exception const &e)
   {
     for (static uint64_t last_height = 0; last_height != chain_height; last_height = chain_height)
-      oxen::log::debug(logcat, "{}Failed to query the block hash for height {}", log_prefix(context), chain_height - 1);
+      log::debug(logcat, "{}Failed to query the block hash for height {}", log_prefix(context), chain_height - 1);
     return round_state::wait_for_next_block;
   }
 
@@ -1070,7 +1078,7 @@ round_state wait_for_next_block(uint64_t hf16_height, round_context &context, cr
   if (!get_round_timings(blockchain, chain_height, prev_timestamp, times))
   {
     for (static uint64_t last_height = 0; last_height != chain_height; last_height = chain_height)
-      oxen::log::error(logcat, "{}Failed to query the block data for Pulse timings", log_prefix(context));
+      log::error(logcat, "{}Failed to query the block data for Pulse timings", log_prefix(context));
     return round_state::wait_for_next_block;
   }
 
@@ -1129,7 +1137,7 @@ round_state prepare_for_round(round_context &context, service_nodes::service_nod
 
     if (round_usize > 255) // Network stalled
     {
-      oxen::log::info(logcat, "{}Pulse has timed out, reverting to accepting miner blocks only.", log_prefix(context));
+      log::info(logcat, "{}Pulse has timed out, reverting to accepting miner blocks only.", log_prefix(context));
       return goto_wait_for_next_block_and_clear_round_data(context);
     }
 
@@ -1164,11 +1172,11 @@ round_state prepare_for_round(round_context &context, service_nodes::service_nod
 
   if (!service_nodes::verify_pulse_quorum_sizes(context.prepare_for_round.quorum))
   {
-    oxen::log::info(logcat, "{}Insufficient Service Nodes to execute Pulse on height {}, we require a PoW miner block. Sleeping until next block.", log_prefix(context), context.wait_for_next_block.height);
+    log::info(logcat, "{}Insufficient Service Nodes to execute Pulse on height {}, we require a PoW miner block. Sleeping until next block.", log_prefix(context), context.wait_for_next_block.height);
     return goto_wait_for_next_block_and_clear_round_data(context);
   }
 
-  oxen::log::debug(logcat, "{}Generate Pulse quorum: {}", log_prefix(context), context.prepare_for_round.quorum);
+  log::debug(logcat, "{}Generate Pulse quorum: {}", log_prefix(context), context.prepare_for_round.quorum);
 
   //
   // NOTE: Quorum participation
@@ -1204,7 +1212,7 @@ round_state wait_for_round(round_context &context, cryptonote::Blockchain const 
   const auto curr_height = blockchain.get_current_blockchain_height(true /*lock*/);
   if (context.wait_for_next_block.height != curr_height)
   {
-    oxen::log::debug(logcat, "{}Block height changed whilst waiting for round {}, restarting Pulse stages", log_prefix(context), +context.prepare_for_round.round);
+    log::debug(logcat, "{}Block height changed whilst waiting for round {}, restarting Pulse stages", log_prefix(context), +context.prepare_for_round.round);
     return goto_wait_for_next_block_and_clear_round_data(context);
   }
 
@@ -1212,7 +1220,7 @@ round_state wait_for_round(round_context &context, cryptonote::Blockchain const 
   if (auto now = pulse::clock::now(); now < start_time)
   {
     for (static uint64_t last_height = 0; last_height != context.wait_for_next_block.height; last_height = context.wait_for_next_block.height)
-      oxen::log::info(logcat, "{}Waiting for round {} to start in {}", log_prefix(context), +context.prepare_for_round.round, tools::friendly_duration(start_time - now));
+      log::info(logcat, "{}Waiting for round {} to start in {}", log_prefix(context), +context.prepare_for_round.round, tools::friendly_duration(start_time - now));
     return round_state::wait_for_round;
   }
 
@@ -1225,7 +1233,7 @@ round_state wait_for_round(round_context &context, cryptonote::Blockchain const 
     size_t faulty_chance = tools::uniform_distribution_portable(tools::rng, 100);
     if (faulty_chance < 10)
     {
-      oxen::log::debug(logcat, "{}FAULTY NODE ACTIVATED", log_prefix(context));
+      log::debug(logcat, "{}FAULTY NODE ACTIVATED", log_prefix(context));
       return goto_preparing_for_next_round(context);
     }
 
@@ -1234,24 +1242,24 @@ round_state wait_for_round(round_context &context, cryptonote::Blockchain const 
     {
       auto sleep_time = std::chrono::seconds(tools::uniform_distribution_portable(tools::rng, 20));
       std::this_thread::sleep_for(sleep_time);
-      oxen::log::debug(logcat, "{}SLEEP TIME ACTIVATED {}s", log_prefix(context), tools::to_seconds(sleep_time));
+      log::debug(logcat, "{}SLEEP TIME ACTIVATED {}s", log_prefix(context), tools::to_seconds(sleep_time));
     }
   }
 #endif
 
   if (context.prepare_for_round.participant == sn_type::validator)
   {
-    oxen::log::info(logcat, "{}We are a pulse validator, sending handshake bit and collecting other handshakes.", log_prefix(context));
+    log::info(logcat, "{}We are a pulse validator, sending handshake bit and collecting other handshakes.", log_prefix(context));
     return round_state::send_and_wait_for_handshakes;
   }
   else if (context.prepare_for_round.participant == sn_type::producer)
   {
-    oxen::log::info(logcat, "{}We are the block producer for height {} in round {}, awaiting handshake bitsets.", log_prefix(context), context.wait_for_next_block.height, +context.prepare_for_round.round);
+    log::info(logcat, "{}We are the block producer for height {} in round {}, awaiting handshake bitsets.", log_prefix(context), context.wait_for_next_block.height, +context.prepare_for_round.round);
     return round_state::wait_for_handshake_bitsets;
   }
   else
   {
-    oxen::log::debug(logcat, "{}Non-participant for round, waiting on next round or block.", log_prefix(context));
+    log::debug(logcat, "{}Non-participant for round, waiting on next round or block.", log_prefix(context));
     return goto_preparing_for_next_round(context);
   }
 }
@@ -1271,7 +1279,7 @@ round_state send_and_wait_for_handshakes(round_context &context, void *quorumnet
     }
     catch (std::exception const &e)
     {
-      oxen::log::error(logcat, "{}Attempting to invoke and send a Pulse participation handshake unexpectedly failed. {}", log_prefix(context), e.what());
+      log::error(logcat, "{}Attempting to invoke and send a Pulse participation handshake unexpectedly failed. {}", log_prefix(context), e.what());
       return goto_preparing_for_next_round(context);
     }
   }
@@ -1292,7 +1300,7 @@ round_state send_and_wait_for_handshakes(round_context &context, void *quorumnet
   if (all_handshakes || timed_out)
   {
     bool missing_handshakes = timed_out && !all_handshakes;
-    oxen::log::info(logcat, "{}Collected validator handshakes {}{}Sending handshake bitset and collecting other validator bitsets.", log_prefix(context), bitset_view16(stage.bitset).to_string(), (missing_handshakes ? ", we timed out and some handshakes were not seen! " : ". "));
+    log::info(logcat, "{}Collected validator handshakes {}{}Sending handshake bitset and collecting other validator bitsets.", log_prefix(context), bitset_view16(stage.bitset).to_string(), (missing_handshakes ? ", we timed out and some handshakes were not seen! " : ". "));
     return round_state::send_handshake_bitsets;
   }
   else
@@ -1310,7 +1318,7 @@ round_state send_handshake_bitsets(round_context &context, void *quorumnet_state
   }
   catch(std::exception const &e)
   {
-    oxen::log::error(logcat, "{}Attempting to invoke and send a Pulse validator bitset unexpectedly failed. {}", log_prefix(context), e.what());
+    log::error(logcat, "{}Attempting to invoke and send a Pulse validator bitset unexpectedly failed. {}", log_prefix(context), e.what());
     return goto_preparing_for_next_round(context);
   }
 }
@@ -1340,7 +1348,7 @@ round_state wait_for_handshake_bitsets(round_context &context, service_nodes::se
           best_bitset = *bitset;
           count       = num;
         }
-        oxen::log::trace(logcat, "{}Collected from V[{}], handshake bitset {}", log_prefix(context), quorum_index, bitset_view16(*bitset).to_string());
+        log::trace(logcat, "{}Collected from V[{}], handshake bitset {}", log_prefix(context), quorum_index, bitset_view16(*bitset).to_string());
       }
     }
 
@@ -1354,19 +1362,19 @@ round_state wait_for_handshake_bitsets(round_context &context, service_nodes::se
       {
         // Less than the threshold of the validators can come to agreement about
         // which validators are online, we wait until the next round.
-        oxen::log::debug(logcat, "{}{}/{} \
+        log::debug(logcat, "{}{}/{} \
                          validators did not send any handshake bitset or sent an empty handshake \
                          bitset and have failed to come to agreement. Waiting until next round.",
                          log_prefix(context), count, quorum.size());
       }
       else if (i_am_not_participating)
       {
-        oxen::log::debug(logcat, "{}The participating validator bitset {} does not include us (quorum index {}). Waiting until next round.", log_prefix(context), bitset_view16(best_bitset).to_string(), context.prepare_for_round.my_quorum_position);
+        log::debug(logcat, "{}The participating validator bitset {} does not include us (quorum index {}). Waiting until next round.", log_prefix(context), bitset_view16(best_bitset).to_string(), context.prepare_for_round.my_quorum_position);
       }
       else
       {
         // Can't come to agreement, see threshold comment above
-        oxen::log::debug(logcat, "{}We heard back from less than {} of the validators ({}/{}). Waiting until next round.", log_prefix(context), service_nodes::PULSE_BLOCK_REQUIRED_SIGNATURES, count, quorum.size());
+        log::debug(logcat, "{}We heard back from less than {} of the validators ({}/{}). Waiting until next round.", log_prefix(context), service_nodes::PULSE_BLOCK_REQUIRED_SIGNATURES, count, quorum.size());
       }
 
       return goto_preparing_for_next_round(context);
@@ -1374,7 +1382,7 @@ round_state wait_for_handshake_bitsets(round_context &context, service_nodes::se
 
     context.transient.wait_for_handshake_bitsets.best_bitset = best_bitset;
     context.transient.wait_for_handshake_bitsets.best_count  = count;
-    oxen::log::info(logcat, "{}{}/{} validators agreed on the participating nodes in the quorum {}{}", log_prefix(context), count, quorum.size(),
+    log::info(logcat, "{}{}/{} validators agreed on the participating nodes in the quorum {}{}", log_prefix(context), count, quorum.size(),
                               bitset_view16(best_bitset).to_string(), (context.prepare_for_round.participant == sn_type::producer
                                       ? ""
                                       : ". Awaiting block template from block producer"));
@@ -1396,14 +1404,14 @@ round_state send_block_template(round_context &context, void *quorumnet_state, s
   // Invariants
   if (list_state.empty())
   {
-    oxen::log::warning(logcat, "{}Block producer (us) is not available on the service node list, waiting until next round", log_prefix(context));
+    log::warning(logcat, "{}Block producer (us) is not available on the service node list, waiting until next round", log_prefix(context));
     return goto_preparing_for_next_round(context);
   }
 
   std::shared_ptr<const service_nodes::service_node_info> info = list_state[0].info;
   if (!info->is_active())
   {
-    oxen::log::warning(logcat, "{}Block producer (us) is not an active service node, waiting until next round", log_prefix(context));
+    log::warning(logcat, "{}Block producer (us) is not an active service node, waiting until next round", log_prefix(context));
     return goto_preparing_for_next_round(context);
   }
 
@@ -1418,13 +1426,13 @@ round_state send_block_template(round_context &context, void *quorumnet_state, s
                                                      context.transient.wait_for_handshake_bitsets.best_bitset,
                                                      height))
     {
-      oxen::log::error(logcat, "{}Failed to generate a block template, waiting until next round", log_prefix(context));
+      log::error(logcat, "{}Failed to generate a block template, waiting until next round", log_prefix(context));
       return goto_preparing_for_next_round(context);
     }
 
     if (context.wait_for_next_block.height != height)
     {
-      oxen::log::debug(logcat, "{}Block height changed whilst preparing block template for round {}, restarting Pulse stages", log_prefix(context), +context.prepare_for_round.round);
+      log::debug(logcat, "{}Block height changed whilst preparing block template for round {}, restarting Pulse stages", log_prefix(context), +context.prepare_for_round.round);
       return goto_wait_for_next_block_and_clear_round_data(context);
     }
   }
@@ -1436,7 +1444,7 @@ round_state send_block_template(round_context &context, void *quorumnet_state, s
   crypto::generate_signature(msg_signature_hash(context.wait_for_next_block.top_hash, msg), key.pub, key.key, msg.signature);
 
   // Send
-  oxen::log::info(logcat, "{}Validators are handshaken and ready, sending block template from producer (us) to validators.\n{}", log_prefix(context), cryptonote::obj_to_json_str(block));
+  log::info(logcat, "{}Validators are handshaken and ready, sending block template from producer (us) to validators.\n{}", log_prefix(context), cryptonote::obj_to_json_str(block));
   cryptonote::quorumnet_pulse_relay_message_to_quorum(quorumnet_state, msg, context.prepare_for_round.quorum, true /*block_producer*/);
   return goto_preparing_for_next_round(context);
 }
@@ -1454,7 +1462,7 @@ round_state wait_for_block_template(round_context &context, service_nodes::servi
     if (received)
     {
       cryptonote::block const &block = context.transient.wait_for_block_template.block;
-      oxen::log::info(logcat, "{}Valid block received: {}", log_prefix(context), cryptonote::obj_to_json_str(context.transient.wait_for_block_template.block));
+      log::info(logcat, "{}Valid block received: {}", log_prefix(context), cryptonote::obj_to_json_str(context.transient.wait_for_block_template.block));
 
       // Generate my random value and its hash
       crypto::generate_random_bytes_thread_safe(sizeof(context.transient.random_value.send.data), context.transient.random_value.send.data.data);
@@ -1463,7 +1471,7 @@ round_state wait_for_block_template(round_context &context, service_nodes::servi
     }
     else
     {
-      oxen::log::info(logcat, "{}Timed out, block template was not received", log_prefix(context));
+      log::info(logcat, "{}Timed out, block template was not received", log_prefix(context));
       return goto_preparing_for_next_round(context);
     }
   }
@@ -1503,7 +1511,7 @@ round_state send_and_wait_for_random_value_hashes(round_context &context, servic
     if (!enforce_validator_participation_and_timeouts(context, stage, node_list, timed_out, all_hashes))
       return goto_preparing_for_next_round(context);
 
-    oxen::log::info(logcat, "{}Received {} random value hashes from {}{}", log_prefix(context), bitset_view16(stage.bitset).count(), bitset_view16(stage.bitset).to_string(), (timed_out ? ". We timed out and some hashes are missing" : ""));
+    log::info(logcat, "{}Received {} random value hashes from {}{}", log_prefix(context), bitset_view16(stage.bitset).count(), bitset_view16(stage.bitset).to_string(), (timed_out ? ". We timed out and some hashes are missing" : ""));
     return round_state::send_and_wait_for_random_value;
   }
 
@@ -1561,7 +1569,7 @@ round_state send_and_wait_for_random_value(round_context &context, service_nodes
             string.data()[i] = '.';
 #endif
 
-          oxen::log::debug(logcat, "{}Final random value seeding with V[{}] {}", log_prefix(context), index, string.view());
+          log::debug(logcat, "{}Final random value seeding with V[{}] {}", log_prefix(context), index, string.view());
           crypto_generichash_update(&state, random_value->data, sizeof(random_value->data));
         }
       }
@@ -1583,7 +1591,7 @@ round_state send_and_wait_for_random_value(round_context &context, service_nodes
     crypto::hash const &final_block_hash = cryptonote::get_block_hash(final_block);
     crypto::generate_signature(final_block_hash, key.pub, key.key, context.transient.signed_block.send.data);
 
-    oxen::log::info(logcat, "{}Block final random value {} generated from validators {}", log_prefix(context), oxenc::to_hex(tools::view_guts(final_block.pulse.random_value.data)), bitset_view16(stage.bitset).to_string());
+    log::info(logcat, "{}Block final random value {} generated from validators {}", log_prefix(context), oxenc::to_hex(tools::view_guts(final_block.pulse.random_value.data)), bitset_view16(stage.bitset).to_string());
     return round_state::send_and_wait_for_signed_blocks;
   }
 
@@ -1645,12 +1653,12 @@ round_state send_and_wait_for_signed_blocks(round_context &context, service_node
       uint16_t validator_index = indices[index];
       auto const &signature    = quorum[validator_index];
       assert(signature);
-      oxen::log::debug(logcat, "{}Signature added: {}:{}, {}", log_prefix(context), validator_index, context.prepare_for_round.quorum.validators[validator_index], *signature);
+      log::debug(logcat, "{}Signature added: {}:{}, {}", log_prefix(context), validator_index, context.prepare_for_round.quorum.validators[validator_index], *signature);
       final_block.signatures.emplace_back(validator_index, *signature);
     }
 
     // Propagate Final Block
-    oxen::log::debug(logcat, "{}Final signed block constructed\n{}", log_prefix(context), cryptonote::obj_to_json_str(final_block));
+    log::debug(logcat, "{}Final signed block constructed\n{}", log_prefix(context), cryptonote::obj_to_json_str(final_block));
     cryptonote::block_verification_context bvc = {};
     if (!core.handle_block_found(final_block, bvc))
       return goto_preparing_for_next_round(context);
@@ -1661,7 +1669,9 @@ round_state send_and_wait_for_signed_blocks(round_context &context, service_node
   return round_state::send_and_wait_for_signed_blocks;
 }
 
-void pulse::main(void *quorumnet_state, cryptonote::core &core)
+}  // anonymous namespace
+
+void main(void *quorumnet_state, cryptonote::core &core)
 {
   cryptonote::Blockchain &blockchain          = core.get_blockchain_storage();
   service_nodes::service_node_keys const &key = core.get_service_keys();
@@ -1673,14 +1683,14 @@ void pulse::main(void *quorumnet_state, cryptonote::core &core)
   if (!hf16)
   {
     for (static bool once = true; once; once = !once)
-      oxen::log::error(logcat, "Pulse: HF16 is not defined, pulse worker waiting");
+      log::error(logcat, "Pulse: HF16 is not defined, pulse worker waiting");
     return;
   }
 
   if (uint64_t height = blockchain.get_current_blockchain_height(true /*lock*/); height < *hf16)
   {
     for (static bool once = true; once; once = !once)
-      oxen::log::debug(logcat, "Pulse: Network at block {} is not ready for Pulse until block {}, waiting", height, *hf16);
+      log::debug(logcat, "Pulse: Network at block {} is not ready for Pulse until block {}, waiting", height, *hf16);
     return;
   }
 
@@ -1743,3 +1753,4 @@ void pulse::main(void *quorumnet_state, cryptonote::core &core)
   }
 }
 
+}  // namespace pulse

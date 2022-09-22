@@ -48,7 +48,6 @@
 #include "wallet/wallet2.h"
 
 using namespace cryptonote;
-using boost::lexical_cast;
 namespace po = boost::program_options;
 
 namespace genms
@@ -61,7 +60,7 @@ namespace genms
 
 namespace
 {
-  static auto logcat = oxen::log::Cat("wallet.gen_multisig");
+  static auto logcat = log::Cat("wallet.gen_multisig");
 
   const command_line::arg_descriptor<std::string> arg_filename_base = {"filename-base", genms::tr("Base filename (-1, -2, etc suffixes will be appended as needed)"), ""};
   const command_line::arg_descriptor<std::string> arg_scheme = {"scheme", genms::tr("Give threshold and participants at once as M/N"), ""};

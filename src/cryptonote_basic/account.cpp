@@ -49,7 +49,7 @@ DISABLE_VS_WARNINGS(4244 4345)
 
   namespace cryptonote
 {
-  static auto logcat = oxen::log::Cat("account");
+  static auto logcat = log::Cat("account");
 
   //-----------------------------------------------------------------
   hw::device& account_keys::get_device() const  {
@@ -58,7 +58,7 @@ DISABLE_VS_WARNINGS(4244 4345)
   //-----------------------------------------------------------------
   void account_keys::set_device( hw::device &hwdev)  {
     m_device = &hwdev;
-    oxen::log::debug(oxen::log::Cat("device"), "account_keys::set_device device type: {}", tools::type_name(typeid(hwdev)));
+    log::debug(log::Cat("device"), "account_keys::set_device device type: {}", tools::type_name(typeid(hwdev)));
   }
   //-----------------------------------------------------------------
   static void derive_key(const crypto::chacha_key &base_key, crypto::chacha_key &key)
@@ -141,7 +141,7 @@ DISABLE_VS_WARNINGS(4244 4345)
     try{
       m_keys.get_device().disconnect();
     } catch (const std::exception &e){
-      oxen::log::error(logcat, "Device disconnect exception: {}", e.what());
+      log::error(logcat, "Device disconnect exception: {}", e.what());
     }
   }
   //-----------------------------------------------------------------
@@ -205,7 +205,7 @@ DISABLE_VS_WARNINGS(4244 4345)
   void account_base::create_from_device(hw::device &hwdev)
   {
     m_keys.set_device(hwdev);
-    oxen::log::debug(oxen::log::Cat("device"), "device type: {}", tools::type_name(typeid(hwdev)));
+    log::debug(log::Cat("device"), "device type: {}", tools::type_name(typeid(hwdev)));
     CHECK_AND_ASSERT_THROW_MES(hwdev.init(), "Device init failed");
     CHECK_AND_ASSERT_THROW_MES(hwdev.connect(), "Device connect failed");
     try {

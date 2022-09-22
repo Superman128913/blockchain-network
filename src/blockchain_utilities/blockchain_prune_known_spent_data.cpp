@@ -37,10 +37,10 @@
 #include "blockchain_db/blockchain_db.h"
 #include "version.h"
 
-static auto logcat = oxen::log::Cat("bcutil");
-
 namespace po = boost::program_options;
 using namespace cryptonote;
+
+static auto logcat = log::Cat("bcutil");
 
 static std::map<uint64_t, uint64_t> load_outputs(const fs::path& filename)
 {
@@ -56,7 +56,7 @@ static std::map<uint64_t, uint64_t> load_outputs(const fs::path& filename)
 
   if (!f)
   {
-    oxen::log::error(logcat, "Failed to load outputs from {}: {}", filename, strerror(errno));
+    log::error(logcat, "Failed to load outputs from {}: {}", filename, strerror(errno));
     return {};
   }
   while (1)
@@ -79,7 +79,7 @@ static std::map<uint64_t, uint64_t> load_outputs(const fs::path& filename)
     }
     if (amount == std::numeric_limits<uint64_t>::max())
     {
-      oxen::log::error(logcat, "Bad format in {}", filename);
+      log::error(logcat, "Bad format in {}", filename);
       continue;
     }
     if (sscanf(s, "%" PRIu64 "*%" PRIu64, &offset, &num_offsets) == 2 && num_offsets < std::numeric_limits<uint64_t>::max() - offset)
@@ -92,7 +92,7 @@ static std::map<uint64_t, uint64_t> load_outputs(const fs::path& filename)
     }
     else
     {
-      oxen::log::error(logcat, "Bad format in {}", filename);
+      log::error(logcat, "Bad format in {}", filename);
       continue;
     }
   }
@@ -155,7 +155,7 @@ int main(int argc, char* argv[])
   else
     mlog_set_log(std::string(std::to_string(log_level) + ",bcutil:INFO").c_str());
 
-  oxen::log::warning(logcat, "Starting...");
+  log::warning(logcat, "Starting...");
 
   bool opt_testnet = command_line::get_arg(vm, cryptonote::arg_testnet_on);
   bool opt_devnet = command_line::get_arg(vm, cryptonote::arg_devnet_on);
@@ -165,18 +165,18 @@ int main(int argc, char* argv[])
 
   const auto input = fs::u8path(command_line::get_arg(vm, arg_input));
 
-  oxen::log::warning(logcat, "Initializing source blockchain (BlockchainDB)");
+  log::warning(logcat, "Initializing source blockchain (BlockchainDB)");
   blockchain_objects_t blockchain_objects = {};
   Blockchain *core_storage = &blockchain_objects.m_blockchain;
   BlockchainDB *db = new_db();
   if (db == NULL)
   {
-    oxen::log::error(logcat, "Failed to initialize a database");
+    log::error(logcat, "Failed to initialize a database");
     throw std::runtime_error("Failed to initialize a database");
   }
 
   const fs::path filename = fs::u8path(command_line::get_arg(vm, cryptonote::arg_data_dir)) / db->get_db_name();
-  oxen::log::warning(logcat, "Loading blockchain from folder {} ...", filename);
+  log::warning(logcat, "Loading blockchain from folder {} ...", filename);
 
   try
   {
@@ -184,20 +184,20 @@ int main(int argc, char* argv[])
   }
   catch (const std::exception& e)
   {
-    oxen::log::warning(logcat, "Error opening database: {}", e.what());
+    log::warning(logcat, "Error opening database: {}", e.what());
     return 1;
   }
   r = core_storage->init(db, nullptr /*ons_db*/, net_type);
 
   CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize source blockchain storage");
-  oxen::log::warning(logcat, "Source blockchain storage initialized OK");
+  log::warning(logcat, "Source blockchain storage initialized OK");
 
   std::map<uint64_t, uint64_t> known_spent_outputs;
   if (input.empty())
   {
     std::map<uint64_t, std::pair<uint64_t, uint64_t>> outputs;
 
-    oxen::log::warning(logcat, "Scanning for known spent data...");
+    log::warning(logcat, "Scanning for known spent data...");
     db->for_all_transactions([&](const crypto::hash &txid, const cryptonote::transaction &tx){
       const bool miner_tx = tx.vin.size() == 1 && std::holds_alternative<txin_gen>(tx.vin[0]);
       for (const auto &in: tx.vin)
@@ -226,11 +226,11 @@ int main(int argc, char* argv[])
   }
   else
   {
-    oxen::log::warning(logcat, "Loading known spent data...");
+    log::warning(logcat, "Loading known spent data...");
     known_spent_outputs = load_outputs(input);
   }
 
-  oxen::log::warning(logcat, "Pruning known spent data...");
+  log::warning(logcat, "Pruning known spent data...");
 
   bool stop_requested = false;
   tools::signal_handler::install([&stop_requested](int type) {
@@ -248,22 +248,22 @@ int main(int argc, char* argv[])
     if (i->first == 0)
     {
       if (opt_verbose)
-        oxen::log::info(logcat, "Ignoring output value {}, with {} outputs", i->first, num_outputs);
+        log::info(logcat, "Ignoring output value {}, with {} outputs", i->first, num_outputs);
       continue;
     }
     num_eligible_outputs += num_outputs;
     num_eligible_known_spent_outputs += i->second;
     if (opt_verbose)
-      oxen::log::info(logcat, "{}: {}/{}", i->first, i->second, num_outputs);
+      log::info(logcat, "{}: {}/{}", i->first, i->second, num_outputs);
     if (num_outputs > i->second)
       continue;
     if (num_outputs && num_outputs < i->second)
     {
-      oxen::log::error(logcat, "More outputs are spent than known for amount {}, not touching", i->first);
+      log::error(logcat, "More outputs are spent than known for amount {}, not touching", i->first);
       continue;
     }
     if (opt_verbose)
-      oxen::log::info(logcat, "Pruning data for {} outputs", num_outputs);
+      log::info(logcat, "Pruning data for {} outputs", num_outputs);
     if (!opt_dry_run)
       db->prune_outputs(i->first);
     num_prunable_outputs += i->second;
@@ -271,13 +271,13 @@ int main(int argc, char* argv[])
 
   db->batch_stop();
 
-  oxen::log::info(logcat, "Total outputs: {}", num_total_outputs);
-  oxen::log::info(logcat, "Known spent outputs: {}", num_known_spent_outputs);
-  oxen::log::info(logcat, "Eligible outputs: {}", num_eligible_outputs);
-  oxen::log::info(logcat, "Eligible known spent outputs: {}", num_eligible_known_spent_outputs);
-  oxen::log::info(logcat, "Prunable outputs: {}", num_prunable_outputs);
+  log::info(logcat, "Total outputs: {}", num_total_outputs);
+  log::info(logcat, "Known spent outputs: {}", num_known_spent_outputs);
+  log::info(logcat, "Eligible outputs: {}", num_eligible_outputs);
+  log::info(logcat, "Eligible known spent outputs: {}", num_eligible_known_spent_outputs);
+  log::info(logcat, "Prunable outputs: {}", num_prunable_outputs);
 
-  oxen::log::warning(logcat, "Blockchain known spent data pruned OK");
+  log::warning(logcat, "Blockchain known spent data pruned OK");
   core_storage->deinit();
   return 0;
 

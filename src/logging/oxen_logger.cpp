@@ -7,10 +7,10 @@
 
 namespace oxen::logging
 {
-  static auto logcat = oxen::log::Cat("logging");
+  static auto logcat = log::Cat("logging");
 
   void
-  set_additional_log_categories(oxen::log::Level& log_level)
+  set_additional_log_categories(log::Level& log_level)
   {
     switch (log_level)
     {
@@ -79,7 +79,7 @@ namespace oxen::logging
   }
 
   void
-  init(const std::string& log_location, oxen::log::Level log_level)
+  init(const std::string& log_location, log::Level log_level)
   {
     log::reset_level(log_level);
     log::add_sink(log::Type::Print, "stdout");
@@ -114,19 +114,19 @@ namespace oxen::logging
 
   using namespace std::literals;
 
-  static constexpr std::array<std::pair<std::string_view, oxen::log::Level>, 12> logLevels = {
-      {{""sv, oxen::log::Level::info},
-       {"4"sv, oxen::log::Level::trace},
-       {"3", oxen::log::Level::trace},
-       {"2", oxen::log::Level::debug},
-       {"1", oxen::log::Level::info},
-       {"0", oxen::log::Level::warn},
-       {"trace", oxen::log::Level::trace},
-       {"debug", oxen::log::Level::debug},
-       {"info", oxen::log::Level::info},
-       {"warning", oxen::log::Level::warn},
-       {"error", oxen::log::Level::err},
-       {"critical", oxen::log::Level::critical}}};
+  static constexpr std::array<std::pair<std::string_view, log::Level>, 12> logLevels = {
+      {{""sv, log::Level::info},
+       {"4"sv, log::Level::trace},
+       {"3", log::Level::trace},
+       {"2", log::Level::debug},
+       {"1", log::Level::info},
+       {"0", log::Level::warn},
+       {"trace", log::Level::trace},
+       {"debug", log::Level::debug},
+       {"info", log::Level::info},
+       {"warning", log::Level::warn},
+       {"error", log::Level::err},
+       {"critical", log::Level::critical}}};
 
   std::optional<spdlog::level::level_enum>
   parse_level(std::string_view input)
@@ -137,12 +137,12 @@ namespace oxen::logging
     return std::nullopt;
   }
 
-  static constexpr std::array<std::pair<uint8_t, oxen::log::Level>, 5> intLogLevels = {
-      {{4, oxen::log::Level::trace},
-       {3, oxen::log::Level::trace},
-       {2, oxen::log::Level::debug},
-       {1, oxen::log::Level::info},
-       {0, oxen::log::Level::warn}}};
+  static constexpr std::array<std::pair<uint8_t, log::Level>, 5> intLogLevels = {
+      {{4, log::Level::trace},
+       {3, log::Level::trace},
+       {2, log::Level::debug},
+       {1, log::Level::info},
+       {0, log::Level::warn}}};
 
   std::optional<spdlog::level::level_enum>
   parse_level(uint8_t input)
@@ -153,13 +153,13 @@ namespace oxen::logging
     return std::nullopt;
   }
 
-  static constexpr std::array<std::pair<oxenmq::LogLevel, oxen::log::Level>, 6> omqLogLevels = {
-      {{oxenmq::LogLevel::trace, oxen::log::Level::trace},
-       {oxenmq::LogLevel::debug, oxen::log::Level::debug},
-       {oxenmq::LogLevel::info, oxen::log::Level::info},
-       {oxenmq::LogLevel::warn, oxen::log::Level::warn},
-       {oxenmq::LogLevel::error, oxen::log::Level::err},
-       {oxenmq::LogLevel::fatal, oxen::log::Level::critical}}};
+  static constexpr std::array<std::pair<oxenmq::LogLevel, log::Level>, 6> omqLogLevels = {
+      {{oxenmq::LogLevel::trace, log::Level::trace},
+       {oxenmq::LogLevel::debug, log::Level::debug},
+       {oxenmq::LogLevel::info, log::Level::info},
+       {oxenmq::LogLevel::warn, log::Level::warn},
+       {oxenmq::LogLevel::error, log::Level::err},
+       {oxenmq::LogLevel::fatal, log::Level::critical}}};
 
   std::optional<spdlog::level::level_enum>
   parse_level(oxenmq::LogLevel input)

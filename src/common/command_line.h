@@ -45,8 +45,7 @@
 
 namespace command_line
 {
-
-  static auto logcat = oxen::log::Cat("global");
+  namespace log = oxen::log;
 
   inline const char* tr(const char* str) { return i18n_translate(str, "command_line"); }
 
@@ -221,7 +220,7 @@ namespace command_line
     if (0 != description.find_nothrow(arg.name, false))
     {
       if (!unique)
-        oxen::log::error(logcat, "Argument already exists: {}", arg.name);
+        log::error(globallogcat, "Argument already exists: {}", arg.name);
       return;
     }
 
@@ -234,7 +233,7 @@ namespace command_line
     if (0 != description.find_nothrow(arg.name, false))
     {
       if (!unique)
-        oxen::log::error(logcat, "Argument already exists: {}", arg.name);
+        log::error(globallogcat, "Argument already exists: {}", arg.name);
       return;
     }
 
@@ -247,7 +246,7 @@ namespace command_line
     if (0 != description.find_nothrow(arg.name, false))
     {
       if (!unique)
-        oxen::log::error(logcat, "Argument already exists: {}", arg.name);
+        log::error(globallogcat, "Argument already exists: {}", arg.name);
       return;
     }
 

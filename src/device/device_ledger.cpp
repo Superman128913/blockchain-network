@@ -50,7 +50,7 @@ namespace hw::ledger {
 
   #ifdef WITH_DEVICE_LEDGER
 
-    static auto logcat = oxen::log::Cat("device.ledger");
+    static auto logcat = log::Cat("device.ledger");
 
     /* ===================================================================== */
     /* ===                           Debug                              ==== */
@@ -319,7 +319,7 @@ namespace hw::ledger {
       reset_buffer();
       has_view_key = false;
       tx_in_progress = false;
-      oxen::log::debug(logcat, "Device {} Created", id);
+      log::debug(logcat, "Device {} Created", id);
     }
 
     device_ledger::device_ledger(io::ledger_tcp&& tcp) : hw_device{std::make_unique<io::ledger_tcp>(std::move(tcp))} {
@@ -327,12 +327,12 @@ namespace hw::ledger {
       reset_buffer();
       has_view_key = false;
       tx_in_progress = false;
-      oxen::log::debug(logcat, "Device {} (tcp) created", id);
+      log::debug(logcat, "Device {} (tcp) created", id);
     }
 
     device_ledger::~device_ledger() {
       release();
-      oxen::log::debug(logcat, "Device {} Destroyed", id);
+      log::debug(logcat, "Device {} Destroyed", id);
     }
 
     /* ======================================================================= */
@@ -341,24 +341,24 @@ namespace hw::ledger {
 
     //lock the device for a long sequence
     void device_ledger::lock() {
-      oxen::log::debug(logcat, "Ask for LOCKING for device {} in thread ", name);
+      log::debug(logcat, "Ask for LOCKING for device {} in thread ", name);
       device_locker.lock();
-      oxen::log::debug(logcat, "Device {} LOCKed", name);
+      log::debug(logcat, "Device {} LOCKed", name);
     }
 
     //lock the device for a long sequence
     bool device_ledger::try_lock() {
-      oxen::log::debug(logcat, "Ask for LOCKING(try) for device {} in thread ", name);
+      log::debug(logcat, "Ask for LOCKING(try) for device {} in thread ", name);
       bool r = device_locker.try_lock();
-      oxen::log::debug(logcat, "Device {}{} LOCKed(try)", name, (r ? "" : " not"));
+      log::debug(logcat, "Device {}{} LOCKed(try)", name, (r ? "" : " not"));
       return r;
     }
 
     //unlock the device after a long sequence
     void device_ledger::unlock() {
-      oxen::log::debug(logcat, "Ask for UNLOCKING for device {} in thread ", name);
+      log::debug(logcat, "Ask for UNLOCKING for device {} in thread ", name);
       device_locker.unlock();
-      oxen::log::debug(logcat, "Device {} UNLOCKed", name);
+      log::debug(logcat, "Device {} UNLOCKed", name);
     }
 
 
@@ -381,14 +381,14 @@ namespace hw::ledger {
 #endif
         cmd << " p=(0x" << std::setw(2) << +buffer_send[2] << ",0x" << std::setw(2) << +buffer_send[3] << ')';
         cmd << " sz=0x" << std::setw(2) << +buffer_send[4] << '[' << std::to_string(buffer_send[4]) << "] ";
-        oxen::log::debug(logcat, "CMD: {}{}", cmd.str(), oxenc::to_hex(buffer_send + 5, buffer_send + length_send));
+        log::debug(logcat, "CMD: {}{}", cmd.str(), oxenc::to_hex(buffer_send + 5, buffer_send + length_send));
         last_cmd = std::chrono::steady_clock::now();
       }
     }
 
     void device_ledger::logRESP() {
       if (apdu_verbose)
-        oxen::log::debug(logcat, "RESP (+{}): {} {}", tools::short_duration(std::chrono::steady_clock::now() - last_cmd), oxenc::to_hex(std::string_view{reinterpret_cast<const char*>(&sw), sizeof(sw)}), oxenc::to_hex(buffer_recv, buffer_recv + length_recv));
+        log::debug(logcat, "RESP (+{}): {} {}", tools::short_duration(std::chrono::steady_clock::now() - last_cmd), oxenc::to_hex(std::string_view{reinterpret_cast<const char*>(&sw), sizeof(sw)}), oxenc::to_hex(buffer_recv, buffer_recv + length_recv));
     }
 
     int device_ledger::set_command_header(unsigned char ins, unsigned char p1, unsigned char p2) {
@@ -453,7 +453,7 @@ namespace hw::ledger {
     }
 
     void device_ledger::send_secret(const unsigned char sec[32], int &offset) {
-      oxen::log::debug(logcat, "send_secret: {}", tx_in_progress);
+      log::debug(logcat, "send_secret: {}", tx_in_progress);
       send_bytes(sec, 32, offset);
       if (tx_in_progress) {
         CHECK_AND_ASSERT_THROW_MES(offset + 32 <= BUFFER_SEND_SIZE, "send_secret: out of bounds write (mac)");
@@ -463,7 +463,7 @@ namespace hw::ledger {
     }
 
     void device_ledger::receive_secret(unsigned char sec[32], int &offset) {
-      oxen::log::debug(logcat, "receive_secret: {}", tx_in_progress);
+      log::debug(logcat, "receive_secret: {}", tx_in_progress);
       receive_bytes(sec, 32, offset);
       if (tx_in_progress) {
         CHECK_AND_ASSERT_THROW_MES(offset + 32 <= BUFFER_RECV_SIZE, "receive_secret: out of bounds read (mac)");
@@ -563,7 +563,7 @@ namespace hw::ledger {
 #endif
       release();
       hw_device->init();
-      oxen::log::debug(logcat, "Device {} HIDUSB inited", id);
+      log::debug(logcat, "Device {} HIDUSB inited", id);
       return true;
     }
 
@@ -653,7 +653,7 @@ namespace hw::ledger {
 
         std::string coin{reinterpret_cast<const char*>(buffer_recv), 4};
         auto device_nettype = static_cast<cryptonote::network_type>(buffer_recv[4]);
-        oxen::log::debug(logcat, "Ledger wallet is set to {} {}", coin, nettype_string(device_nettype));
+        log::debug(logcat, "Ledger wallet is set to {} {}", coin, nettype_string(device_nettype));
         if (coin != COIN_NETWORK)
             throw std::runtime_error{"Invalid wallet app: expected " + std::string{COIN_NETWORK} + ", got " + coin};
         if (device_nettype != nettype)
@@ -683,7 +683,7 @@ namespace hw::ledger {
             case mode::NONE:
                 break;
         }
-        oxen::log::debug(logcat, "Switch to mode: {}", +static_cast<unsigned char>(m));
+        log::debug(logcat, "Switch to mode: {}", +static_cast<unsigned char>(m));
         return device::set_mode(m);
     }
 
@@ -717,7 +717,7 @@ namespace hw::ledger {
         //View key is retrieved, if allowed, to speed up blockchain parsing
         receive_bytes(viewkey.data, 32);
         has_view_key = !is_fake_view_key(viewkey);
-        oxen::log::debug(logcat, "{}", (has_view_key ? "Have view key" : "Have no view key"));
+        log::debug(logcat, "{}", (has_view_key ? "Have view key" : "Have no view key"));
 
 #ifdef DEBUG_HWDEVICE
         send_simple(INS_GET_KEY, 0x04);
@@ -784,7 +784,7 @@ namespace hw::ledger {
       if (mode_ == mode::TRANSACTION_PARSE && has_view_key) {
         //If we are in TRANSACTION_PARSE, the given derivation has been retrieved uncrypted (wihtout the help
         //of the device), so continue that way.
-        oxen::log::debug(logcat, "derive_subaddress_public_key  : PARSE mode with known viewkey");
+        log::debug(logcat, "derive_subaddress_public_key  : PARSE mode with known viewkey");
         crypto::derive_subaddress_public_key(pub, derivation, output_index, derived_pub);
       } else {
 
@@ -1098,7 +1098,7 @@ namespace hw::ledger {
       if (mode_ == mode::TRANSACTION_PARSE && has_view_key) {
         //A derivation is requested in PARSE mode and we have the view key,
         //so do that without the device and return the derivation unencrypted.
-        oxen::log::debug(logcat, "generate_key_derivation  : PARSE mode with known viewkey");
+        log::debug(logcat, "generate_key_derivation  : PARSE mode with known viewkey");
         //Note derivation in PARSE mode can only happen with viewkey, so assert it!
         assert(is_fake_view_key(sec));
         r = crypto::generate_key_derivation(pub, viewkey, derivation);
@@ -1130,12 +1130,12 @@ namespace hw::ledger {
       const crypto::public_key *pkey = nullptr;
       if (derivation == main_derivation) {
         pkey = &tx_pub_key;
-        oxen::log::debug(logcat, "conceal derivation with main tx pub key");
+        log::debug(logcat, "conceal derivation with main tx pub key");
       } else {
         for (size_t n = 0; n < additional_derivations.size(); ++n) {
           if (derivation == additional_derivations[n]) {
             pkey = &additional_tx_pub_keys[n];
-            oxen::log::debug(logcat, "conceal derivation with additionnal tx pub key");
+            log::debug(logcat, "conceal derivation with additionnal tx pub key");
             break;
           }
         }
@@ -1431,7 +1431,7 @@ namespace hw::ledger {
       log_hexbuffer("GENERATE_TX_PROOF: **r**   ", sig.r.data, sizeof(sig.r.data));
 
       debug_device->generate_tx_proof(prefix_hash_x, R_x, A_x, B_x, D_x, r_x, sig_x);
-      oxen::log::debug(logcat, "FAIL is normal if random is not fixed in proof");
+      log::debug(logcat, "FAIL is normal if random is not fixed in proof");
       check32("generate_tx_proof", "c", sig_x.c.data, sig.c.data);
       check32("generate_tx_proof", "r", sig_x.r.data, sig.r.data);
 
@@ -1493,7 +1493,7 @@ namespace hw::ledger {
 #ifdef DEBUG_HWDEVICE
       crypto::hash h_x;
       debug_device->get_transaction_prefix_hash(tx, h_x);
-      oxen::log::debug(logcat, "get_transaction_prefix_hash [[IN]] h_x/1 {}", h_x);
+      log::debug(logcat, "get_transaction_prefix_hash [[IN]] h_x/1 {}", h_x);
 #endif
 
       // As of protocol version 4, we send:
@@ -1744,7 +1744,7 @@ namespace hw::ledger {
         receive_bytes(unmasked.mask.bytes, 32, offset);
 
 #ifdef DEBUG_HWDEVICE
-        oxen::log::debug(logcat, "ecdhEncode: Akout: {}", AKout_x);
+        log::debug(logcat, "ecdhEncode: Akout: {}", AKout_x);
         check32("ecdhEncode", "amount", unmasked_x.amount.bytes, unmasked.amount.bytes);
         check32("ecdhEncode", "mask", unmasked_x.mask.bytes, unmasked.mask.bytes);
 
@@ -1776,7 +1776,7 @@ namespace hw::ledger {
         receive_bytes(masked.mask.bytes, 32, offset);
 
 #ifdef DEBUG_HWDEVICE
-        oxen::log::debug(logcat, "ecdhEncode: Akout: {}", AKout_x);
+        log::debug(logcat, "ecdhEncode: Akout: {}", AKout_x);
         check32("ecdhDecode", "amount", masked_x.amount.bytes, masked.amount.bytes);
         check32("ecdhDecode", "mask", masked_x.mask.bytes, masked.mask.bytes);
 #endif

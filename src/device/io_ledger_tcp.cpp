@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include "epee/misc_log_ex.h"
 #include "logging/oxen_logger.h"
+#include "log.hpp"
 
 extern "C" {
 #ifdef _WIN32
@@ -24,7 +25,7 @@ extern "C" {
 
 namespace hw::io {
 
-static auto logcat = oxen::log::Cat("device.io");
+static auto logcat = log::Cat("device.io");
 
 static std::string to_string(const addrinfo* a) {
   std::array<char, INET6_ADDRSTRLEN> buf;
@@ -77,7 +78,7 @@ void ledger_tcp::connect() {
   bool connected = false;
   const char* err = "An unknown error occurred";
   for (a = addr; a && !connected; a = a->ai_next) {
-    oxen::log::debug(logcat, "Attempting to connect to {}", to_string(a));
+    log::debug(logcat, "Attempting to connect to {}", to_string(a));
     int rc = ::connect(fd, a->ai_addr, a->ai_addrlen);
     connected = rc == 0;
     if (rc == -1) {
@@ -103,7 +104,7 @@ void ledger_tcp::connect() {
   if (!connected)
     throw std::runtime_error{"Failed to connect to " + host + ":" + port + ": " + err};
 
-  oxen::log::debug(logcat, "Connected to {}", to_string(a));
+  log::debug(logcat, "Connected to {}", to_string(a));
 
 #ifdef _WIN32
   blocking_param = 0;

@@ -35,7 +35,7 @@
 namespace tools
 {
 
-  static auto logcat = oxen::log::Cat("notify");
+  static auto logcat = log::Cat("notify");
 
 /*
   TODO: 

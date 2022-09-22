@@ -259,7 +259,7 @@ void TransactionHistoryImpl::refresh()
         ti->m_is_stake = pd.m_type == wallet::pay_type::stake;
         m_history.push_back(ti);
         
-        oxen::log::info(logcat, "{}: Unconfirmed payment found {}", __FUNCTION__, pd.m_amount);
+        log::info(logcat, "{}: Unconfirmed payment found {}", __FUNCTION__, pd.m_amount);
     }
      
 }

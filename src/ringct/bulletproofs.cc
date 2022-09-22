@@ -51,7 +51,7 @@ extern "C"
 namespace rct
 {
 
-static auto logcat = oxen::log::Cat("bulletproofs");
+static auto logcat = log::Cat("bulletproofs");
 
 static rct::key vector_exponent(const rct::keyV &a, const rct::keyV &b);
 static rct::keyV vector_powers(const rct::key &x, size_t n);

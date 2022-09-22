@@ -11,7 +11,7 @@
 
 namespace cryptonote::rpc {
 
-  static auto logcat = oxen::log::Cat("rpc.http_client");
+  static auto logcat = log::Cat("rpc.http_client");
 
 http_client_connect_error::http_client_connect_error(const cpr::Error& err, const std::string& prefix) :
   http_client_error{prefix + err.message},
@@ -204,7 +204,7 @@ cpr::Response http_client::post(const std::string& uri, cpr::Body body, cpr::Hea
         new_ssl_opts->SetOption(client_cert->second);
       }
       if (!verify_https) {
-        oxen::log::warning(logcat, "HTTPS certificate verification disabled; this connection is not secure");
+        log::warning(logcat, "HTTPS certificate verification disabled; this connection is not secure");
         new_ssl_opts->SetOption(cpr::ssl::VerifyHost(false));
         new_ssl_opts->SetOption(cpr::ssl::VerifyPeer(false));
         new_ssl_opts->SetOption(cpr::ssl::VerifyStatus(false));
@@ -224,7 +224,7 @@ cpr::Response http_client::post(const std::string& uri, cpr::Body body, cpr::Hea
       if (new_proxy) session.SetProxies(*std::move(new_proxy));
       if (new_ssl_opts) session.SetSslOptions(*new_ssl_opts);
 
-      oxen::log::debug(logcat, "Submitting post request to {}", url.str());
+      log::debug(logcat, "Submitting post request to {}", url.str());
       session.SetUrl(url);
       session.SetHeader(header);
       session.SetBody(std::move(body));
@@ -232,7 +232,7 @@ cpr::Response http_client::post(const std::string& uri, cpr::Body body, cpr::Hea
       res = session.Post();
     }
 
-    oxen::log::debug(logcat, "{}: {}, sent {} bytes, received {} bytes in {}", url.str(), (res.error.code != cpr::ErrorCode::OK ? res.error.message : res.status_line), res.uploaded_bytes, res.downloaded_bytes, tools::friendly_duration(std::chrono::steady_clock::now() - start));
+    log::debug(logcat, "{}: {}, sent {} bytes, received {} bytes in {}", url.str(), (res.error.code != cpr::ErrorCode::OK ? res.error.message : res.status_line), res.uploaded_bytes, res.downloaded_bytes, tools::friendly_duration(std::chrono::steady_clock::now() - start));
 
     bytes_sent += res.uploaded_bytes;
     bytes_received += res.downloaded_bytes;

@@ -19,6 +19,9 @@
 
 namespace db
 {
+  namespace log = oxen::log;
+  inline auto sqlitedb_logcat = log::Cat("db.sqlite");
+
   template <typename T>
   constexpr bool is_cstr = false;
   template <size_t N>
@@ -139,7 +142,7 @@ namespace db
     {
       if (result)
       {
-        oxen::log::error(oxen::log::Cat("db.sqlite"), "Expected single-row result, got multiple rows from {}", st.getQuery());
+        log::error(sqlitedb_logcat, "Expected single-row result, got multiple rows from {}", st.getQuery());
         throw std::runtime_error{"DB error: expected single-row result, got multiple rows"};
       }
       result = get<T...>(st);
@@ -158,7 +161,7 @@ namespace db
     auto maybe_result = exec_and_maybe_get<T...>(st, bind...);
     if (!maybe_result)
     {
-      oxen::log::error(oxen::log::Cat("db.sqlite"), "Expected single-row result, got no rows from {}", st.getQuery());
+      log::error(sqlitedb_logcat, "Expected single-row result, got no rows from {}", st.getQuery());
       throw std::runtime_error{"DB error: expected single-row result, got no rows"};
     }
     return *std::move(maybe_result);

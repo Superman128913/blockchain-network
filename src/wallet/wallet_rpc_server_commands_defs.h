@@ -59,8 +59,6 @@
 
 namespace tools::wallet_rpc {
 
-  static auto logcat = oxen::log::Cat("wallet.rpc");
-
   /// Base class that all wallet rpc commands inherit from
   struct RPC_COMMAND {};
 

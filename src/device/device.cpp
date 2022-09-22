@@ -38,7 +38,7 @@
 
 namespace hw {
 
-    static auto logcat = oxen::log::Cat("device");
+    static auto logcat = log::Cat("device");
     
     /* ======================================================================= */
     /*  SETUP                                                                  */
@@ -86,9 +86,9 @@ namespace hw {
 
         auto device = registry.find(device_descriptor_lookup);
         if (device == registry.end()) {
-          oxen::log::error(logcat, "Device not found in registry: '{}'. Known devices: ", device_descriptor);
+          log::error(logcat, "Device not found in registry: '{}'. Known devices: ", device_descriptor);
             for (const auto& sm_pair : registry)
-                oxen::log::error(logcat, " - {}", sm_pair.first);
+                log::error(logcat, " - {}", sm_pair.first);
             throw std::runtime_error("device not found: " + device_descriptor);
         }
         return *device->second;

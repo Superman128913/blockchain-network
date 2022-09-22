@@ -90,7 +90,7 @@ using namespace crypto;
 
 using namespace cryptonote;
 
-static auto logcat = oxen::log::Cat("blockchain");
+static auto logcat = log::Cat("blockchain");
 
 
 DISABLE_VS_WARNINGS(4267)
@@ -124,7 +124,7 @@ Blockchain::Blockchain(tx_memory_pool& tx_pool, service_nodes::service_node_list
   m_batch_success(true),
   m_prepare_height(0)
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
 }
 //------------------------------------------------------------------
 Blockchain::~Blockchain()
@@ -135,7 +135,7 @@ Blockchain::~Blockchain()
 //------------------------------------------------------------------
 bool Blockchain::have_tx(const crypto::hash &id) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   // WARNING: this function does not take m_blockchain_lock, and thus should only call read only
   // m_db functions which do not depend on one another (ie, no getheight + gethash(height-1), as
   // well as not accessing class members, even read only (ie, m_invalid_blocks). The caller must
@@ -145,7 +145,7 @@ bool Blockchain::have_tx(const crypto::hash &id) const
 //------------------------------------------------------------------
 bool Blockchain::have_tx_keyimg_as_spent(const crypto::key_image &key_im) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   // WARNING: this function does not take m_blockchain_lock, and thus should only call read only
   // m_db functions which do not depend on one another (ie, no getheight + gethash(height-1), as
   // well as not accessing class members, even read only (ie, m_invalid_blocks). The caller must
@@ -159,7 +159,7 @@ bool Blockchain::have_tx_keyimg_as_spent(const crypto::key_image &key_im) const
 template <class visitor_t>
 bool Blockchain::scan_outputkeys_for_indexes(const txin_to_key& tx_in_to_key, visitor_t &vis, const crypto::hash &tx_prefix_hash, uint64_t* pmax_related_block_height) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
 
   // ND: Disable locking and make method private.
   //std::unique_lock lock{*this};
@@ -194,13 +194,13 @@ bool Blockchain::scan_outputkeys_for_indexes(const txin_to_key& tx_in_to_key, vi
       m_db->get_output_key(epee::span<const uint64_t>(&tx_in_to_key.amount, 1), absolute_offsets, outputs, true);
       if (absolute_offsets.size() != outputs.size())
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Output does not exist! amount = {}", tx_in_to_key.amount);
+        log::error(log::Cat("verify"), "Output does not exist! amount = {}", tx_in_to_key.amount);
         return false;
       }
     }
     catch (...)
     {
-      oxen::log::error(oxen::log::Cat("verify"), "Output does not exist! amount = {}", tx_in_to_key.amount);
+      log::error(log::Cat("verify"), "Output does not exist! amount = {}", tx_in_to_key.amount);
       return false;
     }
   }
@@ -209,7 +209,7 @@ bool Blockchain::scan_outputkeys_for_indexes(const txin_to_key& tx_in_to_key, vi
     // check for partial results and add the rest if needed;
     if (outputs.size() < absolute_offsets.size() && outputs.size() > 0)
     {
-      oxen::log::debug(logcat, "Additional outputs needed: {}", absolute_offsets.size() - outputs.size());
+      log::debug(logcat, "Additional outputs needed: {}", absolute_offsets.size() - outputs.size());
       std::vector < uint64_t > add_offsets;
       std::vector<output_data_t> add_outputs;
       add_outputs.reserve(absolute_offsets.size() - outputs.size());
@@ -220,13 +220,13 @@ bool Blockchain::scan_outputkeys_for_indexes(const txin_to_key& tx_in_to_key, vi
         m_db->get_output_key(epee::span<const uint64_t>(&tx_in_to_key.amount, 1), add_offsets, add_outputs, true);
         if (add_offsets.size() != add_outputs.size())
         {
-          oxen::log::error(oxen::log::Cat("verify"), "Output does not exist! amount = {}", tx_in_to_key.amount);
+          log::error(log::Cat("verify"), "Output does not exist! amount = {}", tx_in_to_key.amount);
           return false;
         }
       }
       catch (...)
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Output does not exist! amount = {}", tx_in_to_key.amount);
+        log::error(log::Cat("verify"), "Output does not exist! amount = {}", tx_in_to_key.amount);
         return false;
       }
       outputs.insert(outputs.end(), add_outputs.begin(), add_outputs.end());
@@ -250,13 +250,13 @@ bool Blockchain::scan_outputkeys_for_indexes(const txin_to_key& tx_in_to_key, vi
         // call to the passed boost visitor to grab the public key for the output
         if (!vis.handle_output(output_index.unlock_time, output_index.pubkey, output_index.commitment))
         {
-          oxen::log::error(oxen::log::Cat("verify"), "Failed to handle_output for output no = {}, with absolute offset {}", count, i);
+          log::error(log::Cat("verify"), "Failed to handle_output for output no = {}, with absolute offset {}", count, i);
           return false;
         }
       }
       catch (...)
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Output does not exist! amount = {}, absolute_offset = {}", tx_in_to_key.amount, i);
+        log::error(log::Cat("verify"), "Output does not exist! amount = {}, absolute_offset = {}", tx_in_to_key.amount, i);
         return false;
       }
 
@@ -274,12 +274,12 @@ bool Blockchain::scan_outputkeys_for_indexes(const txin_to_key& tx_in_to_key, vi
     }
     catch (const OUTPUT_DNE& e)
     {
-      oxen::log::error(oxen::log::Cat("verify"), "Output does not exist: {}", e.what());
+      log::error(log::Cat("verify"), "Output does not exist: {}", e.what());
       return false;
     }
     catch (const TX_DNE& e)
     {
-      oxen::log::error(oxen::log::Cat("verify"), "Transaction does not exist: {}", e.what());
+      log::error(log::Cat("verify"), "Transaction does not exist: {}", e.what());
       return false;
     }
 
@@ -290,7 +290,7 @@ bool Blockchain::scan_outputkeys_for_indexes(const txin_to_key& tx_in_to_key, vi
 //------------------------------------------------------------------
 uint64_t Blockchain::get_current_blockchain_height(bool lock) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   // WARNING: this function does not take m_blockchain_lock, and thus should only call read only
   // m_db functions which do not depend on one another (ie, no getheight + gethash(height-1), as
   // well as not accessing class members, even read only (ie, m_invalid_blocks). The caller must
@@ -329,7 +329,7 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
   int64_t const total_blocks = static_cast<int64_t>(end_height) - static_cast<int64_t>(start_height);
   if (total_blocks <= 0) return true;
   if (total_blocks > 1)
-    oxen::log::info(logcat, "Loading blocks into oxen subsystems, scanning blockchain from height: {} to: {} (snl: {}, ons: {}, sqlite: {})", start_height, end_height, snl_height, ons_height, sqlite_height);
+    log::info(logcat, "Loading blocks into oxen subsystems, scanning blockchain from height: {} to: {} (snl: {}, ons: {}, sqlite: {})", start_height, end_height, snl_height, ons_height, sqlite_height);
 
   using clock = std::chrono::steady_clock;
   using dseconds = std::chrono::duration<double>;
@@ -347,7 +347,7 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
     if (duration >= 10s)
     {
       m_service_node_list.store();
-      oxen::log::info(logcat, "... scanning height {} ({:.3f}s) (snl: {:.3f}s, ons: {:.3f}s, batch: {:.3f}s)",
+      log::info(logcat, "... scanning height {} ({:.3f}s) (snl: {:.3f}s, ons: {:.3f}s, batch: {:.3f}s)",
             start_height + (index * BLOCK_COUNT),
             duration.count(),
             snl_iteration_duration.count(),
@@ -372,7 +372,7 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
     uint64_t height = start_height + (index * BLOCK_COUNT);
     if (!get_blocks_only(height, static_cast<uint64_t>(BLOCK_COUNT), blocks))
     {
-      oxen::log::error(logcat, "Unable to get checkpointed historical blocks for updating oxen subsystems");
+      log::error(logcat, "Unable to get checkpointed historical blocks for updating oxen subsystems");
       return false;
     }
 
@@ -383,7 +383,7 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
       std::vector<cryptonote::transaction> txs;
       if (!get_transactions(blk.tx_hashes, txs))
       {
-        oxen::log::error(logcat, "Unable to get transactions for block for updating ONS DB: {}", cryptonote::get_block_hash(blk));
+        log::error(logcat, "Unable to get transactions for block for updating ONS DB: {}", cryptonote::get_block_hash(blk));
         return false;
       }
 
@@ -399,7 +399,7 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
         try {
           m_service_node_list.block_add(blk, txs, checkpoint_ptr);
         } catch (const std::exception& e) {
-          oxen::log::error(logcat, "Unable to process block for updating service node list: {}", e.what());
+          log::error(logcat, "Unable to process block for updating service node list: {}", e.what());
           return false;
         }
         snl_iteration_duration += clock::now() - snl_start;
@@ -410,7 +410,7 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
         auto ons_start = clock::now();
         if (!m_ons_db.add_block(blk, txs))
         {
-          oxen::log::error(logcat, "Unable to process block for updating ONS DB: {}", cryptonote::get_block_hash(blk));
+          log::error(logcat, "Unable to process block for updating ONS DB: {}", cryptonote::get_block_hash(blk));
           return false;
         }
         ons_iteration_duration += clock::now() - ons_start;
@@ -421,7 +421,7 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
         auto sqlite_start = clock::now();
         if (!m_service_node_list.process_batching_rewards(blk))
         {
-          oxen::log::error(logcat, "Unable to process block for updating SQLite DB: {}", cryptonote::get_block_hash(blk));
+          log::error(logcat, "Unable to process block for updating SQLite DB: {}", cryptonote::get_block_hash(blk));
           return false;
         }
         sqlite_iteration_duration += clock::now() - sqlite_start;
@@ -431,7 +431,7 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
 
   if (total_blocks > 1)
   {
-    oxen::log::info(logcat, "Done recalculating oxen subsystems in {:.2f}s ({:.2f}s snl; {:.2f}s ons; {:.2f}s batch)",
+    log::info(logcat, "Done recalculating oxen subsystems in {:.2f}s ({:.2f}s snl; {:.2f}s ons; {:.2f}s batch)",
           dseconds{clock::now() - scan_start}.count(), snl_duration.count(), ons_duration.count(), sqlite_duration.count());
   }
 
@@ -446,7 +446,7 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
 bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, std::shared_ptr<cryptonote::BlockchainSQLite> sqlite_db, const network_type nettype, bool offline, const cryptonote::test_options *test_options, difficulty_type fixed_difficulty, const GetCheckpointsCallback& get_checkpoints/* = nullptr*/)
 
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
 
   CHECK_AND_ASSERT_MES(nettype != network_type::FAKECHAIN || test_options, false, "fake chain network type used without options");
 
@@ -454,12 +454,12 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, std::shared_ptr<crypton
 
   if (db == nullptr)
   {
-    oxen::log::error(logcat, "Attempted to init Blockchain with null DB");
+    log::error(logcat, "Attempted to init Blockchain with null DB");
     return false;
   }
   if (!db->is_open())
   {
-    oxen::log::error(logcat, "Attempted to init Blockchain with unopened DB");
+    log::error(logcat, "Attempted to init Blockchain with unopened DB");
     delete db;
     return false;
   }
@@ -490,7 +490,7 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, std::shared_ptr<crypton
   //       taking testnet into account
   if(!m_db->height())
   {
-    oxen::log::info(logcat, "Blockchain not loaded, generating genesis block.");
+    log::info(logcat, "Blockchain not loaded, generating genesis block.");
     block bl;
     block_verification_context bvc{};
     generate_genesis_block(bl, m_nettype);
@@ -527,7 +527,7 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, std::shared_ptr<crypton
     load_compiled_in_block_hashes(get_checkpoints);
 #endif
 
-  oxen::log::info(logcat, "Blockchain initialized. last block: {}, {} time ago", m_db->height() - 1, epee::misc_utils::get_time_interval_string(timestamp_diff));
+  log::info(logcat, "Blockchain initialized. last block: {}, {} time ago", m_db->height() - 1, epee::misc_utils::get_time_interval_string(timestamp_diff));
   rtxn_guard.stop();
 
   uint64_t num_popped_blocks = 0;
@@ -540,15 +540,15 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, std::shared_ptr<crypton
     if (ideal_hf_version < hf::hf7 || ideal_hf_version == top_block.major_version)
     {
       if (num_popped_blocks > 0)
-        oxen::log::info(logcat, "Initial popping done, top block: {}, top height: {}, block version: {}", top_id, top_height, (uint64_t)top_block.major_version);
+        log::info(logcat, "Initial popping done, top block: {}, top height: {}, block version: {}", top_id, top_height, (uint64_t)top_block.major_version);
       break;
     }
     else
     {
       if (num_popped_blocks == 0)
-        oxen::log::info(logcat, "Current top block {} at height {} has version {} which disagrees with the ideal version {}", top_id, top_height, (uint64_t)top_block.major_version, (uint64_t)ideal_hf_version);
+        log::info(logcat, "Current top block {} at height {} has version {} which disagrees with the ideal version {}", top_id, top_height, (uint64_t)top_block.major_version, (uint64_t)ideal_hf_version);
       if (num_popped_blocks % 100 == 0)
-        oxen::log::info(logcat, "Popping blocks... {}", top_height);
+        log::info(logcat, "Popping blocks... {}", top_height);
       ++num_popped_blocks;
       block popped_block;
       std::vector<transaction> popped_txs;
@@ -557,7 +557,7 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, std::shared_ptr<crypton
         m_db->pop_block(popped_block, popped_txs);
         if (!m_service_node_list.pop_batching_rewards_block(popped_block))
         {
-          oxen::log::error(logcat, "Failed to pop to batch rewards DB. throwing");
+          log::error(logcat, "Failed to pop to batch rewards DB. throwing");
           throw std::runtime_error("Failed to pop to batch reward DB.");
         }
       }
@@ -565,12 +565,12 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, std::shared_ptr<crypton
       // so we re-throw
       catch (const std::exception& e)
       {
-        oxen::log::error(logcat, "Error popping block from blockchain: {}", e.what());
+        log::error(logcat, "Error popping block from blockchain: {}", e.what());
         throw;
       }
       catch (...)
       {
-        oxen::log::error(logcat, "Error popping block from blockchain, throwing!");
+        log::error(logcat, "Error popping block from blockchain, throwing!");
         throw;
       }
     }
@@ -595,7 +595,7 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, std::shared_ptr<crypton
 
   if (ons_db && !m_ons_db.init(this, nettype, ons_db))
   {
-    oxen::log::error(logcat, "ONS failed to initialise");
+    log::error(logcat, "ONS failed to initialise");
     return false;
   }
 
@@ -607,7 +607,7 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, std::shared_ptr<crypton
 
   if (!m_db->is_read_only() && !load_missing_blocks_into_oxen_subsystems())
   {
-    oxen::log::error(logcat, "Failed to load blocks into oxen subsystems");
+    log::error(logcat, "Failed to load blocks into oxen subsystems");
     return false;
   }
 
@@ -616,7 +616,7 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, std::shared_ptr<crypton
 //------------------------------------------------------------------
 bool Blockchain::store_blockchain()
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   // lock because the rpc_thread command handler also calls this
   std::unique_lock lock{*m_db};
 
@@ -629,25 +629,25 @@ bool Blockchain::store_blockchain()
   }
   catch (const std::exception& e)
   {
-    oxen::log::error(logcat, std::string("Error syncing blockchain db: ") + e.what() + "-- shutting down now to prevent issues!");
+    log::error(logcat, std::string("Error syncing blockchain db: ") + e.what() + "-- shutting down now to prevent issues!");
     throw;
   }
   catch (...)
   {
-    oxen::log::error(logcat, "There was an issue storing the blockchain, shutting down now to prevent issues!");
+    log::error(logcat, "There was an issue storing the blockchain, shutting down now to prevent issues!");
     throw;
   }
 
   if(m_show_time_stats)
-    oxen::log::info(logcat, "Blockchain stored OK, took: {}", tools::friendly_duration(std::chrono::steady_clock::now() - save));
+    log::info(logcat, "Blockchain stored OK, took: {}", tools::friendly_duration(std::chrono::steady_clock::now() - save));
   return true;
 }
 //------------------------------------------------------------------
 bool Blockchain::deinit()
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
 
-  oxen::log::trace(logcat, "Stopping blockchain read/write activity");
+  log::trace(logcat, "Stopping blockchain read/write activity");
 
  // stop async service
   m_async_work_idle.reset();
@@ -662,16 +662,16 @@ bool Blockchain::deinit()
     if (m_db)
     {
       m_db->close();
-      oxen::log::trace(logcat, "Local blockchain read/write activity stopped successfully");
+      log::trace(logcat, "Local blockchain read/write activity stopped successfully");
     }
   }
   catch (const std::exception& e)
   {
-    oxen::log::error(logcat, std::string("Error closing blockchain db: ") + e.what());
+    log::error(logcat, std::string("Error closing blockchain db: ") + e.what());
   }
   catch (...)
   {
-    oxen::log::error(logcat, "There was an issue closing/storing the blockchain, shutting down now to prevent issues!");
+    log::error(logcat, "There was an issue closing/storing the blockchain, shutting down now to prevent issues!");
   }
 
   delete m_db;
@@ -703,7 +703,7 @@ void Blockchain::pop_blocks(uint64_t nblocks)
     {
       if (nblocks >= BLOCKS_PER_DAY && (i != 0 && (i % blocks_per_update == 0)))
       {
-        oxen::log::info(logcat, "... popping blocks {}% completed, height: {} ({}s)",
+        log::info(logcat, "... popping blocks {}% completed, height: {} ({}s)",
           (++progress * PERCENT_PER_PROGRESS_UPDATE), (blockchain_height - i), 
           std::chrono::duration<double>{std::chrono::steady_clock::now() - pop_blocks_started}.count()
         );
@@ -714,7 +714,7 @@ void Blockchain::pop_blocks(uint64_t nblocks)
   }
   catch (const std::exception& e)
   {
-    oxen::log::error(logcat, "Error when popping blocks after processing {} blocks: {}", i, e.what());
+    log::error(logcat, "Error when popping blocks after processing {} blocks: {}", i, e.what());
     if (stop_batch)
       m_db->batch_abort();
     return;
@@ -736,7 +736,7 @@ void Blockchain::pop_blocks(uint64_t nblocks)
 // from it to the tx_pool
 block Blockchain::pop_block_from_blockchain(bool pop_batching_rewards = true)
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
   m_cache.m_timestamps_and_difficulties_height = 0;
@@ -755,18 +755,18 @@ block Blockchain::pop_block_from_blockchain(bool pop_batching_rewards = true)
   // so we re-throw
   catch (const std::exception& e)
   {
-    oxen::log::error(logcat, "Error popping block from blockchain: {}", e.what());
+    log::error(logcat, "Error popping block from blockchain: {}", e.what());
     throw;
   }
   catch (...)
   {
-    oxen::log::error(logcat, "Error popping block from blockchain, throwing!");
+    log::error(logcat, "Error popping block from blockchain, throwing!");
     throw;
   }
 
   if (pop_batching_rewards && !m_service_node_list.pop_batching_rewards_block(popped_block))
   {
-    oxen::log::error(logcat, "Failed to pop to batch rewards DB");
+    log::error(logcat, "Failed to pop to batch rewards DB");
     throw std::runtime_error("Failed to pop batch rewards DB");
   }
 
@@ -795,12 +795,12 @@ block Blockchain::pop_block_from_blockchain(bool pop_batching_rewards = true)
       bool r = m_tx_pool.add_tx(tx, tvc, tx_pool_options::from_block(), version);
       if (!r)
       {
-        oxen::log::error(logcat, "Error returning transaction to tx_pool");
+        log::error(logcat, "Error returning transaction to tx_pool");
       }
     }
   }
   if (pruned)
-    oxen::log::warning(logcat, "{} pruned txes could not be added back to the txpool", pruned);
+    log::warning(logcat, "{} pruned txes could not be added back to the txpool", pruned);
 
   m_blocks_longhash_table.clear();
   m_scan_table.clear();
@@ -814,7 +814,7 @@ block Blockchain::pop_block_from_blockchain(bool pop_batching_rewards = true)
 //------------------------------------------------------------------
 bool Blockchain::reset_and_set_genesis_block(const block& b)
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
   m_cache.m_timestamps_and_difficulties_height = 0;
   invalidate_block_template_cache();
@@ -834,14 +834,14 @@ bool Blockchain::reset_and_set_genesis_block(const block& b)
 //------------------------------------------------------------------
 crypto::hash Blockchain::get_tail_id(uint64_t& height) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
   return m_db->top_block_hash(&height);
 }
 //------------------------------------------------------------------
 crypto::hash Blockchain::get_tail_id() const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   // WARNING: this function does not take m_blockchain_lock, and thus should only call read only
   // m_db functions which do not depend on one another (ie, no getheight + gethash(height-1), as
   // well as not accessing class members, even read only (ie, m_invalid_blocks). The caller must
@@ -859,7 +859,7 @@ crypto::hash Blockchain::get_tail_id() const
  */
 void Blockchain::get_short_chain_history(std::list<crypto::hash>& ids) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
   uint64_t sz = m_db->height();
   if(!sz)
@@ -877,7 +877,7 @@ void Blockchain::get_short_chain_history(std::list<crypto::hash>& ids) const
 //------------------------------------------------------------------
 crypto::hash Blockchain::get_block_id_by_height(uint64_t height) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   // WARNING: this function does not take m_blockchain_lock, and thus should only call read only
   // m_db functions which do not depend on one another (ie, no getheight + gethash(height-1), as
   // well as not accessing class members, even read only (ie, m_invalid_blocks). The caller must
@@ -891,12 +891,12 @@ crypto::hash Blockchain::get_block_id_by_height(uint64_t height) const
   }
   catch (const std::exception& e)
   {
-    oxen::log::error(logcat, std::string("Something went wrong fetching block hash by height: ") + e.what());
+    log::error(logcat, std::string("Something went wrong fetching block hash by height: ") + e.what());
     throw;
   }
   catch (...)
   {
-    oxen::log::error(logcat, std::string("Something went wrong fetching block hash by height"));
+    log::error(logcat, std::string("Something went wrong fetching block hash by height"));
     throw;
   }
   return null_hash;
@@ -911,7 +911,7 @@ crypto::hash Blockchain::get_pending_block_id_by_height(uint64_t height) const
 //------------------------------------------------------------------
 bool Blockchain::get_block_by_hash(const crypto::hash &h, block &blk, bool *orphan) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
   // try to find block in main chain
@@ -931,7 +931,7 @@ bool Blockchain::get_block_by_hash(const crypto::hash &h, block &blk, bool *orph
     {
       if (!cryptonote::parse_and_validate_block_from_blob(blob, blk))
       {
-        oxen::log::error(logcat, "Found block {} in alt chain, but failed to parse it", h);
+        log::error(logcat, "Found block {} in alt chain, but failed to parse it", h);
         throw std::runtime_error("Found block in alt chain, but failed to parse it");
       }
       if (orphan)
@@ -941,12 +941,12 @@ bool Blockchain::get_block_by_hash(const crypto::hash &h, block &blk, bool *orph
   }
   catch (const std::exception& e)
   {
-    oxen::log::error(logcat, std::string("Something went wrong fetching block by hash: ") + e.what());
+    log::error(logcat, std::string("Something went wrong fetching block by hash: ") + e.what());
     throw;
   }
   catch (...)
   {
-    oxen::log::error(logcat, std::string("Something went wrong fetching block hash by hash"));
+    log::error(logcat, std::string("Something went wrong fetching block hash by hash"));
     throw;
   }
 
@@ -970,7 +970,7 @@ bool Blockchain::get_block_by_height(uint64_t height, block &blk) const
 // less blocks than desired if there aren't enough.
 difficulty_type Blockchain::get_difficulty_for_next_block(bool pulse)
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   if (m_fixed_difficulty)
   {
     return m_db->height() ? m_fixed_difficulty : 1;
@@ -1030,7 +1030,7 @@ std::vector<time_t> Blockchain::get_last_block_timestamps(unsigned int blocks) c
 // that had been removed.
 bool Blockchain::rollback_blockchain_switching(const std::list<block_and_checkpoint>& original_chain, uint64_t rollback_height)
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
   // fail if rollback_height passed is too high
@@ -1061,10 +1061,10 @@ bool Blockchain::rollback_blockchain_switching(const std::list<block_and_checkpo
     CHECK_AND_ASSERT_MES(r && bvc.m_added_to_main_chain, false, "PANIC! failed to add (again) block while chain switching during the rollback!");
   }
 
-  oxen::log::info(logcat, "Rollback to height {} was successful.", rollback_height);
+  log::info(logcat, "Rollback to height {} was successful.", rollback_height);
   if (!original_chain.empty())
   {
-    oxen::log::info(logcat, "Restoration to previous blockchain successful as well.");
+    log::info(logcat, "Restoration to previous blockchain successful as well.");
   }
   return true;
 }
@@ -1073,7 +1073,7 @@ bool Blockchain::blink_rollback(uint64_t rollback_height)
 {
   auto lock = tools::unique_locks(m_tx_pool, *this);
   bool stop_batch = m_db->batch_start();
-  oxen::log::debug(logcat, "Rolling back to height {}", rollback_height);
+  log::debug(logcat, "Rolling back to height {}", rollback_height);
   bool ret = rollback_blockchain_switching({}, rollback_height);
   if (stop_batch)
     m_db->batch_stop();
@@ -1084,7 +1084,7 @@ bool Blockchain::blink_rollback(uint64_t rollback_height)
 // boolean based on success therein.
 bool Blockchain::switch_to_alternative_blockchain(const std::list<block_extended_info>& alt_chain, bool keep_disconnected_chain)
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
   m_cache.m_timestamps_and_difficulties_height = 0;
@@ -1095,7 +1095,7 @@ bool Blockchain::switch_to_alternative_blockchain(const std::list<block_extended
   // verify that main chain has front of alt chain's parent block
   if (!m_db->block_exists(alt_chain.front().bl.prev_id))
   {
-    oxen::log::error(logcat, "Attempting to move to an alternate chain, but it doesn't appear to connect to the main chain!");
+    log::error(logcat, "Attempting to move to an alternate chain, but it doesn't appear to connect to the main chain!");
     return false;
   }
 
@@ -1129,7 +1129,7 @@ bool Blockchain::switch_to_alternative_blockchain(const std::list<block_extended
     // return false
     if(!r || !bvc.m_added_to_main_chain)
     {
-      oxen::log::error(logcat, "Failed to switch to alternative blockchain");
+      log::error(logcat, "Failed to switch to alternative blockchain");
       // rollback_blockchain_switching should be moved to two different
       // functions: rollback and apply_chain, but for now we pretend it is
       // just the latter (because the rollback was done above).
@@ -1137,7 +1137,7 @@ bool Blockchain::switch_to_alternative_blockchain(const std::list<block_extended
 
       const crypto::hash blkid = cryptonote::get_block_hash(bei.bl);
       add_block_as_invalid(bei.bl);
-      oxen::log::error(logcat, "The block was inserted as invalid while connecting new alternative chain, block_id: {}", blkid);
+      log::error(logcat, "The block was inserted as invalid while connecting new alternative chain, block_id: {}", blkid);
       m_db->remove_alt_block(blkid);
       alt_ch_iter++;
 
@@ -1159,7 +1159,7 @@ bool Blockchain::switch_to_alternative_blockchain(const std::list<block_extended
       bool r = handle_alternative_block(old_ch_ent.block, cryptonote::get_block_hash(old_ch_ent.block), bvc, old_ch_ent.checkpointed ? &old_ch_ent.checkpoint : nullptr);
       if (!r)
       {
-        oxen::log::error(logcat, "Failed to push ex-main chain blocks to alternative chain ");
+        log::error(logcat, "Failed to push ex-main chain blocks to alternative chain ");
         // previously this would fail the blockchain switching, but I don't
         // think this is bad enough to warrant that.
       }
@@ -1181,7 +1181,7 @@ bool Blockchain::switch_to_alternative_blockchain(const std::list<block_extended
       hook(hook_data);
   }
 
-  oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "REORGANIZE SUCCESS! on height: {}, new blockchain size: {}", split_height, m_db->height()));
+  log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "REORGANIZE SUCCESS! on height: {}, new blockchain size: {}", split_height, m_db->height()));
   return true;
 }
 //------------------------------------------------------------------
@@ -1197,7 +1197,7 @@ difficulty_type Blockchain::get_difficulty_for_alternative_chain(const std::list
   if (pulse)
     return PULSE_FIXED_DIFFICULTY;
 
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
 
   uint64_t block_count = 0;
   {
@@ -1278,24 +1278,24 @@ difficulty_type Blockchain::get_difficulty_for_alternative_chain(const std::list
 //   a non-overflowing tx amount (dubious necessity on this check)
 bool Blockchain::prevalidate_miner_transaction(const block& b, uint64_t height, hf hf_version)
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   if (b.miner_tx.vout.size() > 0)
   {
     CHECK_AND_ASSERT_MES(b.miner_tx.vin.size() == 1, false, "coinbase transaction in the block has no inputs");
     CHECK_AND_ASSERT_MES(std::holds_alternative<txin_gen>(b.miner_tx.vin[0]), false, "coinbase transaction in the block has the wrong type");
     if (var::get<txin_gen>(b.miner_tx.vin[0]).height != height)
     {
-      oxen::log::warning(logcat, "The miner transaction in block has invalid height: {}, expected: {}", var::get<txin_gen>(b.miner_tx.vin[0]).height, height);
+      log::warning(logcat, "The miner transaction in block has invalid height: {}, expected: {}", var::get<txin_gen>(b.miner_tx.vin[0]).height, height);
       return false;
     }
-    oxen::log::debug(logcat, "Miner tx hash: {}", get_transaction_hash(b.miner_tx));
+    log::debug(logcat, "Miner tx hash: {}", get_transaction_hash(b.miner_tx));
     CHECK_AND_ASSERT_MES(b.miner_tx.unlock_time == height + MINED_MONEY_UNLOCK_WINDOW, false, "coinbase transaction transaction has the wrong unlock time=" << b.miner_tx.unlock_time << ", expected " << height + MINED_MONEY_UNLOCK_WINDOW);
 
     if (hf_version >= hf::hf12_checkpointing)
     {
       if (b.miner_tx.type != txtype::standard)
       {
-        oxen::log::error(logcat, "Coinbase invalid transaction type for coinbase transaction.");
+        log::error(logcat, "Coinbase invalid transaction type for coinbase transaction.");
         return false;
       }
 
@@ -1303,7 +1303,7 @@ bool Blockchain::prevalidate_miner_transaction(const block& b, uint64_t height, 
       txversion max_version = transaction::get_min_version_for_hf(hf_version);
       if (b.miner_tx.version < min_version || b.miner_tx.version > max_version)
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Coinbase invalid version: {} for hardfork: {} min/max version: {}/{}", b.miner_tx.version, static_cast<int>(hf_version), min_version, max_version);
+        log::error(log::Cat("verify"), "Coinbase invalid version: {} for hardfork: {} min/max version: {}/{}", b.miner_tx.version, static_cast<int>(hf_version), min_version, max_version);
         return false;
       }
     }
@@ -1317,7 +1317,7 @@ bool Blockchain::prevalidate_miner_transaction(const block& b, uint64_t height, 
     //      does not overflow a uint64_t, and this transaction *is* a uint64_t...
     if(!check_outs_overflow(b.miner_tx))
     {
-      oxen::log::error(logcat, "miner transaction has money overflow in block {}", get_block_hash(b));
+      log::error(logcat, "miner transaction has money overflow in block {}", get_block_hash(b));
       return false;
     }
   }
@@ -1328,12 +1328,12 @@ bool Blockchain::prevalidate_miner_transaction(const block& b, uint64_t height, 
 // This function validates the miner transaction reward
 bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_block_weight, uint64_t fee, uint64_t& base_reward, uint64_t already_generated_coins, hf version)
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   //validate reward
   uint64_t const money_in_use = get_outs_money_amount(b.miner_tx);
   if (b.miner_tx.vout.size() == 0) {
     if (b.major_version < hf::hf19_reward_batching) {
-      oxen::log::error(oxen::log::Cat("verify"), "miner tx has no outputs");
+      log::error(log::Cat("verify"), "miner tx has no outputs");
       return false;
     }
   }
@@ -1356,7 +1356,7 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
   block_reward_context.height                    = height;
   if (!calc_batched_governance_reward(height, block_reward_context.batched_governance))
   {
-    oxen::log::error(oxen::log::Cat("verify"), "Failed to calculate batched governance reward");
+    log::error(log::Cat("verify"), "Failed to calculate batched governance reward");
     return false;
   }
 
@@ -1379,7 +1379,7 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
     try {
       hook(hook_data);
     } catch (const std::exception& e) {
-      oxen::log::info(globallogcat, fmt::format(fg(fmt::terminal_color::red), "Miner tx failed validation: {}", e.what()));
+      log::info(globallogcat, fmt::format(fg(fmt::terminal_color::red), "Miner tx failed validation: {}", e.what()));
       return false;
     }
   }
@@ -1388,13 +1388,13 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
   {
     if (version >= hf::hf10_bulletproofs && reward_parts.governance_paid == 0)
     {
-      oxen::log::error(logcat, "Governance reward should not be 0 after hardfork v10 if this height has a governance output because it is the batched payout height");
+      log::error(logcat, "Governance reward should not be 0 after hardfork v10 if this height has a governance output because it is the batched payout height");
       return false;
     }
 
     if (b.miner_tx.vout.back().amount != reward_parts.governance_paid)
     {
-      oxen::log::error(logcat, "Governance reward amount incorrect.  Should be: {}, is: {}", print_money(reward_parts.governance_paid), print_money(b.miner_tx.vout.back().amount));
+      log::error(logcat, "Governance reward amount incorrect.  Should be: {}, is: {}", print_money(reward_parts.governance_paid), print_money(b.miner_tx.vout.back().amount));
       return false;
     }
 
@@ -1406,7 +1406,7 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
                 var::get<txout_to_key>(b.miner_tx.vout.back().target).key,
                 m_nettype))
     {
-      oxen::log::error(logcat, "Governance reward public key incorrect.");
+      log::error(logcat, "Governance reward public key incorrect.");
       return false;
     }
   }
@@ -1425,7 +1425,7 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
 
   if (money_in_use > max_money_in_use)
   {
-    oxen::log::error(oxen::log::Cat("verify"), "coinbase transaction spends too much money ({}). Maximum block reward is {} (= {} base + {} fees)", print_money(money_in_use), print_money(max_money_in_use), print_money(max_base_reward), print_money(reward_parts.miner_fee));
+    log::error(log::Cat("verify"), "coinbase transaction spends too much money ({}). Maximum block reward is {} (= {} base + {} fees)", print_money(money_in_use), print_money(max_money_in_use), print_money(max_base_reward), print_money(reward_parts.miner_fee));
     return false;
   }
 
@@ -1436,7 +1436,7 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
 
   if (b.reward > reward_parts.base_miner + reward_parts.miner_fee + reward_parts.service_node_total)
   {
-    oxen::log::error(oxen::log::Cat("verify"), "block reward to be batched spends too much money ({}). Maximum block reward is {} (= {} base + {} fees)", print_money(b.reward), print_money(max_money_in_use), print_money(max_base_reward), print_money(reward_parts.miner_fee));
+    log::error(log::Cat("verify"), "block reward to be batched spends too much money ({}). Maximum block reward is {} (= {} base + {} fees)", print_money(b.reward), print_money(max_money_in_use), print_money(max_base_reward), print_money(reward_parts.miner_fee));
     return false;
   }
 
@@ -1446,7 +1446,7 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
 // get the block weights of the last <count> blocks, and return by reference <sz>.
 void Blockchain::get_last_n_blocks_weights(std::vector<uint64_t>& weights, size_t count) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
   auto h = m_db->height();
 
@@ -1461,7 +1461,7 @@ void Blockchain::get_last_n_blocks_weights(std::vector<uint64_t>& weights, size_
 //------------------------------------------------------------------
 uint64_t Blockchain::get_long_term_block_weight_median(uint64_t start_height, size_t count) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
 
@@ -1479,7 +1479,7 @@ uint64_t Blockchain::get_long_term_block_weight_median(uint64_t start_height, si
 
   if (cached)
   {
-    oxen::log::trace(logcat, "requesting {} from {}, cached", count, start_height);
+    log::trace(logcat, "requesting {} from {}, cached", count, start_height);
     return m_long_term_block_weights_cache_rolling_median.median();
   }
 
@@ -1490,14 +1490,14 @@ uint64_t Blockchain::get_long_term_block_weight_median(uint64_t start_height, si
     crypto::hash old_tip_hash = m_db->get_block_hash_from_height(tip_height - 1);
     if (old_tip_hash == m_long_term_block_weights_cache_tip_hash)
     {
-      oxen::log::trace(logcat, "requesting {} from {}, incremental", count, start_height);
+      log::trace(logcat, "requesting {} from {}, incremental", count, start_height);
       m_long_term_block_weights_cache_tip_hash = tip_hash;
       m_long_term_block_weights_cache_rolling_median.insert(m_db->get_block_long_term_weight(tip_height));
       return m_long_term_block_weights_cache_rolling_median.median();
     }
   }
 
-  oxen::log::trace(logcat, "requesting {} from {}, uncached", count, start_height);
+  log::trace(logcat, "requesting {} from {}, uncached", count, start_height);
   std::vector<uint64_t> weights = m_db->get_long_term_block_weights(start_height, count);
   m_long_term_block_weights_cache_tip_hash = tip_hash;
   m_long_term_block_weights_cache_rolling_median.clear();
@@ -1508,13 +1508,13 @@ uint64_t Blockchain::get_long_term_block_weight_median(uint64_t start_height, si
 //------------------------------------------------------------------
 uint64_t Blockchain::get_current_cumulative_block_weight_limit() const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   return m_current_block_cumul_weight_limit;
 }
 //------------------------------------------------------------------
 uint64_t Blockchain::get_current_cumulative_block_weight_median() const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   return m_current_block_cumul_weight_median;
 }
 //------------------------------------------------------------------
@@ -1526,7 +1526,7 @@ uint64_t Blockchain::get_current_cumulative_block_weight_median() const
 // This function makes a new block for a miner to mine the hash for
 bool Blockchain::create_block_template_internal(block& b, const crypto::hash *from_block, const block_template_info& info, difficulty_type& diffic, uint64_t& height, uint64_t& expected_reward, const std::string& ex_nonce)
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   size_t median_weight;
   uint64_t already_generated_coins;
   uint64_t pool_cookie;
@@ -1540,7 +1540,7 @@ bool Blockchain::create_block_template_internal(block& b, const crypto::hash *fr
     // just after the block template was created
     if (info.miner_address != m_btc_address && m_btc_nonce == ex_nonce
       && m_btc_pool_cookie == m_tx_pool.cookie() && m_btc.prev_id == get_tail_id()) {
-      oxen::log::debug(logcat, "Using cached template");
+      log::debug(logcat, "Using cached template");
       const uint64_t now = time(NULL);
       if (m_btc.timestamp < now /*ensures it can't get below the median of the last few blocks*/ || !info.is_miner)
         m_btc.timestamp = now;
@@ -1550,7 +1550,7 @@ bool Blockchain::create_block_template_internal(block& b, const crypto::hash *fr
       expected_reward = m_btc_expected_reward;
       return true;
     }
-    oxen::log::debug(logcat, "Not using cached template: address {}, nonce {}, cookie {}, from_block {}", (bool)(info.miner_address != m_btc_address), (m_btc_nonce == ex_nonce), (m_btc_pool_cookie == m_tx_pool.cookie()), (!!from_block));
+    log::debug(logcat, "Not using cached template: address {}, nonce {}, cookie {}, from_block {}", (bool)(info.miner_address != m_btc_address), (m_btc_nonce == ex_nonce), (m_btc_pool_cookie == m_tx_pool.cookie()), (!!from_block));
     invalidate_block_template_cache();
   }
 
@@ -1565,7 +1565,7 @@ bool Blockchain::create_block_template_internal(block& b, const crypto::hash *fr
     bool parent_in_main = m_db->block_exists(*from_block);
     if (!parent_in_alt && !parent_in_main)
     {
-      oxen::log::error(logcat, "Unknown from block");
+      log::error(logcat, "Unknown from block");
       return false;
     }
 
@@ -1656,7 +1656,7 @@ bool Blockchain::create_block_template_internal(block& b, const crypto::hash *fr
           : oxen_miner_tx_context::pulse_block(m_nettype, info.service_node_payout, m_service_node_list.get_block_leader());
   if (!calc_batched_governance_reward(height, miner_tx_context.batched_governance))
   {
-    oxen::log::error(logcat, "Failed to calculate batched governance reward");
+    log::error(logcat, "Failed to calculate batched governance reward");
     return false;
   }
 
@@ -1695,11 +1695,11 @@ bool Blockchain::create_block_template_internal(block& b, const crypto::hash *fr
         if (cumulative_weight != txs_weight + get_transaction_weight(b.miner_tx))
         {
           //fuck, not lucky, -1 makes varint-counter size smaller, in that case we continue to grow with cumulative_weight
-          oxen::log::debug(logcat, "Miner tx creation has no luck with delta_extra size = {} and {}", delta, delta - 1);
+          log::debug(logcat, "Miner tx creation has no luck with delta_extra size = {} and {}", delta, delta - 1);
           cumulative_weight += delta - 1;
           continue;
         }
-        oxen::log::debug(logcat, "Setting extra for block: {}, try_count={}", b.miner_tx.extra.size(), try_count);
+        log::debug(logcat, "Setting extra for block: {}, try_count={}", b.miner_tx.extra.size(), try_count);
       }
     }
     CHECK_AND_ASSERT_MES(cumulative_weight == txs_weight + get_transaction_weight(b.miner_tx), false, "unexpected case: cumulative_weight=" << cumulative_weight << " is not equal txs_cumulative_weight=" << txs_weight << " + get_transaction_weight(b.miner_tx)=" << get_transaction_weight(b.miner_tx));
@@ -1716,7 +1716,7 @@ bool Blockchain::create_block_template_internal(block& b, const crypto::hash *fr
     b.height = height;
     return true;
   }
-  oxen::log::error(logcat, "Failed to create_block_template with {} tries", 10);
+  log::error(logcat, "Failed to create_block_template with {} tries", 10);
   return false;
 }
 //------------------------------------------------------------------
@@ -1751,7 +1751,7 @@ bool Blockchain::create_next_pulse_block_template(block& b, const service_nodes:
 // the needed number of timestamps for the BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW.
 bool Blockchain::complete_timestamps_vector(uint64_t start_top_height, std::vector<uint64_t>& timestamps) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
 
   if(timestamps.size() >= BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW)
     return true;
@@ -1847,7 +1847,7 @@ bool Blockchain::build_alt_chain(const crypto::hash &prev_id,
       // make sure alt chain doesn't somehow start past the end of the main chain
       if (blockchain_height < alt_chain.front().height)
       {
-        oxen::log::info(logcat, "main blockchain wrong height: {}, alt_chain: {}", m_db->height(), alt_chain.front().height);
+        log::info(logcat, "main blockchain wrong height: {}, alt_chain: {}", m_db->height(), alt_chain.front().height);
         failed = true;
       }
 
@@ -1855,7 +1855,7 @@ bool Blockchain::build_alt_chain(const crypto::hash &prev_id,
       // this alternate chain with it.
       if (!failed && !m_db->block_exists(alt_chain.front().bl.prev_id))
       {
-        oxen::log::info(logcat, "alternate chain does not appear to connect to main chain...: {}", alt_chain.front().bl.prev_id);
+        log::info(logcat, "alternate chain does not appear to connect to main chain...: {}", alt_chain.front().bl.prev_id);
         failed = true;
       }
 
@@ -1863,13 +1863,13 @@ bool Blockchain::build_alt_chain(const crypto::hash &prev_id,
       auto h = m_db->get_block_hash_from_height(alt_chain.front().height - 1);
       if (!failed && h != alt_chain.front().bl.prev_id)
       {
-        oxen::log::info(logcat, "alternative chain has wrong connection to main chain: {}, mismatched with: {}", h, alt_chain.front().bl.prev_id);
+        log::info(logcat, "alternative chain has wrong connection to main chain: {}, mismatched with: {}", h, alt_chain.front().bl.prev_id);
         failed = true;
       }
 
       if (!failed && !m_checkpoints.is_alternative_block_allowed(blockchain_height, alt_chain.front().height, nullptr /*service_node_checkpoint*/))
       {
-        oxen::log::debug(logcat, "alternative chain is too old to consider: {}", h);
+        log::debug(logcat, "alternative chain is too old to consider: {}", h);
         failed = true;
       }
 
@@ -1907,7 +1907,7 @@ bool Blockchain::build_alt_chain(const crypto::hash &prev_id,
 // a long forked chain eventually.
 bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id, block_verification_context& bvc, checkpoint_t const *checkpoint)
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
   uint64_t const blk_height   = get_block_height(b);
@@ -1920,7 +1920,7 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
   if (!(parent_in_main || parent_in_alt))
   {
     bvc.m_marked_as_orphaned = true;
-    oxen::log::error(oxen::log::Cat("verify"), "Block recognized as orphaned and rejected, id = {}, height {}, parent in alt {}, parent in main {} (parent {}, current top {}, chain height {})", id, blk_height, parent_in_alt, parent_in_main, b.prev_id, get_tail_id(), chain_height);
+    log::error(log::Cat("verify"), "Block recognized as orphaned and rejected, id = {}, height {}, parent in alt {}, parent in main {} (parent {}, current top {}, chain height {})", id, blk_height, parent_in_alt, parent_in_main, b.prev_id, get_tail_id(), chain_height);
     return true;
   }
 
@@ -1946,7 +1946,7 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
   // (not earlier than the median of the last X blocks in the built alt chain)
   if(!check_block_timestamp(std::move(timestamps), b))
   {
-    oxen::log::error(oxen::log::Cat("verify"), "Block with id: {} for alternative chain, has invalid timestamp: {}", id, b.timestamp);
+    log::error(log::Cat("verify"), "Block with id: {} for alternative chain, has invalid timestamp: {}", id, b.timestamp);
     bvc.m_verifivation_failed = true;
     return false;
   }
@@ -2010,7 +2010,7 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
         cryptonote::transaction tx;
         if (!cryptonote::parse_and_validate_tx_base_from_blob(blob, tx))
         {
-          oxen::log::error(oxen::log::Cat("verify"), "Block with id: {} (as alternative) refers to unparsable transaction hash {}.", tools::type_to_hex(id), txid);
+          log::error(log::Cat("verify"), "Block with id: {} (as alternative) refers to unparsable transaction hash {}.", tools::type_to_hex(id), txid);
           bvc.m_verifivation_failed = true;
           return false;
         }
@@ -2050,7 +2050,7 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
   {
     if (!service_node_checkpoint)
     {
-      oxen::log::error(logcat, "CHECKPOINT VALIDATION FAILED FOR ALT BLOCK");
+      log::error(logcat, "CHECKPOINT VALIDATION FAILED FOR ALT BLOCK");
       bvc.m_verifivation_failed = true;
       return false;
     }
@@ -2074,14 +2074,14 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
       std::string blob;
       if (!m_tx_pool.get_transaction(missed_tx, blob))
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Alternative block references unknown TX, rejected alt block {} {}", blk_height, id);
+        log::error(log::Cat("verify"), "Alternative block references unknown TX, rejected alt block {} {}", blk_height, id);
         return false;
       }
 
       transaction tx;
       if (!parse_and_validate_tx_from_blob(blob, tx))
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Failed to parse block blob from tx pool when querying the missed transactions in block {} {}", blk_height, id);
+        log::error(log::Cat("verify"), "Failed to parse block blob from tx pool when querying the missed transactions in block {} {}", blk_height, id);
         return false;
       }
 
@@ -2094,7 +2094,7 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
       try {
         hook(hook_data);
       } catch (const std::exception& e) {
-        oxen::log::info(logcat, "Failed to add alt block: {}", e.what());
+        log::info(logcat, "Failed to add alt block: {}", e.what());
         return false;
       }
     }
@@ -2116,7 +2116,7 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
       std::vector<block> blocks;
       if (!get_blocks_only(start, end - start, blocks, nullptr /*txs*/))
       {
-        oxen::log::error(logcat, "Unexpected failure to query blocks for alt chain switching calculation from {} to {}", start, (end - 1));
+        log::error(logcat, "Unexpected failure to query blocks for alt chain switching calculation from {} to {}", start, (end - 1));
         return false;
       }
 
@@ -2166,7 +2166,7 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
       if (!pulse_block) stream << " PoW: " << blk_pow.proof_of_work;
       stream << " difficulty: " << current_diff;
 
-      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "{}", stream.str()));
+      log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "{}", stream.str()));
       return true;
     }
   }
@@ -2182,12 +2182,12 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
         bool keep_alt_chain = false;
         if (alt_chain_has_more_checkpoints)
         {
-          oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "###### REORGANIZE on height: {} of {}, checkpoint is found in alternative chain on height {}", alt_chain.front().height, m_db->height() - 1, blk_height));
+          log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "###### REORGANIZE on height: {} of {}, checkpoint is found in alternative chain on height {}", alt_chain.front().height, m_db->height() - 1, blk_height));
         }
         else
         {
           keep_alt_chain = true;
-          oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "###### REORGANIZE on height: {} of {} with cum_difficulty {}\n alternative blockchain size: {} with cum_difficulty {}", alt_chain.front().height, m_db->height() - 1, m_db->get_block_cumulative_difficulty(m_db->height() - 1), alt_chain.size(), alt_data.cumulative_difficulty));
+          log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "###### REORGANIZE on height: {} of {} with cum_difficulty {}\n alternative blockchain size: {} with cum_difficulty {}", alt_chain.front().height, m_db->height() - 1, m_db->get_block_cumulative_difficulty(m_db->height() - 1), alt_chain.size(), alt_data.cumulative_difficulty));
         }
 
         bool r = switch_to_alternative_blockchain(alt_chain, keep_alt_chain);
@@ -2199,7 +2199,7 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
       }
       else
       {
-        oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "----- {} BLOCK ADDED AS ALTERNATIVE ON HEIGHT {}\nid:\t{}\nPoW:\t{}\ndifficulty:\t{}", block_type, blk_height, id, blk_pow.proof_of_work, current_diff));
+        log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "----- {} BLOCK ADDED AS ALTERNATIVE ON HEIGHT {}\nid:\t{}\nPoW:\t{}\ndifficulty:\t{}", block_type, blk_height, id, blk_pow.proof_of_work, current_diff));
         return true;
       }
     }
@@ -2207,7 +2207,7 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
     {
       if (alt_chain_has_greater_pow)
       {
-        oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "###### REORGANIZE on height: {} of {} with cum_difficulty {}\n alternative blockchain size: {} with cum_difficulty {}", alt_chain.front().height, m_db->height() - 1, m_db->get_block_cumulative_difficulty(m_db->height() - 1), alt_chain.size(), alt_data.cumulative_difficulty));
+        log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "###### REORGANIZE on height: {} of {} with cum_difficulty {}\n alternative blockchain size: {} with cum_difficulty {}", alt_chain.front().height, m_db->height() - 1, m_db->get_block_cumulative_difficulty(m_db->height() - 1), alt_chain.size(), alt_data.cumulative_difficulty));
         bool r = switch_to_alternative_blockchain(alt_chain, true);
         if (r)
           bvc.m_added_to_main_chain = true;
@@ -2217,7 +2217,7 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
       }
       else
       {
-        oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "----- {} BLOCK ADDED AS ALTERNATIVE ON HEIGHT {}\nid:\t{}\nPoW:\t{}\ndifficulty:\t{}", block_type, blk_height, id, blk_pow.proof_of_work, current_diff));
+        log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "----- {} BLOCK ADDED AS ALTERNATIVE ON HEIGHT {}\nid:\t{}\nPoW:\t{}\ndifficulty:\t{}", block_type, blk_height, id, blk_pow.proof_of_work, current_diff));
         return true;
       }
     }
@@ -2228,7 +2228,7 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
 //------------------------------------------------------------------
 bool Blockchain::get_blocks_only(uint64_t start_offset, size_t count, std::vector<block>& blocks, std::vector<std::string>* txs) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
   const uint64_t height = m_db->height();
   if(start_offset >= height)
@@ -2244,7 +2244,7 @@ bool Blockchain::get_blocks_only(uint64_t start_offset, size_t count, std::vecto
     }
     catch(std::exception const &e)
     {
-      oxen::log::error(logcat, "Invalid block at height {}. {}", start_offset + i, e.what());
+      log::error(logcat, "Invalid block at height {}. {}", start_offset + i, e.what());
       return false;
     }
   }
@@ -2264,7 +2264,7 @@ bool Blockchain::get_blocks_only(uint64_t start_offset, size_t count, std::vecto
 //------------------------------------------------------------------
 bool Blockchain::get_blocks(uint64_t start_offset, size_t count, std::vector<std::pair<std::string,block>>& blocks, std::vector<std::string>& txs) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
   if(start_offset >= m_db->height())
     return false;
@@ -2286,7 +2286,7 @@ bool Blockchain::get_blocks(uint64_t start_offset, size_t count, std::vector<std
 //------------------------------------------------------------------
 bool Blockchain::get_blocks(uint64_t start_offset, size_t count, std::vector<std::pair<std::string,block>>& blocks) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
   const uint64_t height = m_db->height();
   if(start_offset >= height)
@@ -2299,7 +2299,7 @@ bool Blockchain::get_blocks(uint64_t start_offset, size_t count, std::vector<std
     blocks.emplace_back(m_db->get_block_blob_from_height(start_offset + i), block{});
     if (!parse_and_validate_block_from_blob(blocks.back().first, blocks.back().second))
     {
-      oxen::log::error(logcat, "Invalid block");
+      log::error(logcat, "Invalid block");
       return false;
     }
   }
@@ -2315,7 +2315,7 @@ bool Blockchain::get_blocks(uint64_t start_offset, size_t count, std::vector<std
 //       are missing.
 bool Blockchain::handle_get_blocks(NOTIFY_REQUEST_GET_BLOCKS::request& arg, NOTIFY_RESPONSE_GET_BLOCKS::request& rsp)
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock blockchain_lock{m_blockchain_lock, std::defer_lock};
   auto blink_lock = m_tx_pool.blink_shared_lock(std::defer_lock);
   std::lock(blockchain_lock, blink_lock);
@@ -2358,7 +2358,7 @@ bool Blockchain::handle_get_blocks(NOTIFY_REQUEST_GET_BLOCKS::request& arg, NOTI
       }
       catch (const std::exception &e)
       {
-        oxen::log::error(logcat, "Get block checkpoint from DB failed non-trivially at height: {}, what = {}", block_height, e.what());
+        log::error(logcat, "Get block checkpoint from DB failed non-trivially at height: {}, what = {}", block_height, e.what());
         return false;
       }
     }
@@ -2383,7 +2383,7 @@ bool Blockchain::handle_get_blocks(NOTIFY_REQUEST_GET_BLOCKS::request& arg, NOTI
       // do not display an error if the peer asked for an unpruned block which we are not meant to have
       if (tools::has_unpruned_block(get_block_height(block), get_current_blockchain_height(), get_blockchain_pruning_seed()))
       {
-        oxen::log::error(logcat, "Error retrieving blocks, missed {} transactions for block with hash: {}", missed_tx_ids.size(), get_block_hash(block));
+        log::error(logcat, "Error retrieving blocks, missed {} transactions for block with hash: {}", missed_tx_ids.size(), get_block_hash(block));
       }
 
       rsp.missed_ids.insert(rsp.missed_ids.end(), missed_tx_ids.begin(), missed_tx_ids.end());
@@ -2399,7 +2399,7 @@ bool Blockchain::handle_get_blocks(NOTIFY_REQUEST_GET_BLOCKS::request& arg, NOTI
 //------------------------------------------------------------------
 bool Blockchain::handle_get_txs(NOTIFY_REQUEST_GET_TXS::request& arg, NOTIFY_NEW_TRANSACTIONS::request& rsp)
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock blockchain_lock{m_blockchain_lock, std::defer_lock};
   auto blink_lock = m_tx_pool.blink_shared_lock(std::defer_lock);
   std::lock(blockchain_lock, blink_lock);
@@ -2428,21 +2428,21 @@ bool Blockchain::handle_get_txs(NOTIFY_REQUEST_GET_TXS::request& arg, NOTIFY_NEW
 //------------------------------------------------------------------
 bool Blockchain::get_alternative_blocks(std::vector<block>& blocks) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
   blocks.reserve(m_db->get_alt_block_count());
   m_db->for_all_alt_blocks([&blocks](const crypto::hash &blkid, const cryptonote::alt_block_data_t &data, const std::string *block_blob, const std::string *checkpoint_blob) {
     if (!block_blob)
     {
-      oxen::log::error(logcat, "No blob, but blobs were requested");
+      log::error(logcat, "No blob, but blobs were requested");
       return false;
     }
     cryptonote::block bl;
     if (cryptonote::parse_and_validate_block_from_blob(*block_blob, bl))
       blocks.push_back(std::move(bl));
     else
-      oxen::log::error(logcat, "Failed to parse block from blob");
+      log::error(logcat, "Failed to parse block from blob");
     return true;
   }, true);
   return true;
@@ -2450,7 +2450,7 @@ bool Blockchain::get_alternative_blocks(std::vector<block>& blocks) const
 //------------------------------------------------------------------
 size_t Blockchain::get_alternative_blocks_count() const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
   return m_db->get_alt_block_count();
 }
@@ -2484,7 +2484,7 @@ crypto::public_key Blockchain::get_output_key(uint64_t amount, uint64_t global_i
 //------------------------------------------------------------------
 bool Blockchain::get_outs(const rpc::GET_OUTPUTS_BIN::request& req, rpc::GET_OUTPUTS_BIN::response& res) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
   res.outs.clear();
@@ -2504,7 +2504,7 @@ bool Blockchain::get_outs(const rpc::GET_OUTPUTS_BIN::request& req, rpc::GET_OUT
     m_db->get_output_key(epee::span<const uint64_t>(amounts.data(), amounts.size()), offsets, data);
     if (data.size() != req.outputs.size())
     {
-      oxen::log::error(logcat, "Unexpected output data size: expected {}, got {}", req.outputs.size(), data.size());
+      log::error(logcat, "Unexpected output data size: expected {}, got {}", req.outputs.size(), data.size());
       return false;
     }
     for (const auto &t: data)
@@ -2584,14 +2584,14 @@ void Blockchain::get_output_blacklist(std::vector<uint64_t> &blacklist) const
 // This is used to see what to send another node that needs to sync.
 bool Blockchain::find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, uint64_t& starter_offset) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
   // make sure the request includes at least the genesis block, otherwise
   // how can we expect to sync from the client that the block list came from?
   if(qblock_ids.empty())
   {
-    oxen::log::info(oxen::log::Cat("net.p2p"), "Client sent wrong NOTIFY_REQUEST_CHAIN: m_block_ids.size()={}, dropping connection", qblock_ids.size());
+    log::info(log::Cat("net.p2p"), "Client sent wrong NOTIFY_REQUEST_CHAIN: m_block_ids.size()={}, dropping connection", qblock_ids.size());
     return false;
   }
 
@@ -2601,7 +2601,7 @@ bool Blockchain::find_blockchain_supplement(const std::list<crypto::hash>& qbloc
   auto gen_hash = m_db->get_block_hash_from_height(0);
   if(qblock_ids.back() != gen_hash)
   {
-    oxen::log::info(oxen::log::Cat("net.p2p"), "Client sent wrong NOTIFY_REQUEST_CHAIN: genesis block mismatch: id: {}, expected: {}, dropping connection", qblock_ids.back(), gen_hash);
+    log::info(log::Cat("net.p2p"), "Client sent wrong NOTIFY_REQUEST_CHAIN: genesis block mismatch: id: {}, expected: {}, dropping connection", qblock_ids.back(), gen_hash);
     return false;
   }
 
@@ -2618,7 +2618,7 @@ bool Blockchain::find_blockchain_supplement(const std::list<crypto::hash>& qbloc
     }
     catch (const std::exception& e)
     {
-      oxen::log::warning(logcat, "Non-critical error trying to find block by hash in BlockchainDB, hash: {}", *bl_it);
+      log::warning(logcat, "Non-critical error trying to find block by hash in BlockchainDB, hash: {}", *bl_it);
       return false;
     }
   }
@@ -2627,7 +2627,7 @@ bool Blockchain::find_blockchain_supplement(const std::list<crypto::hash>& qbloc
   // but just in case...
   if(bl_it == qblock_ids.end())
   {
-    oxen::log::error(logcat, "Internal error handling connection, can't find split point");
+    log::error(logcat, "Internal error handling connection, can't find split point");
     return false;
   }
 
@@ -2638,7 +2638,7 @@ bool Blockchain::find_blockchain_supplement(const std::list<crypto::hash>& qbloc
 //------------------------------------------------------------------
 uint64_t Blockchain::block_difficulty(uint64_t i) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   // WARNING: this function does not take m_blockchain_lock, and thus should only call read only
   // m_db functions which do not depend on one another (ie, no getheight + gethash(height-1), as
   // well as not accessing class members, even read only (ie, m_invalid_blocks). The caller must
@@ -2649,7 +2649,7 @@ uint64_t Blockchain::block_difficulty(uint64_t i) const
   }
   catch (const BLOCK_DNE& e)
   {
-    oxen::log::error(logcat, "Attempted to get block difficulty for height above blockchain height");
+    log::error(logcat, "Attempted to get block difficulty for height above blockchain height");
   }
   return 0;
 }
@@ -2658,7 +2658,7 @@ uint64_t Blockchain::block_difficulty(uint64_t i) const
 //       alternatively, return true only if no blocks missed
 bool Blockchain::get_blocks(const std::vector<crypto::hash>& block_ids, std::vector<std::pair<std::string,block>>& blocks, std::unordered_set<crypto::hash>* missed_bs) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
   blocks.reserve(block_ids.size());
@@ -2672,7 +2672,7 @@ bool Blockchain::get_blocks(const std::vector<crypto::hash>& block_ids, std::vec
         blocks.push_back(std::make_pair(m_db->get_block_blob_from_height(height), block()));
         if (!parse_and_validate_block_from_blob(blocks.back().first, blocks.back().second))
         {
-          oxen::log::error(logcat, "Invalid block: {}", block_hash);
+          log::error(logcat, "Invalid block: {}", block_hash);
           blocks.pop_back();
           if (missed_bs) missed_bs->insert(block_hash);
         }
@@ -2692,7 +2692,7 @@ bool Blockchain::get_blocks(const std::vector<crypto::hash>& block_ids, std::vec
 //       alternatively, return true only if no transactions missed
 bool Blockchain::get_transactions_blobs(const std::vector<crypto::hash>& txs_ids, std::vector<std::string>& txs, std::unordered_set<crypto::hash>* missed_txs, bool pruned) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
   txs.reserve(txs_ids.size());
@@ -2718,7 +2718,7 @@ bool Blockchain::get_transactions_blobs(const std::vector<crypto::hash>& txs_ids
 //------------------------------------------------------------------
 std::vector<uint64_t> Blockchain::get_transactions_heights(const std::vector<crypto::hash>& txs_ids) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
   auto heights = m_db->get_tx_block_heights(txs_ids);
@@ -2742,7 +2742,7 @@ size_t get_transaction_version(const std::string &bd)
 //------------------------------------------------------------------
 bool Blockchain::get_split_transactions_blobs(const std::vector<crypto::hash>& txs_ids, std::vector<std::tuple<crypto::hash, std::string, crypto::hash, std::string>>& txs, std::unordered_set<crypto::hash>* missed_txs) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
   txs.reserve(txs_ids.size());
@@ -2756,7 +2756,7 @@ bool Blockchain::get_split_transactions_blobs(const std::vector<crypto::hash>& t
         auto& [hash, pruned, pruned_hash, prunable] = txs.emplace_back(tx_hash, std::move(tx), crypto::null_hash, std::string());
         if (!is_v1_tx(pruned) && !m_db->get_prunable_tx_hash(tx_hash, pruned_hash))
         {
-          oxen::log::error(logcat, "Prunable data hash not found for {}", tx_hash);
+          log::error(logcat, "Prunable data hash not found for {}", tx_hash);
           return false;
         }
         if (!m_db->get_prunable_tx_blob(tx_hash, prunable))
@@ -2775,7 +2775,7 @@ bool Blockchain::get_split_transactions_blobs(const std::vector<crypto::hash>& t
 //------------------------------------------------------------------
 bool Blockchain::get_transactions(const std::vector<crypto::hash>& txs_ids, std::vector<transaction>& txs, std::unordered_set<crypto::hash>* missed_txs) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
   txs.reserve(txs_ids.size());
@@ -2790,7 +2790,7 @@ bool Blockchain::get_transactions(const std::vector<crypto::hash>& txs_ids, std:
         txs.emplace_back();
         if (!parse_and_validate_tx_from_blob(tx, txs.back()))
         {
-          oxen::log::error(logcat, "Invalid transaction");
+          log::error(logcat, "Invalid transaction");
           return false;
         }
       }
@@ -2810,7 +2810,7 @@ bool Blockchain::get_transactions(const std::vector<crypto::hash>& txs_ids, std:
 // BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT additional (more recent) hashes.
 bool Blockchain::find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, std::vector<crypto::hash>& hashes, uint64_t& start_height, uint64_t& current_height, bool clip_pruned) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
   // if we can't find the split point, return false
@@ -2840,7 +2840,7 @@ bool Blockchain::find_blockchain_supplement(const std::list<crypto::hash>& qbloc
 
 bool Blockchain::find_blockchain_supplement(const std::list<crypto::hash>& qblock_ids, NOTIFY_RESPONSE_CHAIN_ENTRY::request& resp) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
   bool result = find_blockchain_supplement(qblock_ids, resp.m_block_ids, resp.start_height, resp.total_height, true);
@@ -2856,7 +2856,7 @@ bool Blockchain::find_blockchain_supplement(const std::list<crypto::hash>& qbloc
 // blocks by reference.
 bool Blockchain::find_blockchain_supplement(const uint64_t req_start_block, const std::list<crypto::hash>& qblock_ids, std::vector<std::pair<std::pair<std::string, crypto::hash>, std::vector<std::pair<crypto::hash, std::string> > > >& blocks, uint64_t& total_height, uint64_t& start_height, bool pruned, bool get_miner_tx_hash, size_t max_count) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
   // if a specific start height has been requested
@@ -2915,11 +2915,11 @@ bool Blockchain::find_blockchain_supplement(const uint64_t req_start_block, cons
 //------------------------------------------------------------------
 bool Blockchain::add_block_as_invalid(cryptonote::block const &block)
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
   auto i_res = m_invalid_blocks.insert(get_block_hash(block));
   CHECK_AND_ASSERT_MES(i_res.second, false, "at insertion invalid block returned status failed");
-  oxen::log::info(logcat, "BLOCK ADDED AS INVALID: {}\n, prev_id={}, m_invalid_blocks count={}", (*i_res.first), block.prev_id, m_invalid_blocks.size());
+  log::info(logcat, "BLOCK ADDED AS INVALID: {}\n, prev_id={}, m_invalid_blocks count={}", (*i_res.first), block.prev_id, m_invalid_blocks.size());
   return true;
 }
 
@@ -2931,31 +2931,31 @@ hf Blockchain::get_network_version(std::optional<uint64_t> height) const {
 //------------------------------------------------------------------
 void Blockchain::flush_invalid_blocks()
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
   m_invalid_blocks.clear();
 }
 //------------------------------------------------------------------
 bool Blockchain::have_block(const crypto::hash& id) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
   if(m_db->block_exists(id))
   {
-    oxen::log::debug(logcat, "block {} found in main chain", id);
+    log::debug(logcat, "block {} found in main chain", id);
     return true;
   }
 
   if(m_db->get_alt_block(id, NULL, NULL, NULL))
   {
-    oxen::log::debug(logcat, "block {} found in alternative chains", id);
+    log::debug(logcat, "block {} found in alternative chains", id);
     return true;
   }
 
   if(m_invalid_blocks.count(id))
   {
-    oxen::log::debug(logcat, "block {} found in m_invalid_blocks", id);
+    log::debug(logcat, "block {} found in m_invalid_blocks", id);
     return true;
   }
 
@@ -2964,7 +2964,7 @@ bool Blockchain::have_block(const crypto::hash& id) const
 //------------------------------------------------------------------
 size_t Blockchain::get_total_transactions() const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   // WARNING: this function does not take m_blockchain_lock, and thus should only call read only
   // m_db functions which do not depend on one another (ie, no getheight + gethash(height-1), as
   // well as not accessing class members, even read only (ie, m_invalid_blocks). The caller must
@@ -2981,7 +2981,7 @@ size_t Blockchain::get_total_transactions() const
 // remove them later if the block fails validation.
 bool Blockchain::check_for_double_spend(const transaction& tx, key_images_container& keys_this_block) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
   auto add_transaction_input_visitor = [&keys_this_block, this](const auto& in) {
     using T = std::decay_t<decltype(in)>;
@@ -3007,7 +3007,7 @@ bool Blockchain::check_for_double_spend(const transaction& tx, key_images_contai
   {
     if (!var::visit(add_transaction_input_visitor, in))
     {
-      oxen::log::error(logcat, "Double spend detected!");
+      log::error(logcat, "Double spend detected!");
       return false;
     }
   }
@@ -3017,12 +3017,12 @@ bool Blockchain::check_for_double_spend(const transaction& tx, key_images_contai
 //------------------------------------------------------------------
 bool Blockchain::get_tx_outputs_gindexs(const crypto::hash& tx_id, size_t n_txes, std::vector<std::vector<uint64_t>>& indexs) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
   uint64_t tx_index;
   if (!m_db->tx_exists(tx_id, tx_index))
   {
-    oxen::log::error(oxen::log::Cat("verify"), "get_tx_outputs_gindexs failed to find transaction with id = {}", tx_id);
+    log::error(log::Cat("verify"), "get_tx_outputs_gindexs failed to find transaction with id = {}", tx_id);
     return false;
   }
   indexs = m_db->get_tx_amount_output_indices(tx_index, n_txes);
@@ -3033,12 +3033,12 @@ bool Blockchain::get_tx_outputs_gindexs(const crypto::hash& tx_id, size_t n_txes
 //------------------------------------------------------------------
 bool Blockchain::get_tx_outputs_gindexs(const crypto::hash& tx_id, std::vector<uint64_t>& indexs) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
   uint64_t tx_index;
   if (!m_db->tx_exists(tx_id, tx_index))
   {
-    oxen::log::error(oxen::log::Cat("verify"), "get_tx_outputs_gindexs failed to find transaction with id = {}", tx_id);
+    log::error(log::Cat("verify"), "get_tx_outputs_gindexs failed to find transaction with id = {}", tx_id);
     return false;
   }
   std::vector<std::vector<uint64_t>> indices = m_db->get_tx_amount_output_indices(tx_index, 1);
@@ -3060,7 +3060,7 @@ void Blockchain::on_new_tx_from_block(const cryptonote::transaction &tx)
       size_t ring_size = 0;
       if (!tx.vin.empty() && std::holds_alternative<txin_to_key>(tx.vin[0]))
         ring_size = var::get<txin_to_key>(tx.vin[0]).key_offsets.size();
-      oxen::log::info(logcat, "HASH: - I/M/O: {}/{}/{} H: {} chcktx: {}", tx.vin.size(), ring_size, tx.vout.size(), 0, tools::friendly_duration(std::chrono::steady_clock::now() - a));
+      log::info(logcat, "HASH: - I/M/O: {}/{}/{} H: {} chcktx: {}", tx.vin.size(), ring_size, tx.vout.size(), 0, tools::friendly_duration(std::chrono::steady_clock::now() - a));
     }
   }
 #endif
@@ -3076,7 +3076,7 @@ void Blockchain::on_new_tx_from_block(const cryptonote::transaction &tx)
 // as a return-by-reference.
 bool Blockchain::check_tx_inputs(transaction& tx, uint64_t& max_used_block_height, crypto::hash& max_used_block_id, tx_verification_context &tvc, bool kept_by_block, std::unordered_set<crypto::key_image>* key_image_conflicts)
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
 #if defined(PER_BLOCK_CHECKPOINT)
@@ -3096,7 +3096,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, uint64_t& max_used_block_heigh
     size_t ring_size = 0;
     if (!tx.vin.empty() && std::holds_alternative<txin_to_key>(tx.vin[0]))
       ring_size = var::get<txin_to_key>(tx.vin[0]).key_offsets.size();
-    oxen::log::info(logcat, "HASH: {} I/M/O: {}/{}/{} H: {} ms: {} B: {} W: {}", get_transaction_hash(tx), tx.vin.size(), ring_size, tx.vout.size(), max_used_block_height, tools::friendly_duration(std::chrono::steady_clock::now() - a + m_fake_scan_time), get_object_blobsize(tx), get_transaction_weight(tx));
+    log::info(logcat, "HASH: {} I/M/O: {}/{}/{} H: {} ms: {} B: {} W: {}", get_transaction_hash(tx), tx.vin.size(), ring_size, tx.vout.size(), max_used_block_height, tools::friendly_duration(std::chrono::steady_clock::now() - a + m_fake_scan_time), get_object_blobsize(tx), get_transaction_weight(tx));
   }
   if (!res)
     return false;
@@ -3109,7 +3109,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, uint64_t& max_used_block_heigh
 //------------------------------------------------------------------
 bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context &tvc) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   std::unique_lock lock{*this};
 
   for (const auto &o: tx.vout) {
@@ -3137,7 +3137,7 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
     const bool bulletproof = rct::is_rct_bulletproof(tx.rct_signatures.type);
     if (bulletproof || !tx.rct_signatures.p.bulletproofs.empty())
     {
-      oxen::log::error(oxen::log::Cat("verify"), "Bulletproofs are not allowed before v10");
+      log::error(log::Cat("verify"), "Bulletproofs are not allowed before v10");
       tvc.m_invalid_output = true;
       return false;
     }
@@ -3150,7 +3150,7 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
     if (auto hf10_height = hard_fork_begins(m_nettype, hf::hf10_bulletproofs);
         hf10_height && height > *hf10_height)
     {
-      oxen::log::error(oxen::log::Cat("verify"), "Borromean range proofs are not allowed after v10");
+      log::error(log::Cat("verify"), "Borromean range proofs are not allowed after v10");
       tvc.m_invalid_output = true;
       return false;
     }
@@ -3159,7 +3159,7 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
   if (hf_version < feature::SMALLER_BP) {
     if (tx.rct_signatures.type == rct::RCTType::Bulletproof2)
     {
-      oxen::log::error(oxen::log::Cat("verify"), "Ringct type {} is not allowed before v{}", (unsigned)rct::RCTType::Bulletproof2, static_cast<int>(feature::SMALLER_BP));
+      log::error(log::Cat("verify"), "Ringct type {} is not allowed before v{}", (unsigned)rct::RCTType::Bulletproof2, static_cast<int>(feature::SMALLER_BP));
       tvc.m_invalid_output = true;
       return false;
     }
@@ -3170,7 +3170,7 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
     {
       if (tx.rct_signatures.type == rct::RCTType::Bulletproof)
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Ringct type {} is not allowed after v{}", (unsigned)rct::RCTType::Bulletproof, static_cast<int>(feature::SMALLER_BP));
+        log::error(log::Cat("verify"), "Ringct type {} is not allowed after v{}", (unsigned)rct::RCTType::Bulletproof, static_cast<int>(feature::SMALLER_BP));
         tvc.m_invalid_output = true;
         return false;
       }
@@ -3182,7 +3182,7 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
     if (tx.version >= txversion::v4_tx_types && tx.is_transfer()) {
       if (tx.rct_signatures.type == rct::RCTType::CLSAG)
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Ringct type {} is not allowed before v{}", (unsigned)rct::RCTType::CLSAG, static_cast<int>(feature::CLSAG));
+        log::error(log::Cat("verify"), "Ringct type {} is not allowed before v{}", (unsigned)rct::RCTType::CLSAG, static_cast<int>(feature::CLSAG));
         tvc.m_invalid_output = true;
         return false;
       }
@@ -3197,7 +3197,7 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
       && tx.version >= txversion::v4_tx_types && tx.is_transfer()
       && (hf_version > feature::CLSAG || height >= 10 + *hard_fork_begins(m_nettype, feature::CLSAG)))
   {
-    oxen::log::error(oxen::log::Cat("verify"), "Ringct type {} is not allowed from v{}", (unsigned)tx.rct_signatures.type, static_cast<int>(feature::CLSAG));
+    log::error(log::Cat("verify"), "Ringct type {} is not allowed from v{}", (unsigned)tx.rct_signatures.type, static_cast<int>(feature::CLSAG));
     tvc.m_invalid_output = true;
     return false;
   }
@@ -3207,7 +3207,7 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
 //------------------------------------------------------------------
 bool Blockchain::have_tx_keyimges_as_spent(const transaction &tx) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   for (const txin_v& in: tx.vin)
   {
     if (!std::holds_alternative<txin_gen>(in))
@@ -3307,7 +3307,7 @@ bool Blockchain::expand_transaction_2(transaction &tx, const crypto::hash &tx_pr
 //        using threads, etc.)
 bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, uint64_t* pmax_used_block_height, std::unordered_set<crypto::key_image>* key_image_conflicts)
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   uint64_t max_used_block_height = 0;
   if (!pmax_used_block_height)
     pmax_used_block_height = &max_used_block_height;
@@ -3325,9 +3325,9 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     if (tvc.m_invalid_version || tvc.m_invalid_type)
     {
       if (tvc.m_invalid_version)
-        oxen::log::error(oxen::log::Cat("verify"), "TX Invalid version: {} for hardfork: {} min/max version: {}/{}", tx.version, (int)hf_version, min_version, max_version);
+        log::error(log::Cat("verify"), "TX Invalid version: {} for hardfork: {} min/max version: {}/{}", tx.version, (int)hf_version, min_version, max_version);
       if (tvc.m_invalid_type)
-        oxen::log::error(oxen::log::Cat("verify"), "TX Invalid type: {} for hardfork: {} max type: {}", tx.type, (int)hf_version, max_type);
+        log::error(log::Cat("verify"), "TX Invalid type: {} for hardfork: {} max type: {}", tx.type, (int)hf_version, max_type);
       return false;
     }
   }
@@ -3336,7 +3336,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
   {
     if (tx.type != txtype::oxen_name_system && !std::holds_alternative<txin_gen>(tx.vin[0]) && hf_version >= feature::MIN_2_OUTPUTS && tx.vout.size() < 2)
     {
-      oxen::log::error(oxen::log::Cat("verify"), "Tx {} has fewer than two outputs, which is not allowed as of hardfork {}", get_transaction_hash(tx), static_cast<int>(feature::MIN_2_OUTPUTS));
+      log::error(log::Cat("verify"), "Tx {} has fewer than two outputs, which is not allowed as of hardfork {}", get_transaction_hash(tx), static_cast<int>(feature::MIN_2_OUTPUTS));
       tvc.m_too_few_outputs = true;
       return false;
     }
@@ -3363,7 +3363,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         // Mixin Check, from hard fork 7, we require mixin at least 9, always.
         if (in_to_key.key_offsets.size() - 1 != cryptonote::TX_OUTPUT_DECOYS)
         {
-          oxen::log::error(oxen::log::Cat("verify"), "Tx {} has incorrect ring size: {} expected: {}", get_transaction_hash(tx), in_to_key.key_offsets.size() - 1, cryptonote::TX_OUTPUT_DECOYS);
+          log::error(log::Cat("verify"), "Tx {} has incorrect ring size: {} expected: {}", get_transaction_hash(tx), in_to_key.key_offsets.size() - 1, cryptonote::TX_OUTPUT_DECOYS);
           tvc.m_low_mixin = true;
           return false;
         }
@@ -3372,7 +3372,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         {
           if (last_key_image && memcmp(&in_to_key.k_image, last_key_image, sizeof(*last_key_image)) >= 0)
           {
-            oxen::log::error(oxen::log::Cat("verify"), "transaction has unsorted inputs");
+            log::error(log::Cat("verify"), "transaction has unsorted inputs");
             tvc.m_verifivation_failed = true;
             return false;
           }
@@ -3381,7 +3381,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
 
         if(have_tx_keyimg_as_spent(in_to_key.k_image))
         {
-          oxen::log::error(oxen::log::Cat("verify"), "Key image already spent in blockchain: {}", tools::type_to_hex(in_to_key.k_image));
+          log::error(log::Cat("verify"), "Key image already spent in blockchain: {}", tools::type_to_hex(in_to_key.k_image));
           if (key_image_conflicts)
             key_image_conflicts->insert(in_to_key.k_image);
           else
@@ -3395,10 +3395,10 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         // signature spending it.
         if (!check_tx_input(in_to_key, tx_prefix_hash, pubkeys[sig_index], pmax_used_block_height))
         {
-          oxen::log::error(oxen::log::Cat("verify"), "Failed to check ring signature for tx {} vin key with k_image: {} sig_index: {}", get_transaction_hash(tx), in_to_key.k_image, sig_index);
+          log::error(log::Cat("verify"), "Failed to check ring signature for tx {} vin key with k_image: {} sig_index: {}", get_transaction_hash(tx), in_to_key.k_image, sig_index);
           if (pmax_used_block_height) // a default value of NULL is used when called from Blockchain::handle_block_to_main_chain()
           {
-            oxen::log::error(oxen::log::Cat("verify"), "  *pmax_used_block_height: {}", *pmax_used_block_height);
+            log::error(log::Cat("verify"), "  *pmax_used_block_height: {}", *pmax_used_block_height);
           }
 
           return false;
@@ -3415,7 +3415,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         {
           if (in_to_key.k_image == entry.key_image) // Check if key image is on the blacklist
           {
-            oxen::log::error(oxen::log::Cat("verify"), "Key image: {} is blacklisted by the service node network", tools::type_to_hex(entry.key_image));
+            log::error(log::Cat("verify"), "Key image: {} is blacklisted by the service node network", tools::type_to_hex(entry.key_image));
             tvc.m_key_image_blacklisted = true;
             return false;
           }
@@ -3424,7 +3424,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         uint64_t unlock_height = 0;
         if (m_service_node_list.is_key_image_locked(in_to_key.k_image, &unlock_height))
         {
-          oxen::log::error(oxen::log::Cat("verify"), "Key image: {} is locked in a stake until height: {}", tools::type_to_hex(in_to_key.k_image), unlock_height);
+          log::error(log::Cat("verify"), "Key image: {} is locked in a stake until height: {}", tools::type_to_hex(in_to_key.k_image), unlock_height);
           tvc.m_key_image_locked_by_snode = true;
           return false;
         }
@@ -3439,7 +3439,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
 
     if (!expand_transaction_2(tx, tx_prefix_hash, pubkeys))
     {
-      oxen::log::error(oxen::log::Cat("verify"), "Failed to expand rct signatures!");
+      log::error(log::Cat("verify"), "Failed to expand rct signatures!");
       return false;
     }
 
@@ -3453,7 +3453,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       // we only accept no signatures for coinbase txes
       if (!std::holds_alternative<txin_gen>(tx.vin[0]))
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Null rct signature on non-coinbase tx");
+        log::error(log::Cat("verify"), "Null rct signature on non-coinbase tx");
         return false;
       }
       break;
@@ -3467,14 +3467,14 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       {
         if (pubkeys.size() != rv.mixRing.size())
         {
-          oxen::log::error(oxen::log::Cat("verify"), "Failed to check ringct signatures: mismatched pubkeys/mixRing size");
+          log::error(log::Cat("verify"), "Failed to check ringct signatures: mismatched pubkeys/mixRing size");
           return false;
         }
         for (size_t i = 0; i < pubkeys.size(); ++i)
         {
           if (pubkeys[i].size() != rv.mixRing[i].size())
           {
-            oxen::log::error(oxen::log::Cat("verify"), "Failed to check ringct signatures: mismatched pubkeys/mixRing size");
+            log::error(log::Cat("verify"), "Failed to check ringct signatures: mismatched pubkeys/mixRing size");
             return false;
           }
         }
@@ -3485,12 +3485,12 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
           {
             if (pubkeys[n][m].dest != rct::rct2pk(rv.mixRing[n][m].dest))
             {
-              oxen::log::error(oxen::log::Cat("verify"), "Failed to check ringct signatures: mismatched pubkey at vin {}, index {}", n, m);
+              log::error(log::Cat("verify"), "Failed to check ringct signatures: mismatched pubkey at vin {}, index {}", n, m);
               return false;
             }
             if (pubkeys[n][m].mask != rct::rct2pk(rv.mixRing[n][m].mask))
             {
-              oxen::log::error(oxen::log::Cat("verify"), "Failed to check ringct signatures: mismatched commitment at vin {}, index {}", n, m);
+              log::error(log::Cat("verify"), "Failed to check ringct signatures: mismatched commitment at vin {}, index {}", n, m);
               return false;
             }
           }
@@ -3500,7 +3500,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       const size_t n_sigs = rv.type == rct::RCTType::CLSAG ? rv.p.CLSAGs.size() : rv.p.MGs.size();
       if (n_sigs != tx.vin.size())
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Failed to check ringct signatures: mismatched MGs/vin sizes");
+        log::error(log::Cat("verify"), "Failed to check ringct signatures: mismatched MGs/vin sizes");
         return false;
       }
       for (size_t n = 0; n < tx.vin.size(); ++n)
@@ -3512,14 +3512,14 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
           error = rv.p.MGs[n].II.empty() || memcmp(&var::get<txin_to_key>(tx.vin[n]).k_image, &rv.p.MGs[n].II[0], 32);
         if (error)
         {
-          oxen::log::error(oxen::log::Cat("verify"), "Failed to check ringct signatures: mismatched key image");
+          log::error(log::Cat("verify"), "Failed to check ringct signatures: mismatched key image");
           return false;
         }
       }
 
       if (!rct::verRctNonSemanticsSimple(rv))
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Failed to check ringct signatures!");
+        log::error(log::Cat("verify"), "Failed to check ringct signatures!");
         return false;
       }
       break;
@@ -3535,7 +3535,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
           size_matches &= pubkeys.size() == rv.mixRing[i].size();
         if (!size_matches)
         {
-          oxen::log::error(oxen::log::Cat("verify"), "Failed to check ringct signatures: mismatched pubkeys/mixRing size");
+          log::error(log::Cat("verify"), "Failed to check ringct signatures: mismatched pubkeys/mixRing size");
           return false;
         }
 
@@ -3545,12 +3545,12 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
           {
             if (pubkeys[n][m].dest != rct::rct2pk(rv.mixRing[m][n].dest))
             {
-              oxen::log::error(oxen::log::Cat("verify"), "Failed to check ringct signatures: mismatched pubkey at vin {}, index {}", n, m);
+              log::error(log::Cat("verify"), "Failed to check ringct signatures: mismatched pubkey at vin {}, index {}", n, m);
               return false;
             }
             if (pubkeys[n][m].mask != rct::rct2pk(rv.mixRing[m][n].mask))
             {
-              oxen::log::error(oxen::log::Cat("verify"), "Failed to check ringct signatures: mismatched commitment at vin {}, index {}", n, m);
+              log::error(log::Cat("verify"), "Failed to check ringct signatures: mismatched commitment at vin {}, index {}", n, m);
               return false;
             }
           }
@@ -3559,32 +3559,32 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
 
       if (rv.p.MGs.size() != 1)
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Failed to check ringct signatures: Bad MGs size");
+        log::error(log::Cat("verify"), "Failed to check ringct signatures: Bad MGs size");
         return false;
       }
       if (rv.p.MGs.empty() || rv.p.MGs[0].II.size() != tx.vin.size())
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Failed to check ringct signatures: mismatched II/vin sizes");
+        log::error(log::Cat("verify"), "Failed to check ringct signatures: mismatched II/vin sizes");
         return false;
       }
       for (size_t n = 0; n < tx.vin.size(); ++n)
       {
         if (memcmp(&var::get<txin_to_key>(tx.vin[n]).k_image, &rv.p.MGs[0].II[n], 32))
         {
-          oxen::log::error(oxen::log::Cat("verify"), "Failed to check ringct signatures: mismatched II/vin sizes");
+          log::error(log::Cat("verify"), "Failed to check ringct signatures: mismatched II/vin sizes");
           return false;
         }
       }
 
       if (!rct::verRct(rv, false))
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Failed to check ringct signatures!");
+        log::error(log::Cat("verify"), "Failed to check ringct signatures!");
         return false;
       }
       break;
     }
     default:
-      oxen::log::error(oxen::log::Cat("verify"), "{}: Unsupported rct type: {}", __func__, (int)rv.type);
+      log::error(log::Cat("verify"), "{}: Unsupported rct type: {}", __func__, (int)rv.type);
       return false;
     }
 
@@ -3595,7 +3595,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       {
         if (proof.V.size() > 1 && !hack::test_suite_permissive_txes)
         {
-          oxen::log::error(oxen::log::Cat("verify"), "Multi output bulletproofs are invalid before v10");
+          log::error(log::Cat("verify"), "Multi output bulletproofs are invalid before v10");
           return false;
         }
       }
@@ -3607,7 +3607,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       std::string fail_reason;
       if (!m_ons_db.validate_ons_tx(hf_version, get_current_blockchain_height(), tx, data, &fail_reason))
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Failed to validate ONS TX reason: {}", fail_reason);
+        log::error(log::Cat("verify"), "Failed to validate ONS TX reason: {}", fail_reason);
         tvc.m_verbose_error = std::move(fail_reason);
         return false;
       }
@@ -3621,7 +3621,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     {
       tvc.m_invalid_input = true;
       tvc.m_verifivation_failed = true;
-      oxen::log::error(oxen::log::Cat("verify"), "TX type: {} should have 0 fee!", tx.type);
+      log::error(log::Cat("verify"), "TX type: {} should have 0 fee!", tx.type);
       return false;
     }
 
@@ -3630,14 +3630,14 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       tx_extra_service_node_state_change state_change;
       if (!get_service_node_state_change_from_tx_extra(tx.extra, state_change, hf_version))
       {
-        oxen::log::error(oxen::log::Cat("verify"), "TX did not have the state change metadata in the tx_extra");
+        log::error(log::Cat("verify"), "TX did not have the state change metadata in the tx_extra");
         return false;
       }
 
       auto quorum = m_service_node_list.get_quorum(service_nodes::quorum_type::obligations, state_change.block_height);
       if (!quorum)
       {
-        oxen::log::error(oxen::log::Cat("verify"), "could not get obligations quorum for recent state change tx");
+        log::error(log::Cat("verify"), "could not get obligations quorum for recent state change tx");
         return false;
       }
 
@@ -3646,7 +3646,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         // will be set by the above on serious failures (i.e. illegal value), but not for less
         // serious ones like state change heights slightly outside of allowed bounds:
         //tvc.m_verifivation_failed = true;
-        oxen::log::error(oxen::log::Cat("verify"), "tx: {}, state change tx could not be completely verified reason: {}", get_transaction_hash(tx), print_vote_verification_context(tvc.m_vote_ctx));
+        log::error(log::Cat("verify"), "tx: {}, state change tx could not be completely verified reason: {}", get_transaction_hash(tx), print_vote_verification_context(tvc.m_vote_ctx));
         return false;
       }
 
@@ -3657,14 +3657,14 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       std::vector<service_nodes::service_node_pubkey_info> service_node_array = m_service_node_list.get_service_node_list_state({state_change_service_node_pubkey});
       if (service_node_array.empty())
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Service Node no longer exists on the network, state change can be ignored");
+        log::error(log::Cat("verify"), "Service Node no longer exists on the network, state change can be ignored");
         return hf_version < hf::hf12_checkpointing; // NOTE: Used to be allowed pre HF12.
       }
 
       const auto& service_node_info = *service_node_array[0].info;
       if (!service_node_info.can_transition_to_state(hf_version, state_change.block_height, state_change.state))
       {
-        oxen::log::error(oxen::log::Cat("verify"), "State change trying to vote Service Node into the same state it invalid (expired, already applied, or impossible)");
+        log::error(log::Cat("verify"), "State change trying to vote Service Node into the same state it invalid (expired, already applied, or impossible)");
         tvc.m_double_spend = true;
         return false;
       }
@@ -3674,7 +3674,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       cryptonote::tx_extra_tx_key_image_unlock unlock;
       if (!cryptonote::get_field_from_tx_extra(tx.extra, unlock))
       {
-        oxen::log::error(logcat, "TX extra didn't have key image unlock in the tx_extra");
+        log::error(logcat, "TX extra didn't have key image unlock in the tx_extra");
         return false;
       }
 
@@ -3682,7 +3682,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       uint64_t unlock_height = 0;
       if (!m_service_node_list.is_key_image_locked(unlock.key_image, &unlock_height, &contribution))
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Requested key image: {} to unlock is not locked", tools::type_to_hex(unlock.key_image));
+        log::error(log::Cat("verify"), "Requested key image: {} to unlock is not locked", tools::type_to_hex(unlock.key_image));
         tvc.m_invalid_input = true;
         return false;
       }
@@ -3690,7 +3690,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       if (!crypto::check_signature(service_nodes::generate_request_stake_unlock_hash(unlock.nonce),
                   contribution.key_image_pub_key, unlock.signature))
       {
-        oxen::log::error(logcat, "Could not verify key image unlock transaction signature for tx: {}", get_transaction_hash(tx));
+        log::error(logcat, "Could not verify key image unlock transaction signature for tx: {}", get_transaction_hash(tx));
         return false;
       }
 
@@ -3703,7 +3703,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     }
     else
     {
-      oxen::log::error(oxen::log::Cat("verify"), "Unhandled tx type: {} rejecting tx: {}", tx.type, get_transaction_hash(tx));
+      log::error(log::Cat("verify"), "Unhandled tx type: {} rejecting tx: {}", tx.type, get_transaction_hash(tx));
       tvc.m_invalid_type = true;;
       return false;
     }
@@ -3794,7 +3794,7 @@ byte_and_output_fees Blockchain::get_dynamic_base_fee(uint64_t block_reward, siz
   // quantize fee up to 8 decimals
   uint64_t mask = get_fee_quantization_mask();
   uint64_t qlo = (lo + mask - 1) / mask * mask;
-  oxen::log::debug(logcat, "lo {}, qlo {}, mask {}", print_money(lo), print_money(qlo), mask);
+  log::debug(logcat, "lo {}, qlo {}, mask {}", print_money(lo), print_money(qlo), mask);
 
   fees.first = qlo;
   return fees;
@@ -3817,7 +3817,7 @@ bool Blockchain::check_fee(size_t tx_weight, size_t tx_outs, uint64_t fee, uint6
   {
     const bool use_long_term_median_in_fee = version >= feature::LONG_TERM_BLOCK_WEIGHT;
     auto fees = get_dynamic_base_fee(base_reward, use_long_term_median_in_fee ? std::min<uint64_t>(median, m_long_term_effective_median_block_weight) : median, version);
-    oxen::log::debug(logcat, "Using {}/byte + {}/out fee", print_money(fees.first), print_money(fees.second));
+    log::debug(logcat, "Using {}/byte + {}/out fee", print_money(fees.first), print_money(fees.second));
     needed_fee = tx_weight * fees.first + tx_outs * fees.second;
     // quantize fee up to 8 decimals
     const uint64_t mask = get_fee_quantization_mask();
@@ -3827,7 +3827,7 @@ bool Blockchain::check_fee(size_t tx_weight, size_t tx_outs, uint64_t fee, uint6
   {
     auto fees = get_dynamic_base_fee(base_reward, median, version);
     assert(fees.second == 0);
-    oxen::log::debug(logcat, "Using {}/kB fee", print_money(fees.first));
+    log::debug(logcat, "Using {}/kB fee", print_money(fees.first));
 
     needed_fee = tx_weight / 1024;
     needed_fee += (tx_weight % 1024) ? 1 : 0;
@@ -3843,7 +3843,7 @@ bool Blockchain::check_fee(size_t tx_weight, size_t tx_outs, uint64_t fee, uint6
 
   if (fee < needed_fee)
   {
-    oxen::log::error(oxen::log::Cat("verify"), "transaction fee is not enough: {}, minimum fee: {}", print_money(fee), print_money(needed_fee));
+    log::error(log::Cat("verify"), "transaction fee is not enough: {}, minimum fee: {}", print_money(fee), print_money(needed_fee));
     return false;
   }
 
@@ -3852,7 +3852,7 @@ bool Blockchain::check_fee(size_t tx_weight, size_t tx_outs, uint64_t fee, uint6
     uint64_t need_burned = opts.burn_fixed + base_miner_fee * opts.burn_percent / 100;
     if (burned < need_burned)
     {
-      oxen::log::error(oxen::log::Cat("verify"), "transaction burned fee is not enough: {}, minimum fee: {}", print_money(burned), print_money(need_burned));
+      log::error(log::Cat("verify"), "transaction burned fee is not enough: {}, minimum fee: {}", print_money(burned), print_money(need_burned));
       return false;
     }
   }
@@ -3883,7 +3883,7 @@ byte_and_output_fees Blockchain::get_dynamic_base_fee_estimate(uint64_t grace_bl
   uint64_t base_reward, base_reward_unpenalized;
   if (!get_base_block_reward(m_current_block_cumul_weight_limit / 2, 1, already_generated_coins, base_reward, base_reward_unpenalized, version, m_db->height()))
   {
-    oxen::log::error(logcat, "Failed to determine block reward, using placeholder {} as a high bound", print_money(BLOCK_REWARD_OVERESTIMATE));
+    log::error(logcat, "Failed to determine block reward, using placeholder {} as a high bound", print_money(BLOCK_REWARD_OVERESTIMATE));
     base_reward = BLOCK_REWARD_OVERESTIMATE;
   }
 
@@ -3891,7 +3891,7 @@ byte_and_output_fees Blockchain::get_dynamic_base_fee_estimate(uint64_t grace_bl
   const uint64_t use_median_value = use_long_term_median_in_fee ? std::min<uint64_t>(median, m_long_term_effective_median_block_weight) : median;
   auto fee = get_dynamic_base_fee(base_reward, use_median_value, version);
   const bool per_byte = version < feature::PER_BYTE_FEE;
-  oxen::log::debug(logcat, "Estimating {}-block fee at {}/{} + {}.out", grace_blocks, print_money(fee.first), (per_byte ? "byte" : "kB"), print_money(fee.second));
+  log::debug(logcat, "Estimating {}-block fee at {}/{} + {}.out", grace_blocks, print_money(fee.first), (per_byte ? "byte" : "kB"), print_money(fee.second));
   return fee;
 }
 
@@ -3900,7 +3900,7 @@ byte_and_output_fees Blockchain::get_dynamic_base_fee_estimate(uint64_t grace_bl
 // a block index or a unix time.
 bool Blockchain::is_output_spendtime_unlocked(uint64_t unlock_time) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   return cryptonote::rules::is_output_unlocked(unlock_time, m_db->height());
 }
 //------------------------------------------------------------------
@@ -3908,7 +3908,7 @@ bool Blockchain::is_output_spendtime_unlocked(uint64_t unlock_time) const
 // and validates that they exist and are usable.
 bool Blockchain::check_tx_input(const txin_to_key& txin, const crypto::hash& tx_prefix_hash, std::vector<rct::ctkey> &output_keys, uint64_t* pmax_related_block_height)
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
 
   // ND:
   // 1. Disable locking and make method private.
@@ -3927,7 +3927,7 @@ bool Blockchain::check_tx_input(const txin_to_key& txin, const crypto::hash& tx_
       //check tx unlock time
       if (!m_bch.is_output_spendtime_unlocked(unlock_time))
       {
-        oxen::log::error(oxen::log::Cat("verify"), "One of outputs for one of inputs has wrong tx.unlock_time = {}", unlock_time);
+        log::error(log::Cat("verify"), "One of outputs for one of inputs has wrong tx.unlock_time = {}", unlock_time);
         return false;
       }
 
@@ -3947,13 +3947,13 @@ bool Blockchain::check_tx_input(const txin_to_key& txin, const crypto::hash& tx_
   outputs_visitor vi(output_keys, *this);
   if (!scan_outputkeys_for_indexes(txin, vi, tx_prefix_hash, pmax_related_block_height))
   {
-    oxen::log::error(oxen::log::Cat("verify"), "Failed to get output keys for tx with amount = {} and count indixes {}", print_money(txin.amount), txin.key_offsets.size());
+    log::error(log::Cat("verify"), "Failed to get output keys for tx with amount = {} and count indixes {}", print_money(txin.amount), txin.key_offsets.size());
     return false;
   }
 
   if(txin.key_offsets.size() != output_keys.size())
   {
-    oxen::log::error(oxen::log::Cat("verify"), "Output keys for tx with amount = {} and count indexes {} returned wrong keys count {}", txin.amount, txin.key_offsets.size(), output_keys.size());
+    log::error(log::Cat("verify"), "Output keys for tx with amount = {} and count indexes {} returned wrong keys count {}", txin.amount, txin.key_offsets.size(), output_keys.size());
     return false;
   }
   // rct_signatures will be expanded after this
@@ -3963,7 +3963,7 @@ bool Blockchain::check_tx_input(const txin_to_key& txin, const crypto::hash& tx_
 //TODO: Is this intended to do something else?  Need to look into the todo there.
 uint64_t Blockchain::get_adjusted_time() const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   //TODO: add collecting median time
   return time(NULL);
 }
@@ -3971,12 +3971,12 @@ uint64_t Blockchain::get_adjusted_time() const
 //TODO: revisit, has changed a bit on upstream
 bool Blockchain::check_block_timestamp(std::vector<uint64_t> timestamps, const block& b, uint64_t& median_ts) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   median_ts = tools::median(std::move(timestamps));
 
   if(b.timestamp < median_ts)
   {
-    oxen::log::error(oxen::log::Cat("verify"), "Timestamp of block with id: {}, {}, less than median of last {} blocks, {}", get_block_hash(b), b.timestamp, BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW, median_ts);
+    log::error(log::Cat("verify"), "Timestamp of block with id: {}, {}, less than median of last {} blocks, {}", get_block_hash(b), b.timestamp, BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW, median_ts);
     return false;
   }
 
@@ -3992,11 +3992,11 @@ bool Blockchain::check_block_timestamp(std::vector<uint64_t> timestamps, const b
 //   false otherwise
 bool Blockchain::check_block_timestamp(const block& b, uint64_t& median_ts) const
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   uint64_t cryptonote_block_future_time_limit = old::BLOCK_FUTURE_TIME_LIMIT_V2;
   if(b.timestamp > get_adjusted_time() + cryptonote_block_future_time_limit)
   {
-    oxen::log::error(oxen::log::Cat("verify"), "Timestamp of block with id: {}, {}, bigger than adjusted time + 2 hours", get_block_hash(b), b.timestamp);
+    log::error(log::Cat("verify"), "Timestamp of block with id: {}, {}, bigger than adjusted time + 2 hours", get_block_hash(b), b.timestamp);
     return false;
   }
 
@@ -4036,7 +4036,7 @@ void Blockchain::return_tx_to_pool(std::vector<std::pair<transaction, std::strin
     const crypto::hash tx_hash = get_transaction_hash(tx.first);
     if (!m_tx_pool.add_tx(tx.first, tx_hash, tx.second, weight, tvc, tx_pool_options::from_block(), version))
     {
-      oxen::log::error(logcat, "Failed to return taken transaction with hash: {} to tx_pool", get_transaction_hash(tx.first));
+      log::error(logcat, "Failed to return taken transaction with hash: {} to tx_pool", get_transaction_hash(tx.first));
     }
   }
 }
@@ -4053,10 +4053,10 @@ bool Blockchain::flush_txes_from_pool(const std::vector<crypto::hash> &txids)
     size_t tx_weight;
     uint64_t fee;
     bool relayed, do_not_relay, double_spend_seen;
-    oxen::log::info(logcat, "Removing txid {} from the pool", txid);
+    log::info(logcat, "Removing txid {} from the pool", txid);
     if(m_tx_pool.have_tx(txid) && !m_tx_pool.take_tx(txid, tx, txblob, tx_weight, fee, relayed, do_not_relay, double_spend_seen))
     {
-      oxen::log::error(logcat, "Failed to remove txid {} from the pool", txid);
+      log::error(logcat, "Failed to remove txid {} from the pool", txid);
       res = false;
     }
   }
@@ -4114,7 +4114,7 @@ Blockchain::block_pow_verified Blockchain::verify_block_pow(cryptonote::block co
       {
         if (blk_hash != expected_hash)
         {
-          oxen::log::error(oxen::log::Cat("verify"), "Block with id is INVALID: {}, expected {}", blk_hash, expected_hash);
+          log::error(log::Cat("verify"), "Block with id is INVALID: {}, expected {}", blk_hash, expected_hash);
           result.valid = false;
           return result;
         }
@@ -4123,7 +4123,7 @@ Blockchain::block_pow_verified Blockchain::verify_block_pow(cryptonote::block co
       }
       else
       {
-        oxen::log::info(oxen::log::Cat("verify"), "No pre-validated hash at height {}, verifying fully", chain_height);
+        log::info(log::Cat("verify"), "No pre-validated hash at height {}, verifying fully", chain_height);
       }
     }
 #endif
@@ -4150,7 +4150,7 @@ Blockchain::block_pow_verified Blockchain::verify_block_pow(cryptonote::block co
     // validate proof_of_work versus difficulty target
     result.valid = check_hash(result.proof_of_work, difficulty);
     if (!result.valid)
-      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "{} with id: {}\n does not have enough proof of work: {} at height {}, required difficulty: {}", (alt_block ? "Alternative block" : "Block"), blk_hash, result.proof_of_work, blk_height, difficulty));
+      log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "{} with id: {}\n does not have enough proof of work: {} at height {}, required difficulty: {}", (alt_block ? "Alternative block" : "Block"), blk_hash, result.proof_of_work, blk_height, difficulty));
   }
 
   return result;
@@ -4167,13 +4167,13 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
   {
     if(cryptonote::get_block_height(blk) == 0)
     {
-      oxen::log::error(oxen::log::Cat("verify"), "Block with id: {} (as alternative), but miner tx says height is 0.", blk_hash);
+      log::error(log::Cat("verify"), "Block with id: {} (as alternative), but miner tx says height is 0.", blk_hash);
       return false;
     }
 
     if (!m_checkpoints.is_alternative_block_allowed(chain_height, blk_height, nullptr))
     {
-      oxen::log::error(oxen::log::Cat("verify"), "Block with id: {} can't be accepted for alternative chain, block height: {}, chain height: {}", blk_hash, blk_height, chain_height);
+      log::error(log::Cat("verify"), "Block with id: {} can't be accepted for alternative chain, block height: {}, chain height: {}", blk_hash, blk_height, chain_height);
       return false;
     }
 
@@ -4182,7 +4182,7 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
     if (auto v = get_network_version(blk_height); blk.major_version != v ||
             (v < hf::hf19_reward_batching && blk.minor_version < static_cast<uint8_t>(v)))
     {
-      oxen::log::info(logcat, "Block with id: {}, has invalid version {}.{}; current: {}.{} for height {}", blk_hash, static_cast<int>(blk.major_version), +blk.minor_version, static_cast<int>(v), static_cast<int>(v), blk_height);
+      log::info(logcat, "Block with id: {}, has invalid version {}.{}; current: {}.{} for height {}", blk_hash, static_cast<int>(blk.major_version), +blk.minor_version, static_cast<int>(v), static_cast<int>(v), blk_height);
       return false;
     }
   }
@@ -4191,7 +4191,7 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
     crypto::hash top_hash = get_tail_id();
     if(blk.prev_id != top_hash)
     {
-      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {}, has wrong prev_id: {}, expected: {}", blk_hash, blk.prev_id, top_hash));
+      log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {}, has wrong prev_id: {}, expected: {}", blk_hash, blk.prev_id, top_hash));
       return false;
     }
 
@@ -4203,11 +4203,11 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
       if (auto now = std::chrono::steady_clock::now(); now > last_outdated_warning + 5min)
       {
         last_outdated_warning = now;
-        oxen::log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "**********************************************************************"));
-        oxen::log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "A block was seen on the network with a version higher than the last"));
-        oxen::log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "known one. This may be an old version of the daemon, and a software"));
-        oxen::log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "update may be required to sync further. Try running: update check"));
-        oxen::log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "**********************************************************************"));
+        log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "**********************************************************************"));
+        log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "A block was seen on the network with a version higher than the last"));
+        log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "known one. This may be an old version of the daemon, and a software"));
+        log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "update may be required to sync further. Try running: update check"));
+        log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "**********************************************************************"));
       }
     }
 
@@ -4215,7 +4215,7 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
     if (blk.major_version != required_major_version ||
             (blk.major_version < hf::hf19_reward_batching && blk.minor_version < static_cast<uint8_t>(required_major_version)))
     {
-      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {}, has invalid version {}.{}; current: {}.{} for height {}", blk_hash, static_cast<int>(blk.major_version), +blk.minor_version, static_cast<int>(required_major_version), static_cast<int>(required_major_version), blk_height));
+      log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {}, has invalid version {}.{}; current: {}.{} for height {}", blk_hash, static_cast<int>(blk.major_version), +blk.minor_version, static_cast<int>(required_major_version), static_cast<int>(required_major_version), blk_height));
       return false;
     }
 
@@ -4228,7 +4228,7 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
       {
         if (!service_node_checkpoint || (service_node_checkpoint && blk.major_version >= hf::hf13_enforce_checkpoints))
         {
-          oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "CHECKPOINT VALIDATION FAILED"));
+          log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "CHECKPOINT VALIDATION FAILED"));
           return false;
         }
       }
@@ -4238,7 +4238,7 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
     // number of the most recent blocks.
     if(!check_block_timestamp(blk))
     {
-      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {}, has invalid timestamp: {}", blk_hash, blk.timestamp));
+      log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {}, has invalid timestamp: {}", blk_hash, blk.timestamp));
       return false;
     }
   }
@@ -4248,7 +4248,7 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
   // sanity check basic miner tx properties;
   if(!prevalidate_miner_transaction(blk, alt_block ? blk_height : chain_height, hf_version))
   {
-    oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {} failed to pass prevalidation", blk_hash));
+    log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {} failed to pass prevalidation", blk_hash));
     return false;
   }
 
@@ -4260,7 +4260,7 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
 //      m_db->add_block()
 bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash& id, block_verification_context& bvc, checkpoint_t const *checkpoint, bool notify)
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
 
   auto block_processing_start = std::chrono::steady_clock::now();
   std::unique_lock lock{*this};
@@ -4338,7 +4338,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
     
     if (m_db->tx_exists(tx_id))
     {
-      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {} attempting to add transaction already in blockchain with id: {}", id, tx_id));
+      log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {} attempting to add transaction already in blockchain with id: {}", id, tx_id));
       bvc.m_verifivation_failed = true;
       return_tx_to_pool(txs);
       return false;
@@ -4350,7 +4350,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
     // get transaction with hash <tx_id> from tx_pool
     if(!m_tx_pool.take_tx(tx_id, tx_tmp, txblob, tx_weight, fee, relayed, do_not_relay, double_spend_seen))
     {
-      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {} has at least one unknown transaction with id: {}", id, tx_id));
+      log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {} has at least one unknown transaction with id: {}", id, tx_id));
       bvc.m_verifivation_failed = true;
       return_tx_to_pool(txs);
       return false;
@@ -4372,7 +4372,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
     // ND: this is not needed, db->add_block() checks for duplicate k_images and fails accordingly.
     // if (!check_for_double_spend(tx, keys))
     // {
-    //     oxen::log::warning(logcat, "Double spend detected in transaction (id: {}", tx_id);
+    //     log::warning(logcat, "Double spend detected in transaction (id: {}", tx_id);
     //     bvc.m_verifivation_failed = true;
     //     break;
     // }
@@ -4388,13 +4388,13 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
       tx_verification_context tvc{};
       if(!check_tx_inputs(tx, tvc))
       {
-        oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {} has at least one transaction (id: {}) with wrong inputs.", id, tx_id));
+        log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {} has at least one transaction (id: {}) with wrong inputs.", id, tx_id));
 
         add_block_as_invalid(bl);
-        oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id {} added as invalid because of wrong inputs in transactions", id));
-        oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "tx_index {}, m_blocks_txs_check {}:", tx_index, m_blocks_txs_check.size()));
+        log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id {} added as invalid because of wrong inputs in transactions", id));
+        log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "tx_index {}, m_blocks_txs_check {}:", tx_index, m_blocks_txs_check.size()));
         for (const auto &h: m_blocks_txs_check)
-          oxen::log::error(oxen::log::Cat("verify"), "  {}", h);
+          log::error(log::Cat("verify"), "  {}", h);
         bvc.m_verifivation_failed = true;
         return_tx_to_pool(txs);
         return false;
@@ -4407,9 +4407,9 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
       // the transaction inputs, but do some sanity checks anyway.
       if (tx_index >= m_blocks_txs_check.size() || memcmp(&m_blocks_txs_check[tx_index++], &tx_id, sizeof(tx_id)) != 0)
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Block with id: {} has at least one transaction (id: {}) with wrong inputs.", id, tx_id);
+        log::error(log::Cat("verify"), "Block with id: {} has at least one transaction (id: {}) with wrong inputs.", id, tx_id);
         add_block_as_invalid(bl);
-        oxen::log::error(oxen::log::Cat("verify"), "Block with id {} added as invalid because of wrong inputs in transactions", id);
+        log::error(log::Cat("verify"), "Block with id {} added as invalid because of wrong inputs in transactions", id);
         bvc.m_verifivation_failed = true;
         return_tx_to_pool(txs);
         return false;
@@ -4428,7 +4428,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
   uint64_t already_generated_coins = chain_height ? m_db->get_block_already_generated_coins(chain_height - 1) : 0;
   if(!validate_miner_transaction(bl, cumulative_block_weight, fee_summary, base_reward, already_generated_coins, get_network_version()))
   {
-    oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block {} with id: {} has incorrect miner transaction", (chain_height - 1), id));
+    log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block {} with id: {} has incorrect miner transaction", (chain_height - 1), id));
     bvc.m_verifivation_failed = true;
     return_tx_to_pool(txs);
     return false;
@@ -4464,7 +4464,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
     }
     catch (const KEY_IMAGE_EXISTS& e)
     {
-      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Error adding block with hash: {} to blockchain, what = {}", id, e.what()));
+      log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Error adding block with hash: {} to blockchain, what = {}", id, e.what()));
       m_batch_success = false;
       bvc.m_verifivation_failed = true;
       return_tx_to_pool(txs);
@@ -4473,7 +4473,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
     catch (const std::exception& e)
     {
       //TODO: figure out the best way to deal with this failure
-      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Error adding block with hash: {} to blockchain, what = {}", id, e.what()));
+      log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Error adding block with hash: {} to blockchain, what = {}", id, e.what()));
       m_batch_success = false;
       bvc.m_verifivation_failed = true;
       return_tx_to_pool(txs);
@@ -4482,7 +4482,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
   }
   else
   {
-    oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Blocks that failed verification should not reach here"));
+    log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Blocks that failed verification should not reach here"));
   }
 
   auto abort_block = oxen::defer([&]() {
@@ -4507,14 +4507,14 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
   try {
     m_service_node_list.block_add(bl, only_txs, checkpoint);
   } catch (const std::exception& e) {
-    oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Failed to add block to Service Node List: {}", e.what()));
+    log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Failed to add block to Service Node List: {}", e.what()));
     bvc.m_verifivation_failed = true;
     return false;
   }
 
   if (!m_ons_db.add_block(bl, only_txs))
   {
-    oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Failed to add block to ONS DB."));
+    log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Failed to add block to ONS DB."));
     bvc.m_verifivation_failed = true;
     return false;
   } 
@@ -4522,7 +4522,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
   if (m_sqlite_db) {
     if (!m_service_node_list.process_batching_rewards(bl))
     {
-      oxen::log::error(logcat, "Failed to add block to batch rewards DB.");
+      log::error(logcat, "Failed to add block to batch rewards DB.");
       bvc.m_verifivation_failed = true;
       return false;
     }
@@ -4537,7 +4537,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
     try {
       hook(hook_data);
     } catch (const std::exception& e) {
-      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block added hook failed with exception: ", e.what()));
+      log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block added hook failed with exception: ", e.what()));
       bvc.m_verifivation_failed = true;
       return false;
     }
@@ -4548,7 +4548,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
   // do this after updating the hard fork state since the weight limit may change due to fork
   if (!update_next_cumulative_weight_limit())
   {
-    oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Failed to update next cumulative weight limit"));
+    log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Failed to update next cumulative weight limit"));
     return false;
   }
 
@@ -4556,7 +4556,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
   uint64_t const fee_after_penalty = get_outs_money_amount(bl.miner_tx) - base_reward;
   if (bl.signatures.size() == service_nodes::PULSE_BLOCK_REQUIRED_SIGNATURES)
   {
-    oxen::log::info(logcat, "\n+++++ PULSE BLOCK SUCCESSFULLY ADDED\n\tid: {}\n\tHEIGHT: {}, v{}.{}\n\tblock reward: {}({} + {}) , coinbase_weight: {}, cumulative weight: {}, {}ms",
+    log::info(logcat, "\n+++++ PULSE BLOCK SUCCESSFULLY ADDED\n\tid: {}\n\tHEIGHT: {}, v{}.{}\n\tblock reward: {}({} + {}) , coinbase_weight: {}, cumulative weight: {}, {}ms",
         id,
         new_height-1,
         static_cast<int>(bl.major_version),
@@ -4571,7 +4571,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
   else
   {
     assert(bl.signatures.empty() && "Signatures were supposed to be checked in Service Node List already.");
-    oxen::log::info(logcat, "\n+++++ MINER BLOCK SUCCESSFULLY ADDED\n\n\tid:  {}\n\tPoW: {}\n\tHEIGHT: {}, v{}.{}, difficulty: {}\n\tblock reward: {}({} + {}), coinbase_weight: {}, cumulative weight: {}, {}({})",
+    log::info(logcat, "\n+++++ MINER BLOCK SUCCESSFULLY ADDED\n\n\tid:  {}\n\tPoW: {}\n\tHEIGHT: {}, v{}.{}, difficulty: {}\n\tblock reward: {}({} + {}), coinbase_weight: {}, cumulative weight: {}, {}({})",
         id,
         miner.blk_pow.proof_of_work,
         new_height - 1,
@@ -4590,7 +4590,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
 
   if(m_show_time_stats)
   {
-    oxen::log::info(logcat, 
+    log::info(logcat, 
         "Height: {} coinbase weight: {} cumm: {} p/t: {} ({}/{}/{}/{}/{}/{}/{}/{})",
         new_height,
         coinbase_weight,
@@ -4662,7 +4662,7 @@ uint64_t Blockchain::get_next_long_term_block_weight(uint64_t block_weight) cons
 bool Blockchain::update_next_cumulative_weight_limit(uint64_t *long_term_effective_median_block_weight)
 {
 
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
 
   // when we reach this, the last hf version is not yet written to the db
   const uint64_t db_height = m_db->height();
@@ -4735,13 +4735,13 @@ bool Blockchain::update_next_cumulative_weight_limit(uint64_t *long_term_effecti
 bool Blockchain::add_new_block(const block& bl, block_verification_context& bvc, checkpoint_t const *checkpoint)
 {
 
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   crypto::hash id = get_block_hash(bl);
   auto lock = tools::unique_locks(m_tx_pool, *this);
   db_rtxn_guard rtxn_guard(m_db);
   if(have_block(id))
   {
-    oxen::log::trace(logcat, "block with id = {} already exists", id);
+    log::trace(logcat, "block with id = {} already exists", id);
     bvc.m_already_exists = true;
     m_blocks_txs_check.clear();
     return false;
@@ -4761,7 +4761,7 @@ bool Blockchain::add_new_block(const block& bl, block_verification_context& bvc,
     }
     catch (const std::exception &e)
     {
-      oxen::log::error(logcat, "Get block checkpoint from DB failed at height: {}, what = {}", block_height, e.what());
+      log::error(logcat, "Get block checkpoint from DB failed at height: {}, what = {}", block_height, e.what());
     }
   }
 
@@ -4796,25 +4796,25 @@ bool Blockchain::update_checkpoints_from_json_file(const fs::path& file_path)
   std::vector<height_to_hash>::const_iterator one_past_last_to_check  = checkpoint_hashes.end();
 
   uint64_t prev_max_height = m_checkpoints.get_max_height();
-  oxen::log::info(logcat, "Adding checkpoints from blockchain hashfile: {}", file_path);
-  oxen::log::info(logcat, "Hard-coded max checkpoint height is {}", prev_max_height);
+  log::info(logcat, "Adding checkpoints from blockchain hashfile: {}", file_path);
+  log::info(logcat, "Hard-coded max checkpoint height is {}", prev_max_height);
   for (std::vector<height_to_hash>::const_iterator it = checkpoint_hashes.begin(); it != one_past_last_to_check; it++)
   {
     uint64_t height;
     height = it->height;
     if (height <= prev_max_height) {
-      oxen::log::info(logcat, "ignoring checkpoint height {}", height);
+      log::info(logcat, "ignoring checkpoint height {}", height);
     } else {
       if (first_to_check == checkpoint_hashes.end())
         first_to_check = it;
 
       std::string blockhash = it->hash;
-      oxen::log::info(logcat, "Adding checkpoint height {}, hash={}", height, blockhash);
+      log::info(logcat, "Adding checkpoint height {}, hash={}", height, blockhash);
 
       if (!m_checkpoints.add_checkpoint(height, blockhash))
       {
         one_past_last_to_check = it;
-        oxen::log::info(logcat, "Failed to add checkpoint at height {}, hash={}", height, blockhash);
+        log::info(logcat, "Failed to add checkpoint at height {}, hash={}", height, blockhash);
         break;
       }
     }
@@ -4840,7 +4840,7 @@ bool Blockchain::update_checkpoints_from_json_file(const fs::path& file_path)
       if (!m_checkpoints.check_block(block_height, m_db->get_block_hash_from_height(block_height), nullptr))
       {
         // roll back to a couple of blocks before the checkpoint
-        oxen::log::error(logcat, "Local blockchain failed to pass a checkpoint, rolling back!");
+        log::error(logcat, "Local blockchain failed to pass a checkpoint, rolling back!");
         std::list<block_and_checkpoint> empty;
         rollback_blockchain_switching(empty, block_height- 2);
         result = false;
@@ -4883,7 +4883,7 @@ void Blockchain::block_longhash_worker(uint64_t height, const epee::span<const b
 bool Blockchain::cleanup_handle_incoming_blocks(bool force_sync)
 {
   bool success = false;
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
 
   try
   {
@@ -4895,7 +4895,7 @@ bool Blockchain::cleanup_handle_incoming_blocks(bool force_sync)
   }
   catch (const std::exception &e)
   {
-    oxen::log::error(logcat, "Exception in cleanup_handle_incoming_blocks: {}", e.what());
+    log::error(logcat, "Exception in cleanup_handle_incoming_blocks: {}", e.what());
   }
 
   if (success && m_sync_counter > 0)
@@ -4908,7 +4908,7 @@ bool Blockchain::cleanup_handle_incoming_blocks(bool force_sync)
     }
     else if (m_db_sync_threshold && ((m_db_sync_on_blocks && m_sync_counter >= m_db_sync_threshold) || (!m_db_sync_on_blocks && m_bytes_to_sync >= m_db_sync_threshold)))
     {
-      oxen::log::debug(logcat, "Sync threshold met, syncing");
+      log::debug(logcat, "Sync threshold met, syncing");
       if(m_db_sync_mode == db_async)
       {
         m_sync_counter = 0;
@@ -4933,7 +4933,7 @@ bool Blockchain::cleanup_handle_incoming_blocks(bool force_sync)
   // when we're well clear of the precomputed hashes, free the memory
   if (!m_blocks_hash_check.empty() && m_db->height() > m_blocks_hash_check.size() + 4096)
   {
-    oxen::log::info(logcat, "Dumping block hashes, we're now 4k past {}", m_blocks_hash_check.size());
+    log::info(logcat, "Dumping block hashes, we're now 4k past {}", m_blocks_hash_check.size());
     m_blocks_hash_check.clear();
     m_blocks_hash_check.shrink_to_fit();
   }
@@ -4955,7 +4955,7 @@ void Blockchain::output_scan_worker(const uint64_t amount, const std::vector<uin
   }
   catch (const std::exception& e)
   {
-    oxen::log::error(oxen::log::Cat("verify"), "EXCEPTION: {}", e.what());
+    log::error(log::Cat("verify"), "EXCEPTION: {}", e.what());
   }
   catch (...)
   {
@@ -4979,7 +4979,7 @@ uint64_t Blockchain::prevalidate_block_hashes(uint64_t height, const std::vector
   // find hashes encompassing those block
   size_t first_index = height / HASH_OF_HASHES_STEP;
   size_t last_index = (height + hashes.size() - 1) / HASH_OF_HASHES_STEP;
-  oxen::log::debug(logcat, "Blocks {} - {} start at {} and end at {}", height, (height + hashes.size() - 1), first_index, last_index);
+  log::debug(logcat, "Blocks {} - {} start at {} and end at {}", height, (height + hashes.size() - 1), first_index, last_index);
 
   // case of not enough to calculate even a single hash
   if (first_index == last_index && hashes.size() < HASH_OF_HASHES_STEP && (height + hashes.size()) % HASH_OF_HASHES_STEP)
@@ -5033,7 +5033,7 @@ uint64_t Blockchain::prevalidate_block_hashes(uint64_t height, const std::vector
       // add to the known hashes array
       if (!valid)
       {
-        oxen::log::debug(logcat, "invalid hash for blocks {} - {}", n * HASH_OF_HASHES_STEP, (n * HASH_OF_HASHES_STEP + HASH_OF_HASHES_STEP - 1));
+        log::debug(logcat, "invalid hash for blocks {} - {}", n * HASH_OF_HASHES_STEP, (n * HASH_OF_HASHES_STEP + HASH_OF_HASHES_STEP - 1));
         break;
       }
 
@@ -5054,7 +5054,7 @@ uint64_t Blockchain::prevalidate_block_hashes(uint64_t height, const std::vector
         usable = hashes.size();
     }
   }
-  oxen::log::debug(logcat, "usable: {} / {}", usable, hashes.size());
+  log::debug(logcat, "usable: {} / {}", usable, hashes.size());
   CHECK_AND_ASSERT_MES(usable < std::numeric_limits<uint64_t>::max() / 2, 0, "usable is negative");
   return usable;
 }
@@ -5107,7 +5107,7 @@ bool Blockchain::calc_batched_governance_reward(uint64_t height, uint64_t &rewar
   std::vector<cryptonote::block> blocks;
   if (!get_blocks_only(start_height, num_blocks, blocks))
   {
-    oxen::log::error(logcat, "Unable to get historical blocks to calculated batched governance payment");
+    log::error(logcat, "Unable to get historical blocks to calculated batched governance payment");
     return false;
   }
 
@@ -5129,7 +5129,7 @@ bool Blockchain::calc_batched_governance_reward(uint64_t height, uint64_t &rewar
 //    keys.
 bool Blockchain::prepare_handle_incoming_blocks(const std::vector<block_complete_entry> &blocks_entry, std::vector<block> &blocks)
 {
-  oxen::log::trace(logcat, "Blockchain::{}", __func__);
+  log::trace(logcat, "Blockchain::{}", __func__);
   auto prepare = std::chrono::steady_clock::now();
   uint64_t bytes = 0;
   size_t total_txs = 0;
@@ -5189,7 +5189,7 @@ bool Blockchain::prepare_handle_incoming_blocks(const std::vector<block_complete
 
     unsigned int batches = blocks_entry.size() / threads;
     unsigned int extra = blocks_entry.size() % threads;
-    oxen::log::debug(logcat, "block_batches: {}", batches);
+    log::debug(logcat, "block_batches: {}", batches);
     std::vector<std::unordered_map<crypto::hash, crypto::hash>> maps(threads);
     auto it = blocks_entry.begin();
     unsigned blockidx = 0;
@@ -5210,7 +5210,7 @@ bool Blockchain::prepare_handle_incoming_blocks(const std::vector<block_complete
         {
           if (block.prev_id != tophash)
           {
-            oxen::log::debug(logcat, "Skipping prepare blocks. New blocks don't belong to chain.");
+            log::debug(logcat, "Skipping prepare blocks. New blocks don't belong to chain.");
             blocks.clear();
             return true;
           }
@@ -5272,7 +5272,7 @@ bool Blockchain::prepare_handle_incoming_blocks(const std::vector<block_complete
 
   if (blocks_exist)
   {
-    oxen::log::debug(logcat, "Skipping remainder of prepare blocks. Blocks exist.");
+    log::debug(logcat, "Skipping remainder of prepare blocks. Blocks exist.");
     return true;
   }
 
@@ -5285,7 +5285,7 @@ bool Blockchain::prepare_handle_incoming_blocks(const std::vector<block_complete
   m_fake_pow_calc_time = prepare_elapsed / blocks_entry.size();
 
   if (blocks_entry.size() > 1 && threads > 1 && m_show_time_stats)
-    oxen::log::debug(logcat, "Prepare blocks took: {}", tools::friendly_duration(prepare_elapsed));
+    log::debug(logcat, "Prepare blocks took: {}", tools::friendly_duration(prepare_elapsed));
 
   auto scantable = std::chrono::steady_clock::now();
 
@@ -5308,7 +5308,7 @@ bool Blockchain::prepare_handle_incoming_blocks(const std::vector<block_complete
     {
       if (tx_index >= txes.size())
       {
-        oxen::log::error(oxen::log::Cat("verify"), "tx_index is out of sync");
+        log::error(log::Cat("verify"), "tx_index is out of sync");
         m_scan_table.clear();
         return false;
       }
@@ -5318,7 +5318,7 @@ bool Blockchain::prepare_handle_incoming_blocks(const std::vector<block_complete
 
       if (!parse_and_validate_tx_base_from_blob(tx_blob, tx))
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Could not parse tx from incoming blocks");
+        log::error(log::Cat("verify"), "Could not parse tx from incoming blocks");
         m_scan_table.clear();
         return false;
       }
@@ -5327,7 +5327,7 @@ bool Blockchain::prepare_handle_incoming_blocks(const std::vector<block_complete
       auto its = m_scan_table.find(tx_prefix_hash);
       if (its != m_scan_table.end())
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Duplicate tx found from incoming blocks.");
+        log::error(log::Cat("verify"), "Duplicate tx found from incoming blocks.");
         m_scan_table.clear();
         return false;
       }
@@ -5348,7 +5348,7 @@ bool Blockchain::prepare_handle_incoming_blocks(const std::vector<block_complete
           auto it = its->second.find(in_to_key.k_image);
           if (it != its->second.end())
           {
-            oxen::log::error(oxen::log::Cat("verify"), "Duplicate key_image found from incoming blocks.");
+            log::error(log::Cat("verify"), "Duplicate key_image found from incoming blocks.");
             m_scan_table.clear();
             return false;
           }
@@ -5434,7 +5434,7 @@ bool Blockchain::prepare_handle_incoming_blocks(const std::vector<block_complete
     {
       if (tx_index >= txes.size())
       {
-        oxen::log::error(oxen::log::Cat("verify"), "tx_index is out of sync");
+        log::error(log::Cat("verify"), "tx_index is out of sync");
         m_scan_table.clear();
         return false;
       }
@@ -5445,7 +5445,7 @@ bool Blockchain::prepare_handle_incoming_blocks(const std::vector<block_complete
       auto its = m_scan_table.find(tx_prefix_hash);
       if (its == m_scan_table.end())
       {
-        oxen::log::error(oxen::log::Cat("verify"), "Tx not found on scan table from incoming blocks.");
+        log::error(log::Cat("verify"), "Tx not found on scan table from incoming blocks.");
         m_scan_table.clear();
         return false;
       }
@@ -5491,7 +5491,7 @@ bool Blockchain::prepare_handle_incoming_blocks(const std::vector<block_complete
     auto scantable_elapsed = std::chrono::steady_clock::now() - scantable;
     m_fake_scan_time = scantable_elapsed / total_txs;
     if(m_show_time_stats)
-      oxen::log::debug(logcat, "Prepare scantable took: {}", tools::friendly_duration(scantable_elapsed));
+      log::debug(logcat, "Prepare scantable took: {}", tools::friendly_duration(scantable_elapsed));
   }
 
   return true;
@@ -5586,7 +5586,7 @@ std::vector<std::pair<Blockchain::block_extended_info,std::vector<crypto::hash>>
   m_db->for_all_alt_blocks([&alt_blocks](const crypto::hash &blkid, const cryptonote::alt_block_data_t &data, const std::string *block_blob, const std::string *checkpoint_blob) {
     if (!block_blob)
     {
-      oxen::log::error(logcat, "No blob, but blobs were requested");
+      log::error(logcat, "No blob, but blobs were requested");
       return false;
     }
 
@@ -5594,7 +5594,7 @@ std::vector<std::pair<Blockchain::block_extended_info,std::vector<crypto::hash>>
     if (data.checkpointed && checkpoint_blob)
     {
       if (!t_serializable_object_from_blob(checkpoint, *checkpoint_blob))
-        oxen::log::error(logcat, "Failed to parse checkpoint from blob");
+        log::error(logcat, "Failed to parse checkpoint from blob");
     }
 
     cryptonote::block block;
@@ -5604,7 +5604,7 @@ std::vector<std::pair<Blockchain::block_extended_info,std::vector<crypto::hash>>
       alt_blocks.insert(std::make_pair(cryptonote::get_block_hash(bei.bl), std::move(bei)));
     }
     else
-      oxen::log::error(logcat, "Failed to parse block from blob");
+      log::error(logcat, "Failed to parse block from blob");
     return true;
   }, true);
 
@@ -5652,30 +5652,30 @@ void Blockchain::load_compiled_in_block_hashes(const GetCheckpointsCallback& get
   std::string_view checkpoints = get_checkpoints(m_nettype);
   if (!checkpoints.empty())
   {
-    oxen::log::info(logcat, "Loading precomputed blocks ({} bytes)", checkpoints.size());
+    log::info(logcat, "Loading precomputed blocks ({} bytes)", checkpoints.size());
     if (m_nettype == network_type::MAINNET)
     {
       // first check hash
       crypto::hash hash;
       if (!tools::sha256sum_str(checkpoints, hash))
       {
-        oxen::log::error(logcat, "Failed to hash precomputed blocks data");
+        log::error(logcat, "Failed to hash precomputed blocks data");
         return;
       }
 
       constexpr auto EXPECTED_SHA256_HASH = "d5772a74dadb64a439b60312f9dc3e5243157c5477037a318840b8c36da9644b"sv;
-      oxen::log::info(logcat, "Precomputed blocks hash: {}, expected {}", hash, EXPECTED_SHA256_HASH);
+      log::info(logcat, "Precomputed blocks hash: {}, expected {}", hash, EXPECTED_SHA256_HASH);
 
       crypto::hash expected_hash;
       if (!tools::hex_to_type(EXPECTED_SHA256_HASH, expected_hash))
       {
-        oxen::log::error(logcat, "Failed to parse expected block hashes hash");
+        log::error(logcat, "Failed to parse expected block hashes hash");
         return;
       }
 
       if (hash != expected_hash)
       {
-        oxen::log::error(logcat, "Block hash data does not match expected hash");
+        log::error(logcat, "Block hash data does not match expected hash");
         return;
       }
     }
@@ -5685,13 +5685,13 @@ void Blockchain::load_compiled_in_block_hashes(const GetCheckpointsCallback& get
       auto nblocks = oxenc::load_little_to_host<uint32_t>(checkpoints.data());
       if (nblocks > (std::numeric_limits<uint32_t>::max() - 4) / sizeof(hash))
       {
-        oxen::log::error(logcat, "Block hash data is too large");
+        log::error(logcat, "Block hash data is too large");
         return;
       }
       const size_t size_needed = 4 + (nblocks * sizeof(crypto::hash));
       if(checkpoints.size() != size_needed)
       {
-        oxen::log::error(logcat, "Failed to load hashes - unexpected data size {}, expected {}", checkpoints.size(), size_needed);
+        log::error(logcat, "Failed to load hashes - unexpected data size {}, expected {}", checkpoints.size(), size_needed);
         return;
       }
       else if(nblocks > 0 && nblocks > (m_db->height() + HASH_OF_HASHES_STEP - 1) / HASH_OF_HASHES_STEP)
@@ -5705,7 +5705,7 @@ void Blockchain::load_compiled_in_block_hashes(const GetCheckpointsCallback& get
           checkpoints.remove_prefix(sizeof(hash.data));
         }
         m_blocks_hash_check.resize(m_blocks_hash_of_hashes.size() * HASH_OF_HASHES_STEP, crypto::null_hash);
-        oxen::log::info(logcat, "{} block hashes loaded", nblocks);
+        log::info(logcat, "{} block hashes loaded", nblocks);
 
         // FIXME: clear tx_pool because the process might have been
         // terminated and caused it to store txs kept by blocks.
@@ -5769,13 +5769,13 @@ bool Blockchain::for_all_outputs(uint64_t amount, std::function<bool(uint64_t he
 
 void Blockchain::invalidate_block_template_cache()
 {
-  oxen::log::debug(logcat, "Invalidating block template cache");
+  log::debug(logcat, "Invalidating block template cache");
   m_btc_valid = false;
 }
 
 void Blockchain::cache_block_template(const block &b, const cryptonote::account_public_address &address, const std::string &nonce, const difficulty_type &diff, uint64_t height, uint64_t expected_reward, uint64_t pool_cookie)
 {
-  oxen::log::debug(logcat, "Setting block template cache");
+  log::debug(logcat, "Setting block template cache");
   m_btc = b;
   m_btc_address = address;
   m_btc_nonce = nonce;

@@ -63,7 +63,7 @@
 
 namespace tools {
 
-  static auto logcat = oxen::log::Cat("util");
+  static auto logcat = log::Cat("util");
 
 #ifndef _WIN32
   static int flock_exnb(int fd)
@@ -78,7 +78,7 @@ namespace tools {
     fl.l_len = 0;
     ret = fcntl(fd, F_SETLK, &fl);
     if (ret < 0)
-      oxen::log::error(logcat, "Error locking fd {}: {} ({})", fd, errno, strerror(errno));
+      log::error(logcat, "Error locking fd {}: {} ({})", fd, errno, strerror(errno));
     return ret;
   }
 #endif
@@ -208,14 +208,14 @@ namespace tools {
       memset(&ov, 0, sizeof(ov));
       if (!LockFileEx(m_fd, LOCKFILE_FAIL_IMMEDIATELY | LOCKFILE_EXCLUSIVE_LOCK, 0, 1, 0, &ov))
       {
-        oxen::log::error(logcat, "Failed to lock {}: {}", filename, std::error_code(GetLastError(), std::system_category()));
+        log::error(logcat, "Failed to lock {}: {}", filename, std::error_code(GetLastError(), std::system_category()));
         CloseHandle(m_fd);
         m_fd = INVALID_HANDLE_VALUE;
       }
     }
     else
     {
-      oxen::log::error(logcat, "Failed to open {}: {}", filename, std::error_code(GetLastError(), std::system_category()));
+      log::error(logcat, "Failed to open {}: {}", filename, std::error_code(GetLastError(), std::system_category()));
     }
 #else
     m_fd = open(filename.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0666);
@@ -223,14 +223,14 @@ namespace tools {
     {
       if (flock_exnb(m_fd) == -1)
       {
-        oxen::log::error(logcat, "Failed to lock {}: {}", filename, std::strerror(errno));
+        log::error(logcat, "Failed to lock {}: {}", filename, std::strerror(errno));
         close(m_fd);
         m_fd = -1;
       }
     }
     else
     {
-      oxen::log::error(logcat, "Failed to open {}: {}", filename, std::strerror(errno));
+      log::error(logcat, "Failed to open {}: {}", filename, std::strerror(errno));
     }
 #endif
   }
@@ -265,7 +265,7 @@ namespace tools {
       return fs::path{psz_path};
     }
 
-    oxen::log::error(logcat, "SHGetSpecialFolderPathW() failed, could not obtain requested path.");
+    log::error(logcat, "SHGetSpecialFolderPathW() failed, could not obtain requested path.");
     return "";
   }
 #endif

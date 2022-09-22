@@ -369,11 +369,11 @@ namespace nodetool
     bool check_incoming_connections();
 
     void kill() { ///< will be called e.g. from deinit()
-      oxen::log::info(globallogcat, "Killing the net_node");
+      log::info(globallogcat, "Killing the net_node");
       is_closing = true;
       if(mPeersLoggerThread)
         mPeersLoggerThread->join(); // make sure the thread finishes
-      oxen::log::info(globallogcat, "Joined extra background net_node threads");
+      log::info(globallogcat, "Joined extra background net_node threads");
     }
 
     //debug functions

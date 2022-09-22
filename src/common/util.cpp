@@ -55,7 +55,7 @@
 
 namespace tools
 {
-  static auto logcat = oxen::log::Cat("util");
+  static auto logcat = log::Cat("util");
 
   bool disable_core_dumps()
   {
@@ -65,7 +65,7 @@ namespace tools
     rlimit.rlim_cur = rlimit.rlim_max = 0;
     if (setrlimit(RLIMIT_CORE, &rlimit))
     {
-      oxen::log::warning(logcat, "Failed to disable core dumps");
+      log::warning(logcat, "Failed to disable core dumps");
       return false;
     }
 #endif
@@ -78,7 +78,7 @@ namespace tools
     struct rlimit rlim;
     if (getrlimit(RLIMIT_MEMLOCK, &rlim) < 0)
     {
-      oxen::log::error(logcat, "Failed to determine the lockable memory limit");
+      log::error(logcat, "Failed to determine the lockable memory limit");
       return -1;
     }
     return rlim.rlim_cur;
@@ -92,7 +92,7 @@ namespace tools
 #ifdef __GLIBC__
     const char *ver = ::gnu_get_libc_version();
     if (!strcmp(ver, "2.25"))
-      oxen::log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "Running with glibc {}, hangs may occur - change glibc version if possible", ver));
+      log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "Running with glibc {}, hangs may occur - change glibc version if possible", ver));
 #endif
 
     return true;

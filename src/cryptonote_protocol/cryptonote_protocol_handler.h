@@ -134,7 +134,7 @@ namespace cryptonote
     template<class T>
     bool relay_to_synchronized_peers(typename T::request& arg, cryptonote_connection_context& exclude_context)
     {
-      oxen::log::debug(globallogcat, "[{}] post relay {} -->", epee::net_utils::print_connection_context_short(exclude_context), tools::type_name<T>());
+      log::debug(globallogcat, "[{}] post relay {} -->", epee::net_utils::print_connection_context_short(exclude_context), tools::type_name<T>());
       std::vector<std::pair<epee::net_utils::zone, boost::uuids::uuid>> connections;
       m_p2p->for_each_connection([&exclude_context, &connections](connection_context& context, nodetool::peerid_type peer_id)
       {
@@ -211,7 +211,7 @@ namespace cryptonote
     template<class t_parameter>
       bool post_notify(typename t_parameter::request& arg, cryptonote_connection_context& context)
       {
-        oxen::log::debug(globallogcat, "[{}] post {} -->", epee::net_utils::print_connection_context_short(context), tools::type_name<t_parameter>());
+        log::debug(globallogcat, "[{}] post {} -->", epee::net_utils::print_connection_context_short(context), tools::type_name<t_parameter>());
         std::string blob;
         epee::serialization::store_t_to_binary(arg, blob);
         return m_p2p->invoke_notify_to_peer(t_parameter::ID, epee::strspan<uint8_t>(blob), context);

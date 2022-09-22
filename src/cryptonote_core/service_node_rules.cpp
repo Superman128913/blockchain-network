@@ -16,7 +16,7 @@ using cryptonote::hf;
 
 namespace service_nodes {
 
-static auto logcat = oxen::log::Cat("service_nodes");
+static auto logcat = log::Cat("service_nodes");
 
 uint64_t get_staking_requirement(cryptonote::network_type nettype, hf hardfork)
 {
@@ -112,11 +112,11 @@ bool check_service_node_portions(hf hf_version, const std::vector<std::pair<cryp
     hf_version = hf::hf18;
   else if (hf_version > hf::hf19_reward_batching)
   {
-    oxen::log::info(logcat, "Registration tx rejected: portions-based registrations not permitted after HF19");
+    log::info(logcat, "Registration tx rejected: portions-based registrations not permitted after HF19");
     return false;
   }
   if (portions.size() > oxen::MAX_CONTRIBUTORS_V1) {
-    oxen::log::info(logcat, "Registration tx rejected: too many contributors ({} > {})", portions.size(), oxen::MAX_CONTRIBUTORS_V1);
+    log::info(logcat, "Registration tx rejected: too many contributors ({} > {})", portions.size(), oxen::MAX_CONTRIBUTORS_V1);
     return false;
   }
 
@@ -127,11 +127,11 @@ bool check_service_node_portions(hf hf_version, const std::vector<std::pair<cryp
 
     const uint64_t min_portions = get_min_node_contribution(hf_version, cryptonote::old::STAKING_PORTIONS, reserved, i);
     if (portions[i].second < min_portions) {
-      oxen::log::info(logcat, "Registration tx rejected: portion {} too small ({} < {})", i, portions[i].second, min_portions);
+      log::info(logcat, "Registration tx rejected: portion {} too small ({} < {})", i, portions[i].second, min_portions);
       return false;
     }
     if (portions[i].second > remaining) {
-      oxen::log::info(logcat, "Registration tx rejected: portion {} exceeds available portions", i);
+      log::info(logcat, "Registration tx rejected: portion {} exceeds available portions", i);
       return false;
     }
 
@@ -145,11 +145,11 @@ bool check_service_node_portions(hf hf_version, const std::vector<std::pair<cryp
 bool check_service_node_stakes(hf hf_version, cryptonote::network_type nettype, uint64_t staking_requirement, const std::vector<std::pair<cryptonote::account_public_address, uint64_t>>& stakes)
 {
   if (hf_version < hf::hf19_reward_batching) {
-    oxen::log::info(logcat, "Registration tx rejected: amount-based registrations not accepted before HF19");
+    log::info(logcat, "Registration tx rejected: amount-based registrations not accepted before HF19");
     return false; // OXEN-based registrations not accepted before HF19
   }
   if (stakes.size() > oxen::MAX_CONTRIBUTORS_HF19) {
-    oxen::log::info(logcat, "Registration tx rejected: too many contributors ({} > {})", stakes.size(), oxen::MAX_CONTRIBUTORS_HF19);
+    log::info(logcat, "Registration tx rejected: too many contributors ({} > {})", stakes.size(), oxen::MAX_CONTRIBUTORS_HF19);
     return false;
   }
 
@@ -163,11 +163,11 @@ bool check_service_node_stakes(hf hf_version, cryptonote::network_type nettype, 
     const uint64_t min_stake = i == 0 ? operator_requirement : get_min_node_contribution(hf_version, staking_requirement, reserved, i);
 
     if (stakes[i].second < min_stake) {
-      oxen::log::info(logcat, "Registration tx rejected: stake {} too small ({} < {})", i, stakes[i].second, min_stake);
+      log::info(logcat, "Registration tx rejected: stake {} too small ({} < {})", i, stakes[i].second, min_stake);
       return false;
     }
     if (stakes[i].second > remaining) {
-      oxen::log::info(logcat, "Registration tx rejected: stake {} ({}) exceeds available remaining stake ({})", i, stakes[i].second, remaining);
+      log::info(logcat, "Registration tx rejected: stake {} ({}) exceeds available remaining stake ({})", i, stakes[i].second, remaining);
       return false;
     }
 

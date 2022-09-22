@@ -54,8 +54,6 @@
 
 namespace mms
 {
-  static auto logcat = oxen::log::Cat("wallet.mms");
-
   enum class message_type
   {
     key_set,

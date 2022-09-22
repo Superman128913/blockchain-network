@@ -228,7 +228,7 @@ namespace cryptonote
       {
         if (out_index >= output_unlock_times.size())
         {
-          oxen::log::error(globallogcat, "Tried to get unlock time of a v3 transaction with missing output unlock time");
+          log::error(globallogcat, "Tried to get unlock time of a v3 transaction with missing output unlock time");
           return unlock_time;
         }
         return output_unlock_times[out_index];

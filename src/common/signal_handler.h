@@ -3,6 +3,7 @@
 #include <csignal>
 #include <functional>
 #include <mutex>
+#include "logging/oxen_logger.h"
 
 namespace tools {
 
@@ -47,7 +48,7 @@ namespace tools {
       }
       else
       {
-        oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Got control signal {}. Exiting without saving...", type);
+        log::info(globallogcat, fmt::format(fg(fmt::terminal_color::red), "Got control signal {}. Exiting without saving...", type);
         return FALSE;
       }
       return TRUE;

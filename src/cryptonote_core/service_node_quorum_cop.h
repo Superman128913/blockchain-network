@@ -89,7 +89,7 @@ namespace service_nodes
       else if (type == quorum_type::checkpointing) return checkpointing;
       else if (type == quorum_type::blink) return blink;
       else if (type == quorum_type::pulse) return pulse;
-      oxen::log::error(oxen::log::Cat("quorum_cop"), "Developer error: Unhandled quorum enum with value: {}", (size_t)type);
+      log::error(log::Cat("quorum_cop"), "Developer error: Unhandled quorum enum with value: {}", (size_t)type);
       assert(!"Developer error: Unhandled quorum enum with value: ");
       return nullptr;
     }

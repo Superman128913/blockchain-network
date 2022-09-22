@@ -60,7 +60,7 @@
 
 namespace cryptonote
 {
-  static auto logcat = oxen::log::Cat("net.cn");
+  static auto logcat = log::Cat("net.cn");
 
   constexpr size_t BLOCK_QUEUE_NSPANS_THRESHOLD = 10; // chunks of N blocks
   constexpr size_t BLOCK_QUEUE_SIZE_THRESHOLD = 100*1024*1024; // bytes, i.e. 100 MB
@@ -120,7 +120,7 @@ namespace cryptonote
   template<class t_core>
   bool t_cryptonote_protocol_handler<t_core>::on_callback(cryptonote_connection_context& context)
   {
-    oxen::log::debug(logcat, "callback fired");
+    log::debug(logcat, "callback fired");
     CHECK_AND_ASSERT_MES_CC( context.m_callback_request_count > 0, false, "false callback fired, but context.m_callback_request_count=" << context.m_callback_request_count);
     --context.m_callback_request_count;
 
@@ -129,11 +129,11 @@ namespace cryptonote
       NOTIFY_REQUEST_CHAIN::request r{};
       context.m_needed_objects.clear();
       m_core.get_blockchain_storage().get_short_chain_history(r.block_ids);
-      oxen::log::info(oxen::log::Cat("net.p2p.msg"), "-->>NOTIFY_REQUEST_CHAIN: m_block_ids.size()={}", r.block_ids.size());
+      log::info(log::Cat("net.p2p.msg"), "-->>NOTIFY_REQUEST_CHAIN: m_block_ids.size()={}", r.block_ids.size());
       post_notify<NOTIFY_REQUEST_CHAIN>(r, context);
 
 
-      oxen::log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "requesting chain", cryptonote::get_protocol_state_string(context.m_state));
+      log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "requesting chain", cryptonote::get_protocol_state_string(context.m_state));
     }
     else if(context.m_state == cryptonote_connection_context::state_standby)
     {
@@ -175,9 +175,9 @@ namespace cryptonote
       context.m_need_blink_sync = false;
       if (!r.heights.empty())
       {
-        oxen::log::info(oxen::log::Cat("net.p2p.msg"), "-->>NOTIFY_REQUEST_BLOCK_BLINKS: requesting blink tx lists for {} blocks", r.heights.size());
+        log::info(log::Cat("net.p2p.msg"), "-->>NOTIFY_REQUEST_BLOCK_BLINKS: requesting blink tx lists for {} blocks", r.heights.size());
         post_notify<NOTIFY_REQUEST_BLOCK_BLINKS>(r, context);
-        oxen::log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "requesting block blinks", cryptonote::get_protocol_state_string(context.m_state));
+        log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "requesting block blinks", cryptonote::get_protocol_state_string(context.m_state));
       }
     }
 
@@ -244,7 +244,7 @@ namespace cryptonote
       << std::setw(10) << up_sum
       << std::setw(13) << up_curr_sum
       << "\n";
-    oxen::log::warning(logcat, "Connections:\n{}", ss.str());
+    log::warning(logcat, "Connections:\n{}", ss.str());
   }
   //------------------------------------------------------------------------------------------------------------------------
   // Returns a list of connection_info objects describing each open p2p connection
@@ -331,7 +331,7 @@ namespace cryptonote
       if (version != hshd.top_version)
       {
         if (version < hshd.top_version && version == get_network_version(nettype, m_core.get_current_blockchain_height()))
-          oxen::log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "{} peer claims higher version than we think ({} for {} instead of {}) 0 we may be forked from the network and a software upgrade may be needed", context, (unsigned)hshd.top_version, (hshd.current_height - 1), (unsigned)version));
+          log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "{} peer claims higher version than we think ({} for {} instead of {}) 0 we may be forked from the network and a software upgrade may be needed", context, (unsigned)hshd.top_version, (hshd.current_height - 1), (unsigned)version));
         return false;
       }
     }
@@ -342,7 +342,7 @@ namespace cryptonote
       const uint32_t log_stripes = tools::get_pruning_log_stripes(hshd.pruning_seed);
       if (log_stripes != PRUNING_LOG_STRIPES || tools::get_pruning_stripe(hshd.pruning_seed) > (1u << log_stripes))
       {
-        oxen::log::warning(logcat, "{} peer claim unexpected pruning seed {}, disconnecting", context, epee::string_tools::to_string_hex(hshd.pruning_seed));
+        log::warning(logcat, "{} peer claim unexpected pruning seed {}, disconnecting", context, epee::string_tools::to_string_hex(hshd.pruning_seed));
         return false;
       }
     }
@@ -351,7 +351,7 @@ namespace cryptonote
     context.m_pruning_seed = hshd.pruning_seed;
     if constexpr (PRUNING_DEBUG_SPOOF_SEED) {
       context.m_pruning_seed = tools::make_pruning_seed(1 + (context.m_remote_address.as<epee::net_utils::ipv4_network_address>().ip()) % (1 << PRUNING_LOG_STRIPES), PRUNING_LOG_STRIPES);
-      oxen::log::info(logcat, "{}{}, seed address {}", context, "New connection posing as pruning seed ", epee::string_tools::to_string_hex(context.m_pruning_seed), &context.m_pruning_seed);
+      log::info(logcat, "{}{}, seed address {}", context, "New connection posing as pruning seed ", epee::string_tools::to_string_hex(context.m_pruning_seed), &context.m_pruning_seed);
     }
 
     // No chain synchronization over hidden networks (tor, i2p, etc.)
@@ -369,12 +369,12 @@ namespace cryptonote
     {
       if (hshd.blink_blocks.size() != hshd.blink_hash.size())
       {
-        oxen::log::warning(logcat, "{} peer sent illegal mismatched blink heights/hashes; disconnecting", context);
+        log::warning(logcat, "{} peer sent illegal mismatched blink heights/hashes; disconnecting", context);
         return false;
       }
       else if (hshd.blink_blocks.size() > 1000)
       {
-        oxen::log::warning(logcat, "{} peer sent too many post-checkpoint blink blocks; disconnecting", context);
+        log::warning(logcat, "{} peer sent too many post-checkpoint blink blocks; disconnecting", context);
         return false;
       }
 
@@ -388,13 +388,13 @@ namespace cryptonote
       context.m_blink_state.erase(context.m_blink_state.lower_bound(1), context.m_blink_state.lower_bound(immutable_height + 1));
       auto our_blink_hashes = m_core.get_pool().get_blink_checksums();
       uint64_t last_height;
-      oxen::log::debug(logcat, "Peer sent {} blink hashes", hshd.blink_blocks.size());
+      log::debug(logcat, "Peer sent {} blink hashes", hshd.blink_blocks.size());
       for (size_t i = 0; i < hshd.blink_blocks.size(); i++) {
         auto &height = hshd.blink_blocks[i];
         if (i == 0 || height > last_height)
           last_height = height;
         else {
-          oxen::log::warning(logcat, "{} peer sent blink tx heights out of order, which is not valid; disconnecting", context);
+          log::warning(logcat, "{} peer sent blink tx heights out of order, which is not valid; disconnecting", context);
           return false;
         }
 
@@ -429,7 +429,7 @@ namespace cryptonote
       }
 
       if (context.m_need_blink_sync)
-        oxen::log::info(logcat, "{}Need to synchronized blink signatures", context);
+        log::info(logcat, "{}Need to synchronized blink signatures", context);
     }
 
     uint64_t target = m_core.get_target_blockchain_height();
@@ -448,9 +448,9 @@ namespace cryptonote
       uint64_t max_block_height = std::max(hshd.current_height, curr_height);
       std::string sync_msg = fmt::format("{}Sync data returned a new top block candidate: {} -> {} [Your node is {} blocks ({} {})]\nSYNCHRONIZATION started", context, curr_height, hshd.current_height, abs_diff, tools::get_human_readable_timespan(abs_diff*TARGET_BLOCK_TIME), (0 <= diff ? "behind" : "ahead"));
       if (is_initial)
-        oxen::log::info(globallogcat, fmt::format(fg(fmt::terminal_color::cyan), sync_msg));
+        log::info(globallogcat, fmt::format(fg(fmt::terminal_color::cyan), sync_msg));
       else
-        oxen::log::debug(globallogcat, sync_msg);
+        log::debug(globallogcat, sync_msg);
 
       m_period_start_time = m_sync_start_time = std::chrono::steady_clock::now();
       m_sync_start_height = curr_height;
@@ -491,12 +491,12 @@ namespace cryptonote
 
     if (context.m_need_blink_sync || context.m_state == cryptonote_connection_context::state_synchronizing)
     {
-      oxen::log::debug(logcat, "{}Remote blockchain height: {}, id: {}", context, hshd.current_height, hshd.top_id);
+      log::debug(logcat, "{}Remote blockchain height: {}, id: {}", context, hshd.current_height, hshd.top_id);
       //let the socket to send response to handshake, but request callback, to let send request data after response
-      oxen::log::debug(logcat, "requesting callback");
+      log::debug(logcat, "requesting callback");
       ++context.m_callback_request_count;
       m_p2p->request_callback(context);
-      oxen::log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "requesting callback", cryptonote::get_protocol_state_string(context.m_state));
+      log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "requesting callback", cryptonote::get_protocol_state_string(context.m_state));
     }
     return true;
   }
@@ -532,20 +532,20 @@ namespace cryptonote
   template<class t_core>
   int t_cryptonote_protocol_handler<t_core>::handle_notify_new_fluffy_block(int command, NOTIFY_NEW_FLUFFY_BLOCK::request& arg, cryptonote_connection_context& context)
   {
-    if(oxen::log::Cat("net.p2p,msg")->should_log(oxen::log::Level::info))
+    if(log::Cat("net.p2p,msg")->should_log(log::Level::info))
     {
       crypto::hash hash;
       cryptonote::block b;
       bool ret = cryptonote::parse_and_validate_block_from_blob(arg.b.block, b, &hash);
       if (ret)
-        oxen::log::info(oxen::log::Cat("net.p2p.msg"), "Received NOTIFY_NEW_FLUFFY_BLOCK {} (height {}, {} txes)", hash, arg.current_blockchain_height, arg.b.txs.size());
+        log::info(log::Cat("net.p2p.msg"), "Received NOTIFY_NEW_FLUFFY_BLOCK {} (height {}, {} txes)", hash, arg.current_blockchain_height, arg.b.txs.size());
     }
 
     if(context.m_state != cryptonote_connection_context::state_normal)
       return 1;
     if(!is_synchronized() || m_no_sync) // can happen if a peer connection goes to normal but another thread still hasn't finished adding queued blocks
     {
-      oxen::log::debug(logcat, "{}Received new block while syncing, ignored", context);
+      log::debug(logcat, "{}Received new block while syncing, ignored", context);
       return 1;
     }
     
@@ -560,7 +560,7 @@ namespace cryptonote
         // What we asked for != to what we received ..
         if(context.m_requested_objects.size() != arg.b.txs.size())
         {
-          oxen::log::error(logcat, "NOTIFY_NEW_FLUFFY_BLOCK -> request/response mismatch, block = {}, requested = {}, received = {}, dropping connection", tools::type_to_hex(get_blob_hash(arg.b.block)), context.m_requested_objects.size(), new_block.tx_hashes.size());
+          log::error(logcat, "NOTIFY_NEW_FLUFFY_BLOCK -> request/response mismatch, block = {}, requested = {}, received = {}, dropping connection", tools::type_to_hex(get_blob_hash(arg.b.block)), context.m_requested_objects.size(), new_block.tx_hashes.size());
           drop_connection(context, false, false);
           m_core.resume_mine();
           return 1;
@@ -588,7 +588,7 @@ namespace cryptonote
           {
             if(!get_transaction_hash(tx, tx_hash))
             {
-              oxen::log::info(logcat, "NOTIFY_NEW_FLUFFY_BLOCK: get_transaction_hash failed, dropping connection");
+              log::info(logcat, "NOTIFY_NEW_FLUFFY_BLOCK: get_transaction_hash failed, dropping connection");
               drop_connection(context, false, false);
               m_core.resume_mine();
               return 1;
@@ -596,7 +596,7 @@ namespace cryptonote
           }
           catch(...)
           {
-            oxen::log::info(logcat, "NOTIFY_NEW_FLUFFY_BLOCK: get_transaction_hash failed, exception thrown, dropping connection");
+            log::info(logcat, "NOTIFY_NEW_FLUFFY_BLOCK: get_transaction_hash failed, exception thrown, dropping connection");
             drop_connection(context, false, false);
             m_core.resume_mine();
             return 1;
@@ -614,7 +614,7 @@ namespace cryptonote
             auto req_tx_it = context.m_requested_objects.find(tx_hash);
             if(req_tx_it == context.m_requested_objects.end())
             {
-              oxen::log::error(logcat, "Peer sent wrong transaction (NOTIFY_NEW_FLUFFY_BLOCK): transaction with id = {} wasn't requested, dropping connection", tx_hash);
+              log::error(logcat, "Peer sent wrong transaction (NOTIFY_NEW_FLUFFY_BLOCK): transaction with id = {} wasn't requested, dropping connection", tx_hash);
               drop_connection(context, false, false);
               m_core.resume_mine();
               return 1;
@@ -627,11 +627,11 @@ namespace cryptonote
           // sent in our pool, so don't verify again..
           if(!m_core.get_pool().have_tx(tx_hash))
           {
-            oxen::log::debug(logcat, "Incoming tx {} not in pool, adding", tx_hash);
+            log::debug(logcat, "Incoming tx {} not in pool, adding", tx_hash);
             cryptonote::tx_verification_context tvc{};
             if(!m_core.handle_incoming_tx(tx_blob, tvc, tx_pool_options::from_block()) || tvc.m_verifivation_failed)
             {
-              oxen::log::info(logcat, "Block verification failed: transaction verification failed, dropping connection");
+              log::info(logcat, "Block verification failed: transaction verification failed, dropping connection");
               drop_connection(context, false, false);
               m_core.resume_mine();
               return 1;
@@ -647,7 +647,7 @@ namespace cryptonote
         }
         else
         {
-          oxen::log::error(logcat, "sent wrong tx: failed to parse and validate transaction: {}, dropping connection", oxenc::to_hex(tx_blob));
+          log::error(logcat, "sent wrong tx: failed to parse and validate transaction: {}, dropping connection", oxenc::to_hex(tx_blob));
           drop_connection(context, false, false);
           m_core.resume_mine();
           return 1;
@@ -660,7 +660,7 @@ namespace cryptonote
       // ones we received.
       if(context.m_requested_objects.size())
       {
-        oxen::log::error(logcat, "NOTIFY_NEW_FLUFFY_BLOCK: peer sent the number of transaction requested, but not the actual transactions requested, context.m_requested_objects.size() = {}, dropping connection", context.m_requested_objects.size());
+        log::error(logcat, "NOTIFY_NEW_FLUFFY_BLOCK: peer sent the number of transaction requested, but not the actual transactions requested, context.m_requested_objects.size() = {}, dropping connection", context.m_requested_objects.size());
         
         drop_connection(context, false, false);
         m_core.resume_mine();
@@ -689,14 +689,14 @@ namespace cryptonote
             }
             else
             {
-              oxen::log::error(logcat, "1 tx requested, none not found, but {} returned", txes.size());
+              log::error(logcat, "1 tx requested, none not found, but {} returned", txes.size());
               m_core.resume_mine();
               return 1;
             }
           }
           else
           {
-            oxen::log::debug(logcat, "Tx {} not found in pool", tx_hash);
+            log::debug(logcat, "Tx {} not found in pool", tx_hash);
             need_tx_indices.push_back(tx_idx);
           }
         }
@@ -707,21 +707,21 @@ namespace cryptonote
       if(!need_tx_indices.empty()) // drats, we don't have everything..
       {
         // request non-mempool txs
-        oxen::log::debug(logcat, "We are missing {} txes for this fluffy block", need_tx_indices.size());
+        log::debug(logcat, "We are missing {} txes for this fluffy block", need_tx_indices.size());
         for (auto txidx: need_tx_indices)
-          oxen::log::debug(logcat, "  tx {}", new_block.tx_hashes[txidx]);
+          log::debug(logcat, "  tx {}", new_block.tx_hashes[txidx]);
         NOTIFY_REQUEST_FLUFFY_MISSING_TX::request missing_tx_req;
         missing_tx_req.block_hash = get_block_hash(new_block);
         missing_tx_req.current_blockchain_height = arg.current_blockchain_height;
         missing_tx_req.missing_tx_indices = std::move(need_tx_indices);
         
         m_core.resume_mine();
-        oxen::log::info(oxen::log::Cat("net.p2p.msg"), "-->>NOTIFY_REQUEST_FLUFFY_MISSING_TX: missing_tx_indices.size()={}", missing_tx_req.missing_tx_indices.size());
+        log::info(log::Cat("net.p2p.msg"), "-->>NOTIFY_REQUEST_FLUFFY_MISSING_TX: missing_tx_indices.size()={}", missing_tx_req.missing_tx_indices.size());
         post_notify<NOTIFY_REQUEST_FLUFFY_MISSING_TX>(missing_tx_req, context);
       }
       else // whoo-hoo we've got em all ..
       {
-        oxen::log::debug(logcat, "We have all needed txes for this fluffy block");
+        log::debug(logcat, "We have all needed txes for this fluffy block");
 
         block_complete_entry b = {};
         b.block                = arg.b.block;
@@ -734,7 +734,7 @@ namespace cryptonote
         std::vector<block> pblocks;
         if (!m_core.prepare_handle_incoming_blocks(blocks, pblocks))
         {
-          oxen::log::warning(logcat, "Failure in prepare_handle_incoming_blocks");
+          log::warning(logcat, "Failure in prepare_handle_incoming_blocks");
           m_core.resume_mine();
           return 1;
         }
@@ -743,7 +743,7 @@ namespace cryptonote
         m_core.handle_incoming_block(arg.b.block, pblocks.empty() ? NULL : &pblocks[0], bvc, nullptr /*checkpoint*/); // got block from handle_notify_new_block
         if (!m_core.cleanup_handle_incoming_blocks(true))
         {
-          oxen::log::warning(logcat, "Failure in cleanup_handle_incoming_blocks");
+          log::warning(logcat, "Failure in cleanup_handle_incoming_blocks");
           m_core.resume_mine();
           return 1;
         }
@@ -751,7 +751,7 @@ namespace cryptonote
 
         if( bvc.m_verifivation_failed )
         {
-          oxen::log::warning(logcat, "Block verification failed, dropping connection");
+          log::warning(logcat, "Block verification failed, dropping connection");
           drop_connection(context, true, false);
           return 1;
         }
@@ -769,15 +769,15 @@ namespace cryptonote
           context.m_state = cryptonote_connection_context::state_synchronizing;
           NOTIFY_REQUEST_CHAIN::request r{};
           m_core.get_blockchain_storage().get_short_chain_history(r.block_ids);
-          oxen::log::info(oxen::log::Cat("net.p2p.msg"), "-->>NOTIFY_REQUEST_CHAIN: m_block_ids.size()={}", r.block_ids.size());
+          log::info(log::Cat("net.p2p.msg"), "-->>NOTIFY_REQUEST_CHAIN: m_block_ids.size()={}", r.block_ids.size());
           post_notify<NOTIFY_REQUEST_CHAIN>(r, context);
-          oxen::log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "requesting chain", cryptonote::get_protocol_state_string(context.m_state));
+          log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "requesting chain", cryptonote::get_protocol_state_string(context.m_state));
         }            
       }
     } 
     else
     {
-      oxen::log::error(logcat, "sent wrong block: failed to parse and validate block: {}, dropping connection", oxenc::to_hex(arg.b.block));
+      log::error(logcat, "sent wrong block: failed to parse and validate block: {}, dropping connection", oxenc::to_hex(arg.b.block));
         
       m_core.resume_mine();
       drop_connection(context, false, false);
@@ -791,7 +791,7 @@ namespace cryptonote
   template<class t_core>
   int t_cryptonote_protocol_handler<t_core>::handle_uptime_proof(int command, NOTIFY_UPTIME_PROOF::request& arg, cryptonote_connection_context& context)
   {
-    oxen::log::info(oxen::log::Cat("net.p2p.msg"), "Received NOTIFY_UPTIME_PROOF");
+    log::info(log::Cat("net.p2p.msg"), "Received NOTIFY_UPTIME_PROOF");
     // NOTE: Don't relay your own uptime proof, otherwise we have the following situation
 
     // Node1 sends uptime ->
@@ -823,7 +823,7 @@ namespace cryptonote
   template<class t_core>
   int t_cryptonote_protocol_handler<t_core>::handle_btencoded_uptime_proof(int command, NOTIFY_BTENCODED_UPTIME_PROOF::request& arg, cryptonote_connection_context& context)
   {
-    oxen::log::info(oxen::log::Cat("net.p2p.msg"), "Received NOTIFY_BTENCODED_UPTIME_PROOF");
+    log::info(log::Cat("net.p2p.msg"), "Received NOTIFY_BTENCODED_UPTIME_PROOF");
     // NOTE: Don't relay your own uptime proof, otherwise we have the following situation
 
     // Node1 sends uptime ->
@@ -857,14 +857,14 @@ namespace cryptonote
   template<class t_core>
   int t_cryptonote_protocol_handler<t_core>::handle_notify_new_service_node_vote(int command, NOTIFY_NEW_SERVICE_NODE_VOTE::request& arg, cryptonote_connection_context& context)
   {
-    oxen::log::info(oxen::log::Cat("net.p2p.msg"), "Received NOTIFY_NEW_SERVICE_NODE_VOTE ({} txes)", arg.votes.size());
+    log::info(log::Cat("net.p2p.msg"), "Received NOTIFY_NEW_SERVICE_NODE_VOTE ({} txes)", arg.votes.size());
 
     if(context.m_state != cryptonote_connection_context::state_normal)
       return 1;
 
     if(!is_synchronized() || m_no_sync)
     {
-      oxen::log::debug(logcat, "{}Received new service node vote while syncing, ignored", context);
+      log::debug(logcat, "{}Received new service node vote while syncing, ignored", context);
       return 1;
     }
 
@@ -875,7 +875,7 @@ namespace cryptonote
 
       if (vvc.m_verification_failed)
       {
-        oxen::log::info(logcat, "Vote type: {}, verification failed, dropping connection", it->type);
+        log::info(logcat, "Vote type: {}, verification failed, dropping connection", it->type);
         drop_connection(context, false /*add_fail*/, false /*flush_all_spans i.e. delete cached block data from this peer*/);
         return 1;
       }
@@ -900,7 +900,7 @@ namespace cryptonote
   template<class t_core>
   int t_cryptonote_protocol_handler<t_core>::handle_request_fluffy_missing_tx(int command, NOTIFY_REQUEST_FLUFFY_MISSING_TX::request& arg, cryptonote_connection_context& context)
   {
-    oxen::log::info(oxen::log::Cat("net.p2p.msg"), "Received NOTIFY_REQUEST_FLUFFY_MISSING_TX ({} txes), block hash {}", arg.missing_tx_indices.size(), arg.block_hash);
+    log::info(log::Cat("net.p2p.msg"), "Received NOTIFY_REQUEST_FLUFFY_MISSING_TX ({} txes), block hash {}", arg.missing_tx_indices.size(), arg.block_hash);
     
     std::vector<std::pair<std::string, block>> local_blocks;
     std::vector<std::string> local_txs;
@@ -908,7 +908,7 @@ namespace cryptonote
     block b;
     if (!m_core.get_block_by_hash(arg.block_hash, b))
     {
-      oxen::log::error(logcat, "failed to find block: {}, dropping connection", arg.block_hash);
+      log::error(logcat, "failed to find block: {}, dropping connection", arg.block_hash);
       drop_connection(context, false, false);
       return 1;
     }
@@ -927,7 +927,7 @@ namespace cryptonote
       {
         if (!requested_index_set.insert(requested_index).second)
         {
-          oxen::log::error(logcat, "Failed to handle request NOTIFY_REQUEST_FLUFFY_MISSING_TX, request is asking for the same tx index more than once, tx index = {}, block tx count {}, block_height = {}, dropping connection", requested_index, b.tx_hashes.size(), arg.current_blockchain_height);
+          log::error(logcat, "Failed to handle request NOTIFY_REQUEST_FLUFFY_MISSING_TX, request is asking for the same tx index more than once, tx index = {}, block tx count {}, block_height = {}, dropping connection", requested_index, b.tx_hashes.size(), arg.current_blockchain_height);
 
           drop_connection(context, false, false);
           return 1;
@@ -939,12 +939,12 @@ namespace cryptonote
     {
       if(tx_idx < b.tx_hashes.size())
       {
-        oxen::log::debug(logcat, "  tx {}", b.tx_hashes[tx_idx]);
+        log::debug(logcat, "  tx {}", b.tx_hashes[tx_idx]);
         txids.push_back(b.tx_hashes[tx_idx]);
       }
       else
       {
-        oxen::log::error(logcat, "Failed to handle request NOTIFY_REQUEST_FLUFFY_MISSING_TX, request is asking for a tx whose index is out of bounds, tx index = {}, block tx count {}, block_height = {}, dropping connection ", tx_idx, b.tx_hashes.size(), arg.current_blockchain_height);
+        log::error(logcat, "Failed to handle request NOTIFY_REQUEST_FLUFFY_MISSING_TX, request is asking for a tx whose index is out of bounds, tx index = {}, block tx count {}, block_height = {}, dropping connection ", tx_idx, b.tx_hashes.size(), arg.current_blockchain_height);
         
         drop_connection(context, false, false);
         return 1;
@@ -955,13 +955,13 @@ namespace cryptonote
     std::unordered_set<crypto::hash> missed;
     if (!m_core.get_transactions(txids, txs, &missed))
     {
-      oxen::log::error(logcat, "Failed to handle request NOTIFY_REQUEST_FLUFFY_MISSING_TX, failed to get requested transactions");
+      log::error(logcat, "Failed to handle request NOTIFY_REQUEST_FLUFFY_MISSING_TX, failed to get requested transactions");
       drop_connection(context, false, false);
       return 1;
     }
     if (!missed.empty() || txs.size() != txids.size())
     {
-      oxen::log::error(logcat, "Failed to handle request NOTIFY_REQUEST_FLUFFY_MISSING_TX, {} requested transactions not found, dropping connection", missed.size());
+      log::error(logcat, "Failed to handle request NOTIFY_REQUEST_FLUFFY_MISSING_TX, {} requested transactions not found, dropping connection", missed.size());
       drop_connection(context, false, false);
       return 1;
     }
@@ -971,7 +971,7 @@ namespace cryptonote
       fluffy_response.b.txs.push_back(t_serializable_object_to_blob(tx));
     }
 
-    oxen::log::info(oxen::log::Cat("net.p2p.msg"), "-->>NOTIFY_RESPONSE_FLUFFY_MISSING_TX: txs.size()={}, rsp.current_blockchain_height={}", fluffy_response.b.txs.size(), fluffy_response.current_blockchain_height);
+    log::info(log::Cat("net.p2p.msg"), "-->>NOTIFY_RESPONSE_FLUFFY_MISSING_TX: txs.size()={}, rsp.current_blockchain_height={}", fluffy_response.b.txs.size(), fluffy_response.current_blockchain_height);
            
     post_notify<NOTIFY_NEW_FLUFFY_BLOCK>(fluffy_response, context);    
     return 1;        
@@ -980,7 +980,7 @@ namespace cryptonote
   template<class t_core>
   int t_cryptonote_protocol_handler<t_core>::handle_notify_new_transactions(int command, NOTIFY_NEW_TRANSACTIONS::request& arg, cryptonote_connection_context& context)
   {
-    oxen::log::info(oxen::log::Cat("net.p2p.msg"), "Received NOTIFY_NEW_TRANSACTIONS ({} txes w/ {} blinks)", arg.txs.size(), arg.blinks.size());
+    log::info(log::Cat("net.p2p.msg"), "Received NOTIFY_NEW_TRANSACTIONS ({} txes w/ {} blinks)", arg.txs.size(), arg.blinks.size());
     for (const auto &blob: arg.txs)
       if(OXEN_LOG_ENABLED(info))
       {
@@ -988,7 +988,7 @@ namespace cryptonote
         crypto::hash hash;
         bool ret = cryptonote::parse_and_validate_tx_from_blob(blob, tx, hash);
         if (ret)
-          oxen::log::info(oxen::log::Cat("net.p2p.msg"), "Including transaction {}", hash);
+          log::info(log::Cat("net.p2p.msg"), "Including transaction {}", hash);
       }
 
     if(context.m_state != cryptonote_connection_context::state_normal)
@@ -1000,7 +1000,7 @@ namespace cryptonote
     bool syncing = !is_synchronized();
     if((syncing && !arg.requested) || m_no_sync)
     {
-      oxen::log::debug(logcat, "{}Received new tx while syncing, ignored", context);
+      log::debug(logcat, "{}Received new tx while syncing, ignored", context);
       return 1;
     }
 
@@ -1050,7 +1050,7 @@ namespace cryptonote
 
       if (blink_rollback_height > 0)
       {
-        oxen::log::debug(logcat, "after handling parsed txes we need to rollback to height: {}", blink_rollback_height);
+        log::debug(logcat, "after handling parsed txes we need to rollback to height: {}", blink_rollback_height);
         // We need to clear back to and including block at height blink_rollback_height (so that the
         // new blockchain "height", i.e. of current top_block_height+1, is blink_rollback_height).
         auto &blockchain = m_core.get_blockchain_storage();
@@ -1060,13 +1060,13 @@ namespace cryptonote
                  immutable = blockchain.get_immutable_height();
         if (immutable >= blink_rollback_height)
         {
-          oxen::log::warning(logcat, "blink rollback specified a block at or before the immutable height; we can only roll back to the immutable height.");
+          log::warning(logcat, "blink rollback specified a block at or before the immutable height; we can only roll back to the immutable height.");
           blink_rollback_height = immutable + 1;
         }
         if (blink_rollback_height < height)
           m_core.get_blockchain_storage().blink_rollback(blink_rollback_height);
         else
-          oxen::log::debug(logcat, "Nothing to roll back");
+          log::debug(logcat, "Nothing to roll back");
       }
     }
 
@@ -1083,7 +1083,7 @@ namespace cryptonote
     // so don't drop the connection).
     if (!syncing && (!all_okay || bad_blinks))
     {
-      oxen::log::info(logcat, "{} verification(s) failed, dropping connection", (!all_okay && bad_blinks ? "Tx and Blink" : !all_okay ? "Tx" : "Blink"));
+      log::info(logcat, "{} verification(s) failed, dropping connection", (!all_okay && bad_blinks ? "Tx and Blink" : !all_okay ? "Tx" : "Blink"));
       drop_connection(context, false, false);
     }
 
@@ -1093,10 +1093,10 @@ namespace cryptonote
   template<class t_core>
   int t_cryptonote_protocol_handler<t_core>::handle_request_get_blocks(int command, NOTIFY_REQUEST_GET_BLOCKS::request& arg, cryptonote_connection_context& context)
   {
-    oxen::log::info(oxen::log::Cat("net.p2p.msg"), "Received NOTIFY_REQUEST_GET_BLOCKS ({} blocks)", arg.blocks.size());
+    log::info(log::Cat("net.p2p.msg"), "Received NOTIFY_REQUEST_GET_BLOCKS ({} blocks)", arg.blocks.size());
     if (arg.blocks.size() > CURRENCY_PROTOCOL_MAX_OBJECT_REQUEST_COUNT)
     {
-      oxen::log::error(logcat, "Requested blocks count is too big ({}) expected not more than {}", arg.blocks.size(), CURRENCY_PROTOCOL_MAX_OBJECT_REQUEST_COUNT);
+      log::error(logcat, "Requested blocks count is too big ({}) expected not more than {}", arg.blocks.size(), CURRENCY_PROTOCOL_MAX_OBJECT_REQUEST_COUNT);
       drop_connection(context, false, false);
       return 1;
     }
@@ -1104,11 +1104,11 @@ namespace cryptonote
     NOTIFY_RESPONSE_GET_BLOCKS::request rsp;
     if(!m_core.get_blockchain_storage().handle_get_blocks(arg, rsp))
     {
-      oxen::log::error(logcat, "failed to handle request NOTIFY_REQUEST_GET_BLOCKS, dropping connection");
+      log::error(logcat, "failed to handle request NOTIFY_REQUEST_GET_BLOCKS, dropping connection");
       drop_connection(context, false, false);
       return 1;
     }
-    oxen::log::info(oxen::log::Cat("net.p2p.msg"), "-->>NOTIFY_RESPONSE_GET_BLOCKS: blocks.size()={}, rsp.m_current_blockchain_height={}, missed_ids.size()={}", rsp.blocks.size(), rsp.current_blockchain_height, rsp.missed_ids.size());
+    log::info(log::Cat("net.p2p.msg"), "-->>NOTIFY_RESPONSE_GET_BLOCKS: blocks.size()={}, rsp.m_current_blockchain_height={}, missed_ids.size()={}", rsp.blocks.size(), rsp.current_blockchain_height, rsp.missed_ids.size());
     post_notify<NOTIFY_RESPONSE_GET_BLOCKS>(rsp, context);
     return 1;
   }
@@ -1118,8 +1118,8 @@ namespace cryptonote
   template<class t_core>
   int t_cryptonote_protocol_handler<t_core>::handle_response_get_blocks(int command, NOTIFY_RESPONSE_GET_BLOCKS::request& arg, cryptonote_connection_context& context)
   {
-    oxen::log::debug(logcat, "Received NOTIFY_RESPONSE_GET_BLOCKS ({} blocks)", arg.blocks.size());
-    oxen::log::debug(oxen::log::Cat("net.p2p.msg"), "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "received blocks", cryptonote::get_protocol_state_string(context.m_state));
+    log::debug(logcat, "Received NOTIFY_RESPONSE_GET_BLOCKS ({} blocks)", arg.blocks.size());
+    log::debug(log::Cat("net.p2p.msg"), "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "received blocks", cryptonote::get_protocol_state_string(context.m_state));
 
     auto request_time = *context.m_last_request_time;
     context.m_last_request_time.reset();
@@ -1147,11 +1147,11 @@ namespace cryptonote
     }
     ++m_sync_spans_downloaded;
     m_sync_download_objects_size += size;
-    oxen::log::debug(logcat, "{} downloaded {} bytes worth of blocks", context, size);
+    log::debug(logcat, "{} downloaded {} bytes worth of blocks", context, size);
 
     if(context.m_last_response_height > arg.current_blockchain_height)
     {
-      oxen::log::error(logcat, "sent wrong NOTIFY_GET_BLOCKS: arg.m_current_blockchain_height={} < m_last_response_height={}, dropping connection", arg.current_blockchain_height, context.m_last_response_height);
+      log::error(logcat, "sent wrong NOTIFY_GET_BLOCKS: arg.m_current_blockchain_height={} < m_last_response_height={}, dropping connection", arg.current_blockchain_height, context.m_last_response_height);
       drop_connection(context, false, false);
       ++m_sync_bad_spans_downloaded;
       return 1;
@@ -1176,14 +1176,14 @@ namespace cryptonote
       crypto::hash block_hash;
       if(!parse_and_validate_block_from_blob(block_entry.block, b, block_hash))
       {
-        oxen::log::error(logcat, "sent wrong block: failed to parse and validate block: {}, dropping connection", oxenc::to_hex(block_entry.block));
+        log::error(logcat, "sent wrong block: failed to parse and validate block: {}, dropping connection", oxenc::to_hex(block_entry.block));
         drop_connection(context, false, false);
         ++m_sync_bad_spans_downloaded;
         return 1;
       }
       if (b.miner_tx.vin.size() != 1 || !std::holds_alternative<txin_gen>(b.miner_tx.vin.front()))
       {
-        oxen::log::error(logcat, "sent wrong block: block: miner tx does not have exactly one txin_gen input {}, dropping connection", oxenc::to_hex(block_entry.block));
+        log::error(logcat, "sent wrong block: block: miner tx does not have exactly one txin_gen input {}, dropping connection", oxenc::to_hex(block_entry.block));
         drop_connection(context, false, false);
         ++m_sync_bad_spans_downloaded;
         return 1;
@@ -1194,14 +1194,14 @@ namespace cryptonote
       auto req_it = context.m_requested_objects.find(block_hash);
       if(req_it == context.m_requested_objects.end())
       {
-        oxen::log::error(logcat, "sent wrong NOTIFY_RESPONSE_GET_BLOCKS: block with id={} wasn't requested, dropping connection", tools::type_to_hex(get_blob_hash(block_entry.block)));
+        log::error(logcat, "sent wrong NOTIFY_RESPONSE_GET_BLOCKS: block with id={} wasn't requested, dropping connection", tools::type_to_hex(get_blob_hash(block_entry.block)));
         drop_connection(context, false, false);
         ++m_sync_bad_spans_downloaded;
         return 1;
       }
       if(b.tx_hashes.size() != block_entry.txs.size())
       {
-        oxen::log::error(logcat, "sent wrong NOTIFY_RESPONSE_GET_BLOCKS: block with id={}, tx_hashes.size()= {} mismatch with block_complete_entry.m_txs.size()= {}, dropping connection", tools::type_to_hex(get_blob_hash(block_entry.block)), b.tx_hashes.size(), block_entry.txs.size());
+        log::error(logcat, "sent wrong NOTIFY_RESPONSE_GET_BLOCKS: block with id={}, tx_hashes.size()= {} mismatch with block_complete_entry.m_txs.size()= {}, dropping connection", tools::type_to_hex(get_blob_hash(block_entry.block)), b.tx_hashes.size(), block_entry.txs.size());
         drop_connection(context, false, false);
         ++m_sync_bad_spans_downloaded;
         return 1;
@@ -1213,19 +1213,19 @@ namespace cryptonote
 
     if(!context.m_requested_objects.empty())
     {
-      oxen::log::error(logcat, "{}returned not all requested objects (context.m_requested_objects.size()={}), dropping connection", context, context.m_requested_objects.size());
+      log::error(logcat, "{}returned not all requested objects (context.m_requested_objects.size()={}), dropping connection", context, context.m_requested_objects.size());
       drop_connection(context, false, false);
       ++m_sync_bad_spans_downloaded;
       return 1;
     }
 
     {
-      oxen::log::debug(globallogcat, fmt::format(fg(fmt::terminal_color::yellow), "{} Got NEW BLOCKS inside of {}: size: {}, blocks: {} - {} (pruning seed {})", context, __FUNCTION__, arg.blocks.size(), start_height, (start_height + arg.blocks.size() - 1), epee::string_tools::to_string_hex(context.m_pruning_seed)));
+      log::debug(globallogcat, fmt::format(fg(fmt::terminal_color::yellow), "{} Got NEW BLOCKS inside of {}: size: {}, blocks: {} - {} (pruning seed {})", context, __FUNCTION__, arg.blocks.size(), start_height, (start_height + arg.blocks.size() - 1), epee::string_tools::to_string_hex(context.m_pruning_seed)));
 
       // add that new span to the block queue
       seconds_f dt = now - request_time;
       const double rate = size / dt.count();
-      oxen::log::debug(logcat, "{} adding span: {} at height {}, {} seconds, {} kB/s, size now {} MB", context, arg.blocks.size(), start_height, dt.count(), (rate/1024), (m_block_queue.get_data_size() + blocks_size) / 1048576.f);
+      log::debug(logcat, "{} adding span: {} at height {}, {} seconds, {} kB/s, size now {} MB", context, arg.blocks.size(), start_height, dt.count(), (rate/1024), (m_block_queue.get_data_size() + blocks_size) / 1048576.f);
       m_block_queue.add_blocks(start_height, arg.blocks, context.m_connection_id, rate, blocks_size);
 
       const crypto::hash last_block_hash = cryptonote::get_block_hash(b);
@@ -1299,11 +1299,11 @@ namespace cryptonote
       const std::unique_lock sync{m_sync_lock, std::try_to_lock};
       if (!sync)
       {
-        oxen::log::debug(logcat, "{}Failed to lock m_sync_lock, going back to download", context);
+        log::debug(logcat, "{}Failed to lock m_sync_lock, going back to download", context);
         goto skip;
       }
-      oxen::log::debug(logcat, "{} lock m_sync_lock, adding blocks to chain...", context);
-      oxen::log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "adding blocks", cryptonote::get_protocol_state_string(context.m_state));
+      log::debug(logcat, "{} lock m_sync_lock, adding blocks to chain...", context);
+      log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "adding blocks", cryptonote::get_protocol_state_string(context.m_state));
 
       {
         m_core.pause_mine();
@@ -1322,38 +1322,38 @@ namespace cryptonote
           boost::uuids::uuid span_connection_id;
           if (!m_block_queue.get_next_span(start_height, blocks, span_connection_id))
           {
-            oxen::log::debug(logcat, "{} no next span found, going back to download", context);
+            log::debug(logcat, "{} no next span found, going back to download", context);
             break;
           }
 
           if (blocks.empty())
           {
-            oxen::log::error(logcat, "{}Next span has no blocks", context);
+            log::error(logcat, "{}Next span has no blocks", context);
             m_block_queue.remove_spans(span_connection_id, start_height);
             continue;
           }
 
-          oxen::log::debug(logcat, "{} next span in the queue has blocks {}-{}, we need {}", context, start_height, (start_height + blocks.size() - 1), previous_height);
+          log::debug(logcat, "{} next span in the queue has blocks {}-{}, we need {}", context, start_height, (start_height + blocks.size() - 1), previous_height);
 
           block new_block;
           crypto::hash last_block_hash;
           if (!parse_and_validate_block_from_blob(blocks.back().block, new_block, last_block_hash))
           {
-            oxen::log::error(logcat, "{}Failed to parse block, but it should already have been parsed", context);
+            log::error(logcat, "{}Failed to parse block, but it should already have been parsed", context);
             m_block_queue.remove_spans(span_connection_id, start_height);
             continue;
           }
           if (m_core.have_block(last_block_hash))
           {
             const uint64_t subchain_height = start_height + blocks.size();
-            oxen::log::debug(logcat, "{}{} - {}, blockchain height {}", context, "These are old blocks, ignoring: blocks ", start_height, (subchain_height-1), m_core.get_current_blockchain_height());
+            log::debug(logcat, "{}{} - {}, blockchain height {}", context, "These are old blocks, ignoring: blocks ", start_height, (subchain_height-1), m_core.get_current_blockchain_height());
             m_block_queue.remove_spans(span_connection_id, start_height);
             ++m_sync_old_spans_downloaded;
             continue;
           }
           if (!parse_and_validate_block_from_blob(blocks.front().block, new_block))
           {
-            oxen::log::error(logcat, "{}Failed to parse block, but it should already have been parsed", context);
+            log::error(logcat, "{}Failed to parse block, but it should already have been parsed", context);
             m_block_queue.remove_spans(span_connection_id, start_height);
             continue;
           }
@@ -1376,20 +1376,20 @@ namespace cryptonote
               {
                 if (should_drop_connection(context, get_next_needed_pruning_stripe().first))
                 {
-                  oxen::log::debug(logcat, "{}Got block with unknown parent which was not requested, but peer does not have that block - dropping connection", context);
+                  log::debug(logcat, "{}Got block with unknown parent which was not requested, but peer does not have that block - dropping connection", context);
                   if (!context.m_is_income)
                     m_p2p->add_used_stripe_peer(context);
                   drop_connection(context, false, true);
                   return 1;
                 }
-                oxen::log::debug(logcat, "{}Got block with unknown parent which was not requested, but peer does not have that block - back to download", context);
+                log::debug(logcat, "{}Got block with unknown parent which was not requested, but peer does not have that block - back to download", context);
 
                 goto skip;
               }
 
               // this can happen if a connection was sicced onto a late span, if it did not have those blocks,
               // since we don't know that at the sic time
-              oxen::log::error(logcat, "Got block with unknown parent which was not requested - querying block hashes");
+              log::error(logcat, "Got block with unknown parent which was not requested - querying block hashes");
               m_block_queue.remove_spans(span_connection_id, start_height);
               context.m_needed_objects.clear();
               context.m_last_response_height = 0;
@@ -1397,7 +1397,7 @@ namespace cryptonote
             }
 
             // parent was requested, so we wait for it to be retrieved
-            oxen::log::debug(logcat, "{} parent was requested, we'll get back to it", context);
+            log::debug(logcat, "{} parent was requested, we'll get back to it", context);
             break;
           }
 
@@ -1407,13 +1407,13 @@ namespace cryptonote
           {
             starting = false;
             auto elapsed = std::chrono::steady_clock::now() - m_last_add_end_time;
-            oxen::log::debug(logcat, "Restarting adding block after idle for {} seconds", tools::friendly_duration(elapsed));
+            log::debug(logcat, "Restarting adding block after idle for {} seconds", tools::friendly_duration(elapsed));
           }
 
           std::vector<block> pblocks;
           if (!m_core.prepare_handle_incoming_blocks(blocks, pblocks))
           {
-            oxen::log::error(logcat, "Failure in prepare_handle_incoming_blocks");
+            log::error(logcat, "Failure in prepare_handle_incoming_blocks");
             return 1;
           }
 
@@ -1422,7 +1422,7 @@ namespace cryptonote
             OXEN_DEFER
             {
               if (!m_core.cleanup_handle_incoming_blocks())
-                oxen::log::warning(logcat, "Failure in cleanup_handle_incoming_blocks");
+                log::warning(logcat, "Failure in cleanup_handle_incoming_blocks");
 
               // in case the peer had dropped beforehand, remove the span anyway so other threads can wake up and get it
               if (remove_spans)
@@ -1431,7 +1431,7 @@ namespace cryptonote
 
             if (!pblocks.empty() && pblocks.size() != blocks.size())
             {
-              oxen::log::error(logcat, "Internal error: blocks.size() != block_entry.txs.size()");
+              log::error(logcat, "Internal error: blocks.size() != block_entry.txs.size()");
               return 1;
             }
 
@@ -1455,11 +1455,11 @@ namespace cryptonote
                   if (!m_p2p->for_connection(span_connection_id, [&](cryptonote_connection_context& context, nodetool::peerid_type peer_id)->bool{
                     cryptonote::transaction tx;
                     parse_and_validate_tx_from_blob(block_entry.txs[i], tx); // must succeed if we got here
-                    oxen::log::error(logcat, "transaction verification failed on NOTIFY_RESPONSE_GET_BLOCKS, tx_id = {}, dropping connection", tools::type_to_hex(cryptonote::get_transaction_hash(tx)));
+                    log::error(logcat, "transaction verification failed on NOTIFY_RESPONSE_GET_BLOCKS, tx_id = {}, dropping connection", tools::type_to_hex(cryptonote::get_transaction_hash(tx)));
                     drop_connection(context, false, true);
                     return 1;
                   }))
-                    oxen::log::error(logcat, "span connection id not found");
+                    log::error(logcat, "span connection id not found");
 
                   remove_spans = true;
                   return 1;
@@ -1480,7 +1480,7 @@ namespace cryptonote
 
                 if (!t_serializable_object_from_blob(checkpoint_allocated_on_stack_, block_entry.checkpoint))
                 {
-                  oxen::log::error(logcat, "Checkpoint blob available but failed to parse");
+                  log::error(logcat, "Checkpoint blob available but failed to parse");
                   return false;
                 }
 
@@ -1502,11 +1502,11 @@ namespace cryptonote
                           ? "Block verification failed, dropping connection"
                           : "Block received at sync phase was marked as orphaned, dropping connection";
 
-                  oxen::log::info(logcat, err_msg);
+                  log::info(logcat, err_msg);
                   drop_connection(context, true, true);
                   return 1;
                 }))
-                  oxen::log::error(logcat, "span connection id not found");
+                  log::error(logcat, "span connection id not found");
 
                 remove_spans = true;
                 return 1;
@@ -1518,7 +1518,7 @@ namespace cryptonote
             } // each download block
 
             remove_spans = true;
-            oxen::log::debug(logcat, "{}Block process time ({} blocks, {} txs): {} ({}/{})",
+            log::debug(logcat, "{}Block process time ({} blocks, {} txs): {} ({}/{})",
                 context,
                 blocks.size(),
                 num_txs,
@@ -1561,14 +1561,14 @@ namespace cryptonote
                 + std::to_string(previous_stripe) + " -> " + std::to_string(current_stripe);
             if (OXEN_LOG_ENABLED(debug))
               timing_message += std::string(": ") + m_block_queue.get_overview(current_blockchain_height);
-            oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Synced {}/{} {} {}", current_blockchain_height, target_blockchain_height, progress_message, timing_message));
+            log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Synced {}/{} {} {}", current_blockchain_height, target_blockchain_height, progress_message, timing_message));
             if (previous_stripe != current_stripe)
               notify_new_stripe(context, current_stripe);
           }
         }
       }
 
-      oxen::log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "stopping adding blocks", cryptonote::get_protocol_state_string(context.m_state));
+      log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "stopping adding blocks", cryptonote::get_protocol_state_string(context.m_state));
 
       if (should_download_next_span(context, false))
       {
@@ -1588,7 +1588,7 @@ namespace cryptonote
 skip:
     if (!request_missing_objects(context, true, force_next_span))
     {
-      oxen::log::error(logcat, "Failed to request missing objects, dropping connection");
+      log::error(logcat, "Failed to request missing objects, dropping connection");
       drop_connection(context, false, false);
       return 1;
     }
@@ -1608,10 +1608,10 @@ skip:
         if (stripe && peer_stripe && peer_stripe != stripe)
           return true;
         context.m_state = cryptonote_connection_context::state_synchronizing;
-        oxen::log::debug(logcat, "requesting callback");
+        log::debug(logcat, "requesting callback");
         ++context.m_callback_request_count;
         m_p2p->request_callback(context);
-        oxen::log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "requesting callback", cryptonote::get_protocol_state_string(context.m_state));
+        log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "requesting callback", cryptonote::get_protocol_state_string(context.m_state));
       }
       return true;
     });
@@ -1622,11 +1622,11 @@ skip:
   template<class t_core>
   int t_cryptonote_protocol_handler<t_core>::handle_request_get_txs(int command, NOTIFY_REQUEST_GET_TXS::request& arg, cryptonote_connection_context& context)
   {
-    oxen::log::info(oxen::log::Cat("net.p2p.msg"), "Received NOTIFY_REQUEST_GET_TXS ({} txs)", arg.txs.size());
+    log::info(log::Cat("net.p2p.msg"), "Received NOTIFY_REQUEST_GET_TXS ({} txs)", arg.txs.size());
 
     if (arg.txs.size() > CURRENCY_PROTOCOL_MAX_TXS_REQUEST_COUNT)
     {
-      oxen::log::error(logcat, "Requested txs count is too big ({}) expected not mroe than {}", arg.txs.size(), CURRENCY_PROTOCOL_MAX_TXS_REQUEST_COUNT);
+      log::error(logcat, "Requested txs count is too big ({}) expected not mroe than {}", arg.txs.size(), CURRENCY_PROTOCOL_MAX_TXS_REQUEST_COUNT);
       drop_connection(context, false, false);
       return 1;
     }
@@ -1635,11 +1635,11 @@ skip:
     rsp.requested = true;
     if(!m_core.get_blockchain_storage().handle_get_txs(arg, rsp))
     {
-      oxen::log::error(logcat, "failed to handle request NOTIFY_REQUEST_GET_TXS, dropping connection");
+      log::error(logcat, "failed to handle request NOTIFY_REQUEST_GET_TXS, dropping connection");
       drop_connection(context, false, false);
       return 1;
     }
-    oxen::log::info(oxen::log::Cat("net.p2p.msg"), "-->>NOTIFY_NEW_TRANSACTIONS: requested=true, txs[{}], blinks[{}]", rsp.txs.size(), rsp.blinks.size());
+    log::info(log::Cat("net.p2p.msg"), "-->>NOTIFY_NEW_TRANSACTIONS: requested=true, txs[{}], blinks[{}]", rsp.txs.size(), rsp.blinks.size());
     post_notify<NOTIFY_NEW_TRANSACTIONS>(rsp, context);
     return 1;
   }
@@ -1656,7 +1656,7 @@ skip:
   template<class t_core>
   bool t_cryptonote_protocol_handler<t_core>::kick_idle_peers()
   {
-    oxen::log::trace(logcat, "Checking for idle peers...");
+    log::trace(logcat, "Checking for idle peers...");
     m_p2p->for_each_connection([&](cryptonote_connection_context& context, nodetool::peerid_type peer_id)->bool
     {
       if (context.m_state == cryptonote_connection_context::state_synchronizing && context.m_last_request_time)
@@ -1664,8 +1664,8 @@ skip:
         const auto dt = std::chrono::steady_clock::now() - *context.m_last_request_time;
         if (dt > IDLE_PEER_KICK_TIME)
         {
-          oxen::log::info(logcat, "{} kicking idle peer, last update {} seconds ago", context, seconds_f{dt}.count());
-          oxen::log::debug(logcat, "requesting callback");
+          log::info(logcat, "{} kicking idle peer, last update {} seconds ago", context, seconds_f{dt}.count());
+          log::debug(logcat, "requesting callback");
           context.m_last_request_time.reset();
           context.m_state = cryptonote_connection_context::state_standby; // we'll go back to adding, then (if we can't), download
           ++context.m_callback_request_count;
@@ -1685,7 +1685,7 @@ skip:
     if (target > height) // if we're not synced yet, don't do it
       return true;
 
-    oxen::log::trace(logcat, "Checking for outgoing syncing peers...");
+    log::trace(logcat, "Checking for outgoing syncing peers...");
     unsigned n_syncing = 0, n_synced = 0;
     boost::uuids::uuid last_synced_peer_id(boost::uuids::nil_uuid());
     m_p2p->for_each_connection([&](cryptonote_connection_context& context, nodetool::peerid_type peer_id)->bool
@@ -1702,17 +1702,17 @@ skip:
       }
       return true;
     });
-    oxen::log::trace(logcat, "{} syncing, {} synced", n_syncing, n_synced);
+    log::trace(logcat, "{} syncing, {} synced", n_syncing, n_synced);
 
     // if we're at max out peers, and not enough are syncing
     if (n_synced + n_syncing >= m_max_out_peers && n_syncing < p2p::DEFAULT_SYNC_SEARCH_CONNECTIONS_COUNT && last_synced_peer_id != boost::uuids::nil_uuid())
     {
       if (!m_p2p->for_connection(last_synced_peer_id, [&](cryptonote_connection_context& ctx, nodetool::peerid_type peer_id)->bool{
-        oxen::log::debug(logcat, "{}dropping synced peer, {} syncing, {} synced", ctx, n_syncing, n_synced);
+        log::debug(logcat, "{}dropping synced peer, {} syncing, {} synced", ctx, n_syncing, n_synced);
         drop_connection(ctx, false, false);
         return true;
       }))
-        oxen::log::debug(logcat, "Failed to find peer we wanted to drop");
+        log::debug(logcat, "Failed to find peer we wanted to drop");
     }
 
     return true;
@@ -1725,7 +1725,7 @@ skip:
     {
       if (context.m_state == cryptonote_connection_context::state_standby)
       {
-        oxen::log::debug(logcat, "requesting callback");
+        log::debug(logcat, "requesting callback");
         ++context.m_callback_request_count;
         m_p2p->request_callback(context);
       }
@@ -1737,15 +1737,15 @@ skip:
   template<class t_core>
   int t_cryptonote_protocol_handler<t_core>::handle_request_chain(int command, NOTIFY_REQUEST_CHAIN::request& arg, cryptonote_connection_context& context)
   {
-    oxen::log::debug(logcat, "Received NOTIFY_REQUEST_CHAIN ({} blocks)", arg.block_ids.size());
+    log::debug(logcat, "Received NOTIFY_REQUEST_CHAIN ({} blocks)", arg.block_ids.size());
     NOTIFY_RESPONSE_CHAIN_ENTRY::request r;
     if(!m_core.find_blockchain_supplement(arg.block_ids, r))
     {
-      oxen::log::error(logcat, "Failed to handle NOTIFY_REQUEST_CHAIN.");
+      log::error(logcat, "Failed to handle NOTIFY_REQUEST_CHAIN.");
       drop_connection(context, false, false);
       return 1;
     }
-    oxen::log::debug(logcat, "-->>NOTIFY_RESPONSE_CHAIN_ENTRY: m_start_height={}, m_total_height={}, m_block_ids.size()={}", r.start_height, r.total_height, r.m_block_ids.size());
+    log::debug(logcat, "-->>NOTIFY_RESPONSE_CHAIN_ENTRY: m_start_height={}, m_total_height={}, m_block_ids.size()={}", r.start_height, r.total_height, r.m_block_ids.size());
     post_notify<NOTIFY_RESPONSE_CHAIN_ENTRY>(r, context);
     return 1;
   }
@@ -1767,7 +1767,7 @@ skip:
     {
       if (!m_block_queue.has_next_span(blockchain_height, filled, request_time, connection_id))
       {
-        oxen::log::debug(logcat, "{} we should download it as no peer reserved it", context);
+        log::debug(logcat, "{} we should download it as no peer reserved it", context);
         return true;
       }
       if (!filled)
@@ -1775,7 +1775,7 @@ skip:
         const auto dt = now - request_time;
         if (dt >= REQUEST_NEXT_SCHEDULED_SPAN_THRESHOLD)
         {
-          oxen::log::debug(logcat, "{} we should download it as it's not been received yet after {}", context, seconds_f{dt}.count());
+          log::debug(logcat, "{} we should download it as it's not been received yet after {}", context, seconds_f{dt}.count());
           return true;
         }
 
@@ -1791,7 +1791,7 @@ skip:
             const bool stalled = last_activity > LAST_ACTIVITY_STALL_THRESHOLD;
             if (stalled)
             {
-              oxen::log::debug(logcat, "{} we should download it as the downloading peer is stalling for {} seconds", context, seconds_f{last_activity}.count());
+              log::debug(logcat, "{} we should download it as the downloading peer is stalling for {} seconds", context, seconds_f{last_activity}.count());
               download = true;
               return true;
             }
@@ -1819,7 +1819,7 @@ skip:
             }
             if (dl_speed * .8f > ctx.m_current_speed_down * multiplier)
             {
-              oxen::log::debug(logcat, "{} we should download it as we are substantially faster ({} vs {}, multiplier {} after {} seconds)", context, dl_speed, ctx.m_current_speed_down, multiplier, seconds_f{dt}.count());
+              log::debug(logcat, "{} we should download it as we are substantially faster ({} vs {}, multiplier {} after {} seconds)", context, dl_speed, ctx.m_current_speed_down, multiplier, seconds_f{dt}.count());
               download = true;
               return true;
             }
@@ -1831,7 +1831,7 @@ skip:
           }
           else
           {
-            oxen::log::warning(logcat, "{} we should download it as the downloading peer is unexpectedly not known to us", context);
+            log::warning(logcat, "{} we should download it as the downloading peer is unexpectedly not known to us", context);
             return true;
           }
         }
@@ -1846,19 +1846,19 @@ skip:
   {
     if (context.m_anchor)
     {
-      oxen::log::debug(logcat, "{}This is an anchor peer, not dropping", context);
+      log::debug(logcat, "{}This is an anchor peer, not dropping", context);
       return false;
     }
     if (context.m_pruning_seed == 0)
     {
-      oxen::log::debug(logcat, "{}This peer is not striped, not dropping", context);
+      log::debug(logcat, "{}This peer is not striped, not dropping", context);
       return false;
     }
 
     const uint32_t peer_stripe = tools::get_pruning_stripe(context.m_pruning_seed);
     if (next_stripe == peer_stripe)
     {
-      oxen::log::debug(logcat, "{}This peer has needed stripe {}, not dropping", context, peer_stripe);
+      log::debug(logcat, "{}This peer has needed stripe {}, not dropping", context, peer_stripe);
       return false;
     }
 
@@ -1867,7 +1867,7 @@ skip:
       const uint64_t next_available_block_height = context.m_last_response_height - context.m_needed_objects.size() + 1;
       if (tools::has_unpruned_block(next_available_block_height, context.m_remote_blockchain_height, context.m_pruning_seed))
       {
-        oxen::log::debug(logcat, "{}This peer has unpruned next block at height {}, not dropping", context, next_available_block_height);
+        log::debug(logcat, "{}This peer has unpruned next block at height {}, not dropping", context, next_available_block_height);
         return false;
       }
     }
@@ -1885,11 +1885,11 @@ skip:
       const uint32_t distance = (peer_stripe + (1<<PRUNING_LOG_STRIPES) - next_stripe) % (1<<PRUNING_LOG_STRIPES);
       if ((n_out_peers >= m_max_out_peers && n_peers_on_next_stripe == 0) || (distance > 1 && n_peers_on_next_stripe <= 2) || distance > 2)
       {
-        oxen::log::debug(logcat, "{}we want seed {}, and either {} is at max out peers ({}) or distance {} from {} to {} is too large and we have only {} peers on next seed, dropping connection to make space", context, next_stripe, n_out_peers, m_max_out_peers, distance, next_stripe, peer_stripe, n_peers_on_next_stripe);
+        log::debug(logcat, "{}we want seed {}, and either {} is at max out peers ({}) or distance {} from {} to {} is too large and we have only {} peers on next seed, dropping connection to make space", context, next_stripe, n_out_peers, m_max_out_peers, distance, next_stripe, peer_stripe, n_peers_on_next_stripe);
         return true;
       }
     }
-    oxen::log::debug(logcat, "{}End of checks, not dropping", context);
+    log::debug(logcat, "{}End of checks, not dropping", context);
     return false;
   }
   //------------------------------------------------------------------------------------------------------------------------
@@ -1908,7 +1908,7 @@ skip:
     }
     if (skip > 0)
     {
-      oxen::log::debug(logcat, "{}skipping {}/{} blocks", context, skip, context.m_needed_objects.size());
+      log::debug(logcat, "{}skipping {}/{} blocks", context, skip, context.m_needed_objects.size());
       context.m_needed_objects = std::vector<crypto::hash>(context.m_needed_objects.begin() + skip, context.m_needed_objects.end());
     }
   }
@@ -1956,17 +1956,17 @@ skip:
           return false; // drop outgoing connections
         }
 
-        oxen::log::debug(logcat, "{}proceed {} (queue {}, stripe {}/{}), {}-{} needed, bc add stripe {}, we have {}), bc_height {}", context, proceed, queue_proceed, stripe_proceed_main, stripe_proceed_secondary, next_needed_pruning_stripe.first, next_needed_pruning_stripe.second, add_stripe, peer_stripe, bc_height);
-        oxen::log::debug(logcat, "{}  - next_block_height {}, seed {}, next_needed_height {}", context, next_block_height, epee::string_tools::to_string_hex(context.m_pruning_seed), next_needed_height);
-        oxen::log::debug(logcat, "{}  - last_response_height {}, m_needed_objects size {}", context, context.m_last_response_height, context.m_needed_objects.size());
+        log::debug(logcat, "{}proceed {} (queue {}, stripe {}/{}), {}-{} needed, bc add stripe {}, we have {}), bc_height {}", context, proceed, queue_proceed, stripe_proceed_main, stripe_proceed_secondary, next_needed_pruning_stripe.first, next_needed_pruning_stripe.second, add_stripe, peer_stripe, bc_height);
+        log::debug(logcat, "{}  - next_block_height {}, seed {}, next_needed_height {}", context, next_block_height, epee::string_tools::to_string_hex(context.m_pruning_seed), next_needed_height);
+        log::debug(logcat, "{}  - last_response_height {}, m_needed_objects size {}", context, context.m_last_response_height, context.m_needed_objects.size());
 
         // if we're waiting for next span, try to get it before unblocking threads below,
         // or a runaway downloading of future spans might happen
         if (stripe_proceed_main && should_download_next_span(context, true))
         {
-          oxen::log::debug(logcat, "{} we should try for that next span too, we think we could get it faster, resuming", context);
+          log::debug(logcat, "{} we should try for that next span too, we think we could get it faster, resuming", context);
           force_next_span = true;
-          oxen::log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "resuming", cryptonote::get_protocol_state_string(context.m_state));
+          log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "resuming", cryptonote::get_protocol_state_string(context.m_state));
           break;
         }
 
@@ -1974,8 +1974,8 @@ skip:
         {
           if (context.m_state != cryptonote_connection_context::state_standby)
           {
-            oxen::log::debug(logcat, "{}{} and {}, resuming", context, "Block queue is ", nspans, size);
-            oxen::log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "resuming", cryptonote::get_protocol_state_string(context.m_state));
+            log::debug(logcat, "{}{} and {}, resuming", context, "Block queue is ", nspans, size);
+            log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "resuming", cryptonote::get_protocol_state_string(context.m_state));
           }
           break;
         }
@@ -1990,8 +1990,8 @@ skip:
           boost::uuids::uuid connection_id;
           if (m_block_queue.has_next_span(m_core.get_current_blockchain_height(), filled, time, connection_id) && filled)
           {
-            oxen::log::debug(logcat, "{}No other thread is adding blocks, and next span needed is ready, resuming", context);
-            oxen::log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "resuming", cryptonote::get_protocol_state_string(context.m_state));
+            log::debug(logcat, "{}No other thread is adding blocks, and next span needed is ready, resuming", context);
+            log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "resuming", cryptonote::get_protocol_state_string(context.m_state));
             context.m_state = cryptonote_connection_context::state_standby;
             ++context.m_callback_request_count;
             m_p2p->request_callback(context);
@@ -2007,7 +2007,7 @@ skip:
               auto ns = std::chrono::steady_clock::now() - m_last_add_end_time;
               if (ns >= DROP_ON_SYNC_WEDGE_THRESHOLD)
               {
-                oxen::log::debug(logcat, "{}Block addition seems to have wedged, dropping connection", context);
+                log::debug(logcat, "{}Block addition seems to have wedged, dropping connection", context);
                 return false;
               }
             }
@@ -2017,11 +2017,11 @@ skip:
         if (context.m_state != cryptonote_connection_context::state_standby)
         {
           if (!queue_proceed)
-            oxen::log::debug(logcat, "{}{} and {}, pausing", context, "Block queue is ", nspans, size);
+            log::debug(logcat, "{}{} and {}, pausing", context, "Block queue is ", nspans, size);
           else if (!stripe_proceed_main && !stripe_proceed_secondary)
-            oxen::log::debug(logcat, "{}We do not have the stripe required to download another block, pausing", context);
+            log::debug(logcat, "{}We do not have the stripe required to download another block, pausing", context);
           context.m_state = cryptonote_connection_context::state_standby;
-          oxen::log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "pausing", cryptonote::get_protocol_state_string(context.m_state));
+          log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "pausing", cryptonote::get_protocol_state_string(context.m_state));
         }
 
         return true;
@@ -2029,7 +2029,7 @@ skip:
       context.m_state = cryptonote_connection_context::state_synchronizing;
     }
 
-    oxen::log::debug(logcat, "{} request_missing_objects: check {}, force_next_span {}, m_needed_objects {} lrh {}, chain {}, pruning seed {}", context, check_having_blocks, force_next_span, context.m_needed_objects.size(), context.m_last_response_height, m_core.get_current_blockchain_height(), epee::string_tools::to_string_hex(context.m_pruning_seed));
+    log::debug(logcat, "{} request_missing_objects: check {}, force_next_span {}, m_needed_objects {} lrh {}, chain {}, pruning seed {}", context, check_having_blocks, force_next_span, context.m_needed_objects.size(), context.m_last_response_height, m_core.get_current_blockchain_height(), epee::string_tools::to_string_hex(context.m_pruning_seed));
     if(context.m_needed_objects.size() || force_next_span)
     {
       //we know objects that we need, request this objects
@@ -2059,10 +2059,10 @@ skip:
       }
       if (span.second == 0)
       {
-        oxen::log::debug(logcat, "{} span size is 0", context);
+        log::debug(logcat, "{} span size is 0", context);
         if (context.m_last_response_height + 1 < context.m_needed_objects.size())
         {
-          oxen::log::error(logcat, "{} ERROR: inconsistent context: lrh {}, nos {}", context, context.m_last_response_height, context.m_needed_objects.size());
+          log::error(logcat, "{} ERROR: inconsistent context: lrh {}, nos {}", context, context.m_last_response_height, context.m_needed_objects.size());
           context.m_needed_objects.clear();
           context.m_last_response_height = 0;
           goto skip;
@@ -2071,19 +2071,19 @@ skip:
 
         const uint64_t first_block_height = context.m_last_response_height - context.m_needed_objects.size() + 1;
         span = m_block_queue.reserve_span(first_block_height, context.m_last_response_height, count_limit, context.m_connection_id, context.m_pruning_seed, context.m_remote_blockchain_height, context.m_needed_objects);
-        oxen::log::debug(logcat, "{} span from {}: {}/{}", context, first_block_height, span.first, span.second);
+        log::debug(logcat, "{} span from {}: {}/{}", context, first_block_height, span.first, span.second);
         if (span.second > 0)
         {
           const uint32_t stripe = tools::get_pruning_stripe(span.first, context.m_remote_blockchain_height, PRUNING_LOG_STRIPES);
           if (context.m_pruning_seed && stripe != tools::get_pruning_stripe(context.m_pruning_seed))
           {
-            oxen::log::debug(logcat, "{} starting early on next seed ({}  with stripe {}, context seed {})", context, span.first, stripe, epee::string_tools::to_string_hex(context.m_pruning_seed));
+            log::debug(logcat, "{} starting early on next seed ({}  with stripe {}, context seed {})", context, span.first, stripe, epee::string_tools::to_string_hex(context.m_pruning_seed));
           }
         }
       }
       if (span.second == 0 && !force_next_span)
       {
-        oxen::log::debug(logcat, "{} still no span reserved, we may be in the corner case of next span scheduled and everything else scheduled/filled", context);
+        log::debug(logcat, "{} still no span reserved, we may be in the corner case of next span scheduled and everything else scheduled/filled", context);
         std::vector<crypto::hash> hashes;
         boost::uuids::uuid span_connection_id;
         span = m_block_queue.get_next_span_if_scheduled(hashes, span_connection_id);
@@ -2104,7 +2104,7 @@ skip:
           }
         }
       }
-      oxen::log::debug(logcat, "{} span: {}/{} ({} - {})", context, span.first, span.second, span.first, (span.first + span.second - 1));
+      log::debug(logcat, "{} span: {}/{} ({} - {})", context, span.first, span.second, span.first, (span.first + span.second - 1));
       if (span.second > 0)
       {
         if (!is_next)
@@ -2113,14 +2113,14 @@ skip:
           uint64_t skip = span.first - first_context_block_height;
           if (skip > context.m_needed_objects.size())
           {
-            oxen::log::error(logcat, "ERROR: skip {}, m_needed_objects {}, first_context_block_height{}", skip, context.m_needed_objects.size(), first_context_block_height);
+            log::error(logcat, "ERROR: skip {}, m_needed_objects {}, first_context_block_height{}", skip, context.m_needed_objects.size(), first_context_block_height);
             return false;
           }
           if (skip > 0)
             context.m_needed_objects = std::vector<crypto::hash>(context.m_needed_objects.begin() + skip, context.m_needed_objects.end());
           if (context.m_needed_objects.size() < span.second)
           {
-            oxen::log::error(logcat, "ERROR: span {}/{}, m_needed_objects {}", span.first, span.second, context.m_needed_objects.size());
+            log::error(logcat, "ERROR: span {}/{}, m_needed_objects {}", span.first, span.second, context.m_needed_objects.size());
             return false;
           }
 
@@ -2134,10 +2134,10 @@ skip:
         }
 
         context.m_last_request_time = std::chrono::steady_clock::now();
-        oxen::log::info(oxen::log::Cat("net.p2p.msg"), "-->>NOTIFY_REQUEST_GET_OBJECTS: blocks.size()={}, requested blocks count={} / {} from {}, first hash {}", req.blocks.size(), count, count_limit, span.first, req.blocks.front());
+        log::info(log::Cat("net.p2p.msg"), "-->>NOTIFY_REQUEST_GET_OBJECTS: blocks.size()={}, requested blocks count={} / {} from {}, first hash {}", req.blocks.size(), count, count_limit, span.first, req.blocks.front());
 
         post_notify<NOTIFY_REQUEST_GET_BLOCKS>(req, context);
-        oxen::log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "requesting objects", cryptonote::get_protocol_state_string(context.m_state));
+        log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "requesting objects", cryptonote::get_protocol_state_string(context.m_state));
         return true;
       }
 
@@ -2149,7 +2149,7 @@ skip:
       {
         // at this point, we have to either close the connection, or start getting blocks past the
         // current point, or become dormant
-        oxen::log::debug(logcat, "{}this peer is pruned at seed {}, next stripe needed is {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), next_stripe);
+        log::debug(logcat, "{}this peer is pruned at seed {}, next stripe needed is {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), next_stripe);
         if (!context.m_is_income)
         {
           if (should_drop_connection(context, next_stripe))
@@ -2160,7 +2160,7 @@ skip:
         }
         // we'll get back stuck waiting for the go ahead
         context.m_state = cryptonote_connection_context::state_normal;
-        oxen::log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "Nothing to do for now, switching to normal state", cryptonote::get_protocol_state_string(context.m_state));
+        log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "Nothing to do for now, switching to normal state", cryptonote::get_protocol_state_string(context.m_state));
         return true;
       }
     }
@@ -2182,8 +2182,8 @@ skip:
         bool filled = false;
         if (m_block_queue.get_next_span(start_height, blocks, span_connection_id, filled) && filled)
         {
-          oxen::log::debug(logcat, "{}No other thread is adding blocks, resuming", context);
-          oxen::log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "will try to add blocks next", cryptonote::get_protocol_state_string(context.m_state));
+          log::debug(logcat, "{}No other thread is adding blocks, resuming", context);
+          log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "will try to add blocks next", cryptonote::get_protocol_state_string(context.m_state));
           context.m_state = cryptonote_connection_context::state_standby;
           ++context.m_callback_request_count;
           m_p2p->request_callback(context);
@@ -2207,9 +2207,9 @@ skip:
       }
 
       context.m_last_request_time = std::chrono::steady_clock::now();
-      oxen::log::info(oxen::log::Cat("net.p2p.msg"), "-->>NOTIFY_REQUEST_CHAIN: m_block_ids.size()={}, start_from_current_chain {}", r.block_ids.size(), start_from_current_chain);
+      log::info(log::Cat("net.p2p.msg"), "-->>NOTIFY_REQUEST_CHAIN: m_block_ids.size()={}, start_from_current_chain {}", r.block_ids.size(), start_from_current_chain);
       post_notify<NOTIFY_REQUEST_CHAIN>(r, context);
-      oxen::log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "requesting chain", cryptonote::get_protocol_state_string(context.m_state));
+      log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "requesting chain", cryptonote::get_protocol_state_string(context.m_state));
     }else
     {
       CHECK_AND_ASSERT_MES(context.m_last_response_height == context.m_remote_blockchain_height-1
@@ -2226,13 +2226,13 @@ skip:
       {
         if (m_core.get_current_blockchain_height() >= m_core.get_target_blockchain_height())
         {
-          oxen::log::info(globallogcat, fmt::format(fg(fmt::terminal_color::green), "SYNCHRONIZED OK"));
+          log::info(globallogcat, fmt::format(fg(fmt::terminal_color::green), "SYNCHRONIZED OK"));
           on_connection_synchronized();
         }
       }
       else
       {
-        oxen::log::info(logcat, "{} we've reached this peer's blockchain height", context);
+        log::info(logcat, "{} we've reached this peer's blockchain height", context);
       }
     }
     return true;
@@ -2255,10 +2255,10 @@ skip:
           if (synced_seconds == 0s)
             synced_seconds = 1s;
           float blocks_per_second = synced_blocks / (float)synced_seconds.count();
-          oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Synced {} blocks in {} ({} blocks per second)", synced_blocks, tools::get_human_readable_timespan(synced_seconds), blocks_per_second));
+          log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Synced {} blocks in {} ({} blocks per second)", synced_blocks, tools::get_human_readable_timespan(synced_seconds), blocks_per_second));
         }
       }
-      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "\n**********************************************************************\n\
+      log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "\n**********************************************************************\n\
 You are now synchronized with the network. You may now start oxen-wallet-cli.\n\
 \n\
 Use the \"help\" command to see the list of available commands.\n\
@@ -2266,7 +2266,7 @@ Use the \"help\" command to see the list of available commands.\n\
       if (OXEN_LOG_ENABLED(info))
       {
         const std::chrono::duration<double> sync_time{std::chrono::steady_clock::now() - m_sync_timer};
-        oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Sync time: {:.0f} min, {} + {} MB downloaded, {}% old spans, {}% bad spans", sync_time.count()/1e9/60,
+        log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Sync time: {:.0f} min, {} + {} MB downloaded, {}% old spans, {}% bad spans", sync_time.count()/1e9/60,
             (10 * m_sync_download_objects_size / 1024 / 1024) / 10.f,
             (10 * m_sync_download_chain_size / 1024 / 1024) / 10.f,
             100.0f * m_sync_old_spans_downloaded / m_sync_spans_downloaded,
@@ -2294,8 +2294,8 @@ Use the \"help\" command to see the list of available commands.\n\
   template<class t_core>
   int t_cryptonote_protocol_handler<t_core>::handle_response_chain_entry(int command, NOTIFY_RESPONSE_CHAIN_ENTRY::request& arg, cryptonote_connection_context& context)
   {
-    oxen::log::info(oxen::log::Cat("net.p2p.msg"), "Received NOTIFY_RESPONSE_CHAIN_ENTRY: m_block_ids.size()={}, m_start_height={}, m_total_height={}", arg.m_block_ids.size(), arg.start_height, arg.total_height);
-    oxen::log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "received chain", cryptonote::get_protocol_state_string(context.m_state));
+    log::info(log::Cat("net.p2p.msg"), "Received NOTIFY_RESPONSE_CHAIN_ENTRY: m_block_ids.size()={}, m_start_height={}, m_total_height={}", arg.m_block_ids.size(), arg.start_height, arg.total_height);
+    log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "received chain", cryptonote::get_protocol_state_string(context.m_state));
 
     context.m_last_request_time.reset();
 
@@ -2303,21 +2303,21 @@ Use the \"help\" command to see the list of available commands.\n\
 
     if(!arg.m_block_ids.size())
     {
-      oxen::log::error(logcat, "sent empty m_block_ids, dropping connection");
+      log::error(logcat, "sent empty m_block_ids, dropping connection");
       drop_connection(context, true, false);
       return 1;
     }
     if (arg.total_height < arg.m_block_ids.size() || arg.start_height > arg.total_height - arg.m_block_ids.size())
     {
-      oxen::log::error(logcat, "sent invalid start/nblocks/height, dropping connection");
+      log::error(logcat, "sent invalid start/nblocks/height, dropping connection");
       drop_connection(context, true, false);
       return 1;
     }
-    oxen::log::debug(logcat, "{}first block hash {}, last {}", context, arg.m_block_ids.front(), arg.m_block_ids.back());
+    log::debug(logcat, "{}first block hash {}, last {}", context, arg.m_block_ids.front(), arg.m_block_ids.back());
 
     if (arg.total_height >= MAX_BLOCK_NUMBER || arg.m_block_ids.size() >= MAX_BLOCK_NUMBER)
     {
-      oxen::log::error(logcat, "sent wrong NOTIFY_RESPONSE_CHAIN_ENTRY, with total_height={} and block_ids={}", arg.total_height, arg.m_block_ids.size());
+      log::error(logcat, "sent wrong NOTIFY_RESPONSE_CHAIN_ENTRY, with total_height={} and block_ids={}", arg.total_height, arg.m_block_ids.size());
       drop_connection(context, false, false);
       return 1;
     }
@@ -2325,7 +2325,7 @@ Use the \"help\" command to see the list of available commands.\n\
     context.m_last_response_height = arg.start_height + arg.m_block_ids.size()-1;
     if(context.m_last_response_height > context.m_remote_blockchain_height)
     {
-      oxen::log::error(logcat, "sent wrong NOTIFY_RESPONSE_CHAIN_ENTRY, with m_total_height={}, m_start_height= {}, m_block_ids.size()={}", arg.total_height, arg.start_height, arg.m_block_ids.size());
+      log::error(logcat, "sent wrong NOTIFY_RESPONSE_CHAIN_ENTRY, with m_total_height={}, m_start_height= {}, m_block_ids.size()={}", arg.total_height, arg.start_height, arg.m_block_ids.size());
       drop_connection(context, false, false);
       return 1;
     }
@@ -2333,7 +2333,7 @@ Use the \"help\" command to see the list of available commands.\n\
     uint64_t n_use_blocks = m_core.prevalidate_block_hashes(arg.start_height, arg.m_block_ids);
     if (n_use_blocks + HASH_OF_HASHES_STEP <= arg.m_block_ids.size())
     {
-      oxen::log::error(logcat, "Most blocks are invalid, dropping connection");
+      log::error(logcat, "Most blocks are invalid, dropping connection");
       drop_connection(context, true, false);
       return 1;
     }
@@ -2350,7 +2350,7 @@ Use the \"help\" command to see the list of available commands.\n\
 
     if (!request_missing_objects(context, false))
     {
-      oxen::log::error(logcat, "Failed to request missing objects, dropping connection");
+      log::error(logcat, "Failed to request missing objects, dropping connection");
       drop_connection(context, false, false);
       return 1;
     }
@@ -2365,12 +2365,12 @@ Use the \"help\" command to see the list of available commands.\n\
   template<class t_core>
   int t_cryptonote_protocol_handler<t_core>::handle_request_block_blinks(int command, NOTIFY_REQUEST_BLOCK_BLINKS::request& arg, cryptonote_connection_context& context)
   {
-    oxen::log::info(oxen::log::Cat("net.p2p.msg"), "Received NOTIFY_REQUEST_BLOCK_BLINKS: heights.size()={}", arg.heights.size());
+    log::info(log::Cat("net.p2p.msg"), "Received NOTIFY_REQUEST_BLOCK_BLINKS: heights.size()={}", arg.heights.size());
     NOTIFY_RESPONSE_BLOCK_BLINKS::request r;
 
     r.txs = m_core.get_pool().get_mined_blinks({arg.heights.begin(), arg.heights.end()});
 
-    oxen::log::info(oxen::log::Cat("net.p2p.msg"), "-->>NOTIFY_RESPONSE_BLOCK_BLINKS: txs.size()={}", r.txs.size());
+    log::info(log::Cat("net.p2p.msg"), "-->>NOTIFY_RESPONSE_BLOCK_BLINKS: txs.size()={}", r.txs.size());
     post_notify<NOTIFY_RESPONSE_BLOCK_BLINKS>(r, context);
     return 1;
   }
@@ -2378,12 +2378,12 @@ Use the \"help\" command to see the list of available commands.\n\
   template<class t_core>
   int t_cryptonote_protocol_handler<t_core>::handle_response_block_blinks(int command, NOTIFY_RESPONSE_BLOCK_BLINKS::request& arg, cryptonote_connection_context& context)
   {
-    oxen::log::info(oxen::log::Cat("net.p2p.msg"), "Received NOTIFY_RESPONSE_BLOCK_BLINKS: txs.size()={}", arg.txs.size());
+    log::info(log::Cat("net.p2p.msg"), "Received NOTIFY_RESPONSE_BLOCK_BLINKS: txs.size()={}", arg.txs.size());
 
     m_core.get_pool().keep_missing_blinks(arg.txs);
     if (arg.txs.empty())
     {
-      oxen::log::debug(logcat, "NOTIFY_RESPONSE_BLOCKS_BLINKS included only blink txes we already knew about");
+      log::debug(logcat, "NOTIFY_RESPONSE_BLOCKS_BLINKS included only blink txes we already knew about");
       return 1;
     }
 
@@ -2398,10 +2398,10 @@ Use the \"help\" command to see the list of available commands.\n\
         arg.txs.resize(arg.txs.size() - CURRENCY_PROTOCOL_MAX_TXS_REQUEST_COUNT);
       }
 
-      oxen::log::info(oxen::log::Cat("net.p2p.msg"), "-->>NOTIFY_REQUEST_GET_TXS: requesting for tx & blink data, txs.size()={}", req.txs.size());
+      log::info(log::Cat("net.p2p.msg"), "-->>NOTIFY_REQUEST_GET_TXS: requesting for tx & blink data, txs.size()={}", req.txs.size());
       post_notify<NOTIFY_REQUEST_GET_TXS>(req, context);
     }
-    oxen::log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "requesting missing blink txs", cryptonote::get_protocol_state_string(context.m_state));
+    log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "requesting missing blink txs", cryptonote::get_protocol_state_string(context.m_state));
     return 1;
   }
   //------------------------------------------------------------------------------------------------------------------------
@@ -2414,7 +2414,7 @@ Use the \"help\" command to see the list of available commands.\n\
     {
       if (peer_id && exclude_context.m_connection_id != context.m_connection_id && context.m_remote_address.get_zone() == epee::net_utils::zone::public_)
       {
-        oxen::log::debug(logcat, "{}PEER FLUFFY BLOCKS - RELAYING THIN/COMPACT WHATEVER BLOCK", context);
+        log::debug(logcat, "{}PEER FLUFFY BLOCKS - RELAYING THIN/COMPACT WHATEVER BLOCK", context);
         fluffyConnections.push_back({context.m_remote_address.get_zone(), context.m_connection_id});
       }
       return true;
@@ -2432,7 +2432,7 @@ Use the \"help\" command to see the list of available commands.\n\
 
       // relay_block is only meant to send the header, tx blobs should be
       // requested subsequently in handle notify fluffy transactions
-      oxen::log::debug(logcat, "relay_block called with argument that contains TX blobs, this is the non-expected case");
+      log::debug(logcat, "relay_block called with argument that contains TX blobs, this is the non-expected case");
       NOTIFY_NEW_FLUFFY_BLOCK::request arg_without_tx_blobs = {};
       arg_without_tx_blobs.current_blockchain_height        = arg.current_blockchain_height;
       arg_without_tx_blobs.b.block                          = arg.b.block;
@@ -2551,7 +2551,7 @@ Use the \"help\" command to see the list of available commands.\n\
     const bool use_next = (n_next > m_max_out_peers / 2 && n_subsequent <= 1) || (n_next > 2 && n_subsequent == 0);
     const uint32_t ret_stripe = use_next ? subsequent_pruning_stripe: next_pruning_stripe;
     const std::string po = get_peers_overview();
-    oxen::log::debug(oxen::log::Cat(po), "get_next_needed_pruning_stripe: want height {} ({} from blockchain, {} from block queue), stripe {} ({}/{} on it and {} on {}, {} others) -> {} (+{}), current peers {}", want_height, want_height_from_blockchain, want_height_from_block_queue, next_pruning_stripe, n_next, m_max_out_peers, n_subsequent, subsequent_pruning_stripe, n_others, ret_stripe, (ret_stripe - next_pruning_stripe + (1 << PRUNING_LOG_STRIPES)) % (1 << PRUNING_LOG_STRIPES), po);
+    log::debug(log::Cat(po), "get_next_needed_pruning_stripe: want height {} ({} from blockchain, {} from block queue), stripe {} ({}/{} on it and {} on {}, {} others) -> {} (+{}), current peers {}", want_height, want_height_from_blockchain, want_height_from_block_queue, next_pruning_stripe, n_next, m_max_out_peers, n_subsequent, subsequent_pruning_stripe, n_others, ret_stripe, (ret_stripe - next_pruning_stripe + (1 << PRUNING_LOG_STRIPES)) % (1 << PRUNING_LOG_STRIPES), po);
     return std::make_pair(next_pruning_stripe, ret_stripe);
   }
   //------------------------------------------------------------------------------------------------------------------------
@@ -2576,7 +2576,7 @@ Use the \"help\" command to see the list of available commands.\n\
   template<class t_core>
   void t_cryptonote_protocol_handler<t_core>::drop_connection(cryptonote_connection_context &context, bool add_fail, bool flush_all_spans)
   {
-    oxen::log::debug(logcat, "{}dropping connection id {} (pruning seed {}), add_fail {}, flush_all_spans {}", context, boost::lexical_cast<std::string>(context.m_connection_id), epee::string_tools::to_string_hex(context.m_pruning_seed), add_fail, flush_all_spans);
+    log::debug(logcat, "{}dropping connection id {} (pruning seed {}), add_fail {}, flush_all_spans {}", context, boost::lexical_cast<std::string>(context.m_connection_id), epee::string_tools::to_string_hex(context.m_pruning_seed), add_fail, flush_all_spans);
 
     if (add_fail)
       m_p2p->add_host_fail(context.m_remote_address);
@@ -2589,7 +2589,7 @@ Use the \"help\" command to see the list of available commands.\n\
     // them before we close the connection and so might never learn of the problem.
     if (context.m_drop_count >= 1)
     {
-      oxen::log::debug(logcat, "{}{} a second chance before dropping", context, "giving connect id ", boost::lexical_cast<std::string>(context.m_connection_id));
+      log::debug(logcat, "{}{} a second chance before dropping", context, "giving connect id ", boost::lexical_cast<std::string>(context.m_connection_id));
       ++context.m_drop_count;
     }
     else
@@ -2608,14 +2608,14 @@ Use the \"help\" command to see the list of available commands.\n\
     const uint64_t previous_target = m_core.get_target_blockchain_height();
     if (target < previous_target)
     {
-      oxen::log::info(logcat, "Target height decreasing from {} to {}", previous_target, target);
+      log::info(logcat, "Target height decreasing from {} to {}", previous_target, target);
       m_core.set_target_blockchain_height(target);
       if (target == 0 && context.m_state > cryptonote_connection_context::state_before_handshake && !m_stopping)
-        oxen::log::warning(logcat, fmt::format(fg(fmt::terminal_color::yellow), "oxend is now disconnected from the network"));
+        log::warning(logcat, fmt::format(fg(fmt::terminal_color::yellow), "oxend is now disconnected from the network"));
     }
 
     m_block_queue.flush_spans(context.m_connection_id, false);
-    oxen::log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "closed", cryptonote::get_protocol_state_string(context.m_state));
+    log::debug(logcat, "{}[{}] state: {} in state {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed), "closed", cryptonote::get_protocol_state_string(context.m_state));
   }
 
   //------------------------------------------------------------------------------------------------------------------------

@@ -69,11 +69,10 @@ namespace crypto
   {
     std::vector<const Language::Base*> get_language_list();
   }
-}
 
 namespace
 {
-  static auto logcat = oxen::log::Cat("mnemonic");
+  auto logcat = log::Cat("mnemonic");
 
   uint32_t create_checksum_index(const std::vector<epee::wipeable_string> &word_list,
     const Language::Base *language);
@@ -160,7 +159,7 @@ namespace
       if (full_match)
       {
         *language = *it1;
-        oxen::log::info(logcat, "Full match for language {}", (*language)->get_english_language_name());
+        log::info(logcat, "Full match for language {}", (*language)->get_english_language_name());
         return true;
       }
       // Some didn't match. Clear the index array.
@@ -174,11 +173,11 @@ namespace
     if (fallback)
     {
       *language = fallback;
-      oxen::log::info(logcat, "Fallback match for language {}", (*language)->get_english_language_name());
+      log::info(logcat, "Fallback match for language {}", (*language)->get_english_language_name());
       return true;
     }
 
-    oxen::log::info(logcat, "No match found");
+    log::info(logcat, "No match found");
     memwipe(matched_indices.data(), matched_indices.size() * sizeof(matched_indices[0]));
     return false;
   }
@@ -234,18 +233,11 @@ namespace
     epee::wipeable_string trimmed_last_word = last_word.length() > unique_prefix_length ? Language::utf8prefix(last_word, unique_prefix_length) :
       last_word;
     bool ret = Language::WordEqual()(trimmed_checksum, trimmed_last_word);
-    oxen::log::info(logcat, "Checksum is {}", (ret ? "valid" : "invalid"));
+    log::info(logcat, "Checksum is {}", (ret ? "valid" : "invalid"));
     return ret;
   }
 }
 
-/*!
- * \namespace crypto
- * 
- * \brief crypto namespace.
- */
-namespace crypto
-{
   /*!
    * \namespace crypto::ElectrumWords
    * 
@@ -271,7 +263,7 @@ namespace crypto
 
       if (len % 4)
       {
-        oxen::log::error(logcat, "Invalid seed: not a multiple of 4");
+        log::error(logcat, "Invalid seed: not a multiple of 4");
         return false;
       }
 
@@ -283,7 +275,7 @@ namespace crypto
         if (seed.size() != expected/2 && seed.size() != expected &&
           seed.size() != expected + 1)
         {
-          oxen::log::error(logcat, "Invalid seed: unexpected number of words");
+          log::error(logcat, "Invalid seed: unexpected number of words");
           return false;
         }
 
@@ -296,7 +288,7 @@ namespace crypto
       Language::Base *language;
       if (!find_seed_language(seed, has_checksum, matched_indices, &language))
       {
-        oxen::log::error(logcat, "Invalid seed: language not found");
+        log::error(logcat, "Invalid seed: language not found");
         return false;
       }
       language_name = language->get_language_name();
@@ -307,7 +299,7 @@ namespace crypto
         if (!checksum_test(seed, language))
         {
           // Checksum fail
-          oxen::log::error(logcat, "Invalid seed: invalid checksum");
+          log::error(logcat, "Invalid seed: invalid checksum");
           return false;
         }
         seed.pop_back();
@@ -326,7 +318,7 @@ namespace crypto
         if (!(w[0]% word_list_length == w[1]))
         {
           memwipe(w, sizeof(w));
-          oxen::log::error(logcat, "Invalid seed: mumble mumble");
+          log::error(logcat, "Invalid seed: mumble mumble");
           return false;
         }
 
@@ -360,12 +352,12 @@ namespace crypto
       epee::wipeable_string s;
       if (!words_to_bytes(words, s, sizeof(dst), true, language_name))
       {
-        oxen::log::error(logcat, "Invalid seed: failed to convert words to bytes");
+        log::error(logcat, "Invalid seed: failed to convert words to bytes");
         return false;
       }
       if (s.size() != sizeof(dst))
       {
-        oxen::log::error(logcat, "Invalid seed: wrong output size");
+        log::error(logcat, "Invalid seed: wrong output size");
         return false;
       }
       dst = *(const crypto::secret_key*)s.data();

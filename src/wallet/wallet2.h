@@ -1330,12 +1330,12 @@ private:
         if (throw_on_error)
           throw;
         else
-          oxen::log::error(oxen::log::Cat("wallet.wallet2"), "HTTP request failed: {}", e.what());
+          log::error(log::Cat("wallet.wallet2"), "HTTP request failed: {}", e.what());
       } catch (...) {
         if (throw_on_error)
           throw;
         else
-          oxen::log::error(oxen::log::Cat("wallet.wallet2"), "HTTP request failed: unknown error");
+          log::error(log::Cat("wallet.wallet2"), "HTTP request failed: unknown error");
       }
       return false;
     }

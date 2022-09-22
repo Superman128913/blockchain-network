@@ -1,8 +1,10 @@
 #include "scoped_message_writer.h"
 
-static auto logcat = oxen::log::Cat("msgwriter");
+namespace tools {
 
-tools::scoped_message_writer::~scoped_message_writer()
+static auto logcat = log::Cat("msgwriter");
+
+scoped_message_writer::~scoped_message_writer()
 {
   if (m_flush)
   {
@@ -13,4 +15,6 @@ tools::scoped_message_writer::~scoped_message_writer()
       logcat->log(m_log_level, fmt::format(fg(m_color),m_oss.str()));
     std::cout << std::endl;
   }
+}
+
 }

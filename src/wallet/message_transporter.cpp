@@ -39,7 +39,8 @@ using namespace std::literals;
 namespace mms
 {
 
-  static auto logcat = oxen::log::Cat("wallet.mms");
+  namespace log = oxen::log;
+  static auto logcat = log::Cat("wallet.mms");
 
 namespace bitmessage_rpc
 {
@@ -113,7 +114,7 @@ bool message_transporter::receive_messages(const std::vector<std::string> &desti
   bitmessage_rpc::inbox_messages_response bitmessage_res;
   if (!epee::serialization::load_t_from_json(bitmessage_res, json))
   {
-    oxen::log::error(logcat, "Failed to deserialize messages");
+    log::error(logcat, "Failed to deserialize messages");
     return true;
   }
   size_t size = bitmessage_res.inboxMessages.size();
@@ -148,7 +149,7 @@ bool message_transporter::receive_messages(const std::vector<std::string> &desti
       }
       catch(const std::exception& e)
       {
-        oxen::log::error(logcat, "Failed to deserialize message: {}", e.what());
+        log::error(logcat, "Failed to deserialize message: {}", e.what());
       }
     }
   }
@@ -235,7 +236,7 @@ void message_transporter::post_request(const std::string &request, std::string &
     auto res = m_http_client.post("", request, {{"Content-Type", "application/xml; charset=utf-8"}});
     answer = res.text;
   } catch (const std::exception& e) {
-    oxen::log::error(logcat, "POST request to Bitmessage failed: {}", e.what());
+    log::error(logcat, "POST request to Bitmessage failed: {}", e.what());
     THROW_WALLET_EXCEPTION(tools::error::no_connection_to_bitmessage, m_http_client.get_base_url());
   }
 

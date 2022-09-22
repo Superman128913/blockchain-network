@@ -39,7 +39,7 @@ using namespace std;
 
 namespace rct {
 
-    static auto logcat = oxen::log::Cat("ringct");
+    static auto logcat = log::Cat("ringct");
 
     //dp 
     //Debug printing for the above types

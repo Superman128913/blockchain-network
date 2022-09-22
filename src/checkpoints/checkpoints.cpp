@@ -47,15 +47,15 @@
 namespace cryptonote
 {
 
-  static auto logcat = oxen::log::Cat("checkpoints");
+  static auto logcat = log::Cat("checkpoints");
 
   bool checkpoint_t::check(crypto::hash const &hash) const
   {
     bool result = block_hash == hash;
     if (result)
-      oxen::log::info(logcat, "CHECKPOINT PASSED FOR HEIGHT {} {}", height, block_hash);
+      log::info(logcat, "CHECKPOINT PASSED FOR HEIGHT {} {}", height, block_hash);
     else
-      oxen::log::warning(logcat, "CHECKPOINT FAILED FOR HEIGHT {}. EXPECTED HASH {}GIVEN HASH: {}", height, block_hash, hash);
+      log::warning(logcat, "CHECKPOINT FAILED FOR HEIGHT {}. EXPECTED HASH {}GIVEN HASH: {}", height, block_hash, hash);
     return result;
   };
 
@@ -96,7 +96,7 @@ namespace cryptonote
   {
     if (std::error_code ec; !fs::exists(json_hashfile_fullpath, ec))
     {
-      oxen::log::info(logcat, "Blockchain checkpoints file not found");
+      log::info(logcat, "Blockchain checkpoints file not found");
       return true;
     }
 
@@ -105,7 +105,7 @@ namespace cryptonote
         !tools::slurp_file(json_hashfile_fullpath, contents) ||
         !epee::serialization::load_t_from_json(hashes, contents))
     {
-      oxen::log::error(logcat, "Error loading checkpoints from {}", json_hashfile_fullpath);
+      log::error(logcat, "Error loading checkpoints from {}", json_hashfile_fullpath);
       return false;
     }
 
@@ -122,7 +122,7 @@ namespace cryptonote
     }
     catch (const std::exception &e)
     {
-      oxen::log::error(logcat, "Get block checkpoint from DB failed at height: {}, what = {}", height, e.what());
+      log::error(logcat, "Get block checkpoint from DB failed at height: {}, what = {}", height, e.what());
       return false;
     }
   }
@@ -161,7 +161,7 @@ namespace cryptonote
     }
     catch (const std::exception& e)
     {
-      oxen::log::error(logcat, "Failed to add checkpoint with hash: {} at height: {}, what = {}", checkpoint.block_hash, checkpoint.height, e.what());
+      log::error(logcat, "Failed to add checkpoint with hash: {} at height: {}, what = {}", checkpoint.block_hash, checkpoint.height, e.what());
       result = false;
     }
 
@@ -202,7 +202,7 @@ namespace cryptonote
       }
       catch (const std::exception &e)
       {
-        oxen::log::error(logcat, "Pruning block checkpoint on block added failed non-trivially at height: {}, what = {}", m_last_cull_height, e.what());
+        log::error(logcat, "Pruning block checkpoint on block added failed non-trivially at height: {}, what = {}", m_last_cull_height, e.what());
       }
     }
 
@@ -229,7 +229,7 @@ namespace cryptonote
         }
         catch (const std::exception &e)
         {
-          oxen::log::error(logcat, "Remove block checkpoint on detach failed non-trivially at height: {}, what = {}", delete_height, e.what());
+          log::error(logcat, "Remove block checkpoint on detach failed non-trivially at height: {}, what = {}", delete_height, e.what());
         }
       }
     }

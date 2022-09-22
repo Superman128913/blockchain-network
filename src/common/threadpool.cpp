@@ -37,7 +37,6 @@ static thread_local bool is_leaf = false;
 
 namespace tools
 {
-  static auto logcat = oxen::log::Cat("global");
 
 threadpool::threadpool(unsigned int max_threads) : running(true), active(0) {
   create(max_threads);
@@ -115,7 +114,7 @@ threadpool::waiter::~waiter()
   {
     std::unique_lock lock{mt};
     if (num)
-      oxen::log::error(logcat, "wait should have been called before waiter dtor - waiting now");
+      log::error(globallogcat, "wait should have been called before waiter dtor - waiting now");
   }
   catch (...) { /* ignore */ }
   try

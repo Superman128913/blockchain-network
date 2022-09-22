@@ -46,8 +46,6 @@
 
 namespace tools
 {
-  static auto logcat = oxen::log::Cat("wallet.rpc");
-
   using HttpRequest = uWS::HttpRequest;
   using HttpResponse = uWS::HttpResponse<false/*SSL*/>;
 

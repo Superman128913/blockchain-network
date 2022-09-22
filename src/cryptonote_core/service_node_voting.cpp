@@ -47,7 +47,7 @@ using cryptonote::hf;
 
 namespace service_nodes
 {
-  static auto logcat = oxen::log::Cat("service_nodes");
+  static auto logcat = log::Cat("service_nodes");
 
   static crypto::hash make_state_change_vote_hash(uint64_t block_height, uint32_t service_node_index, new_state state)
   {
@@ -71,7 +71,7 @@ namespace service_nodes
     {
       default:
       {
-        oxen::log::info(logcat, "Unhandled vote type with value: {}", (int)vote.type);
+        log::info(logcat, "Unhandled vote type with value: {}", (int)vote.type);
         assert("Unhandled vote type" == 0);
         return result;
       };
@@ -107,7 +107,7 @@ namespace service_nodes
     if (worker_index >= quorum.workers.size())
     {
       if (vvc) vvc->m_worker_index_out_of_bounds = true;
-        oxen::log::info(logcat, "Quorum worker index in was out of bounds: {}, expected to be in range of: [0, {}", worker_index, quorum.workers.size());
+        log::info(logcat, "Quorum worker index in was out of bounds: {}, expected to be in range of: [0, {}", worker_index, quorum.workers.size());
       return false;
     }
     return true;
@@ -118,7 +118,7 @@ namespace service_nodes
     if (validator_index >= quorum.validators.size())
     {
       if (vvc) vvc->m_validator_index_out_of_bounds = true;
-        oxen::log::info(logcat, "Validator's index was out of bounds: {}, expected to be in range of: [0, {}", validator_index, quorum.validators.size());
+        log::info(logcat, "Validator's index was out of bounds: {}, expected to be in range of: [0, {}", validator_index, quorum.validators.size());
       return false;
     }
     return true;
@@ -138,26 +138,26 @@ namespace service_nodes
     auto &vvc = tvc.m_vote_ctx;
     if (state_change.state != new_state::deregister && hf_version < hf::hf12_checkpointing)
     {
-      oxen::log::info(logcat, "Non-deregister state changes are invalid before v12");
+      log::info(logcat, "Non-deregister state changes are invalid before v12");
       return bad_tx(tvc);
     }
 
     if (state_change.state >= new_state::_count)
     {
-      oxen::log::info(logcat, "Unknown state change to new state: {}", static_cast<uint16_t>(state_change.state));
+      log::info(logcat, "Unknown state change to new state: {}", static_cast<uint16_t>(state_change.state));
       return bad_tx(tvc);
     }
 
     if (state_change.votes.size() < service_nodes::STATE_CHANGE_MIN_VOTES_TO_CHANGE_STATE)
     {
-      oxen::log::info(logcat, "Not enough votes");
+      log::info(logcat, "Not enough votes");
       vvc.m_not_enough_votes = true;
       return bad_tx(tvc);
     }
 
     if (state_change.votes.size() > service_nodes::STATE_CHANGE_QUORUM_SIZE)
     {
-      oxen::log::info(logcat, "Too many votes");
+      log::info(logcat, "Too many votes");
       return bad_tx(tvc);
     }
 
@@ -168,7 +168,7 @@ namespace service_nodes
     {
       if (state_change.block_height >= latest_height)
       {
-        oxen::log::info(logcat, "Received state change tx for height: {} and service node: {}, is newer than current height: {} blocks and has been rejected.", state_change.block_height, state_change.service_node_index, latest_height);
+        log::info(logcat, "Received state change tx for height: {} and service node: {}, is newer than current height: {} blocks and has been rejected.", state_change.block_height, state_change.service_node_index, latest_height);
         vvc.m_invalid_block_height = true;
         if (state_change.block_height >= latest_height + VOTE_OR_TX_VERIFY_HEIGHT_BUFFER)
           tvc.m_verifivation_failed = true;
@@ -177,7 +177,7 @@ namespace service_nodes
 
       if (latest_height >= state_change.block_height + service_nodes::STATE_CHANGE_TX_LIFETIME_IN_BLOCKS)
       {
-        oxen::log::info(logcat, "Received state change tx for height: {} and service node: {}, is older than: {} (current height: {}) blocks and has been rejected.", state_change.block_height, state_change.service_node_index, service_nodes::STATE_CHANGE_TX_LIFETIME_IN_BLOCKS, latest_height);
+        log::info(logcat, "Received state change tx for height: {} and service node: {}, is older than: {} (current height: {}) blocks and has been rejected.", state_change.block_height, state_change.service_node_index, service_nodes::STATE_CHANGE_TX_LIFETIME_IN_BLOCKS, latest_height);
         vvc.m_invalid_block_height = true;
         if (latest_height >= state_change.block_height + (service_nodes::STATE_CHANGE_TX_LIFETIME_IN_BLOCKS + VOTE_OR_TX_VERIFY_HEIGHT_BUFFER))
           tvc.m_verifivation_failed = true;
@@ -195,7 +195,7 @@ namespace service_nodes
         if (validator_index_tracker >= static_cast<int>(vote.validator_index))
         {
           vvc.m_votes_not_sorted = true;
-          oxen::log::info(logcat, "Vote validator index is not stored in ascending order, prev validator index: {}, curr index: {}", validator_index_tracker, vote.validator_index);
+          log::info(logcat, "Vote validator index is not stored in ascending order, prev validator index: {}, curr index: {}", validator_index_tracker, vote.validator_index);
           return bad_tx(tvc);
         }
         validator_index_tracker = vote.validator_index;
@@ -207,14 +207,14 @@ namespace service_nodes
       if (++validator_set[vote.validator_index] > 1)
       {
         vvc.m_duplicate_voters = true;
-        oxen::log::info(logcat, "Voter quorum index is duplicated: {}", vote.validator_index);
+        log::info(logcat, "Voter quorum index is duplicated: {}", vote.validator_index);
         return bad_tx(tvc);
       }
 
       crypto::public_key const &key = quorum.validators[vote.validator_index];
       if (!crypto::check_signature(hash, key, vote.signature))
       {
-        oxen::log::info(logcat, "Invalid signature for voter {}/{}", vote.validator_index, key);
+        log::info(logcat, "Invalid signature for voter {}/{}", vote.validator_index, key);
         vvc.m_signature_not_valid = true;
         return bad_tx(tvc);
       }
@@ -241,13 +241,13 @@ namespace service_nodes
       {
         if (signatures.size() < service_nodes::CHECKPOINT_MIN_VOTES)
         {
-          oxen::log::info(logcat, "Checkpoint has insufficient signatures to be considered at height: {}", height);
+          log::info(logcat, "Checkpoint has insufficient signatures to be considered at height: {}", height);
           return false;
         }
 
         if (signatures.size() > service_nodes::CHECKPOINT_QUORUM_SIZE)
         {
-          oxen::log::info(logcat, "Checkpoint has too many signatures to be considered at height: {}", height);
+          log::info(logcat, "Checkpoint has too many signatures to be considered at height: {}", height);
           return false;
         }
 
@@ -259,13 +259,13 @@ namespace service_nodes
       {
         if (signatures.size() != PULSE_BLOCK_REQUIRED_SIGNATURES)
         {
-          oxen::log::info(logcat, "Pulse block has {} signatures but requires {}", signatures.size(), PULSE_BLOCK_REQUIRED_SIGNATURES);
+          log::info(logcat, "Pulse block has {} signatures but requires {}", signatures.size(), PULSE_BLOCK_REQUIRED_SIGNATURES);
           return false;
         }
 
         if (!block)
         {
-          oxen::log::info(logcat, "Internal Error: Wrong type passed in any object, expected block.");
+          log::info(logcat, "Internal Error: Wrong type passed in any object, expected block.");
           return false;
         }
 
@@ -273,7 +273,7 @@ namespace service_nodes
         {
           auto mask  = std::bitset<sizeof(pulse_validator_bit_mask()) * 8>(pulse_validator_bit_mask());
           auto other = std::bitset<sizeof(pulse_validator_bit_mask()) * 8>(block->pulse.validator_bitset);
-          oxen::log::info(logcat, "Pulse block specifies validator participation bits out of bounds. Expected the bit mask: {}, block: {}", mask.to_string(), other.to_string());
+          log::info(logcat, "Pulse block specifies validator participation bits out of bounds. Expected the bit mask: {}, block: {}", mask.to_string(), other.to_string());
           return false;
         }
       }
@@ -290,7 +290,7 @@ namespace service_nodes
 
         if (curr >= next)
         {
-          oxen::log::info(logcat, "Voters in signatures are not given in ascending order, failed verification at height: {}", height);
+          log::info(logcat, "Voters in signatures are not given in ascending order, failed verification at height: {}", height);
           return false;
         }
       }
@@ -302,14 +302,14 @@ namespace service_nodes
       {
         if (!block)
         {
-          oxen::log::info(logcat, "Internal Error: Wrong type passed in any object, expected block.");
+          log::info(logcat, "Internal Error: Wrong type passed in any object, expected block.");
           return false;
         }
 
         uint16_t bit = 1 << quorum_signature.voter_index;
         if ((block->pulse.validator_bitset & bit) == 0)
         {
-          oxen::log::info(logcat, "Received pulse signature from validator {} that is not participating in round {}", static_cast<int>(quorum_signature.voter_index), static_cast<int>(block->pulse.round));
+          log::info(logcat, "Received pulse signature from validator {} that is not participating in round {}", static_cast<int>(quorum_signature.voter_index), static_cast<int>(block->pulse.round));
           return false;
         }
       }
@@ -317,19 +317,19 @@ namespace service_nodes
       crypto::public_key const &key = quorum.validators[quorum_signature.voter_index];
       if (quorum_signature.voter_index >= unique_vote_set.size())
       {
-        oxen::log::info(logcat, "Internal Error: Voter Index indexes out of bounds of the vote set, index: {}vote set size: {}", quorum_signature.voter_index, unique_vote_set.size());
+        log::info(logcat, "Internal Error: Voter Index indexes out of bounds of the vote set, index: {}vote set size: {}", quorum_signature.voter_index, unique_vote_set.size());
         return false;
       }
 
       if (unique_vote_set[quorum_signature.voter_index]++)
       {
-        oxen::log::info(logcat, "Voter: {}, quorum index is duplicated: {}, failed verification at height: {}", tools::type_to_hex(key), quorum_signature.voter_index, height);
+        log::info(logcat, "Voter: {}, quorum index is duplicated: {}, failed verification at height: {}", tools::type_to_hex(key), quorum_signature.voter_index, height);
         return false;
       }
 
       if (!crypto::check_signature(hash, key, quorum_signature.signature))
       {
-        oxen::log::info(logcat, "Incorrect signature for vote, failed verification at height: {} for voter: {}\n{}", height, key, quorum);
+        log::info(logcat, "Incorrect signature for vote, failed verification at height: {} for voter: {}\n{}", height, key, quorum);
         return false;
       }
     }
@@ -349,13 +349,13 @@ namespace service_nodes
     {
       if ((checkpoint.height % service_nodes::CHECKPOINT_INTERVAL) != 0)
       {
-        oxen::log::info(logcat, "Checkpoint given but not expecting a checkpoint at height: {}", checkpoint.height);
+        log::info(logcat, "Checkpoint given but not expecting a checkpoint at height: {}", checkpoint.height);
         return false;
       }
 
       if (!verify_quorum_signatures(quorum, quorum_type::checkpointing, hf_version, checkpoint.height, checkpoint.block_hash, checkpoint.signatures))
       {
-        oxen::log::info(logcat, "Checkpoint failed signature validation at block {} {}", checkpoint.height, checkpoint.block_hash);
+        log::info(logcat, "Checkpoint failed signature validation at block {} {}", checkpoint.height, checkpoint.block_hash);
         return false;
       }
     }
@@ -363,7 +363,7 @@ namespace service_nodes
     {
       if (checkpoint.signatures.size() != 0)
       {
-        oxen::log::info(logcat, "Non service-node checkpoints should have no signatures, checkpoint failed at height: {}", checkpoint.height);
+        log::info(logcat, "Non service-node checkpoints should have no signatures, checkpoint failed at height: {}", checkpoint.height);
         return false;
       }
     }
@@ -413,13 +413,13 @@ namespace service_nodes
     if (latest_height > vote.block_height + VOTE_LIFETIME)
     {
       height_in_buffer = latest_height <= vote.block_height + (VOTE_LIFETIME + VOTE_OR_TX_VERIFY_HEIGHT_BUFFER);
-      oxen::log::info(logcat, "Received vote for height: {}, is older than: {} blocks and has been rejected.", vote.block_height, VOTE_LIFETIME);
+      log::info(logcat, "Received vote for height: {}, is older than: {} blocks and has been rejected.", vote.block_height, VOTE_LIFETIME);
       vvc.m_invalid_block_height = true;
     }
     else if (vote.block_height > latest_height)
     {
       height_in_buffer = vote.block_height <= latest_height + VOTE_OR_TX_VERIFY_HEIGHT_BUFFER;
-      oxen::log::info(logcat, "Received vote for height: {}, is newer than: {} (latest block height) and has been rejected.", vote.block_height, latest_height);
+      log::info(logcat, "Received vote for height: {}, is newer than: {} (latest block height) and has been rejected.", vote.block_height, latest_height);
       vvc.m_invalid_block_height = true;
     }
 
@@ -465,7 +465,7 @@ namespace service_nodes
     {
       default:
       {
-        oxen::log::info(logcat, "Unhandled vote type with value: {}", (int)vote.type);
+        log::info(logcat, "Unhandled vote type with value: {}", (int)vote.type);
         assert("Unhandled vote type" == 0);
         return false;
       };
@@ -474,7 +474,7 @@ namespace service_nodes
       {
         if (vote.group != quorum_group::validator)
         {
-          oxen::log::info(logcat, "Vote received specifies incorrect voting group, expected vote from validator");
+          log::info(logcat, "Vote received specifies incorrect voting group, expected vote from validator");
           vvc.m_incorrect_voting_group = true;
           result = false;
         }
@@ -491,7 +491,7 @@ namespace service_nodes
       {
         if (vote.group != quorum_group::validator)
         {
-          oxen::log::info(logcat, "Vote received specifies incorrect voting group");
+          log::info(logcat, "Vote received specifies incorrect voting group");
           vvc.m_incorrect_voting_group = true;
           result = false;
         }
@@ -509,7 +509,7 @@ namespace service_nodes
 
     result = crypto::check_signature(hash, key, vote.signature);
     if (result)
-      oxen::log::debug(logcat, "Signature accepted for {} voter {}/{} voting for worker {} at height {}", vote.type, vote.index_in_group, key, (vote.type == quorum_type::obligations ? " voting for worker " + std::to_string(vote.state_change.worker_index) : ""), vote.block_height);
+      log::debug(logcat, "Signature accepted for {} voter {}/{} voting for worker {} at height {}", vote.type, vote.index_in_group, key, (vote.type == quorum_type::obligations ? " voting for worker " + std::to_string(vote.state_change.worker_index) : ""), vote.block_height);
     else
       vvc.m_signature_not_valid = true;
 
@@ -532,7 +532,7 @@ namespace service_nodes
     switch(find_vote.type)
     {
       default:
-        oxen::log::info(logcat, "Unhandled find_vote type with value: {}", (int)find_vote.type);
+        log::info(logcat, "Unhandled find_vote type with value: {}", (int)find_vote.type);
         assert("Unhandled find_vote type" == 0);
         return nullptr;
 
@@ -643,7 +643,7 @@ namespace service_nodes
       cryptonote::tx_extra_service_node_state_change state_change;
       if (!get_service_node_state_change_from_tx_extra(tx.extra, state_change, version))
       {
-        oxen::log::error(logcat, "Could not get state change from tx, possibly corrupt tx");
+        log::error(logcat, "Could not get state change from tx, possibly corrupt tx");
         continue;
       }
 

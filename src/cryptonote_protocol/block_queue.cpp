@@ -52,7 +52,7 @@ struct hash<boost::uuids::uuid>
 namespace cryptonote
 {
 
-  static auto logcat = oxen::log::Cat("cn.block_queue");
+  static auto logcat = log::Cat("cn.block_queue");
 
 void block_queue::add_blocks(uint64_t height, std::vector<cryptonote::block_complete_entry> bcel, const boost::uuids::uuid &connection_id, float rate, size_t size)
 {
@@ -181,9 +181,9 @@ uint64_t block_queue::get_next_needed_height(uint64_t blockchain_height) const
 void block_queue::print() const
 {
   std::unique_lock lock{mutex};
-  oxen::log::debug(logcat, "Block queue has {} spans", blocks.size());
+  log::debug(logcat, "Block queue has {} spans", blocks.size());
   for (const auto &span: blocks)
-    oxen::log::debug(logcat, "  {} - {} ({}) - {}  {} ({} kB/s)", span.start_block_height, (span.start_block_height+span.nblocks-1), span.nblocks, (span.blocks.empty() ? "scheduled" : "filled    "), boost::lexical_cast<std::string>(span.connection_id), ((unsigned)(span.rate*10/1024.f))/10.f);
+    log::debug(logcat, "  {} - {} ({}) - {}  {} ({} kB/s)", span.start_block_height, (span.start_block_height+span.nblocks-1), span.nblocks, (span.blocks.empty() ? "scheduled" : "filled    "), boost::lexical_cast<std::string>(span.connection_id), ((unsigned)(span.rate*10/1024.f))/10.f);
 }
 
 std::string block_queue::get_overview(uint64_t blockchain_height) const
@@ -241,15 +241,15 @@ std::pair<uint64_t, uint64_t> block_queue::reserve_span(
 {
   std::unique_lock lock{mutex};
 
-  oxen::log::debug(logcat, "reserve_span: first_block_height {}, last_block_height {}, max {}, seed {}, blockchain_height {}, block hashes size {}", first_block_height, last_block_height, max_blocks, epee::string_tools::to_string_hex(pruning_seed), blockchain_height, block_hashes.size());
+  log::debug(logcat, "reserve_span: first_block_height {}, last_block_height {}, max {}, seed {}, blockchain_height {}, block hashes size {}", first_block_height, last_block_height, max_blocks, epee::string_tools::to_string_hex(pruning_seed), blockchain_height, block_hashes.size());
   if (last_block_height < first_block_height || max_blocks == 0)
   {
-    oxen::log::debug(logcat, "reserve_span: early out: first_block_height {}, last_block_height {}, max_blocks {}", first_block_height, last_block_height, max_blocks);
+    log::debug(logcat, "reserve_span: early out: first_block_height {}, last_block_height {}, max_blocks {}", first_block_height, last_block_height, max_blocks);
     return std::make_pair(0, 0);
   }
   if (block_hashes.size() > last_block_height)
   {
-    oxen::log::debug(logcat, "reserve_span: more block hashes than fit within last_block_height: {} and {}", block_hashes.size(), last_block_height);
+    log::debug(logcat, "reserve_span: more block hashes than fit within last_block_height: {} and {}", block_hashes.size(), last_block_height);
     return std::make_pair(0, 0);
   }
 
@@ -264,17 +264,17 @@ std::pair<uint64_t, uint64_t> block_queue::reserve_span(
 
   // if the peer's pruned for the starting block and its unpruned stripe comes next, start downloading from there
   const uint32_t next_unpruned_height = tools::get_next_unpruned_block_height(span_start_height, blockchain_height, pruning_seed);
-  oxen::log::debug(logcat, "reserve_span: next_unpruned_height {} from {} and seed {}, limit {}", next_unpruned_height, span_start_height, epee::string_tools::to_string_hex(pruning_seed), span_start_height);
+  log::debug(logcat, "reserve_span: next_unpruned_height {} from {} and seed {}, limit {}", next_unpruned_height, span_start_height, epee::string_tools::to_string_hex(pruning_seed), span_start_height);
   if (next_unpruned_height > span_start_height && next_unpruned_height < span_start_height + PRUNING_STRIPE_SIZE)
   {
-    oxen::log::debug(logcat, "We can download from next span: ideal height {}, next unpruned height {}(+{}), current seed {}", span_start_height, next_unpruned_height, next_unpruned_height - span_start_height, pruning_seed);
+    log::debug(logcat, "We can download from next span: ideal height {}, next unpruned height {}(+{}), current seed {}", span_start_height, next_unpruned_height, next_unpruned_height - span_start_height, pruning_seed);
     span_start_height = next_unpruned_height;
   }
-  oxen::log::debug(logcat, "span_start_height: {}", span_start_height);
+  log::debug(logcat, "span_start_height: {}", span_start_height);
   const uint64_t block_hashes_start_height = last_block_height - block_hashes.size() + 1;
   if (span_start_height >= block_hashes.size() + block_hashes_start_height)
   {
-    oxen::log::debug(logcat, "Out of hashes, cannot reserve");
+    log::debug(logcat, "Out of hashes, cannot reserve");
     return std::make_pair(0, 0);
   }
 
@@ -295,10 +295,10 @@ std::pair<uint64_t, uint64_t> block_queue::reserve_span(
   }
   if (span_length == 0)
   {
-    oxen::log::debug(logcat, "span_length 0, cannot reserve");
+    log::debug(logcat, "span_length 0, cannot reserve");
     return std::make_pair(0, 0);
   }
-  oxen::log::debug(logcat, "Reserving span {} - {} for {}", span_start_height, (span_start_height + span_length - 1), boost::lexical_cast<std::string>(connection_id));
+  log::debug(logcat, "Reserving span {} - {} for {}", span_start_height, (span_start_height + span_length - 1), boost::lexical_cast<std::string>(connection_id));
   add_blocks(span_start_height, span_length, connection_id, std::chrono::steady_clock::now());
   set_span_hashes(span_start_height, connection_id, hashes);
   return std::make_pair(span_start_height, span_length);
@@ -464,7 +464,7 @@ float block_queue::get_speed(const boost::uuids::uuid &connection_id) const
     return 1.0f; // everything dead ? Can't happen, but let's trap anyway
 
   const float speed = conn_rate / best_rate;
-  oxen::log::trace(logcat, " Relative speed for {}: {} ({}/{}", boost::lexical_cast<std::string>(connection_id), speed, conn_rate, best_rate);
+  log::trace(logcat, " Relative speed for {}: {} ({}/{}", boost::lexical_cast<std::string>(connection_id), speed, conn_rate, best_rate);
   return speed;
 }
 
@@ -489,7 +489,7 @@ float block_queue::get_download_rate(const boost::uuids::uuid &connection_id) co
 
   if (conn_rate < 0)
     conn_rate = 0.0f;
-  oxen::log::trace(logcat, "Download rate for {}: {} b/s", boost::lexical_cast<std::string>(connection_id), conn_rate);
+  log::trace(logcat, "Download rate for {}: {} b/s", boost::lexical_cast<std::string>(connection_id), conn_rate);
   return conn_rate;
 }
 

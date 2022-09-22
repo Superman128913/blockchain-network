@@ -46,7 +46,7 @@ void apply_permutation(std::vector<size_t> permutation, const F &swap)
   for (size_t n = 0; n < permutation.size(); ++n)
     if (std::find(permutation.begin(), permutation.end(), n) == permutation.end())
     {
-      oxen::log::error(globallogcat, "Bad permutation");
+      log::error(globallogcat, "Bad permutation");
       throw std::runtime_error("Bad permutation");
       return;
     }
@@ -70,7 +70,7 @@ void apply_permutation(const std::vector<size_t> &permutation, std::vector<T> &v
 {
   if (permutation.size() != v.size())
   {
-    oxen::log::error(globallogcat, "Mismatched vector sizes");
+    log::error(globallogcat, "Mismatched vector sizes");
     throw std::runtime_error("Mismatched vector sizes");
     return;
   }

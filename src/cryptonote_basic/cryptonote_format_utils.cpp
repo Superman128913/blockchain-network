@@ -55,11 +55,11 @@
 
 using namespace crypto;
 
-#define CHECK_AND_ASSERT_THROW_MES_L1(expr, message) {if(!(expr)) {oxen::log::warning(logcat, message); throw std::runtime_error(message);}}
+#define CHECK_AND_ASSERT_THROW_MES_L1(expr, message) {if(!(expr)) {log::warning(logcat, message); throw std::runtime_error(message);}}
 
 namespace cryptonote
 {
-  static auto logcat = oxen::log::Cat("cn");
+  static auto logcat = log::Cat("cn");
 
   static inline unsigned char *operator &(ec_point &point) {
     return &reinterpret_cast<unsigned char &>(point);
@@ -135,14 +135,14 @@ namespace cryptonote
         return true;
       if (rv.outPk.size() != tx.vout.size())
       {
-        oxen::log::info(logcat, "Failed to parse transaction from blob, bad outPk size in tx {}", get_transaction_hash(tx));
+        log::info(logcat, "Failed to parse transaction from blob, bad outPk size in tx {}", get_transaction_hash(tx));
         return false;
       }
       for (size_t n = 0; n < tx.rct_signatures.outPk.size(); ++n)
       {
         if (!std::holds_alternative<txout_to_key>(tx.vout[n].target))
         {
-          oxen::log::info(logcat, "Unsupported output type in tx {}", get_transaction_hash(tx));
+          log::info(logcat, "Unsupported output type in tx {}", get_transaction_hash(tx));
           return false;
         }
         rv.outPk[n].dest = rct::pk2rct(var::get<txout_to_key>(tx.vout[n].target).key);
@@ -155,18 +155,18 @@ namespace cryptonote
         {
           if (rv.p.bulletproofs.size() != 1)
           {
-            oxen::log::info(logcat, "Failed to parse transaction from blob, bad bulletproofs size in tx {}", get_transaction_hash(tx));
+            log::info(logcat, "Failed to parse transaction from blob, bad bulletproofs size in tx {}", get_transaction_hash(tx));
             return false;
           }
           if (rv.p.bulletproofs[0].L.size() < 6)
           {
-            oxen::log::info(logcat, "Failed to parse transaction from blob, bad bulletproofs L size in tx {}", get_transaction_hash(tx));
+            log::info(logcat, "Failed to parse transaction from blob, bad bulletproofs L size in tx {}", get_transaction_hash(tx));
             return false;
           }
           const size_t max_outputs = 1 << (rv.p.bulletproofs[0].L.size() - 6);
           if (max_outputs < tx.vout.size())
           {
-            oxen::log::info(logcat, "Failed to parse transaction from blob, bad bulletproofs max outputs in tx {}", get_transaction_hash(tx));
+            log::info(logcat, "Failed to parse transaction from blob, bad bulletproofs max outputs in tx {}", get_transaction_hash(tx));
             return false;
           }
           const size_t n_amounts = tx.vout.size();
@@ -197,7 +197,7 @@ namespace cryptonote
     try {
       serialization::serialize(ba, tx);
     } catch (const std::exception& e) {
-      oxen::log::error(logcat, "Failed to parse and validate transaction from blob: {}", e.what());
+      log::error(logcat, "Failed to parse and validate transaction from blob: {}", e.what());
       return false;
     }
     CHECK_AND_ASSERT_MES(expand_transaction_1(tx, false), false, "Failed to expand transaction data");
@@ -212,7 +212,7 @@ namespace cryptonote
     try {
       tx.serialize_base(ba);
     } catch (const std::exception& e) {
-      oxen::log::error(logcat, "Failed to parse transaction base from blob: {}", e.what());
+      log::error(logcat, "Failed to parse transaction base from blob: {}", e.what());
       return false;
     }
     CHECK_AND_ASSERT_MES(expand_transaction_1(tx, true), false, "Failed to expand transaction data");
@@ -226,7 +226,7 @@ namespace cryptonote
     try {
       serialization::value(ba, tx);
     } catch (const std::exception& e) {
-      oxen::log::error(logcat, "Failed to parse transaction prefix from blob: {}", e.what());
+      log::error(logcat, "Failed to parse transaction prefix from blob: {}", e.what());
       return false;
     }
     return true;
@@ -238,7 +238,7 @@ namespace cryptonote
     try {
       serialization::serialize(ba, tx);
     } catch (const std::exception& e) {
-      oxen::log::error(logcat, "Failed to parse and validate transaction from blob + hash: {}", e.what());
+      log::error(logcat, "Failed to parse and validate transaction from blob + hash: {}", e.what());
       return false;
     }
     CHECK_AND_ASSERT_MES(expand_transaction_1(tx, false), false, "Failed to expand transaction data");
@@ -270,7 +270,7 @@ namespace cryptonote
     bool r = hwdev.generate_key_derivation(tx_public_key, ack.m_view_secret_key, recv_derivation);
     if (!r)
     {
-      oxen::log::warning(logcat, "key image helper: failed to generate_key_derivation({}, {})", tx_public_key, ack.m_view_secret_key);
+      log::warning(logcat, "key image helper: failed to generate_key_derivation({}, {})", tx_public_key, ack.m_view_secret_key);
       memcpy(&recv_derivation, rct::identity().bytes, sizeof(recv_derivation));
     }
 
@@ -281,7 +281,7 @@ namespace cryptonote
       r = hwdev.generate_key_derivation(additional_tx_public_keys[i], ack.m_view_secret_key, additional_recv_derivation);
       if (!r)
       {
-        oxen::log::warning(logcat, "key image helper: failed to generate_key_derivation({}, {})", additional_tx_public_keys[i], ack.m_view_secret_key);
+        log::warning(logcat, "key image helper: failed to generate_key_derivation({}, {})", additional_tx_public_keys[i], ack.m_view_secret_key);
       }
       else
       {
@@ -528,7 +528,7 @@ namespace cryptonote
     try {
       serialization::deserialize_all(ar, tx_extra_fields);
     } catch (const std::exception& e) {
-      oxen::log::warning(logcat, "{}: failed to deserialize extra field: {}; extra = {}", __func__, e.what(), oxenc::to_hex(tx_extra.begin(), tx_extra.end()));
+      log::warning(logcat, "{}: failed to deserialize extra field: {}; extra = {}", __func__, e.what(), oxenc::to_hex(tx_extra.begin(), tx_extra.end()));
       return false;
     }
 
@@ -549,7 +549,7 @@ namespace cryptonote
       for (auto& f : tx_extra_fields)
         serialization::value(ar, f);
     } catch (const std::exception& e) {
-      oxen::log::info(logcat, "failed to serialize tx extra field: {}", e.what());
+      log::info(logcat, "failed to serialize tx extra field: {}", e.what());
       return false;
     }
 
@@ -611,7 +611,7 @@ namespace cryptonote
     tx_extra_field field = tx_extra_additional_pub_keys{ additional_pub_keys };
     if (!add_tx_extra_field_to_tx_extra(tx_extra, field))
     {
-      oxen::log::info(logcat, "failed to serialize tx extra additional tx pub keys");
+      log::info(logcat, "failed to serialize tx extra additional tx pub keys");
       return false;
     }
     return true;
@@ -684,7 +684,7 @@ namespace cryptonote
     tx_extra_field field = proofs;
     if (!add_tx_extra_field_to_tx_extra(tx_extra, field))
     {
-      oxen::log::info(logcat, "failed to serialize tx extra tx key image proof");
+      log::info(logcat, "failed to serialize tx extra tx key image proof");
       return false;
     }
 
@@ -696,7 +696,7 @@ namespace cryptonote
     tx_extra_field field = unlock;
     if (!add_tx_extra_field_to_tx_extra(tx_extra, field))
     {
-      oxen::log::info(logcat, "failed to serialize tx extra tx key image unlock");
+      log::info(logcat, "failed to serialize tx extra tx key image unlock");
       return false;
     }
     return true;
@@ -731,7 +731,7 @@ namespace cryptonote
 
     if (!add_tx_extra_field_to_tx_extra(tx_extra, field))
     {
-      oxen::log::info(logcat, "failed to serialize tx extra registration tx");
+      log::info(logcat, "failed to serialize tx extra registration tx");
       return false;
     }
 
@@ -794,7 +794,7 @@ namespace cryptonote
           value(newar, field);
       } while (ar.remaining_bytes() > 0);
     } catch (const std::exception& e) {
-      oxen::log::info(logcat, "{}: failed to deserialize extra field: {}; extra = {}", __func__, e.what(), oxenc::to_hex(tx_extra.begin(), tx_extra.end()));
+      log::info(logcat, "{}: failed to deserialize extra field: {}; extra = {}", __func__, e.what(), oxenc::to_hex(tx_extra.begin(), tx_extra.end()));
       return false;
     }
 
@@ -854,7 +854,7 @@ namespace cryptonote
     tx_extra_field field = tx_extra_burn{burn};
     if (!add_tx_extra_field_to_tx_extra(tx_extra, field))
     {
-      oxen::log::info(logcat, "failed to serialize tx extra burn amount");
+      log::info(logcat, "failed to serialize tx extra burn amount");
       return false;
     }
     return true;
@@ -903,13 +903,13 @@ namespace cryptonote
   {
     if (!tx.is_transfer() && tx.vout.size() != 0)
     {
-      oxen::log::warning(logcat, "tx type: {} must have 0 outputs, received: {}, id={}", transaction::type_to_string(tx.type), tx.vout.size(), get_transaction_hash(tx));
+      log::warning(logcat, "tx type: {} must have 0 outputs, received: {}, id={}", transaction::type_to_string(tx.type), tx.vout.size(), get_transaction_hash(tx));
       return false;
     }
 
     if (tx.version >= txversion::v3_per_output_unlock_times && tx.vout.size() != tx.output_unlock_times.size())
     {
-      oxen::log::warning(logcat, "tx version: {} must have equal number of output unlock times and outputs", transaction::version_to_string(tx.version));
+      log::warning(logcat, "tx version: {} must have equal number of output unlock times and outputs", transaction::version_to_string(tx.version));
       return false;
 
     }
@@ -924,7 +924,7 @@ namespace cryptonote
       {
         if (out.amount <= 0)
         {
-          oxen::log::warning(logcat, "zero amount output in transaction id={}", get_transaction_hash(tx));
+          log::warning(logcat, "zero amount output in transaction id={}", get_transaction_hash(tx));
           return false;
         }
       }
@@ -1227,7 +1227,7 @@ namespace cryptonote
         const_cast<transaction&>(t).rct_signatures.p.serialize_rctsig_prunable(
                 ba, t.rct_signatures.type, t.vin.size(), t.vout.size(), mixin);
       } catch (const std::exception& e) {
-        oxen::log::error(logcat, "Failed to serialize rct signatures (prunable): {}", e.what());
+        log::error(logcat, "Failed to serialize rct signatures (prunable): {}", e.what());
         return false;
       }
       cryptonote::get_blob_hash(ba.str(), res);
@@ -1314,7 +1314,7 @@ namespace cryptonote
       try {
         tt.rct_signatures.serialize_rctsig_base(ba, t.vin.size(), t.vout.size());
       } catch (const std::exception& e) {
-        oxen::log::error(logcat, "Failed to serialize rct signatures base: {}", e.what());
+        log::error(logcat, "Failed to serialize rct signatures base: {}", e.what());
         return false;
       }
       cryptonote::get_blob_hash(ba.str(), hashes[1]);
@@ -1327,7 +1327,7 @@ namespace cryptonote
     }
     else if (!calculate_transaction_prunable_hash(t, &blob, hashes[2]))
     {
-      oxen::log::error(logcat, "Failed to get tx prunable hash");
+      log::error(logcat, "Failed to get tx prunable hash");
       return false;
     }
 
@@ -1447,7 +1447,7 @@ namespace cryptonote
     try {
       serialization::serialize(ba, b);
     } catch (const std::exception& e) {
-      oxen::log::error(logcat, "Failed to parse block from blob: {}", e.what());
+      log::error(logcat, "Failed to parse block from blob: {}", e.what());
       return false;
     }
     b.invalidate_hashes();

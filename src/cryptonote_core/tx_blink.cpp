@@ -50,7 +50,7 @@ crypto::public_key blink_tx::get_sn_pubkey(subquorum q, int position, const serv
     if (!blink_quorum) {
         // TODO FIXME XXX - we don't want a failure here; if this happens we need to go back into state
         // history to retrieve the state info.  (Or maybe this can't happen?)
-        oxen::log::error(globallogcat, "FIXME: could not get blink quorum for blink_tx");
+        log::error(globallogcat, "FIXME: could not get blink quorum for blink_tx");
         return crypto::null_pkey;
     }
 

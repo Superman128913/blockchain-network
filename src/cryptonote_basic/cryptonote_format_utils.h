@@ -273,7 +273,7 @@ namespace cryptonote
       blob = serialization::dump_binary(const_cast<std::remove_const_t<T>&>(val));
       return true;
     } catch (const std::exception& e) {
-      oxen::log::error(globallogcat, "Serialization of {} failed: {}", tools::type_name(typeid(T)), e.what());
+      log::error(globallogcat, "Serialization of {} failed: {}", tools::type_name(typeid(T)), e.what());
       return false;
     }
   }
@@ -318,7 +318,7 @@ namespace cryptonote
     try {
       serialize(ar, obj);
     } catch (const std::exception& e) {
-      oxen::log::error(globallogcat, "obj_to_json_str failed: serialization failed: {}", e.what());
+      log::error(globallogcat, "obj_to_json_str failed: serialization failed: {}", e.what());
       return ""s;
     }
     return ss.str();

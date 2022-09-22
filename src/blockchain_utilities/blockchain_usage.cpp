@@ -39,7 +39,7 @@
 namespace po = boost::program_options;
 using namespace cryptonote;
 
-static auto logcat = oxen::log::Cat("quorum_cop");
+static auto logcat = log::Cat("quorum_cop");
 
 struct output_data
 {
@@ -120,7 +120,7 @@ int main(int argc, char* argv[])
 
   auto m_config_folder = command_line::get_arg(vm, cryptonote::arg_data_dir);
   auto log_file_path = m_config_folder + "oxen-blockchain-usage.log";
-  oxen::log::Level log_level;
+  log::Level log_level;
   if(auto level = oxen::logging::parse_level(command_line::get_arg(vm, arg_log_level).c_str())) {
     log_level = *level;
   } else {
@@ -128,7 +128,7 @@ int main(int argc, char* argv[])
       throw std::runtime_error{"Incorrect log level"};
   }
   oxen::logging::init(log_file_path, log_level);
-  oxen::log::warning(logcat, "Starting...");
+  log::warning(logcat, "Starting...");
 
   bool opt_testnet = command_line::get_arg(vm, cryptonote::arg_testnet_on);
   bool opt_devnet = command_line::get_arg(vm, cryptonote::arg_devnet_on);
@@ -146,7 +146,7 @@ int main(int argc, char* argv[])
   //   Blockchain* core_storage = new Blockchain(NULL);
   // because unlike blockchain_storage constructor, which takes a pointer to
   // tx_memory_pool, Blockchain's constructor takes tx_memory_pool object.
-  oxen::log::warning(logcat, "Initializing source blockchain (BlockchainDB)");
+  log::warning(logcat, "Initializing source blockchain (BlockchainDB)");
   const std::string input = command_line::get_arg(vm, arg_input);
   blockchain_objects_t blockchain_objects = {};
   Blockchain *core_storage = &blockchain_objects.m_blockchain;
@@ -154,13 +154,13 @@ int main(int argc, char* argv[])
   BlockchainDB *db = new_db();
   if (db == NULL)
   {
-    oxen::log::error(logcat, "Failed to initialize a database");
+    log::error(logcat, "Failed to initialize a database");
     throw std::runtime_error("Failed to initialize a database");
   }
-  oxen::log::warning(logcat, "database: LMDB");
+  log::warning(logcat, "database: LMDB");
 
   const fs::path filename = fs::u8path(input);
-  oxen::log::warning(logcat, "Loading blockchain from folder {} ...", filename);
+  log::warning(logcat, "Loading blockchain from folder {} ...", filename);
 
   try
   {
@@ -168,22 +168,22 @@ int main(int argc, char* argv[])
   }
   catch (const std::exception& e)
   {
-    oxen::log::warning(logcat, "Error opening database: {}", e.what());
+    log::warning(logcat, "Error opening database: {}", e.what());
     return 1;
   }
 
   r = core_storage->init(db, nullptr /*ons_db*/, nullptr, net_type);
 
   CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize source blockchain storage");
-  oxen::log::warning(logcat, "Source blockchain storage initialized OK");
+  log::warning(logcat, "Source blockchain storage initialized OK");
 
-  oxen::log::warning(logcat, "Building usage patterns...");
+  log::warning(logcat, "Building usage patterns...");
 
   size_t done = 0;
   std::unordered_map<output_data, std::list<reference>> outputs;
   std::unordered_map<uint64_t,uint64_t> indices;
 
-  oxen::log::warning(logcat, "Reading blockchain from {}", input);
+  log::warning(logcat, "Reading blockchain from {}", input);
   core_storage->for_all_transactions([&](const crypto::hash &hash, const cryptonote::transaction &tx)->bool
   {
     const bool coinbase = tx.vin.size() == 1 && std::holds_alternative<txin_gen>(tx.vin[0]);
@@ -228,15 +228,15 @@ int main(int argc, char* argv[])
     for (const auto &c: counts)
     {
       float percent = 100.f * c.second / total;
-      oxen::log::info(logcat, "{} outputs used {} times ({}%)", std::to_string(c.second), c.first, percent);
+      log::info(logcat, "{} outputs used {} times ({}%)", std::to_string(c.second), c.first, percent);
     }
   }
   else
   {
-    oxen::log::info(logcat, "No outputs to process");
+    log::info(logcat, "No outputs to process");
   }
 
-  oxen::log::warning(logcat, "Blockchain usage exported OK");
+  log::warning(logcat, "Blockchain usage exported OK");
   return 0;
 
   CATCH_ENTRY("Export error", 1);

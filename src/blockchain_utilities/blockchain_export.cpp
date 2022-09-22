@@ -36,12 +36,13 @@
 #include "cryptonote_core/uptime_proof.h"
 #include <fmt/std.h>
 
-static auto logcat = oxen::log::Cat("bcutil");
-
 namespace po = boost::program_options;
 
 int main(int argc, char* argv[])
 {
+  using namespace oxen;
+  auto logcat = log::Cat("bcutil");
+
   TRY_ENTRY();
 
   epee::string_tools::set_module_name_and_folder(argv[0]);
@@ -92,7 +93,7 @@ int main(int argc, char* argv[])
 
   auto m_config_folder = command_line::get_arg(vm, cryptonote::arg_data_dir);
   auto log_file_path = m_config_folder + "oxen-blockchain-export.log";
-  oxen::log::Level log_level;
+  log::Level log_level;
   if(auto level = oxen::logging::parse_level(command_line::get_arg(vm, arg_log_level).c_str())) {
     log_level = *level;
   } else {
@@ -100,7 +101,7 @@ int main(int argc, char* argv[])
       throw std::runtime_error{"Incorrect log level"};
   }
   oxen::logging::init(log_file_path, log_level);
-  oxen::log::warning(logcat, "Starting...");
+  log::warning(logcat, "Starting...");
 
   bool opt_testnet = command_line::get_arg(vm, cryptonote::arg_testnet_on);
   bool opt_devnet = command_line::get_arg(vm, cryptonote::arg_devnet_on);
@@ -118,42 +119,42 @@ int main(int argc, char* argv[])
     output_file_path = fs::u8path(command_line::get_arg(vm, arg_output_file));
   else
     output_file_path = config_folder / "export" / BLOCKCHAIN_RAW;
-  oxen::log::warning(logcat, "Export output file: {}", output_file_path.string());
+  log::warning(logcat, "Export output file: {}", output_file_path.string());
 
-  oxen::log::warning(logcat, "Initializing source blockchain (BlockchainDB)");
+  log::warning(logcat, "Initializing source blockchain (BlockchainDB)");
   blockchain_objects_t blockchain_objects = {};
   Blockchain *core_storage = &blockchain_objects.m_blockchain;
   BlockchainDB *db = new_db();
   if (db == NULL)
   {
-    oxen::log::error(logcat, "Failed to initialize a database");
+    log::error(logcat, "Failed to initialize a database");
     throw std::runtime_error("Failed to initialize a database");
   }
-  oxen::log::warning(logcat, "database: LMDB");
+  log::warning(logcat, "database: LMDB");
 
   auto filename = config_folder / db->get_db_name();
 
-  oxen::log::warning(logcat, "Loading blockchain from folder {} ...", filename);
+  log::warning(logcat, "Loading blockchain from folder {} ...", filename);
   try
   {
     db->open(filename, core_storage->nettype(), DBF_RDONLY);
   }
   catch (const std::exception& e)
   {
-    oxen::log::warning(logcat, "Error opening database: {}", e.what());
+    log::warning(logcat, "Error opening database: {}", e.what());
     return 1;
   }
   r = core_storage->init(db, nullptr, nullptr, opt_testnet ? cryptonote::network_type::TESTNET : opt_devnet ? cryptonote::network_type::DEVNET : cryptonote::network_type::MAINNET);
 
   if (core_storage->get_blockchain_pruning_seed() && !opt_blocks_dat)
   {
-    oxen::log::warning(logcat, "Blockchain is pruned, cannot export");
+    log::warning(logcat, "Blockchain is pruned, cannot export");
     return 1;
   }
 
   CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize source blockchain storage");
-  oxen::log::warning(logcat, "Source blockchain storage initialized OK");
-  oxen::log::warning(logcat, "Exporting blockchain raw data...");
+  log::warning(logcat, "Source blockchain storage initialized OK");
+  log::warning(logcat, "Exporting blockchain raw data...");
 
   if (opt_blocks_dat)
   {
@@ -166,7 +167,7 @@ int main(int argc, char* argv[])
     r = bootstrap.store_blockchain_raw(core_storage, NULL, output_file_path, block_stop);
   }
   CHECK_AND_ASSERT_MES(r, 1, "Failed to export blockchain raw data");
-  oxen::log::warning(logcat, "Blockchain raw data exported OK");
+  log::warning(logcat, "Blockchain raw data exported OK");
   return 0;
 
   CATCH_ENTRY("Export error", 1);

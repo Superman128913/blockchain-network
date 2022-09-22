@@ -42,7 +42,8 @@
 
 namespace mms
 {
-  static auto logcat = oxen::log::Cat("wallet.mms");
+  namespace log = oxen::log;
+  static auto logcat = log::Cat("wallet.mms");
 
 message_store::message_store()
 {
@@ -439,7 +440,7 @@ bool message_store::get_signer_index_by_monero_address(const cryptonote::account
       return true;
     }
   }
-  oxen::log::warning(logcat, "No authorized signer with Monero address {}", account_address_to_string(monero_address));
+  log::warning(logcat, "No authorized signer with Monero address {}", account_address_to_string(monero_address));
   return false;
 }
 
@@ -454,7 +455,7 @@ bool message_store::get_signer_index_by_label(const std::string label, uint32_t 
       return true;
     }
   }
-  oxen::log::warning(logcat, "No authorized signer with label {}", label);
+  log::warning(logcat, "No authorized signer with label {}", label);
   return false;
 }
 
@@ -537,7 +538,7 @@ size_t message_store::add_message(const multisig_wallet_state &state,
   // Save for every new message right away (at least while in beta)
   save(state);
 
-  oxen::log::info(boost::format("Added %s message %s for signer %s of type %s")
+  log::info(boost::format("Added %s message %s for signer %s of type %s")
           % message_direction_to_string(direction) % m.id % signer_index % message_type_to_string(type));
   return m_messages.size() - 1;
 }
@@ -553,7 +554,7 @@ bool message_store::get_message_index_by_id(uint32_t id, size_t &index) const
       return true;
     }
   }
-  oxen::log::warning(logcat, "No message found with an id of {}", id);
+  log::warning(logcat, "No message found with an id of {}", id);
   return false;
 }
 
@@ -719,7 +720,7 @@ void message_store::read_from_file(const multisig_wallet_state &state, const fs:
   {
     // Simply do nothing if the file is not there; allows e.g. easy recovery
     // from problems with the MMS by deleting the file
-    oxen::log::info(logcat, "No message store file found: {}", filename);
+    log::info(logcat, "No message store file found: {}", filename);
     return;
   }
 
@@ -737,7 +738,7 @@ void message_store::read_from_file(const multisig_wallet_state &state, const fs:
   }
   catch (const std::exception &e)
   {
-    oxen::log::error(logcat, "MMS file {} has bad structure <iv,encrypted_data>: {}", filename, e.what());
+    log::error(logcat, "MMS file {} has bad structure <iv,encrypted_data>: {}", filename, e.what());
     THROW_WALLET_EXCEPTION_IF(true, tools::error::file_read_error, filename);
   }
 
@@ -756,7 +757,7 @@ void message_store::read_from_file(const multisig_wallet_state &state, const fs:
   }
   catch (const std::exception &e)
   {
-    oxen::log::error(logcat, "MMS file {} has bad structure: {}", filename, e.what());
+    log::error(logcat, "MMS file {} has bad structure: {}", filename, e.what());
     THROW_WALLET_EXCEPTION_IF(true, tools::error::file_read_error, filename);
   }
 

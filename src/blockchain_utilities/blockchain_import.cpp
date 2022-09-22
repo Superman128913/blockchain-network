@@ -48,8 +48,6 @@
 #include <fmt/std.h>
 #include <fmt/color.h>
 
-static auto logcat = oxen::log::Cat("bcutil");
-
 namespace
 {
 // CONFIG
@@ -88,6 +86,8 @@ const command_line::arg_descriptor<bool> arg_recalculate_difficulty = {
 namespace po = boost::program_options;
 
 using namespace cryptonote;
+
+static auto logcat = log::Cat("bcutil");
 
 // db_mode: safe, fast, fastest
 int get_db_flags_from_mode(const std::string& db_mode)
@@ -144,7 +144,7 @@ int check_flush(cryptonote::core &core, std::vector<block_complete_entry> &block
     cryptonote::block block;
     if (!parse_and_validate_block_from_blob(b.block, block))
     {
-      oxen::log::error(logcat, "Failed to parse block: {}", tools::type_to_hex(get_blob_hash(b.block)));
+      log::error(logcat, "Failed to parse block: {}", tools::type_to_hex(get_blob_hash(b.block)));
       core.cleanup_handle_incoming_blocks();
       return 1;
     }
@@ -156,12 +156,12 @@ int check_flush(cryptonote::core &core, std::vector<block_complete_entry> &block
   std::vector<block> pblocks;
   if (!core.prepare_handle_incoming_blocks(blocks, pblocks))
   {
-    oxen::log::error(logcat, "Failed to prepare to add blocks");
+    log::error(logcat, "Failed to prepare to add blocks");
     return 1;
   }
   if (!pblocks.empty() && pblocks.size() != blocks.size())
   {
-    oxen::log::error(logcat, "Unexpected parsed blocks size");
+    log::error(logcat, "Unexpected parsed blocks size");
     core.cleanup_handle_incoming_blocks();
     return 1;
   }
@@ -176,7 +176,7 @@ int check_flush(cryptonote::core &core, std::vector<block_complete_entry> &block
       core.handle_incoming_tx(tx_blob, tvc, tx_pool_options::from_block());
       if(tvc.m_verifivation_failed)
       {
-        oxen::log::error(logcat, "transaction verification failed, tx_id = {}", tools::type_to_hex(get_blob_hash(tx_blob)));
+        log::error(logcat, "transaction verification failed, tx_id = {}", tools::type_to_hex(get_blob_hash(tx_blob)));
         core.cleanup_handle_incoming_blocks();
         return 1;
       }
@@ -190,13 +190,13 @@ int check_flush(cryptonote::core &core, std::vector<block_complete_entry> &block
 
     if(bvc.m_verifivation_failed)
     {
-      oxen::log::error(logcat, "Block verification failed, id = {}", tools::type_to_hex(get_blob_hash(block_entry.block)));
+      log::error(logcat, "Block verification failed, id = {}", tools::type_to_hex(get_blob_hash(block_entry.block)));
       core.cleanup_handle_incoming_blocks();
       return 1;
     }
     if(bvc.m_marked_as_orphaned)
     {
-      oxen::log::error(logcat, "Block received at sync phase was marked as orphaned");
+      log::error(logcat, "Block received at sync phase was marked as orphaned");
       core.cleanup_handle_incoming_blocks();
       return 1;
     }
@@ -218,7 +218,7 @@ int import_from_file(cryptonote::core& core, const fs::path& import_file_path, u
 
   if (std::error_code ec; !fs::exists(import_file_path, ec))
   {
-    oxen::log::error(logcat, "bootstrap file not found: {}", import_file_path);
+    log::error(logcat, "bootstrap file not found: {}", import_file_path);
     return false;
   }
 
@@ -231,7 +231,7 @@ int import_from_file(cryptonote::core& core, const fs::path& import_file_path, u
   std::streampos pos;
   // BootstrapFile bootstrap(import_file_path);
   uint64_t total_source_blocks = bootstrap.count_blocks(import_file_path, pos, seek_height);
-  oxen::log::info(logcat, "bootstrap file last block number: {} (zero-based height)  total blocks: {}", total_source_blocks-1, total_source_blocks);
+  log::info(logcat, "bootstrap file last block number: {} (zero-based height)  total blocks: {}", total_source_blocks-1, total_source_blocks);
 
   if (total_source_blocks-1 <= start_height)
   {
@@ -244,7 +244,7 @@ int import_from_file(cryptonote::core& core, const fs::path& import_file_path, u
 
   if (import_file.fail())
   {
-    oxen::log::error(logcat, "import_file.open() fail");
+    log::error(logcat, "import_file.open() fail");
     return false;
   }
 
@@ -268,11 +268,11 @@ int import_from_file(cryptonote::core& core, const fs::path& import_file_path, u
 
   // These are what we'll try to use, and they don't have to be a determination
   // from source and destination blockchains, but those are the defaults.
-  oxen::log::info(logcat, "start block: {}  stop block: {}", start_height, block_stop);
+  log::info(logcat, "start block: {}  stop block: {}", start_height, block_stop);
 
   bool use_batch = opt_batch && !opt_verify;
 
-  oxen::log::info(logcat, "Reading blockchain from bootstrap file...");
+  log::info(logcat, "Reading blockchain from bootstrap file...");
   std::cout << "\n";
 
   std::vector<block_complete_entry> blocks;
@@ -311,7 +311,7 @@ int import_from_file(cryptonote::core& core, const fs::path& import_file_path, u
     // TODO: bootstrap.read_chunk();
     if (! import_file) {
       std::cout << refresh_string;
-      oxen::log::info(logcat, "End of file reached");
+      log::info(logcat, "End of file reached");
       quit = 1;
       break;
     }
@@ -322,19 +322,19 @@ int import_from_file(cryptonote::core& core, const fs::path& import_file_path, u
     } catch (const std::exception& e) {
       throw std::runtime_error("Error in deserialization of chunk size: "s + e.what());
     }
-    oxen::log::debug(logcat, "chunk_size: {}", chunk_size);
+    log::debug(logcat, "chunk_size: {}", chunk_size);
 
     if (chunk_size > BUFFER_SIZE)
     {
-      oxen::log::warning(logcat, "WARNING: chunk_size {} > BUFFER_SIZE {}", chunk_size, BUFFER_SIZE);
+      log::warning(logcat, "WARNING: chunk_size {} > BUFFER_SIZE {}", chunk_size, BUFFER_SIZE);
       throw std::runtime_error("Aborting: chunk size exceeds buffer size");
     }
     if (chunk_size > CHUNK_SIZE_WARNING_THRESHOLD)
     {
-      oxen::log::info(logcat, "NOTE: chunk_size {} > {}", chunk_size, CHUNK_SIZE_WARNING_THRESHOLD);
+      log::info(logcat, "NOTE: chunk_size {} > {}", chunk_size, CHUNK_SIZE_WARNING_THRESHOLD);
     }
     else if (chunk_size == 0) {
-      oxen::log::error(logcat, "ERROR: chunk_size == 0");
+      log::error(logcat, "ERROR: chunk_size == 0");
       return 2;
     }
     import_file.read(buffer_block, chunk_size);
@@ -342,25 +342,25 @@ int import_from_file(cryptonote::core& core, const fs::path& import_file_path, u
       if (import_file.eof())
       {
         std::cout << refresh_string;
-        oxen::log::info(logcat, "End of file reached - file was truncated");
+        log::info(logcat, "End of file reached - file was truncated");
         quit = 1;
         break;
       }
       else
       {
-        oxen::log::error(logcat, "ERROR: unexpected end of file: bytes read before error: {} of chunk_size {}", import_file.gcount(), chunk_size);
+        log::error(logcat, "ERROR: unexpected end of file: bytes read before error: {} of chunk_size {}", import_file.gcount(), chunk_size);
         return 2;
       }
     }
     bytes_read += chunk_size;
-    oxen::log::debug(logcat, "Total bytes read: {}", bytes_read);
+    log::debug(logcat, "Total bytes read: {}", bytes_read);
 
     if (h > block_stop)
     {
       std::cout << refresh_string << "block " << h-1
         << " / " << block_stop
         << "\n" << std::endl;
-      oxen::log::info(logcat, "Specified block number reached - stopping.  block: {}  total blocks: {}", h-1, h);
+      log::info(logcat, "Specified block number reached - stopping.  block: {}  total blocks: {}", h-1, h);
       quit = 1;
       break;
     }
@@ -383,14 +383,14 @@ int import_from_file(cryptonote::core& core, const fs::path& import_file_path, u
         if ((h-1) % display_interval == 0)
         {
           std::cout << refresh_string;
-          oxen::log::debug(logcat, "loading block number {}", h-1);
+          log::debug(logcat, "loading block number {}", h-1);
         }
         else
         {
-          oxen::log::debug(logcat, "loading block number {}", h-1);
+          log::debug(logcat, "loading block number {}", h-1);
         }
         b = bp.block;
-        oxen::log::debug(logcat, "block prev_id: {}\n", b.prev_id);
+        log::debug(logcat, "block prev_id: {}\n", b.prev_id);
 
         if ((h-1) % progress_interval == 0)
         {
@@ -455,7 +455,7 @@ int import_from_file(cryptonote::core& core, const fs::path& import_file_path, u
           catch (const std::exception& e)
           {
             std::cout << refresh_string;
-            oxen::log::error(logcat, "Error adding block to blockchain: {}", e.what());
+            log::error(logcat, "Error adding block to blockchain: {}", e.what());
             quit = 2; // make sure we don't commit partial block data
             break;
           }
@@ -485,7 +485,7 @@ int import_from_file(cryptonote::core& core, const fs::path& import_file_path, u
     catch (const std::exception& e)
     {
       std::cout << refresh_string;
-      oxen::log::error(logcat, "exception while reading from file, height={}: {}", h, e.what());
+      log::error(logcat, "exception while reading from file, height={}: {}", h, e.what());
       return 2;
     }
   } // while
@@ -514,10 +514,10 @@ quitting:
   }
 
   core.get_blockchain_storage().get_db().show_stats();
-  oxen::log::info(logcat, "Number of blocks imported: {}", num_imported);
+  log::info(logcat, "Number of blocks imported: {}", num_imported);
   if (h > 0)
     // TODO: if there was an error, the last added block is probably at zero-based height h-2
-    oxen::log::info(logcat, "Finished at block: {}  total blocks: {}", h-1, h);
+    log::info(logcat, "Finished at block: {}  total blocks: {}", h-1, h);
 
   std::cout << "\n";
   return 0;
@@ -635,7 +635,7 @@ int main(int argc, char* argv[])
   }
   m_config_folder = command_line::get_arg(vm, cryptonote::arg_data_dir);
   auto log_file_path = m_config_folder + "oxen-blockchain-import.log";
-  oxen::log::Level log_level;
+  log::Level log_level;
   if(auto level = oxen::logging::parse_level(command_line::get_arg(vm, arg_log_level).c_str())) {
     log_level = *level;
   } else {
@@ -644,7 +644,7 @@ int main(int argc, char* argv[])
   }
 
   oxen::logging::init(log_file_path, log_level);
-  oxen::log::info(logcat, "Starting...");
+  log::info(logcat, "Starting...");
 
   fs::path import_file_path;
 
@@ -660,25 +660,25 @@ int main(int argc, char* argv[])
     return 0;
   }
 
-  oxen::log::info(logcat, "database: LMDB");
-  oxen::log::info(logcat, "verify:  {}", opt_verify);
+  log::info(logcat, "database: LMDB");
+  log::info(logcat, "verify:  {}", opt_verify);
   if (opt_batch)
   {
-    oxen::log::info(logcat, "batch:   {} batch size: {}", opt_batch, db_batch_size);
+    log::info(logcat, "batch:   {} batch size: {}", opt_batch, db_batch_size);
   }
   else
   {
-    oxen::log::info(logcat, "batch:   {}", opt_batch);
+    log::info(logcat, "batch:   {}", opt_batch);
   }
-  oxen::log::info(logcat, "resume:  {}", opt_resume);
-  oxen::log::info(logcat, "nettype: {}", (opt_testnet ? "testnet" : opt_devnet ? "devnet" : "mainnet"));
+  log::info(logcat, "resume:  {}", opt_resume);
+  log::info(logcat, "nettype: {}", (opt_testnet ? "testnet" : opt_devnet ? "devnet" : "mainnet"));
 
-  oxen::log::info(logcat, "bootstrap file path: {}", import_file_path);
-  oxen::log::info(logcat, "database path:       {}", m_config_folder);
+  log::info(logcat, "bootstrap file path: {}", import_file_path);
+  log::info(logcat, "database path:       {}", m_config_folder);
 
   if (!opt_verify)
   {
-    oxen::log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "\n\
+    log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "\n\
       Import is set to proceed WITHOUT VERIFICATION.\n\
       This is a DANGEROUS operation: if the file was tampered with in transit, or obtained from a malicious source,\n\
       you could end up with a compromised database. It is recommended to NOT use {}.\n\
@@ -712,9 +712,9 @@ int main(int argc, char* argv[])
   if (!command_line::is_arg_defaulted(vm, arg_pop_blocks))
   {
     num_blocks = command_line::get_arg(vm, arg_pop_blocks);
-    oxen::log::info(logcat, "height: {}", core.get_blockchain_storage().get_current_blockchain_height());
+    log::info(logcat, "height: {}", core.get_blockchain_storage().get_current_blockchain_height());
     pop_blocks(core, num_blocks);
-    oxen::log::info(logcat, "height: {}", core.get_blockchain_storage().get_current_blockchain_height());
+    log::info(logcat, "height: {}", core.get_blockchain_storage().get_current_blockchain_height());
     return 0;
   }
 

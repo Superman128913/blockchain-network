@@ -67,7 +67,7 @@
 
 namespace nodetool
 {
-  static auto logcat = oxen::log::Cat("net.p2p");
+  static auto logcat = log::Cat("net.p2p");
 
   template<class t_payload_net_handler>
   node_server<t_payload_net_handler>::~node_server()
@@ -167,7 +167,7 @@ namespace nodetool
       if (now >= it->second)
       {
         m_blocked_hosts.erase(it);
-        oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::cyan), "Host {} unblocked.", address.host_str()));
+        log::info(logcat, fmt::format(fg(fmt::terminal_color::cyan), "Host {} unblocked.", address.host_str()));
         it = m_blocked_hosts.end();
       }
       else
@@ -188,7 +188,7 @@ namespace nodetool
         if (now >= it->second)
         {
           it = m_blocked_subnets.erase(it);
-          oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::cyan), "Subnet {} unblocked", it->first.host_str()));
+          log::info(logcat, fmt::format(fg(fmt::terminal_color::cyan), "Subnet {} unblocked", it->first.host_str()));
           continue;
         }
         if (it->first.matches(ipv4_address))
@@ -241,7 +241,7 @@ namespace nodetool
       conns.clear();
     }
 
-    oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::cyan), "Host {} blocked", addr.host_str()));
+    log::info(logcat, fmt::format(fg(fmt::terminal_color::cyan), "Host {} blocked", addr.host_str()));
     return true;
   }
   //-----------------------------------------------------------------------------------
@@ -253,7 +253,7 @@ namespace nodetool
     if (i == m_blocked_hosts.end())
       return false;
     m_blocked_hosts.erase(i);
-    oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::cyan), "Host {} unblocked", address.host_str()));
+    log::info(logcat, fmt::format(fg(fmt::terminal_color::cyan), "Host {} unblocked", address.host_str()));
     return true;
   }
   //-----------------------------------------------------------------------------------
@@ -293,7 +293,7 @@ namespace nodetool
       conns.clear();
     }
 
-    oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::cyan), "Subnet {} blocked.", subnet.host_str()));
+    log::info(logcat, fmt::format(fg(fmt::terminal_color::cyan), "Subnet {} blocked.", subnet.host_str()));
     return true;
   }
   //-----------------------------------------------------------------------------------
@@ -305,7 +305,7 @@ namespace nodetool
     if (i == m_blocked_subnets.end())
       return false;
     m_blocked_subnets.erase(i);
-    oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::cyan), "Subnet {}", subnet.host_str()));
+    log::info(logcat, fmt::format(fg(fmt::terminal_color::cyan), "Subnet {}", subnet.host_str()));
     return true;
   }
   //-----------------------------------------------------------------------------------
@@ -317,7 +317,7 @@ namespace nodetool
 
     std::lock_guard lock{m_host_fails_score_lock};
     uint64_t fails = ++m_host_fails_score[address.host_str()];
-    oxen::log::debug(logcat, "Host {} fail score={}", address.host_str(), fails);
+    log::debug(logcat, "Host {} fail score={}", address.host_str(), fails);
     if(fails > cryptonote::p2p::IP_FAILS_BEFORE_BLOCK)
     {
       auto it = m_host_fails_score.find(address.host_str());
@@ -448,7 +448,7 @@ namespace nodetool
       network_zone& zone = add_zone(proxy.zone);
       if (zone.m_connect != nullptr)
       {
-        oxen::log::error(logcat, "Listed --{} twice", arg_tx_proxy.name);
+        log::error(logcat, "Listed --{} twice", arg_tx_proxy.name);
         return false;
       }
       zone.m_connect = &socks_connect;
@@ -476,7 +476,7 @@ namespace nodetool
     {
       if (zone.second.m_connect == nullptr)
       {
-        oxen::log::error(logcat, "Set outgoing peer for zone but did not set --{}", arg_tx_proxy.name);
+        log::error(logcat, "Set outgoing peer for zone but did not set --{}", arg_tx_proxy.name);
         return false;
       }
     }
@@ -492,13 +492,13 @@ namespace nodetool
 
       if (!zone.m_bind_ip.empty())
       {
-        oxen::log::error(logcat, "Listed--{} twice", arg_anonymous_inbound.name);
+        log::error(logcat, "Listed--{} twice", arg_anonymous_inbound.name);
         return false;
       }
 
       if (zone.m_connect == nullptr && tx_relay_zones <= 1)
       {
-        oxen::log::error(logcat, "Listed --{} without listing any --{}. The latter is necessary for sending local txes over anonymity networks", arg_anonymous_inbound.name, arg_tx_proxy.name);
+        log::error(logcat, "Listed --{} without listing any --{}. The latter is necessary for sending local txes over anonymity networks", arg_anonymous_inbound.name, arg_tx_proxy.name);
         return false;
       }
 
@@ -541,7 +541,7 @@ namespace nodetool
         port = std::to_string(default_port);
     }
 
-    oxen::log::info(logcat, "Resolving node address: host={}, port={}", host, port);
+    log::info(logcat, "Resolving node address: host={}, port={}", host, port);
 
     io_service io_srv;
     ip::tcp::resolver resolver(io_srv);
@@ -558,13 +558,13 @@ namespace nodetool
       {
         epee::net_utils::network_address na{epee::net_utils::ipv4_network_address{boost::asio::detail::socket_ops::host_to_network_long(endpoint.address().to_v4().to_ulong()), endpoint.port()}};
         seed_nodes.push_back(na);
-        oxen::log::info(logcat, "Added node: {}", na.str());
+        log::info(logcat, "Added node: {}", na.str());
       }
       else
       {
         epee::net_utils::network_address na{epee::net_utils::ipv6_network_address{endpoint.address().to_v6(), endpoint.port()}};
         seed_nodes.push_back(na);
-        oxen::log::info(logcat, "Added node: {}", na.str());
+        log::info(logcat, "Added node: {}", na.str());
       }
     }
     return true;
@@ -700,32 +700,32 @@ namespace nodetool
         std::string ipv6_addr = "";
         std::string ipv6_port = "";
         zone.second.m_net_server.set_connection_filter(this);
-        oxen::log::info(logcat, "Binding (IPv4) on {}:{}", zone.second.m_bind_ip, zone.second.m_port);
+        log::info(logcat, "Binding (IPv4) on {}:{}", zone.second.m_bind_ip, zone.second.m_port);
         if (!zone.second.m_bind_ipv6_address.empty() && m_use_ipv6)
         {
           ipv6_addr = zone.second.m_bind_ipv6_address;
           ipv6_port = zone.second.m_port_ipv6;
-          oxen::log::info(logcat, "Binding (IPv6) on {}:{}", zone.second.m_bind_ipv6_address, zone.second.m_port_ipv6);
+          log::info(logcat, "Binding (IPv6) on {}:{}", zone.second.m_bind_ipv6_address, zone.second.m_port_ipv6);
         }
         try {
           res = zone.second.m_net_server.init_server(zone.second.m_port, zone.second.m_bind_ip, ipv6_port, ipv6_addr, m_use_ipv6, m_require_ipv4);
           CHECK_AND_ASSERT_MES(res, false, "Failed to bind server");
         } catch (const std::exception& e) {
-          oxen::log::error(logcat, "{}", e.what());
+          log::error(logcat, "{}", e.what());
           res = false;
         }
       }
     }
 
     m_listening_port = public_zone.m_net_server.get_binded_port();
-    oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Net service bound (IPv4) to {}:{}", public_zone.m_bind_ip, m_listening_port));
+    log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Net service bound (IPv4) to {}:{}", public_zone.m_bind_ip, m_listening_port));
     if (m_use_ipv6)
     {
       m_listening_port_ipv6 = public_zone.m_net_server.get_binded_port_ipv6();
-      oxen::log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Net service bound (IPv6) to {}:{}", public_zone.m_bind_ipv6_address, m_listening_port_ipv6));
+      log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Net service bound (IPv6) to {}:{}", public_zone.m_bind_ipv6_address, m_listening_port_ipv6));
     }
     if(m_external_port)
-      oxen::log::debug(logcat, "External port defined as {}", m_external_port);
+      log::debug(logcat, "External port defined as {}", m_external_port);
 
     return res;
   }
@@ -742,7 +742,7 @@ namespace nodetool
     // creating thread to log number of connections
     mPeersLoggerThread.emplace([&]()
     {
-      oxen::log::debug(logcat, "Thread monitor number of peers - start");
+      log::debug(logcat, "Thread monitor number of peers - start");
       const network_zone& public_zone = m_network_zones.at(epee::net_utils::zone::public_);
       while (!is_closing && !public_zone.m_net_server.is_stop_signal_sent())
       { // main loop of thread
@@ -771,7 +771,7 @@ namespace nodetool
         }
         std::this_thread::sleep_for(1s);
       } // main loop of thread
-      oxen::log::debug(logcat, "Thread monitor number of peers - done");
+      log::debug(logcat, "Thread monitor number of peers - done");
     }); // lambda
 
     network_zone& public_zone = m_network_zones.at(epee::net_utils::zone::public_);
@@ -781,13 +781,13 @@ namespace nodetool
     //here you can set worker threads count
     int thrds_count = 10;
     //go to loop
-    oxen::log::info(logcat, "Run net_service loop( {} threads)...", thrds_count);
+    log::info(logcat, "Run net_service loop( {} threads)...", thrds_count);
     if(!public_zone.m_net_server.run_server(thrds_count, true))
     {
-      oxen::log::error(logcat, "Failed to run net tcp server!");
+      log::error(logcat, "Failed to run net tcp server!");
     }
 
-    oxen::log::info(logcat, "net_service loop stopped.");
+    log::info(logcat, "net_service loop stopped.");
     return true;
   }
   //-----------------------------------------------------------------------------------
@@ -821,7 +821,7 @@ namespace nodetool
     std::error_code ec;
     if (fs::create_directories(m_config_folder); ec)
     {
-      oxen::log::warning(logcat, "Failed to create data directory {}", m_config_folder);
+      log::warning(logcat, "Failed to create data directory {}", m_config_folder);
       return false;
     }
 
@@ -832,7 +832,7 @@ namespace nodetool
     const auto state_file_path = m_config_folder / cryptonote::P2P_NET_DATA_FILENAME;
     if (!m_peerlist_storage.store(state_file_path, active))
     {
-      oxen::log::warning(logcat, "Failed to save config to file {}", state_file_path);
+      log::warning(logcat, "Failed to save config to file {}", state_file_path);
       return false;
     }
     CATCH_ENTRY_L0("node_server::store", false);
@@ -842,10 +842,10 @@ namespace nodetool
   template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::send_stop_signal()
   {
-    oxen::log::debug(logcat, "[node] sending stop signal");
+    log::debug(logcat, "[node] sending stop signal");
     for (auto& zone : m_network_zones)
         zone.second.m_net_server.send_stop_signal();
-    oxen::log::debug(logcat, "[node] Stop signal sent");
+    log::debug(logcat, "[node] Stop signal sent");
 
     for (auto& zone : m_network_zones)
     {
@@ -885,7 +885,7 @@ namespace nodetool
 
       if(code < 0)
       {
-        oxen::log::warning(logcat, "{}COMMAND_HANDSHAKE invoke failed. ({},{})", context, code, epee::levin::get_err_descr(code));
+        log::warning(logcat, "{}COMMAND_HANDSHAKE invoke failed. ({},{})", context, code, epee::levin::get_err_descr(code));
         if (code == LEVIN_ERROR_CONNECTION_TIMEDOUT || code == LEVIN_ERROR_CONNECTION_DESTROYED)
           timeout = true;
         return;
@@ -893,13 +893,13 @@ namespace nodetool
 
       if(rsp.node_data.network_id != m_network_id)
       {
-        oxen::log::warning(logcat, "{}COMMAND_HANDSHAKE Failed, wrong network! ({}), closing connection.", context, boost::lexical_cast<std::string>(rsp.node_data.network_id));
+        log::warning(logcat, "{}COMMAND_HANDSHAKE Failed, wrong network! ({}), closing connection.", context, boost::lexical_cast<std::string>(rsp.node_data.network_id));
         return;
       }
 
       if(!handle_remote_peerlist(rsp.local_peerlist_new, context))
       {
-        oxen::log::warning(logcat, "{}COMMAND_HANDSHAKE: failed to handle_remote_peerlist(...), closing connection.", context);
+        log::warning(logcat, "{}COMMAND_HANDSHAKE: failed to handle_remote_peerlist(...), closing connection.", context);
         add_host_fail(context.m_remote_address);
         return;
       }
@@ -908,7 +908,7 @@ namespace nodetool
       {
         if(!m_payload_handler.process_payload_sync_data(std::move(rsp.payload_data), context, true))
         {
-          oxen::log::warning(logcat, "{}COMMAND_HANDSHAKE invoked, but process_payload_sync_data returned false, dropping connection.", context);
+          log::warning(logcat, "{}COMMAND_HANDSHAKE invoked, but process_payload_sync_data returned false, dropping connection.", context);
           hsh_result = false;
           return;
         }
@@ -920,15 +920,15 @@ namespace nodetool
         // move
         if(rsp.node_data.peer_id == zone.m_config.m_peer_id)
         {
-          oxen::log::debug(logcat, "{}Connection to self detected, dropping connection", context);
+          log::debug(logcat, "{}Connection to self detected, dropping connection", context);
           hsh_result = false;
           return;
         }
-        oxen::log::info(logcat, "{}New connection handshaked, pruning seed {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed));
-        oxen::log::debug(logcat, "{} COMMAND_HANDSHAKE INVOKED OK", context);
+        log::info(logcat, "{}New connection handshaked, pruning seed {}", context, epee::string_tools::to_string_hex(context.m_pruning_seed));
+        log::debug(logcat, "{} COMMAND_HANDSHAKE INVOKED OK", context);
       }else
       {
-        oxen::log::debug(logcat, "{} COMMAND_HANDSHAKE(AND CLOSE) INVOKED OK", context);
+        log::debug(logcat, "{} COMMAND_HANDSHAKE(AND CLOSE) INVOKED OK", context);
       }
       context_ = context;
     }, std::chrono::milliseconds{cryptonote::p2p::DEFAULT_HANDSHAKE_INVOKE_TIMEOUT});
@@ -940,7 +940,7 @@ namespace nodetool
 
     if(!hsh_result)
     {
-      oxen::log::warning(logcat, "{}COMMAND_HANDSHAKE Failed", context_);
+      log::warning(logcat, "{}COMMAND_HANDSHAKE Failed", context_);
       if (!timeout)
         zone.m_net_server.get_config_object().close(context_.m_connection_id);
     }
@@ -963,13 +963,13 @@ namespace nodetool
       context.m_in_timedsync = false;
       if(code < 0)
       {
-        oxen::log::warning(logcat, "{}COMMAND_TIMED_SYNC invoke failed. ({}, {})", context, code, epee::levin::get_err_descr(code));
+        log::warning(logcat, "{}COMMAND_TIMED_SYNC invoke failed. ({}, {})", context, code, epee::levin::get_err_descr(code));
         return;
       }
 
       if(!handle_remote_peerlist(rsp.local_peerlist_new, context))
       {
-        oxen::log::warning(logcat, "{}COMMAND_TIMED_SYNC: failed to handle_remote_peerlist(...), closing connection.", context);
+        log::warning(logcat, "{}COMMAND_TIMED_SYNC: failed to handle_remote_peerlist(...), closing connection.", context);
         m_network_zones.at(context.m_remote_address.get_zone()).m_net_server.get_config_object().close(context.m_connection_id );
         add_host_fail(context.m_remote_address);
       }
@@ -983,7 +983,7 @@ namespace nodetool
 
     if(!r)
     {
-      oxen::log::warning(logcat, "{}COMMAND_TIMED_SYNC Failed", context_);
+      log::warning(logcat, "{}COMMAND_TIMED_SYNC Failed", context_);
       return false;
     }
     return true;
@@ -998,7 +998,7 @@ namespace nodetool
 
     size_t x = crypto::rand<size_t>()%(max_index+1);
     size_t res = (x*x*x)/(max_index*max_index); //parabola \/
-    oxen::log::debug(logcat, "Random connection index={}(x={}, max_index={})", res, x, max_index);
+    log::debug(logcat, "Random connection index={}(x={}, max_index={})", res, x, max_index);
     return res;
   }
   //-----------------------------------------------------------------------------------
@@ -1091,15 +1091,15 @@ namespace nodetool
     }
 
 
-    oxen::log::debug(logcat, "Connecting to {}(peer_type={}, last_seen: {})...", na.str(), peer_type, (last_seen_stamp ? epee::misc_utils::get_time_interval_string(time(NULL) - last_seen_stamp):"never"));
+    log::debug(logcat, "Connecting to {}(peer_type={}, last_seen: {})...", na.str(), peer_type, (last_seen_stamp ? epee::misc_utils::get_time_interval_string(time(NULL) - last_seen_stamp):"never"));
 
     auto con = zone.m_connect(zone, na);
     if(!con)
     {
       if (is_priority_node(na))
-        oxen::log::info(logcat, "{}[priority] Connect failed to {}", bool(con), na.str());
+        log::info(logcat, "{}[priority] Connect failed to {}", bool(con), na.str());
       else
-        oxen::log::info(logcat, "{} Connect failed to {}", bool(con), na.str());
+        log::info(logcat, "{} Connect failed to {}", bool(con), na.str());
       record_addr_failed(na);
       return false;
     }
@@ -1112,9 +1112,9 @@ namespace nodetool
     {
       bool is_priority = is_priority_node(na);
       if (is_priority_node(na))
-        oxen::log::info(logcat, "{}[priority] Failed to HANDSHAKE with peer {}", *con, na.str());
+        log::info(logcat, "{}[priority] Failed to HANDSHAKE with peer {}", *con, na.str());
       else
-        oxen::log::info(logcat, "{} Failed to HANDSHAKE with peer {}", *con, na.str());
+        log::info(logcat, "{} Failed to HANDSHAKE with peer {}", *con, na.str());
       record_addr_failed(na);
       return false;
     }
@@ -1122,7 +1122,7 @@ namespace nodetool
     if(just_take_peerlist)
     {
       zone.m_net_server.get_config_object().close(con->m_connection_id);
-      oxen::log::debug(logcat, "{}CONNECTION HANDSHAKED OK AND CLOSED.", *con);
+      log::debug(logcat, "{}CONNECTION HANDSHAKED OK AND CLOSED.", *con);
       return true;
     }
 
@@ -1144,7 +1144,7 @@ namespace nodetool
     zone.m_peerlist.append_with_peer_anchor(ape);
     zone.m_notifier.new_out_connection();
 
-    oxen::log::debug(logcat, "{}CONNECTION HANDSHAKED OK.", *con );
+    log::debug(logcat, "{}CONNECTION HANDSHAKED OK.", *con );
     return true;
   }
 
@@ -1155,14 +1155,14 @@ namespace nodetool
     if (zone.m_connect == nullptr)
       return false;
 
-    oxen::log::info(logcat, "Connecting to {}(last_seen: {})...", na.str(), (last_seen_stamp ? epee::misc_utils::get_time_interval_string(time(NULL) - last_seen_stamp):"never"));
+    log::info(logcat, "Connecting to {}(last_seen: {})...", na.str(), (last_seen_stamp ? epee::misc_utils::get_time_interval_string(time(NULL) - last_seen_stamp):"never"));
 
     auto con = zone.m_connect(zone, na);
     if (!con) {
       if (is_priority_node(na))
-        oxen::log::info(logcat, "{}[priority]Connect failed to {}", p2p_connection_context{}, na.str());
+        log::info(logcat, "{}[priority]Connect failed to {}", p2p_connection_context{}, na.str());
       else
-        oxen::log::info(logcat, "{}Connect failed to {}", p2p_connection_context{}, na.str());
+        log::info(logcat, "{}Connect failed to {}", p2p_connection_context{}, na.str());
       record_addr_failed(na);
 
       return false;
@@ -1173,16 +1173,16 @@ namespace nodetool
     const bool res = do_handshake_with_peer(pi, *con, true);
     if (!res) {
       if (is_priority_node(na))
-        oxen::log::info(logcat, "{}[priority] Failed to HANDSHAKE with peer {}", *con, na.str());
+        log::info(logcat, "{}[priority] Failed to HANDSHAKE with peer {}", *con, na.str());
       else
-        oxen::log::info(logcat, "{} Failed to HANDSHAKE with peer {}", *con, na.str());
+        log::info(logcat, "{} Failed to HANDSHAKE with peer {}", *con, na.str());
       record_addr_failed(na);
       return false;
     }
 
     zone.m_net_server.get_config_object().close(con->m_connection_id);
 
-    oxen::log::debug(logcat, "{}CONNECTION HANDSHAKED OK AND CLOSED.", *con);
+    log::debug(logcat, "{}CONNECTION HANDSHAKED OK AND CLOSED.", *con);
 
     return true;
   }
@@ -1217,10 +1217,10 @@ namespace nodetool
   bool node_server<t_payload_net_handler>::make_new_connection_from_anchor_peerlist(const std::vector<anchor_peerlist_entry>& anchor_peerlist)
   {
     for (const auto& pe: anchor_peerlist) {
-      oxen::log::debug(logcat, "Considering connecting (out) to anchor peer: {} {}", peerid_to_string(pe.id), pe.adr.str());
+      log::debug(logcat, "Considering connecting (out) to anchor peer: {} {}", peerid_to_string(pe.id), pe.adr.str());
 
       if(is_peer_used(pe)) {
-        oxen::log::debug(logcat, "Peer is used");
+        log::debug(logcat, "Peer is used");
         continue;
       }
 
@@ -1232,10 +1232,10 @@ namespace nodetool
         continue;
       }
 
-      oxen::log::debug(logcat, "Selected peer: {} {} first_seen: {}", peerid_to_string(pe.id), pe.adr.str(), epee::misc_utils::get_time_interval_string(time(NULL) - pe.first_seen));
+      log::debug(logcat, "Selected peer: {} {} first_seen: {}", peerid_to_string(pe.id), pe.adr.str(), epee::misc_utils::get_time_interval_string(time(NULL) - pe.first_seen));
 
       if(!try_to_connect_and_handshake_with_new_peer(pe.adr, false, 0, anchor, pe.first_seen)) {
-        oxen::log::debug(logcat, "Handshake failed");
+        log::debug(logcat, "Handshake failed");
         continue;
       }
 
@@ -1305,11 +1305,11 @@ namespace nodetool
         if (skipped == 0 || !filtered.empty())
           break;
         if (skipped)
-          oxen::log::info(logcat, "Skipping {} possible peers as they share a class B with existing peers", skipped);
+          log::info(logcat, "Skipping {} possible peers as they share a class B with existing peers", skipped);
       }
       if (filtered.empty())
       {
-        oxen::log::debug(logcat, "No available peer in {} list filtered by {}", (use_white_list ? "white" : "gray"), next_needed_pruning_stripe);
+        log::debug(logcat, "No available peer in {} list filtered by {}", (use_white_list ? "white" : "gray"), next_needed_pruning_stripe);
         return false;
       }
       if (use_white_list)
@@ -1326,7 +1326,7 @@ namespace nodetool
             peerlist_entry pe;
             if (zone.m_peerlist.get_white_peer_by_index(pe, filtered[i]) && pe.adr == na)
             {
-              oxen::log::debug(logcat, "Reusing stripe {} peer {}", next_needed_pruning_stripe, pe.adr.str());
+              log::debug(logcat, "Reusing stripe {} peer {}", next_needed_pruning_stripe, pe.adr.str());
               random_index = i;
               break;
             }
@@ -1351,10 +1351,10 @@ namespace nodetool
 
       ++try_count;
 
-      oxen::log::debug(logcat, "Considering connecting (out) to {} list peer: {} {}, pruning seed {} (stripe {} needed)", (use_white_list ? "white" : "gray"), peerid_to_string(pe.id), pe.adr.str(), epee::string_tools::to_string_hex(pe.pruning_seed), next_needed_pruning_stripe);
+      log::debug(logcat, "Considering connecting (out) to {} list peer: {} {}, pruning seed {} (stripe {} needed)", (use_white_list ? "white" : "gray"), peerid_to_string(pe.id), pe.adr.str(), epee::string_tools::to_string_hex(pe.pruning_seed), next_needed_pruning_stripe);
 
       if(is_peer_used(pe)) {
-        oxen::log::debug(logcat, "Peer is used");
+        log::debug(logcat, "Peer is used");
         continue;
       }
 
@@ -1364,10 +1364,10 @@ namespace nodetool
       if(is_addr_recently_failed(pe.adr))
         continue;
 
-      oxen::log::debug(logcat, "Selected peer: {} {}, pruning seed {} [peer_list={}] last_seen: {}", peerid_to_string(pe.id), pe.adr.str(), epee::string_tools::to_string_hex(pe.pruning_seed), (use_white_list ? white : gray), (pe.last_seen ? epee::misc_utils::get_time_interval_string(time(NULL) - pe.last_seen) : "never"));
+      log::debug(logcat, "Selected peer: {} {}, pruning seed {} [peer_list={}] last_seen: {}", peerid_to_string(pe.id), pe.adr.str(), epee::string_tools::to_string_hex(pe.pruning_seed), (use_white_list ? white : gray), (pe.last_seen ? epee::misc_utils::get_time_interval_string(time(NULL) - pe.last_seen) : "never"));
 
       if(!try_to_connect_and_handshake_with_new_peer(pe.adr, false, pe.last_seen, use_white_list ? white : gray)) {
-        oxen::log::debug(logcat, "Handshake failed");
+        log::debug(logcat, "Handshake failed");
         continue;
       }
 
@@ -1386,10 +1386,10 @@ namespace nodetool
         {
           for (const auto& full_addr : get_seed_nodes())
           {
-            oxen::log::debug(logcat, "Seed node: {}", full_addr);
+            log::debug(logcat, "Seed node: {}", full_addr);
             append_net_address(m_seed_nodes, full_addr, cryptonote::get_config(m_nettype).P2P_DEFAULT_PORT);
           }
-          oxen::log::debug(logcat, "Number of seed nodes: {}", m_seed_nodes.size());
+          log::debug(logcat, "Number of seed nodes: {}", m_seed_nodes.size());
           m_seed_nodes_initialized = true;
         }
       }
@@ -1418,7 +1418,7 @@ namespace nodetool
         {
           if (!m_fallback_seed_nodes_added.test_and_set())
           {
-            oxen::log::warning(logcat, "Failed to connect to any of seed peers, trying fallback seeds");
+            log::warning(logcat, "Failed to connect to any of seed peers, trying fallback seeds");
             current_index = m_seed_nodes.size() - 1;
             {
               shlock.unlock();
@@ -1426,7 +1426,7 @@ namespace nodetool
                 std::unique_lock lock{m_seed_nodes_mutex};
                 for (const auto &peer: get_seed_nodes(m_nettype))
                 {
-                  oxen::log::debug(logcat, "Fallback seed node: {}", peer);
+                  log::debug(logcat, "Fallback seed node: {}", peer);
                   append_net_address(m_seed_nodes, peer, cryptonote::get_config(m_nettype).P2P_DEFAULT_PORT);
                 }
               }
@@ -1434,7 +1434,7 @@ namespace nodetool
             }
             if (current_index == m_seed_nodes.size() - 1)
             {
-              oxen::log::warning(logcat, "No fallback seeds, continuing without seeds");
+              log::warning(logcat, "No fallback seeds, continuing without seeds");
               break;
             }
             // continue for another few cycles
@@ -1442,7 +1442,7 @@ namespace nodetool
           else
           {
             if (!is_connected_to_at_least_one_seed_node)
-              oxen::log::warning(logcat, "Failed to connect to any of seed peers, continuing without seeds");
+              log::warning(logcat, "Failed to connect to any of seed peers, continuing without seeds");
             break;
           }
         }
@@ -1516,7 +1516,7 @@ namespace nodetool
 
     if (start_conn_count == get_public_outgoing_connections_count() && start_conn_count < m_network_zones.at(zone_type::public_).m_config.m_net_config.max_out_connection_count)
     {
-      oxen::log::info(logcat, "Failed to connect to any, trying seeds");
+      log::info(logcat, "Failed to connect to any, trying seeds");
       if (!connect_to_seed())
         return false;
     }
@@ -1543,7 +1543,7 @@ namespace nodetool
       if(zone.m_net_server.is_stop_signal_sent())
         return false;
 
-      oxen::log::debug(logcat, "Making expected connection, type {}, {}/{} connections", peer_type, conn_count, expected_connections);
+      log::debug(logcat, "Making expected connection, type {}, {}/{} connections", peer_type, conn_count, expected_connections);
 
       if (peer_type == anchor && !make_new_connection_from_anchor_peerlist(apl)) {
         return false;
@@ -1677,11 +1677,11 @@ namespace nodetool
     {
       if (m_hide_my_port || public_zone->second.m_config.m_net_config.max_in_connection_count == 0)
       {
-        oxen::log::info(logcat, "Incoming connections disabled, enable them for full connectivity");
+        log::info(logcat, "Incoming connections disabled, enable them for full connectivity");
       }
       else
       {
-        oxen::log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "No incoming connections - check firewalls/routers allow port {}", get_this_peer_port()));
+        log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "No incoming connections - check firewalls/routers allow port {}", get_this_peer_port()));
       }
     }
     return true;
@@ -1695,7 +1695,7 @@ namespace nodetool
     // This really should be spaced out, i.e. the 60s sync timing should apply per peer, not
     // globally.
 
-    oxen::log::debug(logcat, "STARTED PEERLIST IDLE HANDSHAKE");
+    log::debug(logcat, "STARTED PEERLIST IDLE HANDSHAKE");
     typedef std::list<std::pair<epee::net_utils::connection_context_base, peerid_type> > local_connects_type;
     local_connects_type cncts;
     for(auto& zone : m_network_zones)
@@ -1713,7 +1713,7 @@ namespace nodetool
 
     std::for_each(cncts.begin(), cncts.end(), [&](const auto& vl){ do_peer_timed_sync(vl.first, vl.second); });
 
-    oxen::log::debug(logcat, "FINISHED PEERLIST IDLE HANDSHAKE");
+    log::debug(logcat, "FINISHED PEERLIST IDLE HANDSHAKE");
     return true;
   }
   //-----------------------------------------------------------------------------------
@@ -1739,7 +1739,7 @@ namespace nodetool
         ignore = true;
       if (ignore)
       {
-        oxen::log::debug(logcat, "Ignoring {}", be.adr.str());
+        log::debug(logcat, "Ignoring {}", be.adr.str());
         std::swap(local_peerlist[i], local_peerlist[local_peerlist.size() - 1]);
         local_peerlist.resize(local_peerlist.size() - 1);
         --i;
@@ -1765,13 +1765,13 @@ namespace nodetool
     {
       if(peer.adr.get_zone() != zone)
       {
-        oxen::log::warning(logcat, "{} sent peerlist from another zone, dropping", context);
+        log::warning(logcat, "{} sent peerlist from another zone, dropping", context);
         return false;
       }
     }
 
-    oxen::log::debug(logcat, "{}REMOTE PEERLIST: remote peerlist size={}", context, peerlist_.size());
-    oxen::log::trace(logcat, "{}REMOTE PEERLIST: \n{}", context, "REMOTE PEERLIST: \n", print_peerlist_to_string(peerlist_));
+    log::debug(logcat, "{}REMOTE PEERLIST: remote peerlist size={}", context, peerlist_.size());
+    log::trace(logcat, "{}REMOTE PEERLIST: \n{}", context, "REMOTE PEERLIST: \n", print_peerlist_to_string(peerlist_));
     return m_network_zones.at(context.m_remote_address.get_zone()).m_peerlist.merge_peerlist(peerlist_, [this](const peerlist_entry &pe) { return !is_addr_recently_failed(pe.adr); });
   }
   //-----------------------------------------------------------------------------------
@@ -1811,7 +1811,7 @@ namespace nodetool
       {
         if (zone == m_network_zones.end())
         {
-           oxen::log::warning(logcat, "Unable to relay all messages, zone not available");
+           log::warning(logcat, "Unable to relay all messages, zone not available");
            return false;
         }
         if (c_id.first <= zone->first)
@@ -1962,7 +1962,7 @@ namespace nodetool
     {
       if(ec)
       {
-        oxen::log::warning(logcat, "{}back ping connect failed to {}", ping_context, address.str());
+        log::warning(logcat, "{}back ping connect failed to {}", ping_context, address.str());
         return false;
       }
       COMMAND_PING::request req{};
@@ -1983,14 +1983,14 @@ namespace nodetool
       {
         if(code <= 0)
         {
-          oxen::log::warning(logcat, "{}Failed to invoke COMMAND_PING to {}({}, {})", ping_context, address.str(), code, epee::levin::get_err_descr(code));
+          log::warning(logcat, "{}Failed to invoke COMMAND_PING to {}({}, {})", ping_context, address.str(), code, epee::levin::get_err_descr(code));
           return;
         }
 
         network_zone& zone = m_network_zones.at(address.get_zone());
         if(rsp.status != COMMAND_PING::OK_RESPONSE || pr != rsp.peer_id)
         {
-          oxen::log::warning(logcat, "{}{}\" from{}, hsh_peer_id={}, rsp.peer_id={}", ping_context, "back ping invoke wrong response \"", rsp.status, address.str(), pr_, peerid_to_string(rsp.peer_id));
+          log::warning(logcat, "{}{}\" from{}, hsh_peer_id={}, rsp.peer_id={}", ping_context, "back ping invoke wrong response \"", rsp.status, address.str(), pr_, peerid_to_string(rsp.peer_id));
           zone.m_net_server.get_config_object().close(ping_context.m_connection_id);
           return;
         }
@@ -2000,7 +2000,7 @@ namespace nodetool
 
       if(!inv_call_res)
       {
-        oxen::log::warning(logcat, "{}{}", ping_context, "back ping invoke failed to ", address.str());
+        log::warning(logcat, "{}{}", ping_context, "back ping invoke failed to ", address.str());
         zone.m_net_server.get_config_object().close(ping_context.m_connection_id);
         return false;
       }
@@ -2008,7 +2008,7 @@ namespace nodetool
     }, zone.m_bind_ip);
     if(!r)
     {
-      oxen::log::warning(logcat, "{}Failed to call connect_async, network error.", context);
+      log::warning(logcat, "{}Failed to call connect_async, network error.", context);
     }
     return r;
   }
@@ -2018,7 +2018,7 @@ namespace nodetool
   {
     if(!m_payload_handler.process_payload_sync_data(std::move(arg.payload_data), context, false))
     {
-      oxen::log::warning(logcat, "{}Failed to process_payload_sync_data(), dropping connection", context);
+      log::warning(logcat, "{}Failed to process_payload_sync_data(), dropping connection", context);
       drop_connection(context);
       return 1;
     }
@@ -2051,7 +2051,7 @@ namespace nodetool
     if(!context.m_is_income && zone.m_our_address.get_zone() == zone_type)
       rsp.local_peerlist_new.push_back(peerlist_entry{zone.m_our_address, zone.m_config.m_peer_id, std::time(nullptr)});
 
-    oxen::log::debug(logcat, "{}COMMAND_TIMED_SYNC", context);
+    log::debug(logcat, "{}COMMAND_TIMED_SYNC", context);
     return 1;
   }
   //-----------------------------------------------------------------------------------
@@ -2061,7 +2061,7 @@ namespace nodetool
     if(arg.node_data.network_id != m_network_id)
     {
 
-      oxen::log::info(logcat, "{}{}", context, "WRONG NETWORK AGENT CONNECTED! id=", boost::lexical_cast<std::string>(arg.node_data.network_id));
+      log::info(logcat, "{}{}", context, "WRONG NETWORK AGENT CONNECTED! id=", boost::lexical_cast<std::string>(arg.node_data.network_id));
       drop_connection(context);
       add_host_fail(context.m_remote_address);
       return 1;
@@ -2069,7 +2069,7 @@ namespace nodetool
 
     if(!context.m_is_income)
     {
-      oxen::log::warning(logcat, "{}COMMAND_HANDSHAKE came not from incoming connection", context);
+      log::warning(logcat, "{}COMMAND_HANDSHAKE came not from incoming connection", context);
       drop_connection(context);
       add_host_fail(context.m_remote_address);
       return 1;
@@ -2077,7 +2077,7 @@ namespace nodetool
 
     if(context.peer_id)
     {
-      oxen::log::warning(logcat, "{}COMMAND_HANDSHAKE came, but seems that connection already have associated peer_id (double COMMAND_HANDSHAKE?)", context);
+      log::warning(logcat, "{}COMMAND_HANDSHAKE came, but seems that connection already have associated peer_id (double COMMAND_HANDSHAKE?)", context);
       drop_connection(context);
       return 1;
     }
@@ -2088,28 +2088,28 @@ namespace nodetool
     // and pass in a tor connection's peer id, and deduce the two are the same if you reject it
     if(arg.node_data.peer_id == zone.m_config.m_peer_id)
     {
-      oxen::log::debug(logcat, "{}Connection to self detected, dropping connection", context);
+      log::debug(logcat, "{}Connection to self detected, dropping connection", context);
       drop_connection(context);
       return 1;
     }
 
     if (zone.m_current_number_of_in_peers >= zone.m_config.m_net_config.max_in_connection_count) // in peers limit
     {
-      oxen::log::warning(logcat, "{}COMMAND_HANDSHAKE came, but already have max incoming connections, so dropping this one.", context);
+      log::warning(logcat, "{}COMMAND_HANDSHAKE came, but already have max incoming connections, so dropping this one.", context);
       drop_connection(context);
       return 1;
     }
 
     if(!m_payload_handler.process_payload_sync_data(std::move(arg.payload_data), context, true))
     {
-      oxen::log::warning(logcat, "{}COMMAND_HANDSHAKE came, but process_payload_sync_data returned false, dropping connection.", context);
+      log::warning(logcat, "{}COMMAND_HANDSHAKE came, but process_payload_sync_data returned false, dropping connection.", context);
       drop_connection(context);
       return 1;
     }
 
     if(has_too_many_connections(context.m_remote_address))
     {
-      oxen::log::info(logcat, "CONNECTION FROM {} REFUSED, too many connections from the same address", context.m_remote_address.host_str());
+      log::info(logcat, "CONNECTION FROM {} REFUSED, too many connections from the same address", context.m_remote_address.host_str());
       drop_connection(context);
       return 1;
     }
@@ -2144,7 +2144,7 @@ namespace nodetool
         pe.id = peer_id_l;
         pe.pruning_seed = context.m_pruning_seed;
         this->m_network_zones.at(context.m_remote_address.get_zone()).m_peerlist.append_with_peer_white(pe);
-        oxen::log::debug(logcat, "{}PING SUCCESS {}:{}", context, context.m_remote_address.host_str(), port_l);
+        log::debug(logcat, "{}PING SUCCESS {}:{}", context, context.m_remote_address.host_str(), port_l);
       });
     }
     
@@ -2154,14 +2154,14 @@ namespace nodetool
       context.sent_addresses.insert(e.adr);
     get_local_node_data(rsp.node_data, zone);
     m_payload_handler.get_payload_sync_data(rsp.payload_data);
-    oxen::log::debug(logcat, "{}COMMAND_HANDSHAKE", context);
+    log::debug(logcat, "{}COMMAND_HANDSHAKE", context);
     return 1;
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
   int node_server<t_payload_net_handler>::handle_ping(int command, COMMAND_PING::request& arg, COMMAND_PING::response& rsp, p2p_connection_context& context)
   {
-    oxen::log::debug(logcat, "{}COMMAND_PING", context);
+    log::debug(logcat, "{}COMMAND_PING", context);
     rsp.status = COMMAND_PING::OK_RESPONSE;
     rsp.peer_id = m_network_zones.at(context.m_remote_address.get_zone()).m_config.m_peer_id;
     return 1;
@@ -2174,14 +2174,14 @@ namespace nodetool
     std::vector<peerlist_entry> pl_gray;
     for (auto& zone : m_network_zones)
       zone.second.m_peerlist.get_peerlist(pl_gray, pl_white);
-    oxen::log::info(logcat, "\nPeerlist white:\n{}\nPeerlist gray:\n{}", print_peerlist_to_string(pl_white), print_peerlist_to_string(pl_gray));
+    log::info(logcat, "\nPeerlist white:\n{}\nPeerlist gray:\n{}", print_peerlist_to_string(pl_white), print_peerlist_to_string(pl_gray));
     return true;
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::log_connections()
   {
-    oxen::log::info(logcat, "Connections: \r\n{}", print_connections_container());
+    log::info(logcat, "Connections: \r\n{}", print_connections_container());
     return true;
   }
   //-----------------------------------------------------------------------------------
@@ -2208,7 +2208,7 @@ namespace nodetool
   template<class t_payload_net_handler>
   void node_server<t_payload_net_handler>::on_connection_new(p2p_connection_context& context)
   {
-    oxen::log::info(logcat, "[{}] NEW CONNECTION", epee::net_utils::print_connection_context(context));
+    log::info(logcat, "[{}] NEW CONNECTION", epee::net_utils::print_connection_context(context));
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
@@ -2224,7 +2224,7 @@ namespace nodetool
 
     m_payload_handler.on_connection_close(context);
 
-    oxen::log::info(logcat, "[{}] CLOSE CONNECTION", epee::net_utils::print_connection_context(context));
+    log::info(logcat, "[{}] CLOSE CONNECTION", epee::net_utils::print_connection_context(context));
   }
 
   template<class t_payload_net_handler>
@@ -2348,7 +2348,7 @@ namespace nodetool
       return true;
     }
     epee::net_utils::connection<epee::levin::async_protocol_handler<p2p_connection_context> >::set_tos_flag(flag);
-    oxen::log::debug(logcat, "Set ToS flag  {}", flag);
+    log::debug(logcat, "Set ToS flag  {}", flag);
     return true;
   }
 
@@ -2362,7 +2362,7 @@ namespace nodetool
     }
 
     epee::net_utils::connection<epee::levin::async_protocol_handler<p2p_connection_context> >::set_rate_up_limit( limit );
-    oxen::log::info(logcat, "Set limit-up to {} kB/s", limit);
+    log::info(logcat, "Set limit-up to {} kB/s", limit);
     return true;
   }
 
@@ -2374,7 +2374,7 @@ namespace nodetool
       limit=cryptonote::p2p::DEFAULT_LIMIT_RATE_DOWN;
     }
     epee::net_utils::connection<epee::levin::async_protocol_handler<p2p_connection_context> >::set_rate_down_limit( limit );
-    oxen::log::info(logcat, "Set limit-down to {} kB/s", limit);
+    log::info(logcat, "Set limit-down to {} kB/s", limit);
     return true;
   }
 
@@ -2396,11 +2396,11 @@ namespace nodetool
     }
     if(!this->islimitup) {
       epee::net_utils::connection<epee::levin::async_protocol_handler<p2p_connection_context> >::set_rate_up_limit(limit_up);
-      oxen::log::info(logcat, "Set limit-up to {} kB/s", limit_up);
+      log::info(logcat, "Set limit-up to {} kB/s", limit_up);
     }
     if(!this->islimitdown) {
       epee::net_utils::connection<epee::levin::async_protocol_handler<p2p_connection_context> >::set_rate_down_limit(limit_down);
-      oxen::log::info(logcat, "Set limit-down to {} kB/s", limit_down);
+      log::info(logcat, "Set limit-down to {} kB/s", limit_down);
     }
 
     return true;
@@ -2453,12 +2453,12 @@ namespace nodetool
       if (!check_connection_and_handshake_with_peer(pe.adr, pe.last_seen))
       {
         zone.second.m_peerlist.remove_from_peer_gray(pe);
-        oxen::log::debug(logcat, "PEER EVICTED FROM GRAY PEER LIST: address: {} Peer ID: {}", pe.adr.host_str(), peerid_to_string(pe.id));
+        log::debug(logcat, "PEER EVICTED FROM GRAY PEER LIST: address: {} Peer ID: {}", pe.adr.host_str(), peerid_to_string(pe.id));
       }
       else
       {
         zone.second.m_peerlist.set_peer_just_seen(pe.id, pe.adr, pe.pruning_seed);
-        oxen::log::debug(logcat, "PEER PROMOTED TO WHITE PEER LIST IP address: {} Peer ID: {}", pe.adr.host_str(), peerid_to_string(pe.id));
+        log::debug(logcat, "PEER PROMOTED TO WHITE PEER LIST IP address: {} Peer ID: {}", pe.adr.host_str(), peerid_to_string(pe.id));
       }
     }
     return true;
@@ -2472,7 +2472,7 @@ namespace nodetool
       return;
     const uint32_t index = stripe - 1;
     std::lock_guard lock{m_used_stripe_peers_mutex};
-    oxen::log::info(logcat, "adding stripe {} peer: {}", stripe, context.m_remote_address.str());
+    log::info(logcat, "adding stripe {} peer: {}", stripe, context.m_remote_address.str());
     std::remove_if(m_used_stripe_peers[index].begin(), m_used_stripe_peers[index].end(),
         [&context](const epee::net_utils::network_address &na){ return context.m_remote_address == na; });
     m_used_stripe_peers[index].push_back(context.m_remote_address);
@@ -2486,7 +2486,7 @@ namespace nodetool
       return;
     const uint32_t index = stripe - 1;
     std::lock_guard lock{m_used_stripe_peers_mutex};
-    oxen::log::info(logcat, "removing stripe {} peer: {}", stripe, context.m_remote_address.str());
+    log::info(logcat, "removing stripe {} peer: {}", stripe, context.m_remote_address.str());
     std::remove_if(m_used_stripe_peers[index].begin(), m_used_stripe_peers[index].end(),
         [&context](const epee::net_utils::network_address &na){ return context.m_remote_address == na; });
   }
@@ -2495,7 +2495,7 @@ namespace nodetool
   void node_server<t_payload_net_handler>::clear_used_stripe_peers()
   {
     std::lock_guard lock{m_used_stripe_peers_mutex};
-    oxen::log::info(logcat, "clearing used stripe peers");
+    log::info(logcat, "clearing used stripe peers");
     for (auto &e: m_used_stripe_peers)
       e.clear();
   }

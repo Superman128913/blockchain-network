@@ -36,10 +36,10 @@
 #include "version.h"
 #include <fmt/std.h>
 
-static auto logcat = oxen::log::Cat("bcutil");
-
 namespace po = boost::program_options;
 using namespace cryptonote;
+
+static auto logcat = log::Cat("bcutil");
 
 int main(int argc, char* argv[])
 {
@@ -89,7 +89,7 @@ int main(int argc, char* argv[])
 
   auto m_config_folder = command_line::get_arg(vm, cryptonote::arg_data_dir);
   auto log_file_path = m_config_folder + "oxen-blockchain-depth.log";
-  oxen::log::Level log_level;
+  log::Level log_level;
   if(auto level = oxen::logging::parse_level(command_line::get_arg(vm, arg_log_level).c_str())) {
     log_level = *level;
   } else {
@@ -97,7 +97,7 @@ int main(int argc, char* argv[])
       throw std::runtime_error{"Incorrect log level"};
   }
   oxen::logging::init(log_file_path, log_level);
-  oxen::log::warning(logcat, "Starting...");
+  log::warning(logcat, "Starting...");
 
   bool opt_testnet = command_line::get_arg(vm, cryptonote::arg_testnet_on);
   bool opt_devnet = command_line::get_arg(vm, cryptonote::arg_devnet_on);
@@ -121,19 +121,19 @@ int main(int argc, char* argv[])
     }
   }
 
-  oxen::log::warning(logcat, "Initializing source blockchain (BlockchainDB)");
+  log::warning(logcat, "Initializing source blockchain (BlockchainDB)");
   blockchain_objects_t blockchain_objects = {};
   Blockchain *core_storage = &blockchain_objects.m_blockchain;
   BlockchainDB *db = new_db();
   if (db == NULL)
   {
-    oxen::log::error(logcat, "Failed to initialize a database");
+    log::error(logcat, "Failed to initialize a database");
     throw std::runtime_error("Failed to initialize a database");
   }
-  oxen::log::warning(logcat, "database: LMDB");
+  log::warning(logcat, "database: LMDB");
 
   const fs::path filename = fs::u8path(command_line::get_arg(vm, cryptonote::arg_data_dir)) / db->get_db_name();
-  oxen::log::warning(logcat, "Loading blockchain from folder {} ...", filename);
+  log::warning(logcat, "Loading blockchain from folder {} ...", filename);
 
   try
   {
@@ -141,13 +141,13 @@ int main(int argc, char* argv[])
   }
   catch (const std::exception& e)
   {
-    oxen::log::warning(logcat, "Error opening database: {}", e.what());
+    log::warning(logcat, "Error opening database: {}", e.what());
     return 1;
   }
   r = core_storage->init(db, nullptr /*ons_db*/, nullptr, net_type);
 
   CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize source blockchain storage");
-  oxen::log::warning(logcat, "Source blockchain storage initialized OK");
+  log::warning(logcat, "Source blockchain storage initialized OK");
 
   std::vector<crypto::hash> start_txids;
   if (!opt_txid_string.empty())
@@ -160,7 +160,7 @@ int main(int argc, char* argv[])
     cryptonote::block b;
     if (!cryptonote::parse_and_validate_block_from_blob(bd, b))
     {
-      oxen::log::warning(logcat, "Bad block from db");
+      log::warning(logcat, "Bad block from db");
       return 1;
     }
     for (const crypto::hash &txid: b.tx_hashes)
@@ -171,7 +171,7 @@ int main(int argc, char* argv[])
 
   if (start_txids.empty())
   {
-    oxen::log::warning(logcat, "No transaction(s) to check");
+    log::warning(logcat, "No transaction(s) to check");
     return 1;
   }
 
@@ -181,31 +181,31 @@ int main(int argc, char* argv[])
     uint64_t depth = 0;
     bool coinbase = false;
 
-    oxen::log::warning(logcat, "Checking depth for txid {}", start_txid);
+    log::warning(logcat, "Checking depth for txid {}", start_txid);
     std::vector<crypto::hash> txids(1, start_txid);
     while (!coinbase)
     {
-      oxen::log::warning(logcat, "Considering {} transaction(s) at depth {}", txids.size(), depth);
+      log::warning(logcat, "Considering {} transaction(s) at depth {}", txids.size(), depth);
       std::vector<crypto::hash> new_txids;
       for (const crypto::hash &txid: txids)
       {
         std::string bd;
         if (!db->get_pruned_tx_blob(txid, bd))
         {
-          oxen::log::warning(logcat, "Failed to get txid {} from db", txid);
+          log::warning(logcat, "Failed to get txid {} from db", txid);
           return 1;
         }
         cryptonote::transaction tx;
         if (!cryptonote::parse_and_validate_tx_base_from_blob(bd, tx))
         {
-          oxen::log::warning(logcat, "Bad tx: {}", txid);
+          log::warning(logcat, "Bad tx: {}", txid);
           return 1;
         }
         for (size_t ring = 0; ring < tx.vin.size(); ++ring)
         {
           if (std::holds_alternative<cryptonote::txin_gen>(tx.vin[ring]))
           {
-            oxen::log::debug(logcat, "{} is a coinbase transaction", txid);
+            log::debug(logcat, "{} is a coinbase transaction", txid);
             coinbase = true;
             goto done;
           }
@@ -221,7 +221,7 @@ int main(int argc, char* argv[])
               cryptonote::block b;
               if (!cryptonote::parse_and_validate_block_from_blob(bd, b))
               {
-                oxen::log::warning(logcat, "Bad block from db");
+                log::warning(logcat, "Bad block from db");
                 return 1;
               }
               // find the tx which created this output
@@ -234,13 +234,13 @@ int main(int argc, char* argv[])
                   {
                     found = true;
                     new_txids.push_back(cryptonote::get_transaction_hash(b.miner_tx));
-                    oxen::log::debug(logcat, "adding txid: {}", cryptonote::get_transaction_hash(b.miner_tx));
+                    log::debug(logcat, "adding txid: {}", cryptonote::get_transaction_hash(b.miner_tx));
                     break;
                   }
                 }
                 else
                 {
-                  oxen::log::warning(logcat, "Bad vout type in txid {}", cryptonote::get_transaction_hash(b.miner_tx));
+                  log::warning(logcat, "Bad vout type in txid {}", cryptonote::get_transaction_hash(b.miner_tx));
                   return 1;
                 }
               }
@@ -250,13 +250,13 @@ int main(int argc, char* argv[])
                   break;
                 if (!db->get_pruned_tx_blob(block_txid, bd))
                 {
-                  oxen::log::warning(logcat, "Failed to get txid {} from db", block_txid);
+                  log::warning(logcat, "Failed to get txid {} from db", block_txid);
                   return 1;
                 }
                 cryptonote::transaction tx2;
                 if (!cryptonote::parse_and_validate_tx_base_from_blob(bd, tx2))
                 {
-                  oxen::log::warning(logcat, "Bad tx: {}", block_txid);
+                  log::warning(logcat, "Bad tx: {}", block_txid);
                   return 1;
                 }
                 for (size_t out = 0; out < tx2.vout.size(); ++out)
@@ -267,27 +267,27 @@ int main(int argc, char* argv[])
                     {
                       found = true;
                       new_txids.push_back(block_txid);
-                      oxen::log::debug(logcat, "adding txid: {}", block_txid);
+                      log::debug(logcat, "adding txid: {}", block_txid);
                       break;
                     }
                   }
                   else
                   {
-                    oxen::log::warning(logcat, "Bad vout type in txid {}", block_txid);
+                    log::warning(logcat, "Bad vout type in txid {}", block_txid);
                     return 1;
                   }
                 }
               }
               if (!found)
               {
-                oxen::log::warning(logcat, "Output originating transaction not found");
+                log::warning(logcat, "Output originating transaction not found");
                 return 1;
               }
             }
           }
           else
           {
-            oxen::log::warning(logcat, "Bad vin type in txid {}", txid);
+            log::warning(logcat, "Bad vin type in txid {}", txid);
             return 1;
           }
         }
@@ -299,15 +299,15 @@ int main(int argc, char* argv[])
       }
     }
 done:
-    oxen::log::warning(logcat, "Min depth for txid {}: {}", start_txid, depth);
+    log::warning(logcat, "Min depth for txid {}: {}", start_txid, depth);
     depths.push_back(depth);
   }
 
   uint64_t cumulative_depth = 0;
   for (uint64_t depth: depths)
     cumulative_depth += depth;
-  oxen::log::warning(logcat, "Average min depth for {} transaction(s): {}", start_txids.size(), cumulative_depth/(float)depths.size());
-  oxen::log::warning(logcat, "Median min depth for {} transaction(s): {}", start_txids.size(), tools::median(std::move(depths)));
+  log::warning(logcat, "Average min depth for {} transaction(s): {}", start_txids.size(), cumulative_depth/(float)depths.size());
+  log::warning(logcat, "Median min depth for {} transaction(s): {}", start_txids.size(), tools::median(std::move(depths)));
 
   core_storage->deinit();
   return 0;

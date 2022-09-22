@@ -60,7 +60,7 @@ void SubaddressAccountImpl::setLabel(uint32_t accountIndex, const std::string &l
 EXPORT
 void SubaddressAccountImpl::refresh() 
 {
-  oxen::log::debug(logcat, "Refreshing subaddress account");
+  log::debug(logcat, "Refreshing subaddress account");
   
   clearRows();
   auto w = m_wallet->wallet();

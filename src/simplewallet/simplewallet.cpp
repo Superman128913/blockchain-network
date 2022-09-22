@@ -92,8 +92,9 @@ extern "C"
 #include <sodium.h>
 }
 
-using namespace cryptonote;
-namespace po = boost::program_options;
+namespace cryptonote
+{
+
 namespace string_tools = epee::string_tools;
 using sw = cryptonote::simple_wallet;
 
@@ -124,7 +125,7 @@ using sw = cryptonote::simple_wallet;
 namespace
 {
 
-  static auto logcat = oxen::log::Cat("wallet.simplewallet");
+  auto logcat = log::Cat("wallet.simplewallet");
 
   const auto arg_wallet_file = wallet_args::arg_wallet_file();
   const command_line::arg_descriptor<std::string> arg_generate_new_wallet = {"generate-new-wallet", sw::tr("Generate new wallet and save it to <arg>"), ""};
@@ -292,7 +293,7 @@ namespace
     auto pwd_container = tools::password_container::prompt(false, prompt, false);
     if (!pwd_container)
     {
-      oxen::log::error(logcat, "Failed to read secure line");
+      log::error(logcat, "Failed to read secure line");
       return "";
     }
 
@@ -452,7 +453,7 @@ namespace
     }
     catch (const tools::error::wallet_rpc_error& e)
     {
-      oxen::log::error(logcat, "RPC error: {}", e.to_string());
+      log::error(logcat, "RPC error: {}", e.to_string());
       fail_msg_writer() << sw::tr("RPC error: ") << e.what();
     }
     catch (const tools::error::get_outs_error &e)
@@ -461,19 +462,19 @@ namespace
     }
     catch (const tools::error::not_enough_unlocked_money& e)
     {
-      oxen::log::warning(logcat, "not enough money to transfer, available only {}, sent amount {}", print_money(e.available()), print_money(e.tx_amount()));
+      log::warning(logcat, "not enough money to transfer, available only {}, sent amount {}", print_money(e.available()), print_money(e.tx_amount()));
       fail_msg_writer() << sw::tr("Not enough money in unlocked balance");
       warn_of_possible_attack = false;
     }
     catch (const tools::error::not_enough_money& e)
     {
-      oxen::log::warning(logcat, "not enough money to transfer, available only {}, sent amount {}", print_money(e.available()), print_money(e.tx_amount()));
+      log::warning(logcat, "not enough money to transfer, available only {}, sent amount {}", print_money(e.available()), print_money(e.tx_amount()));
       fail_msg_writer() << sw::tr("Not enough money in unlocked balance");
       warn_of_possible_attack = false;
     }
     catch (const tools::error::tx_not_possible& e)
     {
-      oxen::log::warning(logcat, "not enough money to transfer, available only {}, transaction amount {} = {} + {} (fee)",
+      log::warning(logcat, "not enough money to transfer, available only {}, transaction amount {} = {} + {} (fee)",
         print_money(e.available()),
         print_money(e.tx_amount() + e.fee()),
         print_money(e.tx_amount()),
@@ -520,23 +521,23 @@ namespace
     }
     catch (const tools::error::transfer_error& e)
     {
-      oxen::log::error(logcat, "unknown transfer error: {}", e.to_string());
+      log::error(logcat, "unknown transfer error: {}", e.to_string());
       fail_msg_writer() << sw::tr("unknown transfer error: ") << e.what();
     }
     catch (const tools::error::multisig_export_needed& e)
     {
-      oxen::log::error(logcat, "Multisig error: {}", e.to_string());
+      log::error(logcat, "Multisig error: {}", e.to_string());
       fail_msg_writer() << sw::tr("Multisig error: ") << e.what();
       warn_of_possible_attack = false;
     }
     catch (const tools::error::wallet_internal_error& e)
     {
-      oxen::log::error(logcat, "internal error: {}", e.to_string());
+      log::error(logcat, "internal error: {}", e.to_string());
       fail_msg_writer() << sw::tr("internal error: ") << e.what();
     }
     catch (const std::exception& e)
     {
-      oxen::log::error(logcat, "unexpected error: {}", e.what());
+      log::error(logcat, "unexpected error: {}", e.what());
       fail_msg_writer() << sw::tr("unexpected error: ") << e.what();
     }
 
@@ -1182,7 +1183,7 @@ bool simple_wallet::export_multisig_main(const std::vector<std::string> &args EN
   }
   catch (const std::exception &e)
   {
-    oxen::log::error(logcat, "Error exporting multisig info: {}", e.what());
+    log::error(logcat, "Error exporting multisig info: {}", e.what());
     fail_msg_writer() << tr("Error exporting multisig info: ") << e.what();
     return false;
   }
@@ -1488,7 +1489,7 @@ bool simple_wallet::submit_multisig_main(const std::vector<std::string> &args EN
   }
   catch (...)
   {
-    oxen::log::error(logcat, "unknown error");
+    log::error(logcat, "unknown error");
     fail_msg_writer() << tr("unknown error");
     return false;
   }
@@ -1562,12 +1563,12 @@ bool simple_wallet::export_raw_multisig(const std::vector<std::string> &args)
   }
   catch (const std::exception& e)
   {
-    oxen::log::error(logcat, "unexpected error: {}", e.what());
+    log::error(logcat, "unexpected error: {}", e.what());
     fail_msg_writer() << tr("unexpected error: ") << e.what();
   }
   catch (...)
   {
-    oxen::log::error(logcat, "Unknown error");
+    log::error(logcat, "Unknown error");
     fail_msg_writer() << tr("unknown error");
   }
 
@@ -2122,7 +2123,7 @@ bool simple_wallet::cold_sign_tx(const std::vector<tools::wallet2::pending_tx>& 
 
   if (accept_func && !accept_func(exported_txs))
   {
-    oxen::log::error(logcat, "Transactions rejected by callback");
+    log::error(logcat, "Transactions rejected by callback");
     return false;
   }
 
@@ -2507,7 +2508,7 @@ bool simple_wallet::set_device_name(const std::vector<std::string> &args/* = std
       }
 
     } catch(const std::exception & e){
-      oxen::log::warning(logcat, "Device reconnect failed: {}", e.what());
+      log::warning(logcat, "Device reconnect failed: {}", e.what());
       fail_msg_writer() << tr("Device reconnect failed: ") << e.what();
     }
 
@@ -3240,7 +3241,7 @@ bool simple_wallet::set_log(const std::vector<std::string> &args)
   {
     auto log_level = oxen::logging::parse_level(args[0]);
     if (log_level.has_value())
-      oxen::log::reset_level(*log_level);
+      log::reset_level(*log_level);
     else {
       oxen::logging::process_categories_string(args[0]);
     }
@@ -3252,7 +3253,7 @@ bool simple_wallet::set_log(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::ask_wallet_create_if_needed()
 {
-  oxen::log::trace(logcat, "simple_wallet::ask_wallet_create_if_needed() started");
+  log::trace(logcat, "simple_wallet::ask_wallet_create_if_needed() started");
   fs::path wallet_path;
   std::string confirm_creation;
   bool wallet_name_valid = false;
@@ -3260,7 +3261,7 @@ bool simple_wallet::ask_wallet_create_if_needed()
   bool wallet_file_exists;
 
   do{
-      oxen::log::trace(logcat, "User asked to specify wallet file name.");
+      log::trace(logcat, "User asked to specify wallet file name.");
       wallet_path = fs::u8path(input_line(
         tr(m_restoring ? "Specify a new wallet file name for your restored wallet (e.g., MyWallet).\n"
         "Wallet file name (or Ctrl-C to quit)" :
@@ -3269,7 +3270,7 @@ bool simple_wallet::ask_wallet_create_if_needed()
       ));
       if(std::cin.eof())
       {
-        oxen::log::error(logcat, "Unexpected std::cin.eof() - Exited simple_wallet::ask_wallet_create_if_needed()");
+        log::error(logcat, "Unexpected std::cin.eof() - Exited simple_wallet::ask_wallet_create_if_needed()");
         return false;
       }
       if(wallet_path.empty())
@@ -3280,8 +3281,8 @@ bool simple_wallet::ask_wallet_create_if_needed()
       else
       {
         tools::wallet2::wallet_exists(wallet_path, keys_file_exists, wallet_file_exists);
-        oxen::log::trace(logcat, "wallet_path: {}", wallet_path);
-        oxen::log::trace(logcat, "keys_file_exists: {} wallet_file_exists: {}", keys_file_exists, wallet_file_exists);
+        log::trace(logcat, "wallet_path: {}", wallet_path);
+        log::trace(logcat, "keys_file_exists: {} wallet_file_exists: {}", keys_file_exists, wallet_file_exists);
 
         if((keys_file_exists || wallet_file_exists) && (!m_generate_new.empty() || m_restoring))
         {
@@ -3315,7 +3316,7 @@ bool simple_wallet::ask_wallet_create_if_needed()
             confirm_creation = input_line(prompt, true);
             if(std::cin.eof())
             {
-              oxen::log::error(logcat, "Unexpected std::cin.eof() - Exited simple_wallet::ask_wallet_create_if_needed()");
+              log::error(logcat, "Unexpected std::cin.eof() - Exited simple_wallet::ask_wallet_create_if_needed()");
               return false;
             }
             ok = command_line::is_yes(confirm_creation);
@@ -3330,7 +3331,7 @@ bool simple_wallet::ask_wallet_create_if_needed()
       }
     } while(!wallet_name_valid);
 
-  oxen::log::error(logcat, "Failed out of do-while loop in ask_wallet_create_if_needed()");
+  log::error(logcat, "Failed out of do-while loop in ask_wallet_create_if_needed()");
   return false;
 }
 
@@ -4708,7 +4709,7 @@ bool simple_wallet::set_daemon(const std::vector<std::string>& args)
   }
   else if (is_local)
   {
-    oxen::log::info(logcat, tr("Daemon is local, assuming trusted"));
+    log::info(logcat, tr("Daemon is local, assuming trusted"));
     m_wallet->set_trusted_daemon(true);
   }
   success_msg_writer() << "Daemon set to " << daemon_url << ", " << tr(m_wallet->is_trusted_daemon() ? "trusted" : "untrusted");
@@ -4855,7 +4856,7 @@ std::optional<epee::wipeable_string> simple_wallet::on_get_password(const char *
   auto pwd_container = tools::password_container::prompt(false, msg.c_str());
   if (!pwd_container)
   {
-    oxen::log::error(logcat, "Failed to read password");
+    log::error(logcat, "Failed to read password");
     return std::nullopt;
   }
 
@@ -4988,27 +4989,27 @@ bool simple_wallet::refresh_main(uint64_t start_height, enum ResetType reset, bo
   }
   catch (const tools::error::wallet_rpc_error& e)
   {
-    oxen::log::error(logcat, "RPC error: {}", e.to_string());
+    log::error(logcat, "RPC error: {}", e.to_string());
     ss << tr("RPC error: ") << e.what();
   }
   catch (const tools::error::refresh_error& e)
   {
-    oxen::log::error(logcat, "refresh error: {}", e.to_string());
+    log::error(logcat, "refresh error: {}", e.to_string());
     ss << tr("refresh error: ") << e.what();
   }
   catch (const tools::error::wallet_internal_error& e)
   {
-    oxen::log::error(logcat, "internal error: {}", e.to_string());
+    log::error(logcat, "internal error: {}", e.to_string());
     ss << tr("internal error: ") << e.what();
   }
   catch (const std::exception& e)
   {
-    oxen::log::error(logcat, "unexpected error: {}", e.what());
+    log::error(logcat, "unexpected error: {}", e.what());
     ss << tr("unexpected error: ") << e.what();
   }
   catch (...)
   {
-    oxen::log::error(logcat, "unknown error");
+    log::error(logcat, "unknown error");
     ss << tr("unknown error");
   }
 
@@ -5360,17 +5361,17 @@ bool simple_wallet::rescan_spent(const std::vector<std::string> &args)
   }
   catch (const tools::error::wallet_rpc_error& e)
   {
-    oxen::log::error(logcat, "RPC error: {}", e.to_string());
+    log::error(logcat, "RPC error: {}", e.to_string());
     fail_msg_writer() << tr("RPC error: ") << e.what();
   }
   catch (const std::exception& e)
   {
-    oxen::log::error(logcat, "unexpected error: {}", e.what());
+    log::error(logcat, "unexpected error: {}", e.what());
     fail_msg_writer() << tr("unexpected error: ") << e.what();
   }
   catch (...)
   {
-    oxen::log::error(logcat, "unknown error");
+    log::error(logcat, "unknown error");
     fail_msg_writer() << tr("unknown error");
   }
 
@@ -5800,7 +5801,7 @@ bool simple_wallet::confirm_and_send_tx(std::vector<cryptonote::address_parse_in
     }
     catch (...)
     {
-      oxen::log::error(logcat, "Unknown error");
+      log::error(logcat, "Unknown error");
       fail_msg_writer() << tr("unknown error");
       return false;
     }
@@ -6026,7 +6027,7 @@ bool simple_wallet::transfer_main(Transfer transfer_type, const std::vector<std:
   }
   catch (...)
   {
-    oxen::log::error(logcat, "unknown error");
+    log::error(logcat, "unknown error");
     fail_msg_writer() << tr("unknown error");
     return false;
   }
@@ -6088,7 +6089,7 @@ bool simple_wallet::register_service_node(const std::vector<std::string> &args_)
   }
   catch (...)
   {
-    oxen::log::error(logcat, "unknown error");
+    log::error(logcat, "unknown error");
     fail_msg_writer() << tr("unknown error");
   }
 
@@ -6203,7 +6204,7 @@ bool simple_wallet::stake(const std::vector<std::string> &args_)
     }
     catch (...)
     {
-      oxen::log::error(logcat, "unknown error");
+      log::error(logcat, "unknown error");
       fail_msg_writer() << tr("unknown error");
     }
   }
@@ -6272,7 +6273,7 @@ bool simple_wallet::request_stake_unlock(const std::vector<std::string> &args_)
   }
   catch (...)
   {
-    oxen::log::error(logcat, "unknown error");
+    log::error(logcat, "unknown error");
     fail_msg_writer() << tr("unknown error");
   }
 
@@ -6688,7 +6689,7 @@ bool simple_wallet::ons_buy_mapping(std::vector<std::string> args)
   }
   catch (...)
   {
-    oxen::log::error(logcat, "unknown error");
+    log::error(logcat, "unknown error");
     fail_msg_writer() << tr("unknown error");
     return true;
   }
@@ -6767,7 +6768,7 @@ bool simple_wallet::ons_renew_mapping(std::vector<std::string> args)
   }
   catch (...)
   {
-    oxen::log::error(logcat, "unknown error");
+    log::error(logcat, "unknown error");
     fail_msg_writer() << tr("unknown error");
     return true;
   }
@@ -6823,7 +6824,7 @@ bool simple_wallet::ons_update_mapping(std::vector<std::string> args)
     auto enc_hex = response[0]["encrypted_value"].get<std::string>();
     if (!oxenc::is_hex(enc_hex) || enc_hex.size() > 2*ons::mapping_value::BUFFER_SIZE)
     {
-      oxen::log::error(logcat, "invalid ONS data returned from oxend");
+      log::error(logcat, "invalid ONS data returned from oxend");
       fail_msg_writer() << tr("invalid ONS data returned from oxend");
       return true;
     }
@@ -6895,7 +6896,7 @@ bool simple_wallet::ons_update_mapping(std::vector<std::string> args)
   }
   catch (...)
   {
-    oxen::log::error(logcat, "unknown error");
+    log::error(logcat, "unknown error");
     fail_msg_writer() << tr("unknown error");
     return true;
   }
@@ -7290,7 +7291,7 @@ bool simple_wallet::sweep_unmixable(const std::vector<std::string> &args_)
   }
   catch (...)
   {
-    oxen::log::error(logcat, "unknown error");
+    log::error(logcat, "unknown error");
     fail_msg_writer() << tr("unknown error");
   }
 
@@ -7413,7 +7414,7 @@ bool simple_wallet::sweep_main_internal(sweep_type_t sweep_type, std::vector<too
     }
     catch (...)
     {
-      oxen::log::error(logcat, "Unknown error");
+      log::error(logcat, "Unknown error");
       fail_msg_writer() << tr("unknown error");
     }
   }
@@ -7595,7 +7596,7 @@ bool simple_wallet::sweep_main(uint32_t account, uint64_t below, Transfer transf
   }
   catch (...)
   {
-    oxen::log::error(logcat, "unknown error");
+    log::error(logcat, "unknown error");
     fail_msg_writer() << tr("unknown error");
   }
 
@@ -7691,7 +7692,7 @@ bool simple_wallet::sweep_single(const std::vector<std::string> &args_)
   }
   catch (...)
   {
-    oxen::log::error(logcat, "unknown error");
+    log::error(logcat, "unknown error");
     fail_msg_writer() << tr("unknown error");
   }
 
@@ -7997,7 +7998,7 @@ bool simple_wallet::submit_transfer(const std::vector<std::string> &args_)
   }
   catch (...)
   {
-    oxen::log::error(logcat, "Unknown error");
+    log::error(logcat, "Unknown error");
     fail_msg_writer() << tr("unknown error");
   }
 
@@ -9852,7 +9853,7 @@ bool simple_wallet::export_key_images(const std::vector<std::string> &args)
   }
   catch (const std::exception &e)
   {
-    oxen::log::error(logcat, "Error exporting key images: {}", e.what());
+    log::error(logcat, "Error exporting key images: {}", e.what());
     fail_msg_writer() << "Error exporting key images: " << e.what();
     return true;
   }
@@ -10009,7 +10010,7 @@ bool simple_wallet::export_outputs(const std::vector<std::string> &args)
   }
   catch (const std::exception &e)
   {
-    oxen::log::error(logcat, "Error exporting outputs: {}", e.what());
+    log::error(logcat, "Error exporting outputs: {}", e.what());
     fail_msg_writer() << "Error exporting outputs: " << e.what();
     return true;
   }
@@ -10283,6 +10284,9 @@ void simple_wallet::commit_or_save(std::vector<tools::wallet2::pending_tx>& ptx_
     ptx_vector.pop_back();
   }
 }
+
+} // namespace cryptonote
+
 //----------------------------------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {
@@ -10291,6 +10295,9 @@ int main(int argc, char* argv[])
   setlocale(LC_CTYPE, "");
 
   auto opt_size = command_line::boost_option_sizes();
+
+  using namespace cryptonote;
+  namespace po = boost::program_options;
 
   po::options_description desc_params(wallet_args::tr("Wallet options"), opt_size.first, opt_size.second);
   po::options_description hidden_params("Hidden");
