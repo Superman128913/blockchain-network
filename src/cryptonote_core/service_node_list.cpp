@@ -359,9 +359,9 @@ namespace service_nodes
     {
       // If not using portions then the hf value must be >= 19 and equal to the current blockchain hf:
       if (hf_version < hf::hf19_reward_batching || reg.hf != static_cast<uint8_t>(hf_version))
-        throw invalid_registration{fmt::format(
+        throw invalid_registration{
                 "Wrong registration hardfork {}; you likely need to regenerate "
-                "the registration for compatibility with hardfork {}",
+                "the registration for compatibility with hardfork {}"_format(
                 reg.hf, static_cast<uint8_t>(hf_version))};
     }
 
@@ -387,7 +387,7 @@ namespace service_nodes
     }
 
     if (!valid_fee)
-      throw invalid_registration{fmt::format("Operator fee is too high ({} > {})", reg.fee,
+      throw invalid_registration{"Operator fee is too high ({} > {})"_format(reg.fee,
               reg.uses_portions ? cryptonote::old::STAKING_PORTIONS : cryptonote::STAKING_FEE_BASIS)};
 
     if (!valid_stakes) {
@@ -1594,7 +1594,7 @@ namespace service_nodes
       std::shared_ptr<const quorum> quorum = get_quorum(quorum_type::checkpointing, checkpoint->height, false, alt_block ? &alt_quorums : nullptr);
 
       if (!quorum)
-        throw std::runtime_error{fmt::format("Failed to get testing quorum checkpoint for {} {}", block_type, cryptonote::get_block_hash(block))};
+        throw std::runtime_error{"Failed to get testing quorum checkpoint for {} {}"_format(block_type, cryptonote::get_block_hash(block))};
 
       bool failed_checkpoint_verify = !service_nodes::verify_checkpoint(block.major_version, *checkpoint, *quorum);
       if (alt_block && failed_checkpoint_verify)
@@ -1610,7 +1610,7 @@ namespace service_nodes
       }
 
       if (failed_checkpoint_verify)
-        throw std::runtime_error{fmt::format("Service node checkpoint failed verification for {} {}", block_type, cryptonote::get_block_hash(block))};
+        throw std::runtime_error{"Service node checkpoint failed verification for {} {}"_format(block_type, cryptonote::get_block_hash(block))};
     }
 
     //
@@ -1625,8 +1625,8 @@ namespace service_nodes
       {
         cryptonote::block prev_block;
         if (!find_block_in_db(m_blockchain.get_db(), block.prev_id, prev_block))
-          throw std::runtime_error{fmt::format(
-              "Alt block {} references previous block {} not available in DB.",
+          throw std::runtime_error{
+              "Alt block {} references previous block {} not available in DB."_format(
               cryptonote::get_block_hash(block), block.prev_id)};
 
         prev_timestamp = prev_block.timestamp;
@@ -1638,8 +1638,8 @@ namespace service_nodes
       }
 
       if (!pulse::get_round_timings(m_blockchain, height, prev_timestamp, timings))
-        throw std::runtime_error{fmt::format(
-            "Failed to query the block data for Pulse timings to validate incoming {} at height {}",
+        throw std::runtime_error{
+            "Failed to query the block data for Pulse timings to validate incoming {} at height {}"_format(
             block_type, height)};
     }
 
@@ -1699,7 +1699,7 @@ namespace service_nodes
     }
 
     if (!result)
-      throw std::runtime_error{fmt::format("Failed to verify block components for incoming {} at height {}",
+      throw std::runtime_error{"Failed to verify block components for incoming {} at height {}"_format(
           block_type, height)};
   }
 
@@ -1726,9 +1726,10 @@ namespace service_nodes
       if (newest_block && (now >= earliest_time && now <= latest_time))
       {
         std::shared_ptr<const quorum> quorum = get_quorum(quorum_type::pulse, block_height, false, nullptr);
-        if (!quorum || quorum->validators.empty())
-          throw std::runtime_error{fmt::format(
-              "Unexpected Pulse error: {}", quorum ? " quorum was not generated" : " quorum was empty")};
+        if (!quorum)
+          throw std::runtime_error{"Unexpected Pulse error: quorum was not generated"};
+        if (quorum->validators.empty())
+          throw std::runtime_error{"Unexpected Pulse error: quorum was empty"};
 
         for (size_t validator_index = 0; validator_index < service_nodes::PULSE_QUORUM_NUM_VALIDATORS; validator_index++)
         {
@@ -2478,7 +2479,7 @@ namespace service_nodes
                                         uint64_t reward)
   {
     if (output_index >= miner_tx.vout.size())
-      throw std::out_of_range{fmt::format("Output Index: {} , indexes out of bounds in vout array with size: ",
+      throw std::out_of_range{"Output Index: {}, indexes out of bounds in vout array with size: {}"_format(
         output_index, miner_tx.vout.size())};
 
     cryptonote::tx_out const &output = miner_tx.vout[output_index];
@@ -2488,7 +2489,7 @@ namespace service_nodes
     // 1 ULP difference in the reward calculations.
     // TODO(oxen): eliminate all FP math from reward calculations
     if (!within_one(output.amount, reward))
-      throw std::runtime_error{fmt::format("Service node reward amount incorrect. Should be {}, is: {}", cryptonote::print_money(reward), cryptonote::print_money(output.amount))};
+      throw std::runtime_error{"Service node reward amount incorrect. Should be {}, is: {}"_format(cryptonote::print_money(reward), cryptonote::print_money(output.amount))};
 
     if (!std::holds_alternative<cryptonote::txout_to_key>(output.target))
       throw std::runtime_error{"Service node output target type should be txout_to_key"};
@@ -2505,7 +2506,7 @@ namespace service_nodes
       throw std::runtime_error{"Failed derive public key"};
 
     if (var::get<cryptonote::txout_to_key>(output.target).key != out_eph_public_key)
-      throw std::runtime_error{fmt::format("Invalid service node reward at output: {}, output key, specifies wrong key", output_index)};
+      throw std::runtime_error{"Invalid service node reward at output: {}, output key, specifies wrong key"_format(output_index)};
   }
 
   void service_node_list::validate_miner_tx(const cryptonote::miner_tx_info& info) const
@@ -2530,7 +2531,7 @@ namespace service_nodes
     {
       auto const check_block_leader_pubkey = cryptonote::get_service_node_winner_from_tx_extra(miner_tx.extra);
       if (block_leader.key != check_block_leader_pubkey)
-        throw std::runtime_error{fmt::format("Service node reward winner is incorrect! Expected {}, block has {}", block_leader.key, check_block_leader_pubkey)};
+        throw std::runtime_error{"Service node reward winner is incorrect! Expected {}, block has {}"_format(block_leader.key, check_block_leader_pubkey)};
     }
 
     enum struct verify_mode
@@ -2552,14 +2553,14 @@ namespace service_nodes
       std::vector<crypto::hash> entropy = get_pulse_entropy_for_next_block(m_blockchain.get_db(), block.prev_id, block.pulse.round);
       quorum pulse_quorum = generate_pulse_quorum(m_blockchain.nettype(), block_leader.key, hf_version, m_state.active_service_nodes_infos(), entropy, block.pulse.round);
       if (!verify_pulse_quorum_sizes(pulse_quorum))
-        throw std::runtime_error{fmt::format("Pulse block received but Pulse has insufficient nodes for quorum, block hash {}, height {}", cryptonote::get_block_hash(block), height)};
+        throw std::runtime_error{"Pulse block received but Pulse has insufficient nodes for quorum, block hash {}, height {}"_format(cryptonote::get_block_hash(block), height)};
 
       block_producer_key = pulse_quorum.workers[0];
       mode               = (block_producer_key == block_leader.key) ? verify_mode::pulse_block_leader_is_producer
                                                                     : verify_mode::pulse_different_block_producer;
 
       if (block.pulse.round == 0 && (mode == verify_mode::pulse_different_block_producer))
-        throw std::runtime_error{fmt::format("The block producer in pulse round 0 should be the same node as the block leader: {}, actual producer: {}", block_leader.key, block_producer_key)};
+        throw std::runtime_error{"The block producer in pulse round 0 should be the same node as the block leader: {}, actual producer: {}"_format(block_leader.key, block_producer_key)};
     }
 
     // NOTE: Verify miner tx vout composition
@@ -2595,7 +2596,7 @@ namespace service_nodes
         {
           auto info_it = m_state.service_nodes_infos.find(block_producer_key);
           if (info_it == m_state.service_nodes_infos.end())
-            throw std::runtime_error{fmt::format("The pulse block producer for round {:d} is not current a Service Node: {}", block.pulse.round, block_producer_key)};
+            throw std::runtime_error{"The pulse block producer for round {:d} is not current a Service Node: {}"_format(block.pulse.round, block_producer_key)};
 
           block_producer = info_it->second;
           expected_vouts_size = mode == verify_mode::pulse_different_block_producer && reward_parts.miner_fee > 0
@@ -2617,7 +2618,7 @@ namespace service_nodes
     }
 
     if (miner_tx.vout.size() != expected_vouts_size)
-      throw std::runtime_error{fmt::format("Expected {} block, the miner TX specifies a different amount of outputs vs the expected: {}, miner tx outputs: {}",
+      throw std::runtime_error{"Expected {} block, the miner TX specifies a different amount of outputs vs the expected: {}, miner tx outputs: {}"_format(
           mode == verify_mode::miner ? "miner"sv :
           mode == verify_mode::batched_sn_rewards ? "batch reward"sv :
           mode == verify_mode::pulse_block_leader_is_producer ? "pulse"sv :
@@ -2626,7 +2627,8 @@ namespace service_nodes
           miner_tx.vout.size())};
 
     if (hf_version >= hf::hf16_pulse && reward_parts.base_miner != 0)
-      throw std::runtime_error{fmt::format("Miner reward is incorrect expected 0 reward, block specified {}", cryptonote::print_money(reward_parts.base_miner))};
+      throw std::runtime_error{"Miner reward is incorrect expected 0 reward, block specified {}"_format(
+              cryptonote::print_money(reward_parts.base_miner))};
 
     // NOTE: Verify Coinbase Amounts
     switch(mode)
@@ -2731,7 +2733,7 @@ namespace service_nodes
           auto paid_amount = vout.amount * cryptonote::BATCH_REWARD_FACTOR;
           total_payout_in_vouts += paid_amount;
           if (paid_amount != batch_payment.amount)
-            throw std::runtime_error{fmt::format("Batched reward payout incorrect: expected {}, not {}", batch_payment.amount, paid_amount)};
+            throw std::runtime_error{"Batched reward payout incorrect: expected {}, not {}"_format(batch_payment.amount, paid_amount)};
 
           crypto::public_key out_eph_public_key{};
           if (!cryptonote::get_deterministic_output_key(batch_payment.address_info.address, deterministic_keypair, vout_index, out_eph_public_key))
@@ -2742,7 +2744,7 @@ namespace service_nodes
             throw std::runtime_error{"Output Ephermeral Public Key does not match (payment to wrong recipient)"};
         }
         if (total_payout_in_vouts != total_payout_in_our_db)
-          throw std::runtime_error{fmt::format("Total service node reward amount incorrect: expected {}, not {}", total_payout_in_our_db, total_payout_in_vouts)};
+          throw std::runtime_error{"Total service node reward amount incorrect: expected {}, not {}"_format(total_payout_in_our_db, total_payout_in_vouts)};
       }
       break;
     }
@@ -2789,7 +2791,7 @@ namespace service_nodes
       throw std::runtime_error{"Received alt block but couldn't find parent state in historical state"};
 
     if (starting_state->block_hash != block.prev_id)
-      throw std::runtime_error{fmt::format("Unexpected state_t's hash: {}, does not match the block prev hash: {}",
+      throw std::runtime_error{"Unexpected state_t's hash: {}, does not match the block prev hash: {}"_format(
          starting_state->block_hash, block.prev_id)};
 
     // NOTE: Generate the next Service Node list state from this Alt block.
@@ -3960,11 +3962,11 @@ namespace service_nodes
 
     cmd.clear();
     if (make_friendly)
-      cmd += fmt::format("{} ({}):\n\n", 
+      cmd += "{} ({}):\n\n"_format(
           tr("Run this command in the operator's wallet"),
           cryptonote::get_account_address_as_str(nettype, false, reg.reserved[0].first));
 
-    cmd += fmt::format("register_service_node {} {} {} {}",
+    cmd += "register_service_node {} {} {} {}"_format(
             tools::join(" ", args),
             reg.hf,
             tools::type_to_hex(reg.service_node_pubkey),

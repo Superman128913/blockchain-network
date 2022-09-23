@@ -63,7 +63,7 @@ namespace service_nodes
     _count
   };
 
-  inline std::string to_string(const quorum_type& q)
+  inline constexpr std::string_view to_string(const quorum_type& q)
   {
     switch(q)
     {
@@ -178,10 +178,9 @@ namespace service_nodes
 }; // namespace service_nodes
    //
 template <>
-struct fmt::formatter<service_nodes::quorum_type> : fmt::formatter<std::string> {
+struct fmt::formatter<service_nodes::quorum_type> : fmt::formatter<std::string_view> {
   auto format(service_nodes::quorum_type quorum, format_context& ctx) {
-    return formatter<std::string>::format(
-        fmt::format("{}", to_string(quorum)), ctx);
+    return formatter<std::string_view>::format(to_string(quorum), ctx);
   }
 };
 

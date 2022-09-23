@@ -2643,24 +2643,23 @@ namespace cryptonote::rpc {
       std::string our_ed25519_pubkey = tools::type_to_hex(core.get_service_keys().pub_ed25519);
       if (!error.empty()) {
         status = fmt::format("Error: {}", error);
-        MERROR(fmt::format("{0} reported an error: {1}. Check {0} logs for more details.", name, error));
+        log::error(logcat, "{0} reported an error: {1}. Check {0} logs for more details.", name, error);
         update = 0; // Reset our last ping time to 0 so that we won't send a ping until we get
                     // success back again (even if we had an earlier acceptable ping within the
                     // cutoff time).
-      else if (cur_version < required) {
-        status = fmt::format("Outdated {}. Current: {}.{}.{} Required: {}.{}.{}", name,
-            cur_version[0], cur_version[1], cur_version[2],
-            required[0], required[1], required[2]);
+      } else if (cur_version < required) {
+        status = "Outdated {}. Current: {} Required: {}"_format(
+                name, fmt::join(cur_version, "."), fmt::join(required, "."));
         log::error(logcat, status);
       } else if (!ed25519_pubkey.empty() // TODO: once lokinet & ss are always sending this we can remove this empty bypass
           && ed25519_pubkey != our_ed25519_pubkey) {
-        status = fmt::format("Invalid {} pubkey: expected {}, received {}", name, our_ed25519_pubkey, ed25519_pubkey);
+        status = "Invalid {} pubkey: expected {}, received {}"_format(name, our_ed25519_pubkey, ed25519_pubkey);
         log::error(logcat, status);
       } else {
         auto now = std::time(nullptr);
         auto old = update.exchange(now);
         bool significant = std::chrono::seconds{now - old} > lifetime; // Print loudly for the first ping after startup/expiry
-        auto msg = fmt::format("Received ping from {} {}.{}.{}", name, cur_version[0], cur_version[1], cur_version[2]);
+        auto msg = "Received ping from {} {}"_format(name, fmt::join(cur_version, "."));
         if (significant)
           log::info(logcat, fg(fmt::terminal_color::green), "{}", msg);
         else

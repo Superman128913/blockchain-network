@@ -1209,7 +1209,7 @@ namespace nodetool
 
   static std::string peerid_to_string(peerid_type peer_id)
   {
-    return fmt::format("{:016x}", peer_id);
+    return "{:016x}"_format(peer_id);
   }
 
   //-----------------------------------------------------------------------------------

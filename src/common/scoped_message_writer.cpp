@@ -1,4 +1,5 @@
 #include "scoped_message_writer.h"
+#include "common/format.h"
 
 namespace tools {
 
@@ -12,7 +13,8 @@ scoped_message_writer::~scoped_message_writer()
     if (fmt::terminal_color::white == m_color)
       logcat->log(m_log_level, m_oss.str());
     else
-      logcat->log(m_log_level, "{}", fmt::format(fg(m_color), m_oss.str()));
+      logcat->log(m_log_level, "{}",
+              log::detail::text_style_wrapper{fg(m_color), "{}", m_oss.str()});
     std::cout << std::endl;
   }
 }

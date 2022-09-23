@@ -356,7 +356,7 @@ bool Blockchain::load_missing_blocks_into_oxen_subsystems()
 #ifdef ENABLE_SYSTEMD
       // Tell systemd that we're doing something so that it should let us continue starting up
       // (giving us 120s until we have to send the next notification):
-      sd_notify(0, ("EXTEND_TIMEOUT_USEC=120000000\nSTATUS=Recanning blockchain; height " + std::to_string(start_height + (index * BLOCK_COUNT))).c_str());
+      sd_notify(0, "EXTEND_TIMEOUT_USEC=120000000\nSTATUS=Recanning blockchain; height {}"_format(start_height + (index * BLOCK_COUNT)).c_str());
 #endif
       work_start = clock::now();
 
@@ -2161,7 +2161,7 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
     }
     else
     {
-      std::string msg = fmt::format("----- {} BLOCK ADDED AS ALTERNATIVE ON HEIGHT {}\nid: {}", block_type, blk_height, id);
+      std::string msg = "----- {} BLOCK ADDED AS ALTERNATIVE ON HEIGHT {}\nid: {}"_format(block_type, blk_height, id);
       if (!pulse_block) fmt::format_to(std::back_inserter(msg), " PoW: {}", blk_pow.proof_of_work);
       fmt::format_to(std::back_inserter(msg), " difficulty {}", current_diff);
 

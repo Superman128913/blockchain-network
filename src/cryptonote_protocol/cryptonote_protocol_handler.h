@@ -59,7 +59,7 @@ template <>
 struct fmt::formatter<cryptonote::cryptonote_connection_context> : fmt::formatter<std::string> {
   auto format(cryptonote::cryptonote_connection_context connection_context, format_context& ctx) {
     return formatter<std::string>::format(
-      fmt::format("[{}]", epee::net_utils::print_connection_context_short(connection_context)), ctx);
+      "[{}]"_format(epee::net_utils::print_connection_context_short(connection_context)), ctx);
   }
 };
 

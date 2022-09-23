@@ -213,7 +213,7 @@ namespace cryptonote
       seconds_f connection_time{now - cntxt.m_started};
       ss << std::setw(30) << std::left << std::string(cntxt.m_is_income ? " [INC]":"[OUT]") +
         cntxt.m_remote_address.str()
-        << std::setw(20) << fmt::format("{:016x}", peer_id)
+        << std::setw(20) << "{:016x}"_format(peer_id)
         << std::setw(30) << std::to_string(cntxt.m_recv_cnt) + "(" + std::to_string(tools::to_seconds(now - cntxt.m_last_recv)) + ")" +
                       "/" + std::to_string(cntxt.m_send_cnt) + "(" + std::to_string(tools::to_seconds(now - cntxt.m_last_send)) + ")"
         << std::setw(25) << get_protocol_state_string(cntxt.m_state)
@@ -270,7 +270,7 @@ namespace cryptonote
         cnx.ip = cnx.host;
         cnx.port = std::to_string(cntxt.m_remote_address.as<epee::net_utils::ipv4_network_address>().port());
       }
-      cnx.peer_id = fmt::format("{:016x}", peer_id);
+      cnx.peer_id = "{:016x}"_format(peer_id);
       
       cnx.live_time = std::chrono::duration_cast<std::chrono::milliseconds>(now - cntxt.m_started);
       cnx.recv_idle_time = std::chrono::duration_cast<std::chrono::milliseconds>(now - std::max(cntxt.m_started, cntxt.m_last_recv));
@@ -446,7 +446,8 @@ namespace cryptonote
       int64_t diff = static_cast<int64_t>(hshd.current_height) - static_cast<int64_t>(curr_height);
       uint64_t abs_diff = std::abs(diff);
       uint64_t max_block_height = std::max(hshd.current_height, curr_height);
-      std::string sync_msg = fmt::format("{}Sync data returned a new top block candidate: {} -> {} [Your node is {} blocks ({} {})]\nSYNCHRONIZATION started", context, curr_height, hshd.current_height, abs_diff, tools::get_human_readable_timespan(abs_diff*TARGET_BLOCK_TIME), (0 <= diff ? "behind" : "ahead"));
+      std::string sync_msg = "{}Sync data returned a new top block candidate: {} -> {} [Your node is {} blocks ({} {})]\nSYNCHRONIZATION started"_format(
+              context, curr_height, hshd.current_height, abs_diff, tools::get_human_readable_timespan(abs_diff*TARGET_BLOCK_TIME), (0 <= diff ? "behind" : "ahead"));
       if (is_initial)
         log::info(globallogcat, fg(fmt::terminal_color::cyan), sync_msg);
       else

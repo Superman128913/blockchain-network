@@ -145,17 +145,19 @@ namespace {
     if (dt < 90s)
       s = std::to_string(dt.count()) + (abbreviate ? "sec" : dt == 1s ? " second" : " seconds");
     else if (dt < 90min)
-      s = fmt::format("{:.1f}{:s}", ((float)dt.count()/60), abbreviate ? "min" : " minutes");
+      s = "{:.1f}{:s}"_format(dt.count()/60.0, abbreviate ? "min" : " minutes");
     else if (dt < 36h)
-      s = fmt::format("{:.1f}{:s}", ((float)dt.count()/3600), abbreviate ? "hr" : " hours");
+      s = "{:.1f}{:s}"_format(dt.count()/3600.0, abbreviate ? "hr" : " hours");
     else
-      s = fmt::format("{:.1f} days", ((float)dt.count()/86400));
+      s = "{:.1f} days"_format(dt.count()/86400.0);
     if (abbreviate) {
         if (ago < 0s)
-            return s + " (in fut.)";
-        return s;
+            s += " (in fut.)";
+    } else {
+        s += ' ';
+        s += (ago < 0s ? "in the future" : "ago");
     }
-    return s + " " + (ago < 0s ? "in the future" : "ago");
+    return s;
   }
 
   std::string get_human_time_ago(std::time_t t, std::time_t now, bool abbreviate = false) {
@@ -171,10 +173,10 @@ namespace {
     time_t now = std::time(nullptr);
     time_t last_seen = peer.value<time_t>("last_seen", 0);
 
-    tools::msg_writer() << fmt::format("{:<10} {:016x}    {:<30} {}",
+    tools::msg_writer() << "{:<10} {:016x}    {:<30} {}"_format(
         prefix,
         peer["id"].get<uint64_t>(),
-        fmt::format("{}:{}", peer["host"].get<std::string_view>(), peer["port"].get<uint16_t>()),
+        "{}:{}"_format(peer["host"].get<std::string_view>(), peer["port"].get<uint16_t>()),
         last_seen == 0 ? "never" : get_human_time_ago(last_seen, now));
     return true;
   }
@@ -182,7 +184,7 @@ namespace {
   template <typename... Args>
   void print_peers(std::string_view prefix, const json& peers, size_t& limit, Args&&... args) {
     if (limit > 0)
-      tools::msg_writer() << fmt::format("{:<10} {:<16}    {:<30} {}",
+      tools::msg_writer() << "{:<10} {:<16}    {:<30} {}"_format(
           "Type", "Peer id", "Remote address", "Last seen");
     for (auto it = peers.begin(); it != peers.end() && limit > 0; it++)
       if (print_peer(prefix, *it, std::forward<Args>(args)...))
@@ -393,10 +395,10 @@ bool rpc_command_executor::show_difficulty() {
 
 static std::string get_mining_speed(uint64_t hr)
 {
-  if (hr >= 1e9) return fmt::format("{:.2f} GH/s", hr*1e-9);
-  if (hr >= 1e6) return fmt::format("{:.2f} MH/s", hr*1e-6);
-  if (hr >= 1e3) return fmt::format("{:.2f} kH/s", hr*1e-3);
-  return fmt::format("{:d} H/s", hr);
+  if (hr >= 1e9) return "{:.2f} GH/s"_format(hr*1e-9);
+  if (hr >= 1e6) return "{:.2f} MH/s"_format(hr*1e-6);
+  if (hr >= 1e3) return "{:.2f} kH/s"_format(hr*1e-3);
+  return "{:d} H/s"_format(hr);
 }
 
 static std::ostream& print_fork_extra_info(std::ostream& o, uint64_t t, uint64_t now, std::chrono::seconds block_time)
@@ -414,8 +416,8 @@ static std::ostream& print_fork_extra_info(std::ostream& o, uint64_t t, uint64_t
   if (dblocks <= 30)
     return o << dblocks << " blocks)";
   if (dblocks <= blocks_per_day / 2)
-    return o << fmt::format("{:.1f} hours)", dblocks / blocks_per_day * 24);
-  return o << fmt::format("{:.1f} days)", dblocks / blocks_per_day);
+    return o << "{:.1f} hours)"_format(dblocks / blocks_per_day * 24);
+  return o << "{:.1f} days)"_format(dblocks / blocks_per_day);
 }
 
 static float get_sync_percentage(uint64_t height, uint64_t target_height)
@@ -497,7 +499,7 @@ bool rpc_command_executor::show_status() {
   std::ostringstream str;
   str << "Height: " << height;
   if (height != net_height)
-    str << fmt::format("/{} ({:.1f}%)", net_height, get_sync_percentage(height, net_height));
+    str << "/{} ({:.1f}%)"_format(net_height, get_sync_percentage(height, net_height));
 
   auto net = info["nettype"].get<std::string_view>();
   if (net == "testnet")     str << " ON TESTNET";
@@ -633,7 +635,7 @@ bool rpc_command_executor::print_connections() {
         address,
         get_address_type_name(info["address_type"].get<epee::net_utils::address_type>()),
         info["peer_id"].get<std::string_view>(),
-        fmt::format("{}({}/{})", info["recv_count"].get<uint64_t>(),
+        "{}({}/{})"_format(info["recv_count"].get<uint64_t>(),
           tools::friendly_duration(1ms * info["recv_idle_ms"].get<int64_t>()),
           tools::friendly_duration(1ms * info["send_idle_ms"].get<int64_t>())),
         info["state"].get<std::string_view>(),
@@ -663,7 +665,7 @@ bool rpc_command_executor::print_net_stats()
     auto bytes = stats[in ? "total_bytes_in" : "total_bytes_out"].get<uint64_t>();
     double average = uptime > 0 ? bytes / (double) uptime : 0.0;
     uint64_t lim = limit[in ? "limit_down" : "limit_up"].get<uint64_t>() * 1024; // convert to bytes, as limits are always kB/s
-    tools::success_msg_writer() << fmt::format("{} {} in {} packets, average {}/s = {:.2f}% of the limit of {}/s",
+    tools::success_msg_writer() << "{} {} in {} packets, average {}/s = {:.2f}% of the limit of {}/s"_format(
         in ? "Received" : "Sent",
         tools::get_human_readable_bytes(bytes),
         stats[in ? "total_packets_in" : "total_packets_out"].get<uint64_t>(),
@@ -931,14 +933,14 @@ static void print_pool(const json& txs) {
 
     lines.clear();
     lines.push_back(tx["tx_hash"].get_ref<const std::string&>() + ":"s);
-    lines.push_back(fmt::format("size/weight: {}/{}", tx["size"].get<int>(), tx["weight"].get<int>()));
-    lines.push_back(fmt::format("fee: {} ({}/byte)",
+    lines.push_back("size/weight: {}/{}"_format(tx["size"].get<int>(), tx["weight"].get<int>()));
+    lines.push_back("fee: {} ({}/byte)"_format(
           cryptonote::print_money(tx["fee"].get<uint64_t>()), cryptonote::print_money(tx["fee"].get<double>() / tx["weight"].get<double>())));
-    lines.push_back(fmt::format("received: {} ({})", tx["received_timestamp"].get<std::time_t>(), get_human_time_ago(tx["received_timestamp"].get<std::time_t>(), now)));
+    lines.push_back("received: {} ({})"_format(tx["received_timestamp"].get<std::time_t>(), get_human_time_ago(tx["received_timestamp"].get<std::time_t>(), now)));
     lines.push_back("status: " + tools::join(", ", status));
-    lines.push_back(fmt::format("top required block: {} ({})", tx["max_used_height"].get<uint64_t>(), tx["max_used_block"]));
+    lines.push_back("top required block: {} ({})"_format(tx["max_used_height"].get<uint64_t>(), tx["max_used_block"]));
     if (tx.count("last_failed_height"))
-      lines.push_back(fmt::format("last failed block: {} ({})", tx["last_failed_height"].get<uint64_t>(), tx["last_failed_block"].get<std::string_view>()));
+      lines.push_back("last failed block: {} ({})"_format(tx["last_failed_height"].get<uint64_t>(), tx["last_failed_block"].get<std::string_view>()));
     if (auto extra = tx.find("extra"); extra != tx.end()) {
       lines.push_back("transaction extra: ");
       for (auto c : extra->dump(2)) {
@@ -979,7 +981,7 @@ bool rpc_command_executor::print_transaction_pool(bool long_format) {
           tools::msg_writer() << "  WARNING: spent key image has no txs associated!";
         else
         {
-          tools::msg_writer() << fmt::format("  NOTE: key image for multiple transactions ({}):", tx_hashes.size());
+          tools::msg_writer() << "  NOTE: key image for multiple transactions ({}):"_format(tx_hashes.size());
           for (const auto& txid : tx_hashes)
             tools::msg_writer() << "  - " << txid.get<std::string_view>();
         }
@@ -1015,7 +1017,7 @@ bool rpc_command_executor::print_transaction_pool_stats() {
   if (bytes_total > *full_reward_zone)
   {
     uint64_t backlog = (bytes_total + *full_reward_zone - 1) / *full_reward_zone;
-    backlog_message = fmt::format("estimated {} block ({} minutes) backlog", backlog, (backlog * cryptonote::TARGET_BLOCK_TIME / 1min));
+    backlog_message = "estimated {} block ({} minutes) backlog"_format(backlog, (backlog * cryptonote::TARGET_BLOCK_TIME / 1min));
   }
 
   uint64_t fee_total = pstats["fee_total"].get<uint64_t>();
@@ -1054,7 +1056,7 @@ bool rpc_command_executor::print_transaction_pool_stats() {
     }
 
     constexpr auto hist_fmt = "{:>10} - {:<14} {:>7} {:>11}"sv;
-    tools::msg_writer() << fmt::format("{:^23}     {:>7} {:>11}", "Age", "Txes", "Bytes");
+    tools::msg_writer() << "{:^23}     {:>7} {:>11}"_format("Age", "Txes", "Bytes");
     for (size_t i = 0; i < 10; i++)
       tools::msg_writer()
         << fmt::format(hist_fmt,
@@ -1077,8 +1079,8 @@ bool rpc_command_executor::start_mining(const cryptonote::account_public_address
     return false;
 
   tools::success_msg_writer()
-    << fmt::format("Mining started with {} thread(s).", std::max(num_threads, 1))
-    << (num_blocks ? fmt::format(" Will stop after {} blocks", num_blocks) : "");
+    << "Mining started with {} thread(s)."_format(std::max(num_threads, 1))
+    << (num_blocks ? " Will stop after {} blocks"_format(num_blocks) : "");
   return true;
 }
 
@@ -1098,7 +1100,7 @@ bool rpc_command_executor::get_limit()
     return false;
   auto& limit = *maybe_limit;
 
-  tools::msg_writer() << fmt::format("Current limits are {} kiB/s down, {} kiB/s up",
+  tools::msg_writer() << "Current limits are {} kiB/s down, {} kiB/s up"_format(
       limit["limit_down"].get<uint64_t>(), limit["limit_up"].get<uint64_t>());
   return true;
 }
@@ -1113,7 +1115,7 @@ bool rpc_command_executor::set_limit(int64_t limit_down, int64_t limit_up)
     return false;
   auto& limit = *maybe_limit;
 
-  tools::success_msg_writer() << fmt::format("New limits are {} kiB/s down, {} kiB/s up",
+  tools::success_msg_writer() << "New limits are {} kiB/s down, {} kiB/s up"_format(
     limit["limit_down"].get<uint64_t>(), limit["limit_up"].get<uint64_t>());
   return true;
 }
@@ -1927,7 +1929,7 @@ std::optional<std::string_view> is_invalid_staking_address(
 }
 
 std::string highlight_money(uint64_t amount) {
-  return fmt::format("\x1b[36;1m{}\x1b[0m", cryptonote::format_money(amount));
+  return "\x1b[36;1m{}\x1b[0m"_format(cryptonote::format_money(amount));
 };
 
 }  // anon. namespace
@@ -2135,12 +2137,12 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
               state.contributions.size() - 1 /* -1 because we already added this address to the list */);
 
         auto [result, contribution_str] = input_line_value(fmt::format(
-            "\n\nThe {} must stake between {} and {}.\n\n"
-            "How much OXEN does {} want to stake?",
-            is_operator ? "operator" : "next contributor",
-            highlight_money(min_contribution),
-            highlight_money(amount_left),
-            is_operator ? "the operator" : fmt::format("contributor {}", state.contributions.size() - 1)),
+              "\n\nThe {} must stake between {} and {}.\n\n"
+              "How much OXEN does {} want to stake?",
+              is_operator ? "operator" : "next contributor",
+              highlight_money(min_contribution),
+              highlight_money(amount_left),
+              is_operator ? "the operator" : "contributor {}"_format(state.contributions.size() - 1)),
             true,
             "/\x1b[36;1mmax\x1b[0m/\x1b[36;1mmin\x1b[0m",
             "max"
@@ -2170,15 +2172,15 @@ bool rpc_command_executor::prepare_registration(bool force_registration)
 
         if (contribution > amount_left)
         {
-          tools::fail_msg_writer() << fmt::format(
-              "Invalid amount: The contribution exceeds the remaining staking requirement ({}).\n",
+          tools::fail_msg_writer() <<
+              "Invalid amount: The contribution exceeds the remaining staking requirement ({}).\n"_format(
               highlight_money(amount_left));
           break;
         }
         else if (contribution < min_contribution)
         {
-          tools::fail_msg_writer() << fmt::format(
-              "Invalid amount: The contribution does not meet the minimum staking requirement ({}).\n",
+          tools::fail_msg_writer() <<
+              "Invalid amount: The contribution does not meet the minimum staking requirement ({}).\n"_format(
               highlight_money(min_contribution));
           break;
         }
@@ -2247,7 +2249,7 @@ The Service Node will not activate until the entire stake has been contributed.
               highlight_money(state.total_reserved_contributions),
               highlight_money(staking_requirement),
               highlight_money(amount_left),
-              open_spots > 1 ? fmt::format("1-{} public contributors", open_spots) : "1 public contributor"
+              open_spots > 1 ? "1-{} public contributors"_format(open_spots) : "1 public contributor"
         );
 
         auto result = input_line_ask("Is this acceptable?");
@@ -2284,7 +2286,7 @@ The Service Node will not activate until the entire stake has been contributed.
               (i==0) ? "Operator" : "Contributor " + std::to_string(i),
               addr.substr(0, 9) + ".." + addr.substr(addr.size() - 2),
               cryptonote::print_money(amount),
-              fmt::format("{:.2f}%", amount * 100.0 / (double)staking_requirement));
+              "{:.2f}%"_format(amount * 100.0 / staking_requirement));
         }
 
         if (amount_left > 0)
@@ -2297,8 +2299,8 @@ The Service Node will not activate until the entire stake has been contributed.
                 i == 0 && open_spots == 1 ? cryptonote::print_money(amount_left) :
                 i == 0 ? ">=" + cryptonote::print_money((amount_left + open_spots - 1) / open_spots) :
                 "",
-                i == 0 && open_spots == 1 ? fmt::format("{:.2f}%", amount_left * 100.0 / staking_requirement) :
-                i == 0 ? fmt::format(">={:.2f}%", amount_left * 100.0 / staking_requirement / open_spots) :
+                i == 0 && open_spots == 1 ? "{:.2f}%"_format(amount_left * 100.0 / staking_requirement) :
+                i == 0 ? ">={:.2f}%"_format(amount_left * 100.0 / staking_requirement / open_spots) :
                 "");
         }
 

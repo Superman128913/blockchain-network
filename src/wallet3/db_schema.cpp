@@ -22,7 +22,7 @@ namespace wallet
     {
       if (auto stored_nettype = this->network_type(); stored_nettype != nettype)
       {
-        std::string err = fmt::format("Loaded wallet on network type \"{}\" but db has network type \"{}\"",
+        std::string err = "Loaded wallet on network type \"{}\" but db has network type \"{}\""_format(
             cryptonote::network_type_to_string(nettype),
             cryptonote::network_type_to_string(stored_nettype));
         //TODO: log error as well

@@ -6406,15 +6406,15 @@ bool simple_wallet::query_locked_stakes(bool print_details, bool print_key_image
     //
     // If we aren't showing key images then all the key image details get omitted.
 
-    msg += fmt::format("Service Node: {}\n", node_info.service_node_pubkey);
+    msg += "Service Node: {}\n"_format(node_info.service_node_pubkey);
     if (node_info.requested_unlock_height != service_nodes::KEY_IMAGE_AWAITING_UNLOCK_HEIGHT)
-      msg += fmt::format("Unlock height: {}\n", node_info.requested_unlock_height);
+      msg += "Unlock height: {}\n"_format(node_info.requested_unlock_height);
 
     bool just_me = contributors.size() == 1;
 
-    auto required = fmt::format(" of {} required", cryptonote::format_money(node_info.staking_requirement));
+    auto required = " of {} required"_format(cryptonote::format_money(node_info.staking_requirement));
     if (!just_me) {
-      msg += fmt::format("Total Contributions: {}{}\n", cryptonote::format_money(total), required);
+      msg += "Total Contributions: {}{}\n"_format(cryptonote::format_money(total), required);
       required.clear();
     }
 
@@ -6423,7 +6423,7 @@ bool simple_wallet::query_locked_stakes(bool print_details, bool print_key_image
       msg += "Your Contribution: ";
     else
     {
-      msg += fmt::format("Your Contributions: {}{} in {} contributions:\n    ‣ ",
+      msg += "Your Contributions: {}{} in {} contributions:\n    ‣ "_format(
           cryptonote::format_money(my_total),
           required,
           me.locked_contributions.size());
@@ -6441,13 +6441,13 @@ bool simple_wallet::query_locked_stakes(bool print_details, bool print_key_image
         required.clear();
       }
       if (print_key_images)
-        msg += fmt::format(" (Key image: {})", c.key_image);
+        msg += " (Key image: {})"_format(c.key_image);
       msg += '\n';
     }
 
     if (contributors.size() > 1)
     {
-      msg += fmt::format("Other Contributions: {} from {} contributor{}:\n",
+      msg += "Other Contributions: {} from {} contributor{}:\n"_format(
           cryptonote::format_money(total - my_total),
           contributors.size() - 1,
           contributors.size() == 2 ? "" : "s");
@@ -6455,12 +6455,12 @@ bool simple_wallet::query_locked_stakes(bool print_details, bool print_key_image
       {
         const auto& contributor = contributors[i];
         const auto& locked = contributor.locked_contributions;
-        msg += fmt::format("    • {} ({})\n",
+        msg += "    • {} ({})\n"_format(
             cryptonote::format_money(contributor.amount), contributor.address);
         if (locked.size() == 1)
         {
           if (print_key_images)
-            msg += fmt::format("      Key image: {}\n", locked[0].key_image);
+            msg += "      Key image: {}\n"_format(locked[0].key_image);
         }
         else
         {
@@ -6469,7 +6469,7 @@ bool simple_wallet::query_locked_stakes(bool print_details, bool print_key_image
             msg += "      ‣ ";
             msg += cryptonote::format_money(c.amount);
             if (print_key_images)
-              msg += fmt::format(" (Key image: {})\n", c.key_image);
+              msg += " (Key image: {})\n"_format(c.key_image);
             else
               msg += '\n';
           }
@@ -6531,9 +6531,9 @@ bool simple_wallet::query_locked_stakes(bool print_details, bool print_key_image
 
       for (const auto& black : blacklisted)
       {
-        msg += fmt::format("    • {} (Unlock height {}", cryptonote::format_money(black.amount), black.unlock_height);
+        msg += "    • {} (Unlock height {}"_format(cryptonote::format_money(black.amount), black.unlock_height);
         if (print_key_images)
-          msg += fmt::format("; Key image: {})\n", black.key_image);
+          msg += "; Key image: {})\n"_format(black.key_image);
         else
           msg += ")\n";
       }

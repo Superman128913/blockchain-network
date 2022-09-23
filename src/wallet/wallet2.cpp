@@ -4360,7 +4360,7 @@ bool wallet2::load_keys_buf(const std::string& keys_buf, const epee::wipeable_st
     GET_FIELD_FROM_JSON_RETURN_ON_ERROR(json, nettype, uint8_t, Uint, false, static_cast<uint8_t>(m_nettype));
     // The network type given in the program argument is inconsistent with the network type saved in the wallet
     THROW_WALLET_EXCEPTION_IF(static_cast<uint8_t>(m_nettype) != field_nettype, error::wallet_internal_error,
-      fmt::format("{:s} wallet cannot be opened as {:s} wallet",
+      "{:s} wallet cannot be opened as {:s} wallet"_format(
         field_nettype == 0 ? "Mainnet" : field_nettype == 1 ? "Testnet" : "Devnet",
         m_nettype == network_type::MAINNET ? "mainnet" : m_nettype == network_type::TESTNET ? "testnet" : "devnet"));
     GET_FIELD_FROM_JSON_RETURN_ON_ERROR(json, segregate_pre_fork_outputs, int, Int, false, true);

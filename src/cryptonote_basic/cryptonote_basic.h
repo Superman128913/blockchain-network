@@ -46,6 +46,7 @@
 #include "device/device.hpp"
 #include "txtypes.h"
 #include "logging/oxen_logger.h"
+#include "common/format.h"
 #include <fmt/format.h>
 
 namespace service_nodes
@@ -606,17 +607,17 @@ namespace cryptonote
 }
 
 template <>
-struct fmt::formatter<cryptonote::txtype> : fmt::formatter<std::string> {
+struct fmt::formatter<cryptonote::txtype> : fmt::formatter<std::string_view> {
   auto format(cryptonote::txtype t, format_context& ctx) {
-    return formatter<std::string>::format(
-        fmt::format("{}", cryptonote::transaction::type_to_string(t)), ctx);
+    return formatter<std::string_view>::format(
+        cryptonote::transaction::type_to_string(t), ctx);
   }
 };
 template <>
-struct fmt::formatter<cryptonote::txversion> : fmt::formatter<std::string> {
+struct fmt::formatter<cryptonote::txversion> : fmt::formatter<std::string_view> {
   auto format(cryptonote::txversion v, format_context& ctx) {
-    return formatter<std::string>::format(
-        fmt::format("{}", cryptonote::transaction::version_to_string(v)), ctx);
+    return formatter<std::string_view>::format(
+        cryptonote::transaction::version_to_string(v), ctx);
   }
 };
 

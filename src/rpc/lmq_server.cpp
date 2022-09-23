@@ -309,7 +309,7 @@ static void send_notifies(Mutex& mutex, Subs& subs, const char* desc, Call call)
 void omq_rpc::send_block_notifications(const block& block)
 {
   auto& omq = core_.get_omq();
-  std::string height = fmt::format("{}", get_block_height(block));
+  std::string height = "{}"_format(get_block_height(block));
   send_notifies(subs_mutex_, block_subs_, "block", [&](auto& conn, auto& sub) {
     omq.send(conn, "notify.block", height, std::string_view{block.hash.data, sizeof(block.hash.data)});
   });

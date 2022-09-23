@@ -169,7 +169,6 @@ namespace service_nodes
 template <>
 struct fmt::formatter<service_nodes::quorum> : fmt::formatter<std::string> {
   auto format(service_nodes::quorum quorum, format_context& ctx) {
-    return formatter<std::string>::format(
-        fmt::format("{}", quorum.to_string()), ctx);
+    return formatter<std::string>::format(quorum.to_string(), ctx);
   }
 };
