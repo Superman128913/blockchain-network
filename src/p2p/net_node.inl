@@ -32,6 +32,7 @@
 // IP blocking adapted from Boolberry
 
 #include <algorithm>
+#include <chrono>
 #include <optional>
 #include <boost/uuid/uuid_io.hpp>
 #include <atomic>
@@ -42,10 +43,10 @@
 #include <vector>
 #include <fmt/color.h>
 
+#include "common/string_util.h"
 #include "cryptonote_config.h"
 #include "version.h"
 #include "epee/string_tools.h"
-#include "epee/time_helper.h"
 #include "common/file.h"
 #include "common/fs-format.h"
 #include "common/pruning.h"
@@ -1072,6 +1073,12 @@ namespace nodetool
     return connected;
   }
 
+  static std::string format_stamp_ago(int64_t stamp) {
+    if (stamp)
+      return tools::friendly_duration(std::chrono::system_clock::now() - std::chrono::system_clock::from_time_t(stamp));
+    return "never"s;
+  }
+
   template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::try_to_connect_and_handshake_with_new_peer(const epee::net_utils::network_address& na, bool just_take_peerlist, uint64_t last_seen_stamp, PeerType peer_type, uint64_t first_seen_stamp)
   {
@@ -1091,7 +1098,8 @@ namespace nodetool
     }
 
 
-    log::debug(logcat, "Connecting to {}(peer_type={}, last_seen: {})...", na.str(), peer_type, (last_seen_stamp ? epee::misc_utils::get_time_interval_string(time(NULL) - last_seen_stamp):"never"));
+    log::debug(logcat, "Connecting to {}(peer_type={}, last_seen: {})...",
+            na.str(), peer_type, format_stamp_ago(last_seen_stamp));
 
     auto con = zone.m_connect(zone, na);
     if(!con)
@@ -1155,7 +1163,7 @@ namespace nodetool
     if (zone.m_connect == nullptr)
       return false;
 
-    log::info(logcat, "Connecting to {}(last_seen: {})...", na.str(), (last_seen_stamp ? epee::misc_utils::get_time_interval_string(time(NULL) - last_seen_stamp):"never"));
+    log::info(logcat, "Connecting to {}(last_seen: {})...", na.str(), format_stamp_ago(last_seen_stamp));
 
     auto con = zone.m_connect(zone, na);
     if (!con) {
@@ -1232,7 +1240,8 @@ namespace nodetool
         continue;
       }
 
-      log::debug(logcat, "Selected peer: {} {} first_seen: {}", peerid_to_string(pe.id), pe.adr.str(), epee::misc_utils::get_time_interval_string(time(NULL) - pe.first_seen));
+      log::debug(logcat, "Selected peer: {} {} first_seen: {}",
+              peerid_to_string(pe.id), pe.adr.str(), format_stamp_ago(pe.first_seen));
 
       if(!try_to_connect_and_handshake_with_new_peer(pe.adr, false, 0, anchor, pe.first_seen)) {
         log::debug(logcat, "Handshake failed");
@@ -1364,7 +1373,12 @@ namespace nodetool
       if(is_addr_recently_failed(pe.adr))
         continue;
 
-      log::debug(logcat, "Selected peer: {} {}, pruning seed {} [peer_list={}] last_seen: {}", peerid_to_string(pe.id), pe.adr.str(), epee::string_tools::to_string_hex(pe.pruning_seed), (use_white_list ? white : gray), (pe.last_seen ? epee::misc_utils::get_time_interval_string(time(NULL) - pe.last_seen) : "never"));
+      log::debug(logcat, "Selected peer: {} {}, pruning seed {} [peer_list={}] last_seen: {}",
+              peerid_to_string(pe.id),
+              pe.adr.str(),
+              epee::string_tools::to_string_hex(pe.pruning_seed),
+              (use_white_list ? white : gray),
+              format_stamp_ago(pe.last_seen));
 
       if(!try_to_connect_and_handshake_with_new_peer(pe.adr, false, pe.last_seen, use_white_list ? white : gray)) {
         log::debug(logcat, "Handshake failed");

@@ -55,7 +55,6 @@
 #include "cryptonote_config.h"
 #include "cryptonote_basic/miner.h"
 #include "epee/int-util.h"
-#include "epee/time_helper.h"
 #include "common/threadpool.h"
 #include "common/boost_serialization_helper.h"
 #include "epee/warnings.h"
@@ -512,11 +511,9 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, std::shared_ptr<crypton
 
   // check how far behind we are
   uint64_t top_block_timestamp = m_db->get_top_block_timestamp();
-  uint64_t timestamp_diff = time(NULL) - top_block_timestamp;
-
-  // genesis block has no timestamp, could probably change it to have timestamp of 1341378000...
-  if(!top_block_timestamp)
-    timestamp_diff = time(NULL) - 1341378000;
+  // genesis block has no timestamp, so use block 1's timestamp if we get that:
+  if (!top_block_timestamp)
+    top_block_timestamp = 1525306361;
 
   // create general purpose async service queue
 
@@ -528,7 +525,8 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, std::shared_ptr<crypton
     load_compiled_in_block_hashes(get_checkpoints);
 #endif
 
-  log::info(logcat, "Blockchain initialized. last block: {}, {} time ago", m_db->height() - 1, epee::misc_utils::get_time_interval_string(timestamp_diff));
+  log::info(logcat, "Blockchain initialized. last block: {}, {} time ago", m_db->height() - 1,
+          tools::friendly_duration(std::chrono::system_clock::now() - std::chrono::system_clock::from_time_t(top_block_timestamp)));
   rtxn_guard.stop();
 
   uint64_t num_popped_blocks = 0;
