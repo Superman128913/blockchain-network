@@ -35,7 +35,6 @@
 #include <logging/oxen_logger.h>
 
 using namespace crypto;
-using namespace std;
 
 namespace rct {
 

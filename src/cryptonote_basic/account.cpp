@@ -43,11 +43,9 @@ extern "C"
 #include "cryptonote_config.h"
 #include "common/meta.h"
 
-using namespace std;
-
 DISABLE_VS_WARNINGS(4244 4345)
 
-  namespace cryptonote
+namespace cryptonote
 {
   static auto logcat = log::Cat("account");
 

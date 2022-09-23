@@ -34,7 +34,6 @@
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "rctOps.h"
 using namespace crypto;
-using namespace std;
 
 auto logcat = oxen::log::Cat("ringct");
 
@@ -287,10 +286,10 @@ namespace rct {
     }
 
     //generates a random secret and corresponding public key
-    tuple<key, key>  skpkGen() {
+    std::tuple<key, key>  skpkGen() {
         key sk = skGen();
         key pk = scalarmultBase(sk);
-        return make_tuple(sk, pk);
+        return std::make_tuple(sk, pk);
     }
 
     //generates C =aG + bH from b, a is given..
@@ -299,24 +298,24 @@ namespace rct {
     }
 
     //generates a <secret , public> / Pedersen commitment to the amount
-    tuple<ctkey, ctkey> ctskpkGen(xmr_amount amount) {
+    std::tuple<ctkey, ctkey> ctskpkGen(xmr_amount amount) {
         ctkey sk, pk;
         skpkGen(sk.dest, pk.dest);
         skpkGen(sk.mask, pk.mask);
         key am = d2h(amount);
         key bH = scalarmultH(am);
         addKeys(pk.mask, pk.mask, bH);
-        return make_tuple(sk, pk);
+        return std::make_tuple(sk, pk);
     }
     
     
     //generates a <secret , public> / Pedersen commitment but takes bH as input 
-    tuple<ctkey, ctkey> ctskpkGen(const key &bH) {
+    std::tuple<ctkey, ctkey> ctskpkGen(const key &bH) {
         ctkey sk, pk;
         skpkGen(sk.dest, pk.dest);
         skpkGen(sk.mask, pk.mask);
         addKeys(pk.mask, pk.mask, bH);
-        return make_tuple(sk, pk);
+        return std::make_tuple(sk, pk);
     }
     
     key zeroCommit(xmr_amount amount) {
