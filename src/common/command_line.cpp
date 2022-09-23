@@ -34,6 +34,7 @@
 #ifdef HAVE_READLINE
 #  include "epee/readline_buffer.h"
 #endif
+#include <iostream>
 
 namespace command_line
 {
@@ -104,5 +105,23 @@ void clear_screen()
 #endif
 }
 
+bool handle_error_helper(const boost::program_options::options_description& desc, std::function<bool()> parser) {
+  try
+  {
+    return parser();
+  }
+  catch (const std::exception& e)
+  {
+    std::cerr << "Failed to parse arguments: " << e.what() << std::endl;
+    std::cerr << desc << std::endl;
+    return false;
+  }
+  catch (...)
+  {
+    std::cerr << "Failed to parse arguments: unknown exception" << std::endl;
+    std::cerr << desc << std::endl;
+    return false;
+  }
+}
 
 }
