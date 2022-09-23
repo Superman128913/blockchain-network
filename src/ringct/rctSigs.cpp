@@ -715,10 +715,12 @@ namespace rct {
     //getKeyFromBlockchain grabs a key from the blockchain at "reference_index" to mix with
     //populateFromBlockchain creates a keymatrix with "mixin" + 1 columns and one of the columns is inPk
     //   the return value are the key matrix, and the index where inPk was put (random).     
-    std::tuple<ctkeyM, xmr_amount> populateFromBlockchain(ctkeyV inPk, int mixin) {
+    std::pair<ctkeyM, xmr_amount> populateFromBlockchain(const ctkeyV& inPk, int mixin) {
         int rows = inPk.size();
-        ctkeyM rv(mixin + 1, inPk);
-        int index = randXmrAmount(mixin);
+        std::pair<ctkeyM, xmr_amount> result;
+        auto& [rv, index] = result;
+        rv.resize(mixin + 1, inPk);
+        index = randXmrAmount(mixin);
         int i = 0, j = 0;
         for (i = 0; i <= mixin; i++) {
             if (i != index) {
@@ -727,7 +729,7 @@ namespace rct {
                 }
             }
         }
-        return std::make_tuple(rv, index);
+        return result;
     }
 
     //These functions get keys from blockchain

@@ -34,7 +34,7 @@
 
 #include <cstddef>
 #include <vector>
-#include <tuple>
+#include <utility>
 
 extern "C" {
 #include "crypto/random.h"
@@ -101,7 +101,7 @@ namespace rct {
     //populateFromBlockchain creates a keymatrix with "mixin" columns and one of the columns is inPk
     //   the return value are the key matrix, and the index where inPk was put (random).
     void getKeyFromBlockchain(ctkey & a, size_t reference_index);
-    std::tuple<ctkeyM, xmr_amount> populateFromBlockchain(ctkeyV inPk, int mixin);
+    std::pair<ctkeyM, xmr_amount> populateFromBlockchain(const ctkeyV& inPk, int mixin);
 
     //RingCT protocol
     //genRct:
