@@ -279,6 +279,11 @@ namespace rct {
         return pk;
     }
 
+    void ctkey::randomize() {
+        dest = pkGen();
+        mask = pkGen();
+    }
+
     //generates a random secret and corresponding public key
     void skpkGen(key &sk, key &pk) {
         skGen(sk);

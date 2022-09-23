@@ -100,7 +100,6 @@ namespace rct {
     //getKeyFromBlockchain grabs a key from the blockchain at "reference_index" to mix with
     //populateFromBlockchain creates a keymatrix with "mixin" columns and one of the columns is inPk
     //   the return value are the key matrix, and the index where inPk was put (random).
-    void getKeyFromBlockchain(ctkey & a, size_t reference_index);
     std::pair<ctkeyM, xmr_amount> populateFromBlockchain(const ctkeyV& inPk, int mixin);
 
     //RingCT protocol
