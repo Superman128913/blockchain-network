@@ -28,8 +28,8 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "wallet/wallet_args.h"
 
-#include <boost/format.hpp>
 #include <fstream>
+#include <sstream>
 #include "common/i18n.h"
 #include "common/util.h"
 #include "common/file.h"
@@ -55,21 +55,7 @@ namespace wallet_args
 
   namespace log = oxen::log;
 
-namespace
-{
   static auto logcat = log::Cat("wallet.wallet2");
-
-  class Print
-  {
-  public:
-    Print(const std::function<void(const std::string&)> &p): print(p) {}
-    ~Print() { print(ss.str()); }
-    template<typename T> std::ostream &operator<<(const T &t) { ss << t; return ss; }
-  private:
-    const std::function<void(const std::string&)> &print;
-    std::stringstream ss;
-  };
-}
 
   // Create on-demand to prevent static initialization order fiasco issues.
   command_line::arg_descriptor<std::string> arg_generate_from_json()
@@ -142,19 +128,24 @@ namespace
       auto parser = po::command_line_parser(argc, argv).options(desc_all).positional(positional_options);
       po::store(parser.run(), vm);
 
-      if (command_line::get_arg(vm, command_line::arg_help))
+      bool help = command_line::get_arg(vm, command_line::arg_help);
+      bool version = command_line::get_arg(vm, command_line::arg_version);
+      if (help or version)
       {
-        Print(print) << "Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")\n";
-        Print(print) << wallet_args::tr("This is the command line oxen wallet. It needs to connect to a oxen\n"
-												  "daemon to work correctly.") << "\n";
-        Print(print) << wallet_args::tr("Usage:") << "\n  " << usage;
-        Print(print) << desc_visible;
-        should_terminate = true;
-        return true;
-      }
-      else if (command_line::get_arg(vm, command_line::arg_version))
-      {
-        Print(print) << "Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")";
+        print("Oxen '{}' (v{})\n"_format(OXEN_RELEASE_NAME, OXEN_VERSION_FULL));
+
+        if (help)
+        {
+          print("{}\n"_format(wallet_args::tr("This is the command line oxen wallet. It needs to connect to a oxen\n"
+                                              "daemon to work correctly.")));
+          print("{}\n  {}"_format(wallet_args::tr("Usage:"), usage));
+
+          // Yuck.  Need to replace boost::po.
+          std::ostringstream s;
+          s << desc_visible;
+          print(s.str());
+        }
+
         should_terminate = true;
         return true;
       }
@@ -201,12 +192,12 @@ namespace
     oxen::logging::init(log_path, log_level);
 
     if (notice)
-      Print(print) << notice << "\n";
+      print("{}\n"_format(notice));
 
     if (!command_line::is_arg_defaulted(vm, arg_max_concurrency))
       tools::set_max_concurrency(command_line::get_arg(vm, arg_max_concurrency));
 
-    Print(print) << "Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")";
+    print("Oxen '{}' (v{})\n"_format(OXEN_RELEASE_NAME, OXEN_VERSION_FULL));
 
     if (!command_line::is_arg_defaulted(vm, arg_log_level))
       log::info(logcat, "Setting log level = {}", command_line::get_arg(vm, arg_log_level));
@@ -215,17 +206,15 @@ namespace
       const char *logs = getenv("OXEN_LOGS");
       log::info(logcat, "Setting log levels = {}", (logs ? logs : "<default>"));
     }
-    //log::info(logcat, "{}{}", wallet_args::tr("Logging to: "), log_path);
-
-    //Print(print) << boost::format(wallet_args::tr("Logging to %s")) % log_path;
+    print("{}{}"_format(tr("Logging to: "), log_path));
 
     const ssize_t lockable_memory = tools::get_lockable_memory();
     if (lockable_memory >= 0 && lockable_memory < 256 * 4096) // 256 pages -> at least 256 secret keys and other such small/medium objects
-      Print(print) << tr("WARNING: You may not have a high enough lockable memory limit")
+      print(tr("WARNING: You may not have a high enough lockable memory limit")
 #ifdef ELPP_OS_UNIX
-        << ", " << tr("see ulimit -l")
+        + ", "s + tr("see ulimit -l")
 #endif
-        ;
+      );
 
     return {std::move(vm), should_terminate};
   }
