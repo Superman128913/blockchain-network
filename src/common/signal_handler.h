@@ -48,7 +48,7 @@ namespace tools {
       }
       else
       {
-        log::info(globallogcat, fmt::format(fg(fmt::terminal_color::red), "Got control signal {}. Exiting without saving...", type);
+        log::info(globallogcat, fg(fmt::terminal_color::red), "Got control signal {}. Exiting without saving...", type);
         return FALSE;
       }
       return TRUE;

@@ -942,16 +942,16 @@ namespace cryptonote
     }
 
     if (m_service_node) {
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Service node public keys:"));
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "- primary: {}", tools::type_to_hex(keys.pub)));
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "- ed25519: {}", tools::type_to_hex(keys.pub_ed25519)));
+      log::info(logcat, fg(fmt::terminal_color::yellow), "Service node public keys:");
+      log::info(logcat, fg(fmt::terminal_color::yellow), "- primary: {}", tools::type_to_hex(keys.pub));
+      log::info(logcat, fg(fmt::terminal_color::yellow), "- ed25519: {}", tools::type_to_hex(keys.pub_ed25519));
       // .snode address is the ed25519 pubkey, encoded with base32z and with .snode appended:
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "- lokinet: {}.snode", oxenc::to_base32z(tools::view_guts(keys.pub_ed25519))));
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "-  x25519: {}", tools::type_to_hex(keys.pub_x25519)));
+      log::info(logcat, fg(fmt::terminal_color::yellow), "- lokinet: {}.snode", oxenc::to_base32z(tools::view_guts(keys.pub_ed25519)));
+      log::info(logcat, fg(fmt::terminal_color::yellow), "-  x25519: {}", tools::type_to_hex(keys.pub_x25519));
     } else {
       // Only print the x25519 version because it's the only thing useful for a non-SN (for
       // encrypted LMQ RPC connections).
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "x25519 public key: {}", tools::type_to_hex(keys.pub_x25519)));
+      log::info(logcat, fg(fmt::terminal_color::yellow), "x25519 public key: {}", tools::type_to_hex(keys.pub_x25519));
     }
 
     return true;
@@ -2268,8 +2268,8 @@ namespace cryptonote
         auto pubkey = m_service_node_list.get_pubkey_from_x25519(m_service_keys.pub_x25519);
         if (pubkey != crypto::null_pkey && pubkey != m_service_keys.pub && m_service_node_list.is_service_node(pubkey, false /*don't require active*/))
         {
-        log::info(logcat, fmt::format(fg(fmt::terminal_color::red),
-              "Failed to submit uptime proof: another service node on the network is using the same ed/x25519 keys as this service node. This typically means both have the same 'key_ed25519' private key file."));
+        log::info(logcat, fg(fmt::terminal_color::red),
+              "Failed to submit uptime proof: another service node on the network is using the same ed/x25519 keys as this service node. This typically means both have the same 'key_ed25519' private key file.");
           return;
         }
 
@@ -2284,7 +2284,7 @@ namespace cryptonote
             if (pk != m_service_keys.pub && proof.proof->public_ip == m_sn_public_ip &&
                 (proof.proof->qnet_port == m_quorumnet_port || (
                     m_nettype != network_type::DEVNET && (proof.proof->storage_https_port == storage_https_port() || proof.proof->storage_omq_port == storage_omq_port()))))
-            log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Another service node ({}) is broadcasting the same public IP and ports as this service node ({}:{}[qnet], :{}[SS-HTTP], :{}[SS-LMQ]). This will lead to deregistration of one or both service nodes if not corrected. (Do both service nodes have the correct IP for the service-node-public-ip setting?)", pk, epee::string_tools::get_ip_string_from_int32(m_sn_public_ip), proof.proof->qnet_port, proof.proof->storage_https_port, proof.proof->storage_omq_port));
+            log::info(logcat, fg(fmt::terminal_color::red), "Another service node ({}) is broadcasting the same public IP and ports as this service node ({}:{}[qnet], :{}[SS-HTTP], :{}[SS-LMQ]). This will lead to deregistration of one or both service nodes if not corrected. (Do both service nodes have the correct IP for the service-node-public-ip setting?)", pk, epee::string_tools::get_ip_string_from_int32(m_sn_public_ip), proof.proof->qnet_port, proof.proof->storage_https_port, proof.proof->storage_omq_port);
           });
         }
 
@@ -2292,14 +2292,14 @@ namespace cryptonote
         {
           if (!check_external_ping(m_last_storage_server_ping, get_net_config().UPTIME_PROOF_FREQUENCY, "the storage server"))
           {
-            log::info(logcat, fmt::format(fg(fmt::terminal_color::red),
-                "Failed to submit uptime proof: have not heard from the storage server recently. Make sure that it is running! It is required to run alongside the Loki daemon"));
+            log::info(logcat, fg(fmt::terminal_color::red),
+                "Failed to submit uptime proof: have not heard from the storage server recently. Make sure that it is running! It is required to run alongside the Loki daemon");
             return;
           }
           if (!check_external_ping(m_last_lokinet_ping, get_net_config().UPTIME_PROOF_FREQUENCY, "Lokinet"))
           {
-            log::info(logcat, fmt::format(fg(fmt::terminal_color::red),
-                "Failed to submit uptime proof: have not heard from lokinet recently. Make sure that it is running! It is required to run alongside the Loki daemon"));
+            log::info(logcat, fg(fmt::terminal_color::red),
+                "Failed to submit uptime proof: have not heard from lokinet recently. Make sure that it is running! It is required to run alongside the Loki daemon");
             return;
           }
         }
@@ -2323,14 +2323,17 @@ namespace cryptonote
         main_message = "The daemon is running offline and will not attempt to sync to the Loki network.";
       else
         main_message = "The daemon will start synchronizing with the network. This may take a long time to complete.";
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "\n**********************************************************************\n\
-{}\n\n\
-You can set the level of process detailization through \"set_log <level|categories>\" command,\n\
-where <level> is between 0 (no details) and 4 (very verbose), or custom category based levels (eg, *:WARNING).\n\
-\n\
-Use the \"help\" command to see the list of available commands.\n\
-Use \"help <command>\" to see a command's documentation.\n\
-**********************************************************************\n", main_message));
+      log::info(logcat, fg(fmt::terminal_color::yellow), R"(
+**********************************************************************
+{}
+
+You can set the level of process detailization through "set_log <level|categories>" command,
+where <level> is between 0 (no details) and 4 (very verbose), or custom category based levels (eg, *:WARNING).
+
+Use the "help" command to see the list of available commands.
+Use "help <command>" to see a command's documentation.
+**********************************************************************
+)", main_message);
       m_starter_message_showed = true;
     }
 
@@ -2361,7 +2364,7 @@ Use \"help <command>\" to see a command's documentation.\n\
   {
     uint64_t free_space = get_free_space();
     if (free_space < 1ull * 1024 * 1024 * 1024) // 1 GB
-      log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "Free space is below 1 GB on {}", m_config_folder));
+      log::warning(logcat, fg(fmt::terminal_color::red), "Free space is below 1 GB on {}", m_config_folder);
     return true;
   }
   //-----------------------------------------------------------------------------------------------

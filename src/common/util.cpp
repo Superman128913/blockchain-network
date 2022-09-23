@@ -92,7 +92,7 @@ namespace tools
 #ifdef __GLIBC__
     const char *ver = ::gnu_get_libc_version();
     if (!strcmp(ver, "2.25"))
-      log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "Running with glibc {}, hangs may occur - change glibc version if possible", ver));
+      log::warning(logcat, fg(fmt::terminal_color::red), "Running with glibc {}, hangs may occur - change glibc version if possible", ver);
 #endif
 
     return true;

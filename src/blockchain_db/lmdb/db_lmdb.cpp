@@ -1429,7 +1429,7 @@ void BlockchainLMDB::open(const fs::path& filename, cryptonote::network_type net
 
 #ifdef __OpenBSD__
   if ((mdb_flags & MDB_WRITEMAP) == 0) {
-    log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Running on OpenBSD: forcing WRITEMAP"));
+    log::info(logcat, fg(fmt::terminal_color::red), "Running on OpenBSD: forcing WRITEMAP");
     mdb_flags |= MDB_WRITEMAP;
   }
 #endif
@@ -4848,7 +4848,7 @@ void BlockchainLMDB::migrate_0_1()
   MDB_val k, v;
   char *ptr;
 
-  log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Migrating blockchain from DB version 0 to 1 - this may take a while:"));
+  log::info(logcat, fg(fmt::terminal_color::yellow), "Migrating blockchain from DB version 0 to 1 - this may take a while:");
   log::info(logcat, "updating blocks, hf_versions, outputs, txs, and spent_keys tables...");
 
   do {
@@ -5382,7 +5382,7 @@ void BlockchainLMDB::migrate_1_2()
   MDB_val k, v;
   char *ptr;
 
-  log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Migrating blockchain from DB version 1 to 2 - this may take a while:"));
+  log::info(logcat, fg(fmt::terminal_color::yellow), "Migrating blockchain from DB version 1 to 2 - this may take a while:");
   log::info(logcat, "updating txs_pruned and txs_prunable tables...");
 
   do {
@@ -5517,7 +5517,7 @@ void BlockchainLMDB::migrate_2_3()
   MDB_val k, v;
   char *ptr;
 
-  log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Migrating blockchain from DB version 2 to 3 - this may take a while:"));
+  log::info(logcat, fg(fmt::terminal_color::yellow), "Migrating blockchain from DB version 2 to 3 - this may take a while:");
 
   do {
     log::info(logcat, "migrating block info:");
@@ -5633,7 +5633,7 @@ void BlockchainLMDB::migrate_2_3()
 void BlockchainLMDB::migrate_3_4()
 {
   log::trace(logcat, "BlockchainLMDB::{}", __func__);
-  log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Migrating blockchain from DB version 3 to 4 - this may take a while:"));
+  log::info(logcat, fg(fmt::terminal_color::yellow), "Migrating blockchain from DB version 3 to 4 - this may take a while:");
 
   // Migrate output blacklist
   {
@@ -5862,7 +5862,7 @@ void BlockchainLMDB::migrate_3_4()
 void BlockchainLMDB::migrate_4_5(cryptonote::network_type nettype)
 {
   log::trace(logcat, "BlockchainLMDB::{}", __func__);
-  log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Migrating blockchain from DB version 4 to 5 - this may take a while:"));
+  log::info(logcat, fg(fmt::terminal_color::yellow), "Migrating blockchain from DB version 4 to 5 - this may take a while:");
 
   mdb_txn_safe txn(false);
   {
@@ -5935,7 +5935,7 @@ void BlockchainLMDB::migrate_4_5(cryptonote::network_type nettype)
 void BlockchainLMDB::migrate_5_6()
 {
   log::trace(logcat, "BlockchainLMDB::{}", __func__);
-  log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Migrating blockchain from DB version 5 to 6 - this may take a while:"));
+  log::info(logcat, fg(fmt::terminal_color::yellow), "Migrating blockchain from DB version 5 to 6 - this may take a while:");
 
   mdb_txn_safe txn(false);
   {
@@ -6044,7 +6044,7 @@ void BlockchainLMDB::migrate_5_6()
 void BlockchainLMDB::migrate_6_7()
 {
   log::trace(logcat, "BlockchainLMDB::{}", __func__);
-  log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Migrating blockchain from DB version 6 to 7 - this may take a while:"));
+  log::info(logcat, fg(fmt::terminal_color::yellow), "Migrating blockchain from DB version 6 to 7 - this may take a while:");
 
   std::vector<checkpoint_t> checkpoints;
   checkpoints.reserve(1024);

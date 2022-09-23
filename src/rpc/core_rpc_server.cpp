@@ -2662,7 +2662,7 @@ namespace cryptonote::rpc {
         bool significant = std::chrono::seconds{now - old} > lifetime; // Print loudly for the first ping after startup/expiry
         auto msg = fmt::format("Received ping from {} {}.{}.{}", name, cur_version[0], cur_version[1], cur_version[2]);
         if (significant)
-          log::info(logcat, fmt::format(fg(fmt::terminal_color::green), msg));
+          log::info(logcat, fg(fmt::terminal_color::green), "{}", msg);
         else
           log::debug(logcat, msg);
         success(significant);

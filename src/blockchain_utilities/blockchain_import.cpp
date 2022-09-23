@@ -678,13 +678,13 @@ int main(int argc, char* argv[])
 
   if (!opt_verify)
   {
-    log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "\n\
+    log::warning(logcat, fg(fmt::terminal_color::red), "\n\
       Import is set to proceed WITHOUT VERIFICATION.\n\
       This is a DANGEROUS operation: if the file was tampered with in transit, or obtained from a malicious source,\n\
       you could end up with a compromised database. It is recommended to NOT use {}.\n\
       *****************************************************************************************\n\
       You have 90 seconds to press ^C or terminate this program before unverified import starts\n\
-      *****************************************************************************************", arg_noverify.name));
+      *****************************************************************************************", arg_noverify.name);
     sleep(90);
   }
 

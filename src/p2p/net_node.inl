@@ -167,7 +167,7 @@ namespace nodetool
       if (now >= it->second)
       {
         m_blocked_hosts.erase(it);
-        log::info(logcat, fmt::format(fg(fmt::terminal_color::cyan), "Host {} unblocked.", address.host_str()));
+        log::info(logcat, fg(fmt::terminal_color::cyan), "Host {} unblocked.", address.host_str());
         it = m_blocked_hosts.end();
       }
       else
@@ -188,7 +188,7 @@ namespace nodetool
         if (now >= it->second)
         {
           it = m_blocked_subnets.erase(it);
-          log::info(logcat, fmt::format(fg(fmt::terminal_color::cyan), "Subnet {} unblocked", it->first.host_str()));
+          log::info(logcat, fg(fmt::terminal_color::cyan), "Subnet {} unblocked", it->first.host_str());
           continue;
         }
         if (it->first.matches(ipv4_address))
@@ -241,7 +241,7 @@ namespace nodetool
       conns.clear();
     }
 
-    log::info(logcat, fmt::format(fg(fmt::terminal_color::cyan), "Host {} blocked", addr.host_str()));
+    log::info(logcat, fg(fmt::terminal_color::cyan), "Host {} blocked", addr.host_str());
     return true;
   }
   //-----------------------------------------------------------------------------------
@@ -253,7 +253,7 @@ namespace nodetool
     if (i == m_blocked_hosts.end())
       return false;
     m_blocked_hosts.erase(i);
-    log::info(logcat, fmt::format(fg(fmt::terminal_color::cyan), "Host {} unblocked", address.host_str()));
+    log::info(logcat, fg(fmt::terminal_color::cyan), "Host {} unblocked", address.host_str());
     return true;
   }
   //-----------------------------------------------------------------------------------
@@ -293,7 +293,7 @@ namespace nodetool
       conns.clear();
     }
 
-    log::info(logcat, fmt::format(fg(fmt::terminal_color::cyan), "Subnet {} blocked.", subnet.host_str()));
+    log::info(logcat, fg(fmt::terminal_color::cyan), "Subnet {} blocked.", subnet.host_str());
     return true;
   }
   //-----------------------------------------------------------------------------------
@@ -305,7 +305,7 @@ namespace nodetool
     if (i == m_blocked_subnets.end())
       return false;
     m_blocked_subnets.erase(i);
-    log::info(logcat, fmt::format(fg(fmt::terminal_color::cyan), "Subnet {}", subnet.host_str()));
+    log::info(logcat, fg(fmt::terminal_color::cyan), "Subnet {}", subnet.host_str());
     return true;
   }
   //-----------------------------------------------------------------------------------
@@ -718,11 +718,11 @@ namespace nodetool
     }
 
     m_listening_port = public_zone.m_net_server.get_binded_port();
-    log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Net service bound (IPv4) to {}:{}", public_zone.m_bind_ip, m_listening_port));
+    log::info(logcat, fg(fmt::terminal_color::green), "Net service bound (IPv4) to {}:{}", public_zone.m_bind_ip, m_listening_port);
     if (m_use_ipv6)
     {
       m_listening_port_ipv6 = public_zone.m_net_server.get_binded_port_ipv6();
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Net service bound (IPv6) to {}:{}", public_zone.m_bind_ipv6_address, m_listening_port_ipv6));
+      log::info(logcat, fg(fmt::terminal_color::green), "Net service bound (IPv6) to {}:{}", public_zone.m_bind_ipv6_address, m_listening_port_ipv6);
     }
     if(m_external_port)
       log::debug(logcat, "External port defined as {}", m_external_port);
@@ -1681,7 +1681,7 @@ namespace nodetool
       }
       else
       {
-        log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "No incoming connections - check firewalls/routers allow port {}", get_this_peer_port()));
+        log::warning(logcat, fg(fmt::terminal_color::red), "No incoming connections - check firewalls/routers allow port {}", get_this_peer_port());
       }
     }
     return true;

@@ -740,7 +740,7 @@ namespace service_nodes
     switch (state_change.state) {
       case new_state::deregister:
         if (is_me)
-          log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Deregistration for service node (yours): {}", key));
+          log::info(logcat, fg(fmt::terminal_color::red), "Deregistration for service node (yours): {}", key);
         else
           log::info(logcat, "Deregistration for service node: {}", key);
 
@@ -774,7 +774,7 @@ namespace service_nodes
         }
 
         if (is_me)
-          log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Temporary decommission for service node (yours): {}", key));
+          log::info(logcat, fg(fmt::terminal_color::red), "Temporary decommission for service node (yours): {}", key);
         else
           log::info(logcat, "Temporary decommission for service node: {}", key);
 
@@ -812,7 +812,7 @@ namespace service_nodes
         }
 
         if (is_me)
-          log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Recommission for service node (yours): {}", key));
+          log::info(logcat, fg(fmt::terminal_color::green), "Recommission for service node (yours): {}", key);
         else
           log::info(logcat, "Recommission for service node: {}", key);
 
@@ -857,7 +857,7 @@ namespace service_nodes
         }
 
         if (is_me)
-          log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Reward position reset for service node (yours): {}", key));
+          log::info(logcat, fg(fmt::terminal_color::red), "Reward position reset for service node (yours): {}", key);
         else
           log::info(logcat, "Reward position reset for service node: {}", key);
 
@@ -1144,7 +1144,7 @@ namespace service_nodes
       }
 
       if (my_keys && my_keys->pub == key)
-        log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Service node registered (yours): {} on height: {}", key, block_height));
+        log::info(logcat, fg(fmt::terminal_color::green), "Service node registered (yours): {} on height: {}", key, block_height);
       else
         log::info(logcat, "New service node registered: {} on height: {}", key, block_height);
     }
@@ -1178,11 +1178,11 @@ namespace service_nodes
       {
         if (registered_during_grace_period)
         {
-          log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Service node re-registered (yours): {} at block height: {}", key, block_height));
+          log::info(logcat, fg(fmt::terminal_color::green), "Service node re-registered (yours): {} at block height: {}", key, block_height);
         }
         else
         {
-          log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Service node registered (yours): {} at block height: {}", key, block_height));
+          log::info(logcat, fg(fmt::terminal_color::green), "Service node registered (yours): {} at block height: {}", key, block_height);
         }
       }
       else
@@ -2193,7 +2193,7 @@ namespace service_nodes
       if (i != service_nodes_infos.end())
       {
         if (my_keys && my_keys->pub == pubkey) 
-          log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Service node expired (yours): {} at block height: {}", pubkey, block_height));
+          log::info(logcat, fg(fmt::terminal_color::green), "Service node expired (yours): {} at block height: {}", pubkey, block_height);
         else
           log::info(logcat, "Service node expired: {} at block height: {}", pubkey, block_height);
 
@@ -3176,7 +3176,7 @@ namespace service_nodes
       log::debug(logcat, "Accepted uptime proof from {}", proof.pubkey);
 
       if (m_service_node_keys && proof.pubkey_ed25519 == m_service_node_keys->pub_ed25519)
-        log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Uptime proof from SN {} is not us, but is using our ed/x25519 keys; this is likely to lead to deregistration of one or both service nodes.", proof.pubkey));
+        log::info(logcat, fg(fmt::terminal_color::red), "Uptime proof from SN {} is not us, but is using our ed/x25519 keys; this is likely to lead to deregistration of one or both service nodes.", proof.pubkey);
     }
 
     auto old_x25519 = iproof.pubkey_x25519;
@@ -3305,7 +3305,7 @@ namespace service_nodes
       log::debug(logcat, "Accepted uptime proof from {}", proof->pubkey);
 
       if (m_service_node_keys && proof->pubkey_ed25519 == m_service_node_keys->pub_ed25519)
-        log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Uptime proof from SN {} is not us, but is using our ed/x25519 keys; this is likely to lead to deregistration of one or both service nodes.", proof->pubkey)); 
+        log::info(logcat, fg(fmt::terminal_color::red), "Uptime proof from SN {} is not us, but is using our ed/x25519 keys; this is likely to lead to deregistration of one or both service nodes.", proof->pubkey); 
     }
 
     auto old_x25519 = iproof.pubkey_x25519;

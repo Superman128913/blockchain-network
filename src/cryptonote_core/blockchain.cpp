@@ -1181,7 +1181,7 @@ bool Blockchain::switch_to_alternative_blockchain(const std::list<block_extended
       hook(hook_data);
   }
 
-  log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "REORGANIZE SUCCESS! on height: {}, new blockchain size: {}", split_height, m_db->height()));
+  log::info(logcat, fg(fmt::terminal_color::green), "REORGANIZE SUCCESS! on height: {}, new blockchain size: {}", split_height, m_db->height());
   return true;
 }
 //------------------------------------------------------------------
@@ -1379,7 +1379,7 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
     try {
       hook(hook_data);
     } catch (const std::exception& e) {
-      log::info(globallogcat, fmt::format(fg(fmt::terminal_color::red), "Miner tx failed validation: {}", e.what()));
+      log::info(globallogcat, fg(fmt::terminal_color::red), "Miner tx failed validation: {}", e.what());
       return false;
     }
   }
@@ -2161,12 +2161,11 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
     }
     else
     {
-      std::stringstream stream;
-      stream << "----- " << block_type << " BLOCK ADDED AS ALTERNATIVE ON HEIGHT " << blk_height << "\n" << "id: " << id;
-      if (!pulse_block) stream << " PoW: " << blk_pow.proof_of_work;
-      stream << " difficulty: " << current_diff;
+      std::string msg = fmt::format("----- {} BLOCK ADDED AS ALTERNATIVE ON HEIGHT {}\nid: {}", block_type, blk_height, id);
+      if (!pulse_block) fmt::format_to(std::back_inserter(msg), " PoW: {}", blk_pow.proof_of_work);
+      fmt::format_to(std::back_inserter(msg), " difficulty {}", current_diff);
 
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "{}", stream.str()));
+      log::info(logcat, fg(fmt::terminal_color::blue), "{}", msg);
       return true;
     }
   }
@@ -2182,12 +2181,12 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
         bool keep_alt_chain = false;
         if (alt_chain_has_more_checkpoints)
         {
-          log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "###### REORGANIZE on height: {} of {}, checkpoint is found in alternative chain on height {}", alt_chain.front().height, m_db->height() - 1, blk_height));
+          log::info(logcat, fg(fmt::terminal_color::green), "###### REORGANIZE on height: {} of {}, checkpoint is found in alternative chain on height {}", alt_chain.front().height, m_db->height() - 1, blk_height);
         }
         else
         {
           keep_alt_chain = true;
-          log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "###### REORGANIZE on height: {} of {} with cum_difficulty {}\n alternative blockchain size: {} with cum_difficulty {}", alt_chain.front().height, m_db->height() - 1, m_db->get_block_cumulative_difficulty(m_db->height() - 1), alt_chain.size(), alt_data.cumulative_difficulty));
+          log::info(logcat, fg(fmt::terminal_color::green), "###### REORGANIZE on height: {} of {} with cum_difficulty {}\n alternative blockchain size: {} with cum_difficulty {}", alt_chain.front().height, m_db->height() - 1, m_db->get_block_cumulative_difficulty(m_db->height() - 1), alt_chain.size(), alt_data.cumulative_difficulty);
         }
 
         bool r = switch_to_alternative_blockchain(alt_chain, keep_alt_chain);
@@ -2199,7 +2198,7 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
       }
       else
       {
-        log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "----- {} BLOCK ADDED AS ALTERNATIVE ON HEIGHT {}\nid:\t{}\nPoW:\t{}\ndifficulty:\t{}", block_type, blk_height, id, blk_pow.proof_of_work, current_diff));
+        log::info(logcat, fg(fmt::terminal_color::blue), "----- {} BLOCK ADDED AS ALTERNATIVE ON HEIGHT {}\nid:\t{}\nPoW:\t{}\ndifficulty:\t{}", block_type, blk_height, id, blk_pow.proof_of_work, current_diff);
         return true;
       }
     }
@@ -2207,7 +2206,7 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
     {
       if (alt_chain_has_greater_pow)
       {
-        log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "###### REORGANIZE on height: {} of {} with cum_difficulty {}\n alternative blockchain size: {} with cum_difficulty {}", alt_chain.front().height, m_db->height() - 1, m_db->get_block_cumulative_difficulty(m_db->height() - 1), alt_chain.size(), alt_data.cumulative_difficulty));
+        log::info(logcat, fg(fmt::terminal_color::green), "###### REORGANIZE on height: {} of {} with cum_difficulty {}\n alternative blockchain size: {} with cum_difficulty {}", alt_chain.front().height, m_db->height() - 1, m_db->get_block_cumulative_difficulty(m_db->height() - 1), alt_chain.size(), alt_data.cumulative_difficulty);
         bool r = switch_to_alternative_blockchain(alt_chain, true);
         if (r)
           bvc.m_added_to_main_chain = true;
@@ -2217,7 +2216,7 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
       }
       else
       {
-        log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "----- {} BLOCK ADDED AS ALTERNATIVE ON HEIGHT {}\nid:\t{}\nPoW:\t{}\ndifficulty:\t{}", block_type, blk_height, id, blk_pow.proof_of_work, current_diff));
+        log::info(logcat, fg(fmt::terminal_color::blue), "----- {} BLOCK ADDED AS ALTERNATIVE ON HEIGHT {}\nid:\t{}\nPoW:\t{}\ndifficulty:\t{}", block_type, blk_height, id, blk_pow.proof_of_work, current_diff);
         return true;
       }
     }
@@ -4150,7 +4149,7 @@ Blockchain::block_pow_verified Blockchain::verify_block_pow(cryptonote::block co
     // validate proof_of_work versus difficulty target
     result.valid = check_hash(result.proof_of_work, difficulty);
     if (!result.valid)
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "{} with id: {}\n does not have enough proof of work: {} at height {}, required difficulty: {}", (alt_block ? "Alternative block" : "Block"), blk_hash, result.proof_of_work, blk_height, difficulty));
+      log::info(logcat, fg(fmt::terminal_color::red), "{} with id: {}\n does not have enough proof of work: {} at height {}, required difficulty: {}", (alt_block ? "Alternative block" : "Block"), blk_hash, result.proof_of_work, blk_height, difficulty);
   }
 
   return result;
@@ -4191,7 +4190,7 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
     crypto::hash top_hash = get_tail_id();
     if(blk.prev_id != top_hash)
     {
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {}, has wrong prev_id: {}, expected: {}", blk_hash, blk.prev_id, top_hash));
+      log::info(logcat, fg(fmt::terminal_color::red), "Block with id: {}, has wrong prev_id: {}, expected: {}", blk_hash, blk.prev_id, top_hash);
       return false;
     }
 
@@ -4203,11 +4202,13 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
       if (auto now = std::chrono::steady_clock::now(); now > last_outdated_warning + 5min)
       {
         last_outdated_warning = now;
-        log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "**********************************************************************"));
-        log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "A block was seen on the network with a version higher than the last"));
-        log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "known one. This may be an old version of the daemon, and a software"));
-        log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "update may be required to sync further. Try running: update check"));
-        log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "**********************************************************************"));
+        for (const auto* msg : {
+            "**********************************************************************",
+            "A block was seen on the network with a version higher than the last",
+            "known one. This may be an old version of the daemon, and a software",
+            "update may be required to sync further. Try running: update check",
+            "**********************************************************************"})
+            log::warning(logcat, fg(fmt::terminal_color::red), msg);
       }
     }
 
@@ -4215,7 +4216,7 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
     if (blk.major_version != required_major_version ||
             (blk.major_version < hf::hf19_reward_batching && blk.minor_version < static_cast<uint8_t>(required_major_version)))
     {
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {}, has invalid version {}.{}; current: {}.{} for height {}", blk_hash, static_cast<int>(blk.major_version), +blk.minor_version, static_cast<int>(required_major_version), static_cast<int>(required_major_version), blk_height));
+      log::info(logcat, fg(fmt::terminal_color::red), "Block with id: {}, has invalid version {}.{}; current: {}.{} for height {}", blk_hash, static_cast<int>(blk.major_version), +blk.minor_version, static_cast<int>(required_major_version), static_cast<int>(required_major_version), blk_height);
       return false;
     }
 
@@ -4228,7 +4229,7 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
       {
         if (!service_node_checkpoint || (service_node_checkpoint && blk.major_version >= hf::hf13_enforce_checkpoints))
         {
-          log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "CHECKPOINT VALIDATION FAILED"));
+          log::info(logcat, fg(fmt::terminal_color::red), "CHECKPOINT VALIDATION FAILED");
           return false;
         }
       }
@@ -4238,7 +4239,7 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
     // number of the most recent blocks.
     if(!check_block_timestamp(blk))
     {
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {}, has invalid timestamp: {}", blk_hash, blk.timestamp));
+      log::info(logcat, fg(fmt::terminal_color::red), "Block with id: {}, has invalid timestamp: {}", blk_hash, blk.timestamp);
       return false;
     }
   }
@@ -4248,7 +4249,7 @@ bool Blockchain::basic_block_checks(cryptonote::block const &blk, bool alt_block
   // sanity check basic miner tx properties;
   if(!prevalidate_miner_transaction(blk, alt_block ? blk_height : chain_height, hf_version))
   {
-    log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {} failed to pass prevalidation", blk_hash));
+    log::info(logcat, fg(fmt::terminal_color::red), "Block with id: {} failed to pass prevalidation", blk_hash);
     return false;
   }
 
@@ -4338,7 +4339,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
     
     if (m_db->tx_exists(tx_id))
     {
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {} attempting to add transaction already in blockchain with id: {}", id, tx_id));
+      log::info(logcat, fg(fmt::terminal_color::red), "Block with id: {} attempting to add transaction already in blockchain with id: {}", id, tx_id);
       bvc.m_verifivation_failed = true;
       return_tx_to_pool(txs);
       return false;
@@ -4350,7 +4351,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
     // get transaction with hash <tx_id> from tx_pool
     if(!m_tx_pool.take_tx(tx_id, tx_tmp, txblob, tx_weight, fee, relayed, do_not_relay, double_spend_seen))
     {
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {} has at least one unknown transaction with id: {}", id, tx_id));
+      log::info(logcat, fg(fmt::terminal_color::red), "Block with id: {} has at least one unknown transaction with id: {}", id, tx_id);
       bvc.m_verifivation_failed = true;
       return_tx_to_pool(txs);
       return false;
@@ -4388,11 +4389,11 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
       tx_verification_context tvc{};
       if(!check_tx_inputs(tx, tvc))
       {
-        log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id: {} has at least one transaction (id: {}) with wrong inputs.", id, tx_id));
+        log::info(logcat, fg(fmt::terminal_color::red), "Block with id: {} has at least one transaction (id: {}) with wrong inputs.", id, tx_id);
 
         add_block_as_invalid(bl);
-        log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block with id {} added as invalid because of wrong inputs in transactions", id));
-        log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "tx_index {}, m_blocks_txs_check {}:", tx_index, m_blocks_txs_check.size()));
+        log::info(logcat, fg(fmt::terminal_color::red), "Block with id {} added as invalid because of wrong inputs in transactions", id);
+        log::info(logcat, fg(fmt::terminal_color::red), "tx_index {}, m_blocks_txs_check {}:", tx_index, m_blocks_txs_check.size());
         for (const auto &h: m_blocks_txs_check)
           log::error(log::Cat("verify"), "  {}", h);
         bvc.m_verifivation_failed = true;
@@ -4428,7 +4429,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
   uint64_t already_generated_coins = chain_height ? m_db->get_block_already_generated_coins(chain_height - 1) : 0;
   if(!validate_miner_transaction(bl, cumulative_block_weight, fee_summary, base_reward, already_generated_coins, get_network_version()))
   {
-    log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block {} with id: {} has incorrect miner transaction", (chain_height - 1), id));
+    log::info(logcat, fg(fmt::terminal_color::red), "Block {} with id: {} has incorrect miner transaction", (chain_height - 1), id);
     bvc.m_verifivation_failed = true;
     return_tx_to_pool(txs);
     return false;
@@ -4464,7 +4465,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
     }
     catch (const KEY_IMAGE_EXISTS& e)
     {
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Error adding block with hash: {} to blockchain, what = {}", id, e.what()));
+      log::info(logcat, fg(fmt::terminal_color::red), "Error adding block with hash: {} to blockchain, what = {}", id, e.what());
       m_batch_success = false;
       bvc.m_verifivation_failed = true;
       return_tx_to_pool(txs);
@@ -4473,7 +4474,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
     catch (const std::exception& e)
     {
       //TODO: figure out the best way to deal with this failure
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Error adding block with hash: {} to blockchain, what = {}", id, e.what()));
+      log::info(logcat, fg(fmt::terminal_color::red), "Error adding block with hash: {} to blockchain, what = {}", id, e.what());
       m_batch_success = false;
       bvc.m_verifivation_failed = true;
       return_tx_to_pool(txs);
@@ -4482,7 +4483,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
   }
   else
   {
-    log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Blocks that failed verification should not reach here"));
+    log::info(logcat, fg(fmt::terminal_color::red), "Blocks that failed verification should not reach here");
   }
 
   auto abort_block = oxen::defer([&]() {
@@ -4507,14 +4508,14 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
   try {
     m_service_node_list.block_add(bl, only_txs, checkpoint);
   } catch (const std::exception& e) {
-    log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Failed to add block to Service Node List: {}", e.what()));
+    log::info(logcat, fg(fmt::terminal_color::red), "Failed to add block to Service Node List: {}", e.what());
     bvc.m_verifivation_failed = true;
     return false;
   }
 
   if (!m_ons_db.add_block(bl, only_txs))
   {
-    log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Failed to add block to ONS DB."));
+    log::info(logcat, fg(fmt::terminal_color::red), "Failed to add block to ONS DB.");
     bvc.m_verifivation_failed = true;
     return false;
   } 
@@ -4537,7 +4538,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
     try {
       hook(hook_data);
     } catch (const std::exception& e) {
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Block added hook failed with exception: ", e.what()));
+      log::info(logcat, fg(fmt::terminal_color::red), "Block added hook failed with exception: ", e.what());
       bvc.m_verifivation_failed = true;
       return false;
     }
@@ -4548,7 +4549,7 @@ bool Blockchain::handle_block_to_main_chain(const block& bl, const crypto::hash&
   // do this after updating the hard fork state since the weight limit may change due to fork
   if (!update_next_cumulative_weight_limit())
   {
-    log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "Failed to update next cumulative weight limit"));
+    log::info(logcat, fg(fmt::terminal_color::red), "Failed to update next cumulative weight limit");
     return false;
   }
 

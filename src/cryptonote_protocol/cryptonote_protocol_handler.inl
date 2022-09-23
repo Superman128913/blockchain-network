@@ -331,7 +331,7 @@ namespace cryptonote
       if (version != hshd.top_version)
       {
         if (version < hshd.top_version && version == get_network_version(nettype, m_core.get_current_blockchain_height()))
-          log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "{} peer claims higher version than we think ({} for {} instead of {}) 0 we may be forked from the network and a software upgrade may be needed", context, (unsigned)hshd.top_version, (hshd.current_height - 1), (unsigned)version));
+          log::warning(logcat, fg(fmt::terminal_color::red), "{} peer claims higher version than we think ({} for {} instead of {}) 0 we may be forked from the network and a software upgrade may be needed", context, (unsigned)hshd.top_version, (hshd.current_height - 1), (unsigned)version);
         return false;
       }
     }
@@ -448,7 +448,7 @@ namespace cryptonote
       uint64_t max_block_height = std::max(hshd.current_height, curr_height);
       std::string sync_msg = fmt::format("{}Sync data returned a new top block candidate: {} -> {} [Your node is {} blocks ({} {})]\nSYNCHRONIZATION started", context, curr_height, hshd.current_height, abs_diff, tools::get_human_readable_timespan(abs_diff*TARGET_BLOCK_TIME), (0 <= diff ? "behind" : "ahead"));
       if (is_initial)
-        log::info(globallogcat, fmt::format(fg(fmt::terminal_color::cyan), sync_msg));
+        log::info(globallogcat, fg(fmt::terminal_color::cyan), sync_msg);
       else
         log::debug(globallogcat, sync_msg);
 
@@ -1220,7 +1220,7 @@ namespace cryptonote
     }
 
     {
-      log::debug(globallogcat, fmt::format(fg(fmt::terminal_color::yellow), "{} Got NEW BLOCKS inside of {}: size: {}, blocks: {} - {} (pruning seed {})", context, __FUNCTION__, arg.blocks.size(), start_height, (start_height + arg.blocks.size() - 1), epee::string_tools::to_string_hex(context.m_pruning_seed)));
+      log::debug(globallogcat, fg(fmt::terminal_color::yellow), "{} Got NEW BLOCKS inside of {}: size: {}, blocks: {} - {} (pruning seed {})", context, __FUNCTION__, arg.blocks.size(), start_height, (start_height + arg.blocks.size() - 1), epee::string_tools::to_string_hex(context.m_pruning_seed));
 
       // add that new span to the block queue
       seconds_f dt = now - request_time;
@@ -1561,7 +1561,7 @@ namespace cryptonote
                 + std::to_string(previous_stripe) + " -> " + std::to_string(current_stripe);
             if (OXEN_LOG_ENABLED(debug))
               timing_message += std::string(": ") + m_block_queue.get_overview(current_blockchain_height);
-            log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Synced {}/{} {} {}", current_blockchain_height, target_blockchain_height, progress_message, timing_message));
+            log::info(logcat, fg(fmt::terminal_color::yellow), "Synced {}/{} {} {}", current_blockchain_height, target_blockchain_height, progress_message, timing_message);
             if (previous_stripe != current_stripe)
               notify_new_stripe(context, current_stripe);
           }
@@ -2226,7 +2226,7 @@ skip:
       {
         if (m_core.get_current_blockchain_height() >= m_core.get_target_blockchain_height())
         {
-          log::info(globallogcat, fmt::format(fg(fmt::terminal_color::green), "SYNCHRONIZED OK"));
+          log::info(globallogcat, fg(fmt::terminal_color::green), "SYNCHRONIZED OK");
           on_connection_synchronized();
         }
       }
@@ -2255,22 +2255,24 @@ skip:
           if (synced_seconds == 0s)
             synced_seconds = 1s;
           float blocks_per_second = synced_blocks / (float)synced_seconds.count();
-          log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Synced {} blocks in {} ({} blocks per second)", synced_blocks, tools::get_human_readable_timespan(synced_seconds), blocks_per_second));
+          log::info(logcat, fg(fmt::terminal_color::yellow), "Synced {} blocks in {} ({} blocks per second)", synced_blocks, tools::get_human_readable_timespan(synced_seconds), blocks_per_second);
         }
       }
-      log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "\n**********************************************************************\n\
-You are now synchronized with the network. You may now start oxen-wallet-cli.\n\
-\n\
-Use the \"help\" command to see the list of available commands.\n\
-**********************************************************************"));
+      log::info(logcat, fg(fmt::terminal_color::yellow), R"(
+**********************************************************************
+You are now synchronized with the network. You may now start oxen-wallet-cli.
+
+Use the "help" command to see the list of available commands.
+**********************************************************************)");
       if (OXEN_LOG_ENABLED(info))
       {
         const std::chrono::duration<double> sync_time{std::chrono::steady_clock::now() - m_sync_timer};
-        log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Sync time: {:.0f} min, {} + {} MB downloaded, {}% old spans, {}% bad spans", sync_time.count()/1e9/60,
-            (10 * m_sync_download_objects_size / 1024 / 1024) / 10.f,
-            (10 * m_sync_download_chain_size / 1024 / 1024) / 10.f,
-            100.0f * m_sync_old_spans_downloaded / m_sync_spans_downloaded,
-            100.0f * m_sync_bad_spans_downloaded / m_sync_spans_downloaded));
+        log::info(logcat, fg(fmt::terminal_color::yellow), "Sync time: {:.1f} min, {:.1f} + {:.1f} MB downloaded, {:.2f}% old spans, {:.2f}% bad spans",
+            sync_time.count()/60.0,
+            m_sync_download_objects_size / 1000.0 / 1000.0,
+            m_sync_download_chain_size / 1000.0 / 1000.0,
+            100.0 * m_sync_old_spans_downloaded / m_sync_spans_downloaded,
+            100.0 * m_sync_bad_spans_downloaded / m_sync_spans_downloaded);
       }
       m_core.on_synchronized();
     }
@@ -2611,7 +2613,7 @@ Use the \"help\" command to see the list of available commands.\n\
       log::info(logcat, "Target height decreasing from {} to {}", previous_target, target);
       m_core.set_target_blockchain_height(target);
       if (target == 0 && context.m_state > cryptonote_connection_context::state_before_handshake && !m_stopping)
-        log::warning(logcat, fmt::format(fg(fmt::terminal_color::yellow), "oxend is now disconnected from the network"));
+        log::warning(logcat, fg(fmt::terminal_color::yellow), "oxend is now disconnected from the network");
     }
 
     m_block_queue.flush_spans(context.m_connection_id, false);

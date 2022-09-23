@@ -2484,10 +2484,10 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
 
     if (total_received_1 != total_received_2)
     {
-      log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "**********************************************************************"));
-      log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "Consistency failure in amounts received"));
-      log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "Check transaction {}", txid));
-      log::warning(logcat, fmt::format(fg(fmt::terminal_color::red), "**********************************************************************"));
+      log::warning(logcat, fg(fmt::terminal_color::red), "**********************************************************************");
+      log::warning(logcat, fg(fmt::terminal_color::red), "Consistency failure in amounts received");
+      log::warning(logcat, fg(fmt::terminal_color::red), "Check transaction {}", txid);
+      log::warning(logcat, fg(fmt::terminal_color::red), "**********************************************************************");
       exit(1);
       return;
     }

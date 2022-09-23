@@ -111,7 +111,7 @@ daemon::daemon(boost::program_options::variables_map vm_) :
     p2p{std::make_unique<node_server>(*protocol)},
     rpc{std::make_unique<cryptonote::rpc::core_rpc_server>(*core, *p2p)}
 {
-  log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "Initializing daemon objects..."));
+  log::info(logcat, fg(fmt::terminal_color::blue), "Initializing daemon objects...");
 
   log::info(logcat, "- cryptonote protocol");
   if (!protocol->init(vm))
@@ -146,7 +146,7 @@ daemon::daemon(boost::program_options::variables_map vm_) :
   std::vector<std::tuple<std::string, uint16_t, bool>> rpc_listen_admin, rpc_listen_public;
   if (deprecated_rpc_options)
   {
-    log::info(logcat, fmt::format(fg(fmt::terminal_color::red), "{} options are deprecated and will be removed from a future oxend version; use --rpc-public/--rpc-admin instead", deprecated_option_names));
+    log::info(logcat, fg(fmt::terminal_color::red), "{} options are deprecated and will be removed from a future oxend version; use --rpc-public/--rpc-admin instead", deprecated_option_names);
 
     // These old options from Monero are really janky: --restricted-rpc turns the main port
     // restricted, but then we also have --rpc-restricted-bind-port but both are stuck with
@@ -219,12 +219,12 @@ daemon::daemon(boost::program_options::variables_map vm_) :
     http_rpc_public.emplace(*rpc, rpc_config, true /*restricted*/, std::move(rpc_listen_public));
   }
 
-  log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "Done daemon object initialization"));
+  log::info(logcat, fg(fmt::terminal_color::blue), "Done daemon object initialization");
 }
 
 daemon::~daemon()
 {
-  log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "Deinitializing daemon objects..."));
+  log::info(logcat, fg(fmt::terminal_color::blue), "Deinitializing daemon objects...");
 
   if (http_rpc_public) {
     log::info(logcat, "- public HTTP RPC server");
@@ -257,7 +257,7 @@ daemon::~daemon()
   } catch (const std::exception& e) {
     log::error(logcat, "Failed to stop cryptonote protocol: {}", e.what());
   }
-  log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "Deinitialization complete"));
+  log::info(logcat, fg(fmt::terminal_color::blue), "Deinitialization complete");
 }
 
 void daemon::init_options(boost::program_options::options_description& option_spec, boost::program_options::options_description& hidden)
@@ -298,7 +298,7 @@ bool daemon::run(bool interactive)
 
   try
   {
-    log::info(logcat, fmt::format(fg(fmt::terminal_color::blue), "Starting up oxend services..."));
+    log::info(logcat, fg(fmt::terminal_color::blue), "Starting up oxend services...");
     cryptonote::GetCheckpointsCallback get_checkpoints;
 #if defined(PER_BLOCK_CHECKPOINT)
     get_checkpoints = blocks::GetCheckpointsData;
@@ -342,14 +342,14 @@ bool daemon::run(bool interactive)
       rpc_commands->start_handling([this] { stop(); });
     }
 
-    log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Starting up main network"));
+    log::info(logcat, fg(fmt::terminal_color::green), "Starting up main network");
 
 #ifdef ENABLE_SYSTEMD
     sd_notify(0, ("READY=1\nSTATUS=" + core->get_status_string()).c_str());
 #endif
 
     p2p->run(); // blocks until p2p goes down
-    log::info(logcat, fmt::format(fg(fmt::terminal_color::yellow), "Main network stopped"));
+    log::info(logcat, fg(fmt::terminal_color::yellow), "Main network stopped");
 
     if (rpc_commands)
     {

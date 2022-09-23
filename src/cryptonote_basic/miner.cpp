@@ -345,7 +345,7 @@ namespace cryptonote
       if(check_hash(h, local_diff))
       {
         //we lucky!
-        log::info(logcat, fmt::format(fg(fmt::terminal_color::green), "Found block {} at height {} for difficulty: {}", get_block_hash(b), height, local_diff));
+        log::info(logcat, fg(fmt::terminal_color::green), "Found block {} at height {} for difficulty: {}", get_block_hash(b), height, local_diff);
         cryptonote::block_verification_context bvc;
         m_phandler->handle_block_found(b, bvc);
       }
