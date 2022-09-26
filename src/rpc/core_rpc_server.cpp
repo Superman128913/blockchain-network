@@ -548,7 +548,7 @@ namespace cryptonote::rpc {
       // a single one we want just the value itself; this does that.  Returns a reference to the
       // assigned value (whether as a top-level value or array element).
       template <typename T>
-      json& set(const std::string& key, T&& value, bool binary = is_binary_parameter<T> || is_binary_container<T>) {
+      json& set(const std::string& key, T&& value, [[maybe_unused]] bool binary = is_binary_parameter<T> || is_binary_container<T>) {
         auto* x = &entry[key];
         if (!x->is_null() && !x->is_array())
           x = &(entry[key] = json::array({std::move(*x)}));
