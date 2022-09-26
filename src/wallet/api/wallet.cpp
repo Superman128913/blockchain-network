@@ -153,10 +153,7 @@ struct Wallet2CallbackImpl : public tools::i_wallet2_callback
     {
         std::string tx_hash = tools::type_to_hex(txid);
 
-        log::trace(logcat, "{}: money received.{}{}", __FUNCTION__, (blink ? "blink: " : "height: "), height
-                     << ", tx: " << tx_hash
-                     << ", amount: " << print_money(amount)
-                     << ", idx: " << subaddr_index);
+        log::trace(logcat, "{}: money received.{}{}, tx: {}, amount: {}, idx: {}", __FUNCTION__, (blink ? "blink: " : "height: "), height, tx_hash, print_money(amount), subaddr_index.to_string());
         // do not signal on received tx if wallet is not syncronized completely
         if (m_listener && m_wallet->synchronized()) {
             m_listener->moneyReceived(tx_hash, amount);
@@ -170,10 +167,7 @@ struct Wallet2CallbackImpl : public tools::i_wallet2_callback
 
         std::string tx_hash = tools::type_to_hex(txid);
 
-        log::trace(logcat, "{}: unconfirmed money received. height:  {}", __FUNCTION__, height
-                     << ", tx: " << tx_hash
-                     << ", amount: " << print_money(amount)
-                     << ", idx: " << subaddr_index);
+        log::trace(logcat, "{}: unconfirmed money received. height:  {}, tx: {}, amount: {}, idx: {}", __FUNCTION__, height, tx_hash, print_money(amount), subaddr_index.to_string());
         // do not signal on received tx if wallet is not syncronized completely
         if (m_listener && m_wallet->synchronized()) {
             m_listener->unconfirmedMoneyReceived(tx_hash, amount);
@@ -191,10 +185,7 @@ struct Wallet2CallbackImpl : public tools::i_wallet2_callback
     {
         // TODO;
         std::string tx_hash = tools::type_to_hex(txid);
-        log::trace(logcat, "{}: money spent. height:  {}", __FUNCTION__, height
-                     << ", tx: " << tx_hash
-                     << ", amount: " << print_money(amount)
-                     << ", idx: " << subaddr_index);
+        log::trace(logcat, "{}: money spent. height:  {}, tx: {}, amount: {}, idx: {}", __FUNCTION__, height, tx_hash, print_money(amount), subaddr_index.to_string());
         // do not signal on sent tx if wallet is not syncronized completely
         if (m_listener && m_wallet->synchronized()) {
             m_listener->moneySpent(tx_hash, amount);
@@ -409,27 +400,39 @@ uint64_t Wallet::maximumAllowedAmount()
 EXPORT
 void Wallet::init(const char *argv0, const char *default_log_base_name, const std::string& log_path, bool console) {
     epee::string_tools::set_module_name_and_folder(argv0);
-    mlog_configure(log_path.empty() ? mlog_get_default_log_path(default_log_base_name) : log_path, console);
+    oxen::logging::init(log_path.empty() ? default_log_base_name : log_path, log::Level::info);
 }
 
 EXPORT
 void Wallet::debug(const std::string &category, const std::string &str) {
-    log::debug(category.empty() ? logcat : oxenlog::Category(category.c_str()), str);
+    if (category.empty())
+      log::debug(logcat, str);
+    else
+      log::debug(log::Cat(category), str);
 }
 
 EXPORT
 void Wallet::info(const std::string &category, const std::string &str) {
-    log::info(category.empty() ? logcat : oxenlog::Category(category.c_str()), str);
+    if (category.empty())
+      log::info(logcat, str);
+    else
+      log::info(log::Cat(category), str);
 }
 
 EXPORT
 void Wallet::warning(const std::string &category, const std::string &str) {
-    log::warning(category.empty() ? logcat : oxenlog::Category(category.c_str()), str);
+    if (category.empty())
+      log::warning(logcat, str);
+    else
+      log::warning(log::Cat(category), str);
 }
 
 EXPORT
 void Wallet::error(const std::string &category, const std::string &str) {
-    oxenlog::error(category.empty() ? logcat : oxenlog::Category(category.c_str()), str);
+    if (category.empty())
+      log::error(logcat, str);
+    else
+      log::error(log::Cat(category), str);
 }
 
 ///////////////////////// WalletImpl implementation ////////////////////////
@@ -479,7 +482,7 @@ EXPORT
 WalletImpl::~WalletImpl()
 {
 
-    log::info(__FUNCTION__);
+    log::info(logcat, "{}", __FUNCTION__);
     m_wallet_ptr->callback(nullptr);
     // Stop refresh and long poll threads
     stopRefresh();
@@ -508,15 +511,13 @@ bool WalletImpl::create(std::string_view path_, const std::string &password, con
     bool keys_file_exists;
     bool wallet_file_exists;
     tools::wallet2::wallet_exists(path, keys_file_exists, wallet_file_exists);
-    log::trace(logcat, "wallet_path: {}", path);
-    log::trace(logcat, "keys_file_exists: {}{}{}", std::boolalpha, keys_file_exists, std::noboolalpha
-                 << "  wallet_file_exists: " << std::boolalpha << wallet_file_exists << std::noboolalpha);
-
+    log::trace(logcat, "wallet_path: {}", path.string());
+    log::trace(logcat, "keys_file_exists: {} wallet_file_exists: {}", keys_file_exists, wallet_file_exists);
 
     // add logic to error out if new wallet requested but named wallet file exists
     if (keys_file_exists || wallet_file_exists) {
         std::string error = "attempting to generate or restore wallet, but specified file(s) exist.  Exiting to not risk overwriting.";
-        log::error(error);
+        log::error(logcat, error);
         setStatusCritical(error);
         return false;
     }
@@ -551,14 +552,13 @@ bool WalletImpl::createWatchOnly(std::string_view path_, const std::string &pass
     bool keys_file_exists;
     bool wallet_file_exists;
     tools::wallet2::wallet_exists(path, keys_file_exists, wallet_file_exists);
-    log::trace(logcat, "wallet_path: {}", path);
-    log::trace(logcat, "keys_file_exists: {}{}{}", std::boolalpha, keys_file_exists, std::noboolalpha
-                 << "  wallet_file_exists: " << std::boolalpha << wallet_file_exists << std::noboolalpha);
+    log::trace(logcat, "wallet_path: {}", path.string());
+    log::trace(logcat, "keys_file_exists: {} wallet_file_exists: {}", keys_file_exists, wallet_file_exists);
 
     // add logic to error out if new wallet requested but named wallet file exists
     if (keys_file_exists || wallet_file_exists) {
         std::string error = "attempting to generate view only wallet, but specified file(s) exist.  Exiting to not risk overwriting.";
-        log::error(error);
+        log::error(logcat, error);
         setStatusError(error);
         return false;
     }
@@ -1082,15 +1082,15 @@ std::vector<Wallet::stake_info>* WalletImpl::listCurrentStakes() const
     auto main_addr = mainAddress();
 
     for (const auto& node_info : response)
-        for (const auto& contributor : node_info.contributors)
-            if (contributor.address == main_addr) {
+        for (const auto& contributor : node_info["contributors"])
+            if (contributor["address"] == main_addr) {
                 auto& info = stakes->emplace_back();
-                info.sn_pubkey = node_info.service_node_pubkey;
-                info.stake = contributor.amount;
-                if (node_info.requested_unlock_height != 0)
-                    info.unlock_height = node_info.requested_unlock_height;
-                info.awaiting = !node_info.funded;
-                info.decommissioned = node_info.funded && !node_info.active;
+                info.sn_pubkey = node_info["service_node_pubkey"];
+                info.stake = contributor["amount"];
+                if (node_info["requested_unlock_height"] != 0)
+                    info.unlock_height = node_info["requested_unlock_height"];
+                info.awaiting = !node_info["funded"];
+                info.decommissioned = node_info["funded"] && !node_info["active"];
             }
 
     return stakes;
@@ -1234,8 +1234,7 @@ EXPORT
 void WalletImpl::setAutoRefreshInterval(int millis)
 {
     if (millis > MAX_REFRESH_INTERVAL_MILLIS) {
-        log::error(logcat, "{}: invalid refresh interval {}", __FUNCTION__, millis
-                  << " ms, maximum allowed is " << MAX_REFRESH_INTERVAL_MILLIS << " ms");
+        log::error(logcat, "{}: invalid refresh interval {} ms, maximum allowed is {} ms", __FUNCTION__, millis, MAX_REFRESH_INTERVAL_MILLIS);
         m_refreshIntervalMillis = MAX_REFRESH_INTERVAL_MILLIS;
     } else {
         m_refreshIntervalMillis = millis;
@@ -1330,8 +1329,7 @@ bool WalletImpl::importKeyImages(std::string_view filename_)
   {
     uint64_t spent = 0, unspent = 0;
     uint64_t height = wallet()->import_key_images_from_file(filename, spent, unspent);
-    log::debug(logcat, "Signed key images imported to height {}, ", height
-        << print_money(spent) << " spent, " << print_money(unspent) << " unspent");
+    log::debug(logcat, "Signed key images imported to height {}, {} spent, {} unspent", height, print_money(spent), print_money(unspent));
   }
   catch (const std::exception &e)
   {
@@ -2678,7 +2676,7 @@ PendingTransaction* WalletImpl::stakePending(const std::string& sn_key_str, cons
   if (!tools::hex_to_type(sn_key_str, sn_key))
   {
     error_msg = "Failed to parse service node pubkey";
-    log::error(error_msg);
+    log::error(logcat, error_msg);
     transaction->setError(error_msg);
     return transaction;
   }
@@ -2687,7 +2685,7 @@ PendingTransaction* WalletImpl::stakePending(const std::string& sn_key_str, cons
   if (stake_result.status != tools::wallet2::stake_result_status::success)
   {
     error_msg = "Failed to create a stake transaction: " + stake_result.msg;
-    log::error(error_msg);
+    log::error(logcat, error_msg);
     transaction->setError(error_msg);
     return transaction;
   }

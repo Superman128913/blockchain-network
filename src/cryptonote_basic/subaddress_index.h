@@ -46,6 +46,11 @@ namespace cryptonote
     bool operator!=(const subaddress_index& rhs) const { return !(*this == rhs); }
     bool is_zero() const { return major == 0 && minor == 0; }
 
+    std::string to_string() const
+    {
+      return std::to_string(major) + '/' + std::to_string(minor);
+    }
+
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(major)
       KV_SERIALIZE(minor)
@@ -62,6 +67,7 @@ namespace cryptonote
   {
     return out << subaddr_index.major << '/' << subaddr_index.minor;
   }
+
 }
 
 namespace std

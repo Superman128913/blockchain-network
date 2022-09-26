@@ -28,10 +28,9 @@
 //
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
-#include "common_defines.h"
-#include "epee/misc_log_ex.h"
 #include "common/util.h"
 #include "wallet.h"
+#include "common_defines.h"
 
 namespace Wallet {
 namespace Utils {

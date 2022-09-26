@@ -89,7 +89,7 @@ namespace wallet_args
     _CrtSetDbgFlag ( _CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF );
 #endif
 
-    const command_line::arg_descriptor<std::string> arg_log_level = {"log-level", "0-4 or categories", ""};
+    const command_line::arg_descriptor<std::string> arg_log_level = {"log-level", "0-4 or categories", "warning"};
     const command_line::arg_descriptor<std::size_t> arg_max_log_file_size = {"max-log-file-size", "Specify maximum log file size [B]", 50};
     const command_line::arg_descriptor<std::size_t> arg_max_log_files = {"max-log-files", "Specify maximum number of rotated log files to be saved (no limit by setting to 0)", 50};
     const command_line::arg_descriptor<uint32_t> arg_max_concurrency = {"max-concurrency", wallet_args::tr("Max number of threads to use for a parallel job"), DEFAULT_MAX_CONCURRENCY};
