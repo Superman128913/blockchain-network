@@ -35,6 +35,9 @@
 #  include "epee/readline_buffer.h"
 #endif
 #include <iostream>
+#ifdef _WIN32
+#include "windows.h"
+#endif
 
 namespace command_line
 {

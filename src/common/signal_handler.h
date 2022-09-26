@@ -4,6 +4,10 @@
 #include <functional>
 #include <mutex>
 #include "logging/oxen_logger.h"
+#ifdef _WIN32
+#include "windows.h"
+#endif
+
 
 namespace tools {
 
@@ -16,7 +20,7 @@ namespace tools {
     template<typename T>
     static bool install(T t)
     {
-#if defined(WIN32)
+#ifdef _WIN32
       bool r = TRUE == ::SetConsoleCtrlHandler(&win_handler, TRUE);
       if (r)
       {

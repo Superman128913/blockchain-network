@@ -208,14 +208,14 @@ namespace tools {
       memset(&ov, 0, sizeof(ov));
       if (!LockFileEx(m_fd, LOCKFILE_FAIL_IMMEDIATELY | LOCKFILE_EXCLUSIVE_LOCK, 0, 1, 0, &ov))
       {
-        log::error(logcat, "Failed to lock {}: {}", filename, std::error_code(GetLastError(), std::system_category()));
+        log::error(logcat, "Failed to lock {}: {}", filename, std::error_code(GetLastError(), std::system_category()).message());
         CloseHandle(m_fd);
         m_fd = INVALID_HANDLE_VALUE;
       }
     }
     else
     {
-      log::error(logcat, "Failed to open {}: {}", filename, std::error_code(GetLastError(), std::system_category()));
+      log::error(logcat, "Failed to open {}: {}", filename, std::error_code(GetLastError(), std::system_category()).message());
     }
 #else
     m_fd = open(filename.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0666);

@@ -310,7 +310,7 @@ int main(int argc, char const * argv[])
     if (log_file_path.is_relative())
       log_file_path = fs::absolute(data_dir / log_file_path);
 
-    oxen::logging::init(log_file_path, log_level);
+    oxen::logging::init(log_file_path.string(), log_level);
 
     logs_initialized = true;
 

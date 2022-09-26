@@ -48,7 +48,7 @@ namespace detail
                 error_msg.append("thrown at ");
 
                 // remove path, get just filename + extension
-                error_msg.append(fs::path(file).filename().c_str());
+                error_msg.append(fs::path(file).filename().string());
 
                 error_msg.push_back(':');
                 error_msg.append(std::to_string(line));
