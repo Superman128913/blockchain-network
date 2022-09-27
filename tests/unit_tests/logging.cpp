@@ -138,7 +138,9 @@ TEST(logging, all)
   ASSERT_TRUE(str.find("fatal") != std::string::npos);
   ASSERT_TRUE(str.find("error") != std::string::npos);
   ASSERT_TRUE(str.find("debug") != std::string::npos);
+  #ifndef NDEBUG
   ASSERT_TRUE(str.find("trace") != std::string::npos);
+  #endif
   cleanup();
 }
 
