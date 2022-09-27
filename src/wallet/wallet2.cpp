@@ -3731,7 +3731,7 @@ bool wallet2::get_output_blacklist(std::vector<uint64_t> &blacklist)
 
   try {
     auto res = m_http_client.json_rpc("get_output_blacklist", {});
-    blacklist = std::move(res["blacklist"].get<std::vector<uint64_t>>());
+    blacklist = res["blacklist"].get<std::vector<uint64_t>>();
   } catch (...) {
     log::warning(logcat, "Failed to request output blacklist: no connection to daemon");
     log::warning(logcat, "Failed to request output blacklist: no connection to daemon");
