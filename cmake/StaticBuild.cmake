@@ -223,6 +223,14 @@ function(build_external target)
   endforeach()
   string(REPLACE ___TARGET___ ${target} arg_BUILD_BYPRODUCTS "${arg_BUILD_BYPRODUCTS}")
 
+  set(externalproject_extra)
+  if(NOT CMAKE_VERSION VERSION_LESS 3.24)
+    # Default in cmake 3.24+ is to not extract timestamps for ExternalProject, which breaks pretty
+    # much every autotools package (which thinks it must reconfigure) because timestamps got
+    # updated).
+    list(APPEND externalproject_extra DOWNLOAD_EXTRACT_TIMESTAMP ON)
+  endif()
+
   string(TOUPPER "${target}" prefix)
   expand_urls(urls ${${prefix}_SOURCE} ${${prefix}_MIRROR})
   ExternalProject_Add("${target}${arg_TARGET_SUFFIX}_external"
@@ -237,6 +245,7 @@ function(build_external target)
     BUILD_COMMAND ${arg_BUILD_COMMAND}
     INSTALL_COMMAND ${arg_INSTALL_COMMAND}
     BUILD_BYPRODUCTS ${arg_BUILD_BYPRODUCTS}
+    ${externalproject_extra}
   )
 endfunction()
 
@@ -346,8 +355,6 @@ set(Boost_VERSION ${BOOST_VERSION})
 
 build_external(sqlite3
   BUILD_COMMAND true
-  CONFIGURE_COMMAND autoreconf -ivf && ./configure ${cross_host} --disable-shared --prefix=${DEPS_DESTDIR} --with-pic
-    "CC=${deps_cc}" "CXX=${deps_cxx}" "CFLAGS=${deps_CFLAGS}" "CXXFLAGS=${deps_CXXFLAGS}" ${cross_extra}
   INSTALL_COMMAND make install-includeHEADERS install-libLTLIBRARIES)
 add_static_target( SQLite::SQLite3 sqlite3_external libsqlite3.a)
 
