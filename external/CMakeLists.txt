@@ -69,6 +69,9 @@ add_subdirectory(date EXCLUDE_FROM_ALL)
 set(JSON_BuildTests OFF CACHE INTERNAL "")
 set(JSON_MultipleHeaders ON CACHE BOOL "") # Allows multi-header nlohmann use
 add_subdirectory(nlohmann-json EXCLUDE_FROM_ALL)
+if(BUILD_STATIC_DEPS)
+  set(OXEN_LOGGING_FORCE_SUBMODULES TRUE CACHE BOOL "" FORCE)
+endif()
 add_subdirectory(oxen-logging)
 
 # uSockets doesn't really have a proper build system (just a very simple Makefile) so build it
