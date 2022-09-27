@@ -20,6 +20,16 @@ namespace fs {
 #else
 
 #include <ghc/filesystem.hpp>
+#include "formattable.h"
+
 namespace fs = ghc::filesystem;
+
+namespace formattable {
+  template <> inline constexpr bool via_to_string<ghc::filesystem::path> = true;
+
+  std::string to_string(const ghc::filesystem::path& path) {
+    return path.string();
+  }
+}
 
 #endif
