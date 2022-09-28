@@ -64,9 +64,9 @@ int main(int argc, char** argv)
   conn = oxenmq->connect_remote(remote, [](auto){}, [](auto,auto){});
 
   auto send_func = [&](std::string_view dest, std::string_view amount){
-    oxenmq::bt_dict req;
-    oxenmq::bt_list dests;
-    oxenmq::bt_dict d;
+    oxenc::bt_dict req;
+    oxenc::bt_list dests;
+    oxenc::bt_dict d;
     d["address"] = dest;
     uint64_t amount_int = stoi(std::string(amount));
     d["amount"] = amount_int;
@@ -87,7 +87,7 @@ int main(int argc, char** argv)
           p.set_value(ok);
         };
 
-    oxenmq->request(conn, "restricted.transfer", req_cb, oxenmq::bt_serialize(req));
+    oxenmq->request(conn, "restricted.transfer", req_cb, oxenc::bt_serialize(req));
 
     f.wait();
   };

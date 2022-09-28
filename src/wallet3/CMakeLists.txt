@@ -19,6 +19,7 @@ target_link_libraries(wallet3
     common
     nlohmann_json::nlohmann_json
     oxenmq::oxenmq
+    oxenc::oxenc
   PRIVATE
     cryptonote_protocol
     cryptonote_basic

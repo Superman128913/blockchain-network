@@ -5,7 +5,7 @@
 #include "rpc/common/rpc_command.h"
 
 #include <nlohmann/json.hpp>
-#include <oxenmq/bt_value.h>
+#include <oxenc/bt_value.h>
 
 #include <string>
 #include <unordered_map>
@@ -25,7 +25,7 @@ using cryptonote::rpc::rpc_request;
 
 /// Stores an RPC command callback.  These are set up in request_handler.cpp.
 struct rpc_command {
-  using result_type = std::variant<oxenmq::bt_value, nlohmann::json, std::string>;
+  using result_type = std::variant<oxenc::bt_value, nlohmann::json, std::string>;
   // Called with the incoming command data; returns the response body if all goes well,
   // otherwise throws an exception.
   result_type(*invoke)(rpc_request&&, RequestHandler&);

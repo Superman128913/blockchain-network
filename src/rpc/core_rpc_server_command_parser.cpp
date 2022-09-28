@@ -1,10 +1,10 @@
 #include "core_rpc_server_command_parser.h"
-#include "oxenmq/bt_serialize.h"
 #include "rpc/common/param_parser.hpp"
 
 #include <chrono>
-#include <oxenmq/base64.h>
-#include <oxenmq/hex.h>
+#include <oxenc/bt_serialize.h>
+#include <oxenc/base64.h>
+#include <oxenc/hex.h>
 #include <type_traits>
 #include <utility>
 
@@ -172,14 +172,14 @@ namespace cryptonote::rpc {
     if (tx0 <= 0x2f) {
       good = true;
     } else if (tx0 >= 'A' && tx0 <= 'L') {
-      if (oxenmq::is_base64(tx_data)) {
-        auto end = oxenmq::from_base64(tx_data.begin(), tx_data.end(), tx_data.begin());
+      if (oxenc::is_base64(tx_data)) {
+        auto end = oxenc::from_base64(tx_data.begin(), tx_data.end(), tx_data.begin());
         tx_data.erase(end, tx_data.end());
         good = true;
       }
     } else if (tx0 >= '0' && tx0 <= '2') {
-      if (oxenmq::is_hex(tx_data)) {
-        auto end = oxenmq::from_hex(tx_data.begin(), tx_data.end(), tx_data.begin());
+      if (oxenc::is_hex(tx_data)) {
+        auto end = oxenc::from_hex(tx_data.begin(), tx_data.end(), tx_data.begin());
         tx_data.erase(end, tx_data.end());
         good = true;
       }

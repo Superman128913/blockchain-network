@@ -2,10 +2,10 @@
 #include "lmq_server.h"
 #include "rpc/common/param_parser.hpp"
 #include "cryptonote_config.h"
-#include "oxenmq/oxenmq.h"
+#include <oxenc/bt.h>
+#include <oxenmq/oxenmq.h>
+#include <oxenmq/fmt.h>
 #include <fmt/core.h>
-#include "oxenc/bt.h"
-#include "oxenmq/fmt.h"
 
 // FIXME: Rename this to omq_server.{h,cpp}
 
@@ -207,9 +207,9 @@ omq_rpc::omq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
         request.body = m.data[0];
 
       try {
-        auto result = std::visit([](auto&& v) -> std::string {
+        auto result = var::visit([](auto&& v) -> std::string {
           using T = decltype(v);
-          if constexpr (std::is_same_v<oxenmq::bt_value&&, T>)
+          if constexpr (std::is_same_v<oxenc::bt_value&&, T>)
             return bt_serialize(std::move(v));
           else if constexpr (std::is_same_v<nlohmann::json&&, T>)
             return v.dump();

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <nlohmann/json.hpp>
-#include <oxenmq/bt_serialize.h>
+#include <oxenc/bt_serialize.h>
 #include "json_bt.h"
 
 
@@ -9,8 +9,9 @@ namespace cryptonote::rpc {
 
 using nlohmann::json;
 using oxen::json_to_bt;
+using namespace std::literals;
 
-using rpc_input = std::variant<std::monostate, nlohmann::json, oxenmq::bt_dict_consumer>;
+using rpc_input = std::variant<std::monostate, nlohmann::json, oxenc::bt_dict_consumer>;
 
 /// Exception when trying to invoke an RPC command that indicate a parameter parse failure (will
 /// give an invalid params error for JSON-RPC, for example).
@@ -97,7 +98,7 @@ auto make_invoke() {
       if (auto body = request.body_view()) {
         if (body->front() == 'd') { // Looks like a bt dict
           rpc.set_bt();
-          parse_request(rpc, oxenmq::bt_dict_consumer{*body});
+          parse_request(rpc, oxenc::bt_dict_consumer{*body});
         }
         else
           parse_request(rpc, json::parse(*body));

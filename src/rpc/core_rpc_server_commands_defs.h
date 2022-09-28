@@ -70,7 +70,7 @@
 #include "common/oxen.h"
 
 #include <nlohmann/json.hpp>
-#include <oxenmq/bt_serialize.h>
+#include <oxenc/bt_serialize.h>
 #include <type_traits>
 #include <unordered_set>
 

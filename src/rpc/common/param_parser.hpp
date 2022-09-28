@@ -1,18 +1,18 @@
 #pragma once
 
-#include <nlohmann/json.hpp>
 #include "rpc/common/rpc_binary.h"
 
 #include <chrono>
+#include <nlohmann/json.hpp>
 #include <oxenc/bt_serialize.h>
-#include <oxenmq/base64.h>
-#include <oxenmq/hex.h>
 #include <type_traits>
 #include <utility>
 
 namespace cryptonote::rpc {
   using nlohmann::json;
-  using rpc_input = std::variant<std::monostate, nlohmann::json, oxenmq::bt_dict_consumer>;
+  using oxenc::bt_dict_consumer;
+  using oxenc::bt_list_consumer;
+  using rpc_input = std::variant<std::monostate, json, bt_dict_consumer>;
 
   // Checks that key names are given in ascending order
   template <typename... Ignore>
@@ -45,15 +45,13 @@ namespace cryptonote::rpc {
   template <typename T>
   constexpr bool is_std_optional<std::optional<T>> = true;
 
-  using oxenmq::bt_dict_consumer;
-
   using json_range = std::pair<json::const_iterator, json::const_iterator>;
 
   // Advances the dict consumer to the first element >= the given name.  Returns true if found,
   // false if it advanced beyond the requested name.  This is exactly the same as
   // `d.skip_until(name)`, but is here so we can also overload an equivalent function for json
   // iteration.
-  inline bool skip_until(oxenmq::bt_dict_consumer& d, std::string_view name) {
+  inline bool skip_until(bt_dict_consumer& d, std::string_view name) {
     return d.skip_until(name);
   }
   // Equivalent to the above but for a json object iterator.
@@ -80,13 +78,13 @@ namespace cryptonote::rpc {
   template <typename... T> constexpr bool is_tuple_like<std::tuple<T...>> = true;
 
   template <typename TupleLike, size_t... Is>
-  void load_tuple_values(oxenmq::bt_list_consumer&, TupleLike&, std::index_sequence<Is...>);
+  void load_tuple_values(bt_list_consumer&, TupleLike&, std::index_sequence<Is...>);
 
   // Consumes the next value from the dict consumer into `val`
   template <typename BTConsumer, typename T,
            std::enable_if_t<
-               std::is_same_v<BTConsumer, oxenmq::bt_dict_consumer>
-               || std::is_same_v<BTConsumer, oxenmq::bt_list_consumer>,
+               std::is_same_v<BTConsumer, bt_dict_consumer>
+               || std::is_same_v<BTConsumer, bt_list_consumer>,
               int> = 0>
   void load_value(BTConsumer& c, T& val) {
     if constexpr (std::is_integral_v<T>)
@@ -158,7 +156,7 @@ namespace cryptonote::rpc {
   }
 
   template <typename TupleLike, size_t... Is>
-  void load_tuple_values(oxenmq::bt_list_consumer& c, TupleLike& val, std::index_sequence<Is...>) {
+  void load_tuple_values(bt_list_consumer& c, TupleLike& val, std::index_sequence<Is...>) {
     (load_value(c, std::get<Is>(val)), ...);
   }
 
@@ -203,7 +201,7 @@ namespace cryptonote::rpc {
     {
       if (in.front() == 'd')
       {
-        oxenmq::bt_dict_consumer d{in};
+        bt_dict_consumer d{in};
         get_values(d, name, val, std::forward<More>(more)...);
       }
       else

@@ -1,6 +1,5 @@
 #include "command_parser.h"
 
-#include "oxenmq/bt_serialize.h"
 #include "rpc/common/param_parser.hpp"
 
 #include <nlohmann/json.hpp>
@@ -11,7 +10,7 @@ using nlohmann::json;
 using cryptonote::rpc::required;
 using cryptonote::rpc::get_values;
 
-using rpc_input = var::variant<std::monostate, nlohmann::json, oxenmq::bt_dict_consumer>;
+using rpc_input = std::variant<std::monostate, nlohmann::json, oxenc::bt_dict_consumer>;
 
 
 void parse_request(GET_BALANCE& req, rpc_input in) {
@@ -83,7 +82,7 @@ std::cout << "parse_request(TRANSFER)\n";
     else
       throw std::runtime_error{"Required key 'destinations' not found or invalid"};
   }
-  else  if (auto* bt_in = std::get_if<oxenmq::bt_dict_consumer>(&in))
+  else  if (auto* bt_in = std::get_if<oxenc::bt_dict_consumer>(&in))
   {
     if (bt_in->key() != "destinations")
       throw std::runtime_error{"Required key 'destinations' not found"};

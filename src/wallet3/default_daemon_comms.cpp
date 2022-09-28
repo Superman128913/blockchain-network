@@ -47,7 +47,7 @@ namespace wallet
       while( itr != response.cend())
       {
         const auto& block_str = *itr;
-        auto block_dict = oxenmq::bt_dict_consumer{block_str};
+        auto block_dict = oxenc::bt_dict_consumer{block_str};
 
         Block& b = blocks.emplace_back();
 
@@ -161,7 +161,7 @@ namespace wallet
           if (not ok or response.size() != 2 or response[0] != "200")
             return;
 
-          oxenmq::bt_dict_consumer dc{response[1]};
+          oxenc::bt_dict_consumer dc{response[1]};
 
           int64_t new_height = 0;
           crypto::hash new_hash;
@@ -199,7 +199,7 @@ namespace wallet
           if (not ok or response.size() != 2 or response[0] != "200")
             return;
 
-          oxenmq::bt_dict_consumer dc{response[1]};
+          oxenc::bt_dict_consumer dc{response[1]};
 
           int64_t new_fee_per_byte = 0;
           int64_t new_fee_per_output = 0;
@@ -282,7 +282,7 @@ namespace wallet
       {"size_limit", max_response_size},
       {"start_height", sync_from_height}};
 
-    omq->request(conn, "rpc.get_blocks", req_cb, oxenmq::bt_serialize(req_params_dict));
+    omq->request(conn, "rpc.get_blocks", req_cb, oxenc::bt_serialize(req_params_dict));
   }
 
   std::future<std::vector<Decoy>>
@@ -320,7 +320,7 @@ namespace wallet
       size_t i=0;
       try
       {
-        auto outer_dict = oxenmq::bt_dict_consumer(response[1]);
+        auto outer_dict = oxenc::bt_dict_consumer(response[1]);
 
         if (outer_dict.key() != "outs")
           return;
@@ -378,15 +378,15 @@ namespace wallet
       p->set_value(std::move(outputs));
     }; // req_cb
 
-    oxenmq::bt_dict req_params_dict;
-    oxenmq::bt_list decoy_list_bt;
+    oxenc::bt_dict req_params_dict;
+    oxenc::bt_list decoy_list_bt;
     for (auto index : indexes)
     {
       decoy_list_bt.push_back(index);
     }
     req_params_dict["get_txid"] = with_txid;
     req_params_dict["outputs"] = std::move(decoy_list_bt);
-    omq->request(conn, "rpc.get_outs", req_cb, oxenmq::bt_serialize(req_params_dict));
+    omq->request(conn, "rpc.get_outs", req_cb, oxenc::bt_serialize(req_params_dict));
 
     return fut;
   }
@@ -406,7 +406,7 @@ namespace wallet
       }
       else
       {
-        oxenmq::bt_dict_consumer dc{response[1]};
+        oxenc::bt_dict_consumer dc{response[1]};
         if (dc.skip_until("reason"))
         {
           auto reason = dc.consume_string();
@@ -433,12 +433,12 @@ namespace wallet
     if (not cryptonote::tx_to_blob(tx, tx_str))
       throw std::runtime_error{"wallet daemon comms, failed to serialize transaction"};
 
-    oxenmq::bt_dict req_params_dict;
+    oxenc::bt_dict req_params_dict;
 
     req_params_dict["blink"] = blink;
     req_params_dict["tx"] = tx_str;
 
-    omq->request(conn, "rpc.submit_transaction", req_cb, oxenmq::bt_serialize(req_params_dict));
+    omq->request(conn, "rpc.submit_transaction", req_cb, oxenc::bt_serialize(req_params_dict));
 
     return fut;
   }

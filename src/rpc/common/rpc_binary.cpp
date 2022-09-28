@@ -1,6 +1,6 @@
 #include "rpc_binary.h"
-#include <oxenmq/hex.h>
-#include <oxenmq/base64.h>
+#include <oxenc/hex.h>
+#include <oxenc/base64.h>
 
 namespace cryptonote::rpc {
 
@@ -9,8 +9,8 @@ namespace cryptonote::rpc {
       std::memcpy(val_data, bytes.data(), bytes.size());
       return;
     } else if (bytes.size() == raw_size * 2) {
-      if (oxenmq::is_hex(bytes)) {
-        oxenmq::from_hex(bytes.begin(), bytes.end(), val_data);
+      if (oxenc::is_hex(bytes)) {
+        oxenc::from_hex(bytes.begin(), bytes.end(), val_data);
         return;
       }
     } else {
@@ -20,8 +20,8 @@ namespace cryptonote::rpc {
       const std::string_view b64_padding_string = b64_padding == 2 ? "=="sv : b64_padding == 1 ? "="sv : ""sv;
       if (bytes.size() == b64_unpadded ||
         (b64_padding > 0 && bytes.size() == b64_padded && bytes.substr(b64_unpadded) == b64_padding_string)) {
-        if (oxenmq::is_base64(bytes)) {
-          oxenmq::from_base64(bytes.begin(), bytes.end(), val_data);
+        if (oxenc::is_base64(bytes)) {
+          oxenc::from_base64(bytes.begin(), bytes.end(), val_data);
           return;
         }
       }
@@ -33,8 +33,8 @@ namespace cryptonote::rpc {
   nlohmann::json& json_binary_proxy::operator=(std::string_view binary_data) {
     switch (format) {
       case fmt::bt: return e = binary_data;
-      case fmt::hex: return e = oxenmq::to_hex(binary_data);
-      case fmt::base64: return e = oxenmq::to_base64(binary_data);
+      case fmt::hex: return e = oxenc::to_hex(binary_data);
+      case fmt::base64: return e = oxenc::to_base64(binary_data);
     }
     throw std::runtime_error{"Internal error: invalid binary encoding"};
   }
