@@ -4,6 +4,7 @@
 #include <wallet3/block.hpp>
 #include <sqlitedb/database.hpp>
 #include <wallet3/db_schema.hpp>
+#include "mock_daemon_comms.hpp"
 
 namespace wallet
 {
@@ -24,7 +25,7 @@ class MockWallet : public Wallet
 {
   public:
 
-    MockWallet() : Wallet({},std::make_shared<Keyring>(),{},{},":memory:",{}){};
+    MockWallet() : Wallet({},std::make_shared<Keyring>(),{},std::make_shared<MockDaemonComms>(),":memory:",{}){};
 
     int64_t height = 0;
 
