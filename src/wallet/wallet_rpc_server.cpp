@@ -36,7 +36,6 @@
 #include <chrono>
 #include <exception>
 #include <oxenc/base64.h>
-#include <fmt/std.h>
 
 #include "wallet_rpc_server_error_codes.h"
 #include "wallet_rpc_server.h"

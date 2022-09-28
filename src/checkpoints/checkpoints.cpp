@@ -42,7 +42,6 @@
 #include "common/oxen.h"
 #include "common/file.h"
 #include "common/hex.h"
-#include <fmt/std.h>
 
 namespace cryptonote
 {

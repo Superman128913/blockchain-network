@@ -71,7 +71,6 @@ extern "C" {
 #include "common/i18n.h"
 #include "epee/net/local_ip.h"
 #include "logging/oxen_logger.h"
-#include <fmt/std.h>
 #include <fmt/color.h>
 #include <oxenmq/fmt.h>
 

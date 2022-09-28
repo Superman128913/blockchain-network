@@ -29,7 +29,6 @@
 
 #include "bootstrap_serialization.h"
 #include "serialization/binary_utils.h" // dump_binary(), parse_binary()
-#include <fmt/std.h>
 
 #include "bootstrap_file.h"
 

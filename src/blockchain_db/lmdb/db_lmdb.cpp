@@ -35,7 +35,6 @@
 #include <cstring>
 #include <type_traits>
 #include <variant>
-#include <fmt/std.h>
 #include <fmt/color.h>
 
 #include "common/string_util.h"

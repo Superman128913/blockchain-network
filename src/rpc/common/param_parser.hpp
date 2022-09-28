@@ -1,8 +1,10 @@
 #pragma once
 
-#include "oxenmq/bt_serialize.h"
+#include <nlohmann/json.hpp>
+#include "rpc/common/rpc_binary.h"
 
 #include <chrono>
+#include <oxenc/bt_serialize.h>
 #include <oxenmq/base64.h>
 #include <oxenmq/hex.h>
 #include <type_traits>

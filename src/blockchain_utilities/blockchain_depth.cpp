@@ -34,7 +34,6 @@
 #include "blockchain_db/blockchain_db.h"
 #include "cryptonote_core/uptime_proof.h"
 #include "version.h"
-#include <fmt/std.h>
 
 namespace po = boost::program_options;
 using namespace cryptonote;

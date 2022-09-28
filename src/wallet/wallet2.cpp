@@ -88,7 +88,6 @@
 #include "oxen_economy.h"
 #include "logging/oxen_logger.h"
 #include <fmt/color.h>
-#include <fmt/std.h>
 
 extern "C"
 {

@@ -51,7 +51,6 @@
 #include "cryptonote_basic/verification_context.h"
 #include "cryptonote_core/service_node_voting.h"
 #include "cryptonote_core/oxen_name_system.h"
-#include <fmt/std.h>
 
 using namespace crypto;
 

@@ -11,7 +11,7 @@ using nlohmann::json;
 using cryptonote::rpc::required;
 using cryptonote::rpc::get_values;
 
-using rpc_input = std::variant<std::monostate, nlohmann::json, oxenmq::bt_dict_consumer>;
+using rpc_input = var::variant<std::monostate, nlohmann::json, oxenmq::bt_dict_consumer>;
 
 
 void parse_request(GET_BALANCE& req, rpc_input in) {

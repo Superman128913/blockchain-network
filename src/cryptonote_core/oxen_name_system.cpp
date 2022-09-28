@@ -3,7 +3,6 @@
 #include <iterator>
 #include <vector>
 #include <algorithm>
-#include <fmt/std.h>
 #include "common/hex.h"
 #include "cryptonote_config.h"
 #include "oxen_name_system.h"

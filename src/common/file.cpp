@@ -31,7 +31,6 @@
 //
 #include "file.h"
 #include "logging/oxen_logger.h"
-#include <fmt/std.h>
 #include <unistd.h>
 #include <cstdio>
 #include <fstream>

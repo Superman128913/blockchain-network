@@ -8,7 +8,6 @@
 #include <cryptonote_basic/cryptonote_format_utils.h>
 #include <common/string_util.h>
 #include <epee/misc_log_ex.h>
-#include "oxenmq/oxenmq.h"
 
 #include <iostream>
 

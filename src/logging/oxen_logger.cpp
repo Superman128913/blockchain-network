@@ -1,6 +1,5 @@
 #include "oxen_logger.h"
 #include <oxen/log.hpp>
-#include <fmt/std.h>
 
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <filesystem>

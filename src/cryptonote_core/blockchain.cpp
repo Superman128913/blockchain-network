@@ -36,7 +36,6 @@
 #include <sodium.h>
 #include <fmt/core.h>
 #include <fmt/color.h>
-#include <fmt/std.h>
 
 #include "common/rules.h"
 #include "common/hex.h"

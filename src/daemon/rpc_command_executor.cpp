@@ -47,6 +47,7 @@
 #include <chrono>
 #include <exception>
 #include <oxenc/base32z.h>
+#include <oxenc/variant.h>
 #include <fmt/core.h>
 #include <date/date.h>
 #include <fmt/core.h>
@@ -199,7 +200,7 @@ rpc_command_executor::rpc_command_executor(
   : m_rpc{std::in_place_type<cryptonote::rpc::http_client>, http_url}
 {
   if (login)
-    std::get<cryptonote::rpc::http_client>(m_rpc).set_auth(
+    var::get<cryptonote::rpc::http_client>(m_rpc).set_auth(
         login->username, std::string{login->password.password().view()});
 }
 
@@ -229,7 +230,7 @@ json rpc_command_executor::invoke(
     result = rpc_client->json_rpc(method, std::move(params));
   } else {
     assert(m_omq);
-    auto conn = std::get<oxenmq::ConnectionID>(m_rpc);
+    auto conn = var::get<oxenmq::ConnectionID>(m_rpc);
     auto endpoint = (public_method ? "rpc." : "admin.") + std::string{method};
     std::promise<json> result_p;
     m_omq->request(conn, endpoint, [&result_p](bool success, auto data) {
@@ -627,12 +628,11 @@ bool rpc_command_executor::print_connections() {
 
   for (auto& info : conns)
   {
-    std::string address = info["incoming"].get<bool>() ? "INC " : "OUT ";
-    address += info["ip"].get<std::string_view>();
-    address += ':';
-    address += tools::int_to_string(info["port"].get<uint16_t>());
     tools::msg_writer() << fmt::format(row_fmt,
-        address,
+        "{} {}:{}"_format(
+            info["incoming"].get<bool>() ? "INC" : "OUT",
+            info["ip"].get<std::string_view>(),
+            info["port"].get<uint16_t>()),
         get_address_type_name(info["address_type"].get<epee::net_utils::address_type>()),
         info["peer_id"].get<std::string_view>(),
         "{}({}/{})"_format(info["recv_count"].get<uint64_t>(),
@@ -1663,7 +1663,7 @@ static void append_printable_service_node_list_entry(cryptonote::network_type ne
 
     stream << '\n' << indent2 << "Pulse blocks: ";
     print_votes<std::pair<uint64_t, uint8_t>>(stream, entry, "pulse_votes",
-        [](const auto& val) { return tools::int_to_string(val.first) + (val.second ? " " + tools::int_to_string(val.second) : ""); });
+        [](const auto& val) { return fmt::format(val.second ? "{} {}" : "{}", val.first, val.second); });
 
     auto print_pass_fail = [&stream, &entry](const std::string& key) {
       std::pair<int, int> val;

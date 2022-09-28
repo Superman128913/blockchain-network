@@ -37,7 +37,6 @@
 #include "epee/string_tools.h"
 #include "version.h"
 #include "logging/oxen_logger.h"
-#include <fmt/std.h>
 
 #if defined(WIN32)
 #include <crtdbg.h>

@@ -1314,8 +1314,9 @@ namespace cryptonote::rpc {
     for (auto h : get.request.heights) {
       if (h >= curr_height)
         throw rpc_error{ERROR_TOO_BIG_HEIGHT,
-          "Requested block height: " + tools::int_to_string(h) + " greater than current top block height: " +  tools::int_to_string(curr_height - 1)};
-      get.response_hex[tools::int_to_string(h)] = m_core.get_block_id_by_height(h);
+          "Requested block height {} greater than current top block height {}"_format(
+            h, curr_height - 1)};
+      get.response_hex["{}"_format(h)] = m_core.get_block_id_by_height(h);
     }
     get.response["status"] = STATUS_OK;
   }
@@ -2433,7 +2434,7 @@ namespace cryptonote::rpc {
         "operator_fee", microportion(info.portions_for_operator),
         "operator_address", cryptonote::get_account_address_as_str(m_core.get_nettype(), false/*subaddress*/, info.operator_address),
         "swarm_id", info.swarm_id,
-        "swarm", tools::int_to_string(info.swarm_id, 16),
+        "swarm", "{:x}"_format(info.swarm_id),
         "registration_hf_version", info.registration_hf_version
       );
 

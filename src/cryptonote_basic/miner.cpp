@@ -40,7 +40,6 @@
 #include "epee/string_tools.h"
 #include "epee/storages/portable_storage_template_helper.h"
 #include <logging/oxen_logger.h>
-#include <fmt/std.h>
 #include <fmt/color.h>
 
 #define AUTODETECT_WINDOW 10 // seconds

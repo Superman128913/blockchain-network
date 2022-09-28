@@ -41,7 +41,6 @@
 #include <tuple>
 #include <vector>
 #include <fmt/color.h>
-#include <fmt/std.h>
 
 #include "cryptonote_config.h"
 #include "version.h"

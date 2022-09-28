@@ -33,7 +33,6 @@
 #include "wallet_errors.h"
 #include "ringdb.h"
 #include "cryptonote_config.h"
-#include <fmt/std.h>
 
 #define V1TAG ((uint64_t)798237759845202)
 

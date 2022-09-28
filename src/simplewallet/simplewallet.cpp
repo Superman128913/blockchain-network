@@ -56,7 +56,6 @@
 #include <boost/format.hpp>
 #include <fmt/core.h>
 #include <oxenc/hex.h>
-#include <fmt/std.h>
 #include "epee/console_handler.h"
 #include "common/i18n.h"
 #include "common/command_line.h"

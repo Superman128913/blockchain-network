@@ -6,7 +6,6 @@
 #include <cpr/ssl_options.h>
 #include <nlohmann/json.hpp>
 #include "logging/oxen_logger.h"
-#include <fmt/std.h>
 
 
 namespace cryptonote::rpc {
