@@ -558,7 +558,7 @@ bool Blockchain::init(BlockchainDB* db, sqlite3 *ons_db, std::shared_ptr<crypton
         if (!m_service_node_list.pop_batching_rewards_block(popped_block))
         {
           LOG_ERROR("Failed to pop to batch rewards DB. throwing");
-          throw;
+          throw std::runtime_error("Failed to pop to batch reward DB.");
         }
       }
       // anything that could cause this to throw is likely catastrophic,
@@ -764,8 +764,8 @@ block Blockchain::pop_block_from_blockchain(bool pop_batching_rewards = true)
 
   if (pop_batching_rewards && !m_service_node_list.pop_batching_rewards_block(popped_block))
   {
-    LOG_ERROR("Failed to pop to batch rewards DB. throwing");
-    throw;
+    LOG_ERROR("Failed to pop to batch rewards DB");
+    throw std::runtime_error("Failed to pop batch rewards DB");
   }
 
   m_ons_db.block_detach(*this, m_db->height());
