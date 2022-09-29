@@ -24,8 +24,9 @@ class MockSigningKeyring : public Keyring
         crypto::secret_key _spend_private_key,
         crypto::public_key _spend_public_key,
         crypto::secret_key _view_private_key,
-        crypto::public_key _view_public_key)
-        : Keyring(_spend_private_key, _spend_public_key, _view_private_key, _view_public_key)
+        crypto::public_key _view_public_key,
+        cryptonote::network_type _nettype = cryptonote::network_type::TESTNET)
+        : Keyring(_spend_private_key, _spend_public_key, _view_private_key, _view_public_key, _nettype)
     {}
 
     std::vector<crypto::secret_key> predetermined_tx_keys{};
@@ -60,7 +61,24 @@ class MockSigningKeyring : public Keyring
 
 TEST_CASE("Transaction Creation", "[wallet,tx]")
 {
-  auto wallet = wallet::MockWallet();
+  // Spendkey
+  //secret: 018f2288a77909f312baacbeabc192a53119edc53364d7ee64ac226392c6560e
+  //public: adb121d075407895ba22ff3927b3a8aec60c29176fe97efce7f4d0a7d2c7bc0d
+  // Viewkey
+  //secret: 84d59173dddd78b840f03550f6e3d58163a7d06f35db9585b381e26de440f303
+  //public: 66eb874ad6ee33487c5fe4dab8f17e412d320b8933b1ddf108dd15dd45026d0c
+  crypto::secret_key spend_priv;
+  tools::hex_to_type<crypto::secret_key>("018f2288a77909f312baacbeabc192a53119edc53364d7ee64ac226392c6560e", spend_priv);
+  crypto::public_key spend_pub;
+  tools::hex_to_type<crypto::public_key>("adb121d075407895ba22ff3927b3a8aec60c29176fe97efce7f4d0a7d2c7bc0d", spend_pub);
+
+  crypto::secret_key view_priv;
+  tools::hex_to_type<crypto::secret_key>("84d59173dddd78b840f03550f6e3d58163a7d06f35db9585b381e26de440f303", view_priv);
+  crypto::public_key view_pub;
+  tools::hex_to_type<crypto::public_key>("66eb874ad6ee33487c5fe4dab8f17e412d320b8933b1ddf108dd15dd45026d0c", view_pub);
+
+  auto wallet = wallet::MockWallet(spend_priv, spend_pub, view_priv, view_pub, cryptonote::network_type::TESTNET);
+
   auto comms = std::make_shared<wallet::MockDaemonComms>();
   cryptonote::address_parse_info senders_address{};
   cryptonote::get_account_address_from_str(senders_address, cryptonote::network_type::TESTNET, "T6Td9RNPPsMMApoxc59GLiVDS9a82FL2cNEwdMUCGWDLYTLv7e7rvi99aWdF4M2V1zN7q1Vdf1mage87SJ9gcgSu1wJZu3rFs");
@@ -88,7 +106,7 @@ TEST_CASE("Transaction Creation", "[wallet,tx]")
     REQUIRE(ptx.change.amount == 1);
     REQUIRE(ptx.decoys.size() == ptx.chosen_outputs.size());
     for (const auto& decoys : ptx.decoys)
-      REQUIRE(decoys.size() == 13);
+      REQUIRE(decoys.size() == 10);
   }
 
   SECTION("Fails to create a transaction if amount is not enough")
@@ -112,7 +130,7 @@ TEST_CASE("Transaction Creation", "[wallet,tx]")
     REQUIRE(ptx.change.amount == 1);
     REQUIRE(ptx.decoys.size() == ptx.chosen_outputs.size());
     for (const auto& decoys : ptx.decoys)
-      REQUIRE(decoys.size() == 13);
+      REQUIRE(decoys.size() == 10);
   }
 
   SECTION("Creates a successful transaction using 2 inputs")
@@ -125,26 +143,26 @@ TEST_CASE("Transaction Creation", "[wallet,tx]")
     REQUIRE(ptx.chosen_outputs.size() == 2);
     REQUIRE(ptx.decoys.size() == ptx.chosen_outputs.size());
     for (const auto& decoys : ptx.decoys)
-      REQUIRE(decoys.size() == 13);
+      REQUIRE(decoys.size() == 10);
   }
 
-  wallet.store_test_transaction(4000);
-  wallet.store_test_transaction(4000);
+  wallet.store_test_transaction(8000);
+  wallet.store_test_transaction(8000);
   ctor.fee_per_byte = 1;
 
   SECTION("Creates a successful transaction using 2 inputs, avoids creating dust and uses correct fee using 1 oxen per byte")
   {
     std::vector<cryptonote::tx_destination_entry> recipients;
     recipients.emplace_back(cryptonote::tx_destination_entry{});
-    recipients.back().amount = 4001;
+    recipients.back().amount = 8001;
     wallet::PendingTransaction ptx = ctor.create_transaction(recipients, recipients[0]);
     REQUIRE(ptx.recipients.size() == 1);
     REQUIRE(ptx.chosen_outputs.size() == 2);
-    // 8000 (Inputs) - 4001 (Recipient) - 1857 bytes x 1 oxen (Fee)
-    REQUIRE(ptx.change.amount == 2142);
+    // 16000 (Inputs) - 8001 (Recipient) - (1857 bytes x 1 oxen (Fee)) * 3 (Blink multiplier)
+    REQUIRE(ptx.change.amount == 2428);
     REQUIRE(ptx.decoys.size() == ptx.chosen_outputs.size());
     for (const auto& decoys : ptx.decoys)
-      REQUIRE(decoys.size() == 13);
+      REQUIRE(decoys.size() == 10);
   }
 
   ctor.fee_per_output = 50;
@@ -152,15 +170,15 @@ TEST_CASE("Transaction Creation", "[wallet,tx]")
   {
     std::vector<cryptonote::tx_destination_entry> recipients;
     recipients.emplace_back(cryptonote::tx_destination_entry{});
-    recipients.back().amount = 4001;
+    recipients.back().amount = 8001;
     wallet::PendingTransaction ptx = ctor.create_transaction(recipients, recipients[0]);
     REQUIRE(ptx.recipients.size() == 1);
     REQUIRE(ptx.chosen_outputs.size() == 2);
-    // 8000 (Inputs) - 4001 (Recipient) - 1857 bytes x 1 oxen (Fee) - 100 (Fee for 2x outputs @ 50 oxen) 
-    REQUIRE(ptx.change.amount == 2042);
+    // 16000 (Inputs) - 8001 (Recipient) - (1857 bytes x 1 oxen (Fee) + 100 (Fee for 2x outputs @ 50 oxen)) * 3 (Blink multiplier)
+    REQUIRE(ptx.change.amount == 2128);
     REQUIRE(ptx.decoys.size() == ptx.chosen_outputs.size());
     for (const auto& decoys : ptx.decoys)
-      REQUIRE(decoys.size() == 13);
+      REQUIRE(decoys.size() == 10);
   }
 }
 
@@ -170,21 +188,6 @@ TEST_CASE("Transaction Signing", "[wallet,tx]")
   SECTION("Creates a successful transaction then signs using the keyring successfully")
   {
     // Start a new wallet for real inputs to test signatures
-    auto wallet_with_valid_inputs = wallet::MockWallet();
-
-    auto comms_with_decoys = std::make_shared<wallet::MockDaemonComms>();
-    comms_with_decoys->add_decoy(894631, "37d660205a18fb91debe5b73911e30ed2d353a0b611e89cf20a110653b3d3937", "7ad740731e5b26a0f1e87f3fc0702865196b9a58dccf7d7fc47e721f6a9837b0");
-    comms_with_decoys->add_decoy(1038224, "0c86e47e52bed3925cd9dc56052279af96e26b18741bae79ae86e019bac0fdc0", "7ad740731e5b26a0f1e87f3fc0702865196b9a58dccf7d7fc47e721f6a9837b0");
-    comms_with_decoys->add_decoy(1049882, "a44418c0eaf4f295092b5be2bdfc6a8a7e78d57e2fe3f1a0af267a8a2a451fd1", "7ad740731e5b26a0f1e87f3fc0702865196b9a58dccf7d7fc47e721f6a9837b0");
-    comms_with_decoys->add_decoy(1093414, "590bcaf258e68c79620e9a0b62d81ff2b4cbd19001d4764b76f17d8fceeff8e7", "7ad740731e5b26a0f1e87f3fc0702865196b9a58dccf7d7fc47e721f6a9837b0");
-    comms_with_decoys->add_decoy(1093914, "460f88c45744fc4b78f7df046a9bf254194fceac1074dc9674a54ee41d4baf47", "7ad740731e5b26a0f1e87f3fc0702865196b9a58dccf7d7fc47e721f6a9837b0");
-    comms_with_decoys->add_decoy(1094315, "f075807f61c902e65b2b0f6ea817699c8dd291b060284a77c890586632da4263", "7ad740731e5b26a0f1e87f3fc0702865196b9a58dccf7d7fc47e721f6a9837b0");
-    comms_with_decoys->add_decoy(1094323, "87b2d9b0550a72781b75d190096ffd7e9a5bb15b9f22652f042135fbf7a35318", "7ad740731e5b26a0f1e87f3fc0702865196b9a58dccf7d7fc47e721f6a9837b0");
-    comms_with_decoys->add_decoy(1094368, "5e549f2f3f67cc369cb4387fdee18c5bfde2917e4157aee2cb9129b02f3aafe0", "7ad740731e5b26a0f1e87f3fc0702865196b9a58dccf7d7fc47e721f6a9837b0");
-    comms_with_decoys->add_decoy(1094881, "48a8ff99d1bb51271d2fc3bfbf6af754dc16835a7ba1993ddeadbe1a77efd15b", "7ad740731e5b26a0f1e87f3fc0702865196b9a58dccf7d7fc47e721f6a9837b0");
-    comms_with_decoys->add_decoy(1094887, "02c6cf65059a02844ca0e7442687d704a0806f055a1e8e0032cd07e1d08885b2", "7ad5bc62d68270ae3e5879ed425603e6b1534328f4419ad84b8c8077f9221721"); // Real Output
-    
-
     // Spendkey
     //secret: 018f2288a77909f312baacbeabc192a53119edc53364d7ee64ac226392c6560e
     //public: adb121d075407895ba22ff3927b3a8aec60c29176fe97efce7f4d0a7d2c7bc0d
@@ -201,6 +204,20 @@ TEST_CASE("Transaction Signing", "[wallet,tx]")
     crypto::public_key view_pub;
     tools::hex_to_type<crypto::public_key>("66eb874ad6ee33487c5fe4dab8f17e412d320b8933b1ddf108dd15dd45026d0c", view_pub);
 
+    auto wallet_with_valid_inputs = wallet::MockWallet(spend_priv, spend_pub, view_priv, view_pub, cryptonote::network_type::TESTNET);
+
+    auto comms_with_decoys = std::make_shared<wallet::MockDaemonComms>();
+    comms_with_decoys->add_decoy(894631, "37d660205a18fb91debe5b73911e30ed2d353a0b611e89cf20a110653b3d3937", "7ad740731e5b26a0f1e87f3fc0702865196b9a58dccf7d7fc47e721f6a9837b0");
+    comms_with_decoys->add_decoy(1038224, "0c86e47e52bed3925cd9dc56052279af96e26b18741bae79ae86e019bac0fdc0", "7ad740731e5b26a0f1e87f3fc0702865196b9a58dccf7d7fc47e721f6a9837b0");
+    comms_with_decoys->add_decoy(1049882, "a44418c0eaf4f295092b5be2bdfc6a8a7e78d57e2fe3f1a0af267a8a2a451fd1", "7ad740731e5b26a0f1e87f3fc0702865196b9a58dccf7d7fc47e721f6a9837b0");
+    comms_with_decoys->add_decoy(1093414, "590bcaf258e68c79620e9a0b62d81ff2b4cbd19001d4764b76f17d8fceeff8e7", "7ad740731e5b26a0f1e87f3fc0702865196b9a58dccf7d7fc47e721f6a9837b0");
+    comms_with_decoys->add_decoy(1093914, "460f88c45744fc4b78f7df046a9bf254194fceac1074dc9674a54ee41d4baf47", "7ad740731e5b26a0f1e87f3fc0702865196b9a58dccf7d7fc47e721f6a9837b0");
+    comms_with_decoys->add_decoy(1094315, "f075807f61c902e65b2b0f6ea817699c8dd291b060284a77c890586632da4263", "7ad740731e5b26a0f1e87f3fc0702865196b9a58dccf7d7fc47e721f6a9837b0");
+    comms_with_decoys->add_decoy(1094323, "87b2d9b0550a72781b75d190096ffd7e9a5bb15b9f22652f042135fbf7a35318", "7ad740731e5b26a0f1e87f3fc0702865196b9a58dccf7d7fc47e721f6a9837b0");
+    comms_with_decoys->add_decoy(1094368, "5e549f2f3f67cc369cb4387fdee18c5bfde2917e4157aee2cb9129b02f3aafe0", "7ad740731e5b26a0f1e87f3fc0702865196b9a58dccf7d7fc47e721f6a9837b0");
+    comms_with_decoys->add_decoy(1094881, "48a8ff99d1bb51271d2fc3bfbf6af754dc16835a7ba1993ddeadbe1a77efd15b", "7ad740731e5b26a0f1e87f3fc0702865196b9a58dccf7d7fc47e721f6a9837b0");
+    comms_with_decoys->add_decoy(1094887, "02c6cf65059a02844ca0e7442687d704a0806f055a1e8e0032cd07e1d08885b2", "7ad5bc62d68270ae3e5879ed425603e6b1534328f4419ad84b8c8077f9221721"); // Real Output
+    
     auto keys = std::make_shared<wallet::MockSigningKeyring>(spend_priv, spend_pub, view_priv, view_pub);
     keys->add_tx_key("3d6035889b8dd0b5ecff1c7f37acb7fb7129a5d6bcecc9c69af56d4f2a2c910b");
 
@@ -216,18 +233,13 @@ TEST_CASE("Transaction Signing", "[wallet,tx]")
     o.amount = 1000000000000;
 
     crypto::public_key tx_pub_key;
-    tools::hex_to_type("3bf997b70d9a26e60525f1b14d0383f08c3ec0559aaf7639827d08214d6aa664", tx_pub_key); // TODO sean this is pubkey
+    tools::hex_to_type("3bf997b70d9a26e60525f1b14d0383f08c3ec0559aaf7639827d08214d6aa664", tx_pub_key);
     o.derivation = keys->generate_key_derivation(tx_pub_key);
     tools::hex_to_type("02c6cf65059a02844ca0e7442687d704a0806f055a1e8e0032cd07e1d08885b2", o.key); // Public Key of Output
     tools::hex_to_type("145209bdaf35087c0e61daa14a9b7d3fe3a3c14fc266724d3e7c38cd0b43a201", o.rct_mask);
     tools::hex_to_type("1b6e1e63b1b634c6faaad8eb23f273f98b4b7cedb0a449f8d25c7eea2361d458", o.key_image);
     o.subaddress_index = cryptonote::subaddress_index{0,0};
     o.output_index = 0;
-
-    auto keyimage = keys->key_image(o.derivation, o.key, o.output_index, o.subaddress_index);
-      std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - derivation: " << tools::type_to_hex(o.derivation) << " - debug\n";
-    std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - key: " << tools::type_to_hex(o.key) << " - debug\n";
-    std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - key image: " << tools::type_to_hex(keyimage) << " - debug\n";
 
     wallet_with_valid_inputs.store_test_output(o);
     std::vector<cryptonote::tx_destination_entry> recipients;
@@ -240,7 +252,7 @@ TEST_CASE("Transaction Signing", "[wallet,tx]")
 
 
     REQUIRE_NOTHROW(keys->sign_transaction(ptx));
-    auto& signedtx = ptx.tx; // TODO sean use this
+    auto& signedtx = ptx.tx;
     for (const auto& decoys : ptx.decoys)
     {
       REQUIRE(decoys.size() == 10);
@@ -255,42 +267,7 @@ TEST_CASE("Transaction Signing", "[wallet,tx]")
     auto recv = scanner.scan_received(btx, 123, 456);
 
     REQUIRE(recv.size() == 1);
-    if (recv.size() == 1)
-      REQUIRE(recv[0].amount == 949969108610);
-
-    std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - scanner recv size: " << recv.size() << "\n";
-    std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - expected change amount: " << ptx.change.amount << "\n";
-    if (recv.size() == 1)
-      std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - scanner recv amount: " << recv[0].amount << "\n";
-
-    std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - transaction hash: " << cryptonote::obj_to_json_str(ptx.tx.hash) << "\n";
-    for (size_t n = 0; n < ptx.tx.vin.size(); ++n)
-    {
-      std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - VIN number: " << n << "\n";
-      std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - VIN: " << cryptonote::obj_to_json_str(ptx.tx.vin[n]) << "\n";
-    }
-    for (size_t n = 0; n < ptx.tx.vout.size(); ++n)
-    {
-      std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - VOUT number: " << n << "\n";
-      std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - VOUT: " << cryptonote::obj_to_json_str(ptx.tx.vout[n]) << "\n";
-      std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - VOUT: " << cryptonote::obj_to_json_str(ptx.tx.vout[n]) << "\n";
-    }
-    for (size_t n = 0; n < ptx.tx.signatures.size(); ++n)
-    {
-      std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - signature number: " << n << "\n";
-      std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - signature: " << cryptonote::obj_to_json_str(ptx.tx.signatures[n]) << "\n";
-    }
-    std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - rct_signature key: " << cryptonote::obj_to_json_str(ptx.tx.rct_signatures.message) << "\n";
-    std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - rct_signature mixring: " << cryptonote::obj_to_json_str(ptx.tx.rct_signatures.mixRing) << "\n";
-    std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - rct_signature pseudoOuts: " << cryptonote::obj_to_json_str(ptx.tx.rct_signatures.pseudoOuts) << "\n";
-    std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - rct_signature ecdhInfo: " << cryptonote::obj_to_json_str(ptx.tx.rct_signatures.ecdhInfo) << "\n";
-    std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - rct_signature outPk: " << cryptonote::obj_to_json_str(ptx.tx.rct_signatures.outPk) << "\n";
-    std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - rct_signature xmr_amount fee: " << cryptonote::obj_to_json_str(ptx.tx.rct_signatures.txnFee) << "\n";
-    std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - rct_signature rct prunable rangeSigs: " << cryptonote::obj_to_json_str(ptx.tx.rct_signatures.p.rangeSigs) << "\n";
-    std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - rct_signature rct prunable bulletproofs: " << cryptonote::obj_to_json_str(ptx.tx.rct_signatures.p.bulletproofs) << "\n";
-    std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - rct_signature rct prunable mgsig: " << cryptonote::obj_to_json_str(ptx.tx.rct_signatures.p.MGs) << "\n";
-    std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - rct_signature rct prunable clsag: " << cryptonote::obj_to_json_str(ptx.tx.rct_signatures.p.CLSAGs) << "\n";
-    std::cout << __FILE__ << ":" << __LINE__ << " (" << __func__ << ") TODO sean remove this - rct_signature rct prunable pseudoOuts: " << cryptonote::obj_to_json_str(ptx.tx.rct_signatures.p.pseudoOuts) << "\n";
+    REQUIRE(recv[0].amount == 949969108610);
 
 
     //Final Transaction should look like this
