@@ -59,6 +59,7 @@ public:
   void increment_height();
   void decrement_height();
 
+  void blockchain_detached(uint64_t new_height);
 
   // add_sn_payments/subtract_sn_payments -> passing an array of addresses and amounts. These will be added or subtracted to the database for each address specified. If the address does not exist it will be created.
   bool add_sn_rewards(const std::vector<cryptonote::batch_sn_payment>& payments);

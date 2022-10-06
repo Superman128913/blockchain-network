@@ -726,8 +726,6 @@ void Blockchain::pop_blocks(uint64_t nblocks)
   detached_info hook_data{m_db->height(), /*by_pop_blocks=*/true};
   for (const auto& hook : m_blockchain_detached_hooks)
     hook(hook_data);
-  if (!pop_batching_rewards)
-    m_service_node_list.reset_batching_to_latest_height();
   load_missing_blocks_into_oxen_subsystems();
 
   if (stop_batch)

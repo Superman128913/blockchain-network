@@ -352,6 +352,9 @@ namespace config
   // If a node has been online for this amount of blocks they will receive SN rewards
   inline constexpr uint64_t SERVICE_NODE_PAYABLE_AFTER_BLOCKS = 720;
 
+  // batching and SNL will save the state every STORE_LONG_TERM_STATE_INTERVAL blocks
+  inline constexpr uint64_t STORE_LONG_TERM_STATE_INTERVAL = 10000;
+
   namespace testnet
   {
     inline constexpr uint64_t HEIGHT_ESTIMATE_HEIGHT = 339767;
@@ -451,6 +454,8 @@ struct network_config
 
   uint64_t HARDFORK_DEREGISTRATION_GRACE_PERIOD;
 
+  uint64_t STORE_LONG_TERM_STATE_INTERVAL;
+
 
   inline constexpr std::string_view governance_wallet_address(hf hard_fork_version) const {
     const auto wallet_switch =
@@ -486,6 +491,7 @@ inline constexpr network_config mainnet_config{
   config::LIMIT_BATCH_OUTPUTS,
   config::SERVICE_NODE_PAYABLE_AFTER_BLOCKS,
   config::HARDFORK_DEREGISTRATION_GRACE_PERIOD,
+  config::STORE_LONG_TERM_STATE_INTERVAL,
 };
 inline constexpr network_config testnet_config{
   network_type::TESTNET,
@@ -513,6 +519,7 @@ inline constexpr network_config testnet_config{
   config::LIMIT_BATCH_OUTPUTS,
   config::testnet::SERVICE_NODE_PAYABLE_AFTER_BLOCKS,
   config::HARDFORK_DEREGISTRATION_GRACE_PERIOD,
+  config::STORE_LONG_TERM_STATE_INTERVAL,
 };
 inline constexpr network_config devnet_config{
   network_type::DEVNET,
@@ -567,6 +574,7 @@ inline constexpr network_config fakenet_config{
   config::LIMIT_BATCH_OUTPUTS,
   config::testnet::SERVICE_NODE_PAYABLE_AFTER_BLOCKS,
   config::HARDFORK_DEREGISTRATION_GRACE_PERIOD,
+  config::STORE_LONG_TERM_STATE_INTERVAL,
 };
 
 inline constexpr const network_config& get_config(network_type nettype)
