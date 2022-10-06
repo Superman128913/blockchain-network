@@ -424,7 +424,6 @@ namespace service_nodes
     service_node_list &operator=(const service_node_list &) = delete;
 
     void block_add(const cryptonote::block& block, const std::vector<cryptonote::transaction>& txs, const cryptonote::checkpoint_t* checkpoint);
-    void reset_batching_to_latest_height();
     bool state_history_exists(uint64_t height);
     bool process_batching_rewards(const cryptonote::block& block);
     bool pop_batching_rewards_block(const cryptonote::block& block);
