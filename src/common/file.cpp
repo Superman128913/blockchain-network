@@ -305,7 +305,7 @@ namespace tools {
   {
 
     try {
-      fs::ifstream in(filename);
+      fs::ifstream in(filename, std::ios::binary);
       std::string content((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
       contents = std::move(content);
       return true;
