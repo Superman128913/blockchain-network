@@ -36,6 +36,7 @@
 #include "common/string_util.h"
 #include "common/varint.h"
 #include "common/file.h"
+#include "common/fs-format.h"
 #include "common/signal_handler.h"
 #include "common/hex.h"
 #include "serialization/crypto.h"

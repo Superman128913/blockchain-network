@@ -41,6 +41,7 @@
 #include "common/hex.h"
 #include "common/string_util.h"
 #include "common/median.h"
+#include "common/fs-format.h"
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 #include "cryptonote_basic/hardfork.h"

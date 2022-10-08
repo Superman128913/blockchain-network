@@ -31,7 +31,6 @@
 #include <sodium.h>
 #include <fmt/core.h>
 
-#include <iostream>
 #include <cassert>
 
 #include "cryptonote_config.h"

@@ -560,20 +560,19 @@ namespace rct {
     inline const crypto::hash &rct2hash(const rct::key &k) { return (const crypto::hash&)k; }
     inline bool operator==(const rct::key &k0, const crypto::public_key &k1) { return !crypto_verify_32(k0.bytes, (const unsigned char*)&k1); }
     inline bool operator!=(const rct::key &k0, const crypto::public_key &k1) { return crypto_verify_32(k0.bytes, (const unsigned char*)&k1); }
+
+    inline std::string to_hex_string(const rct::key& v) {
+      return "<{}>"_format(tools::type_to_hex(v));
+    }
 }
 
+template <> inline constexpr bool formattable::via_to_hex_string<rct::key> = true;
 
 namespace cryptonote {
     inline bool operator==(const crypto::public_key &k0, const rct::key &k1) { return !crypto_verify_32((const unsigned char*)&k0, k1.bytes); }
     inline bool operator!=(const crypto::public_key &k0, const rct::key &k1) { return crypto_verify_32((const unsigned char*)&k0, k1.bytes); }
     inline bool operator==(const crypto::secret_key &k0, const rct::key &k1) { return !crypto_verify_32((const unsigned char*)&k0, k1.bytes); }
     inline bool operator!=(const crypto::secret_key &k0, const rct::key &k1) { return crypto_verify_32((const unsigned char*)&k0, k1.bytes); }
-}
-
-namespace rct {
-inline std::ostream &operator <<(std::ostream &o, const rct::key &v) {
-  return o << '<' << tools::type_to_hex(v) << '>';
-}
 }
 
 namespace std

@@ -47,6 +47,7 @@
 #include "epee/string_tools.h"
 #include "epee/time_helper.h"
 #include "common/file.h"
+#include "common/fs-format.h"
 #include "common/pruning.h"
 #include "net/error.h"
 #include "common/periodic_task.h"

@@ -39,7 +39,6 @@
 
 #include <memory>
 #include <vector>
-#include <sstream>
 #include <boost/format.hpp>
 
 namespace Wallet {

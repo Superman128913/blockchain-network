@@ -35,6 +35,8 @@
 
 #include "generic-ops.h"
 #include "common/hex.h"
+#include "common/formattable.h"
+#include "common/format.h"
 #include "crypto/cn_heavy_hash.hpp"
 
 namespace crypto {
@@ -156,12 +158,9 @@ namespace crypto {
     return c;
   }
 
-  inline std::ostream &operator <<(std::ostream &o, const crypto::hash &v) {
-    return o << '<' << tools::type_to_hex(v) << '>';
-  }
-  inline std::ostream &operator <<(std::ostream &o, const crypto::hash8 &v) {
-    return o << '<' << tools::type_to_hex(v) << '>';
-  }
+
+  inline std::string to_hex_string(const crypto::hash& h) { return "<{}>"_format(tools::type_to_hex(h)); }
+  inline std::string to_hex_string(const crypto::hash8& h) { return "<{}>"_format(tools::type_to_hex(h)); }
 
   constexpr inline crypto::hash null_hash = {};
   constexpr inline crypto::hash8 null_hash8 = {};
@@ -169,3 +168,6 @@ namespace crypto {
 
 CRYPTO_MAKE_HASHABLE(hash)
 CRYPTO_MAKE_COMPARABLE(hash8)
+
+template <> inline constexpr bool formattable::via_to_hex_string<crypto::hash> = true;
+template <> inline constexpr bool formattable::via_to_hex_string<crypto::hash8> = true;

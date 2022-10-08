@@ -46,7 +46,6 @@
 #include "cryptonote_config.h"
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
-#include "crypto/fmt.h"
 #include "ringct/rctSigs.h"
 #include "cryptonote_basic/verification_context.h"
 #include "cryptonote_core/service_node_voting.h"
@@ -269,7 +268,7 @@ namespace cryptonote
     bool r = hwdev.generate_key_derivation(tx_public_key, ack.m_view_secret_key, recv_derivation);
     if (!r)
     {
-      log::warning(logcat, "key image helper: failed to generate_key_derivation({}, <{}>)", tx_public_key, expose_secret(ack.m_view_secret_key));
+      log::warning(logcat, "key image helper: failed to generate_key_derivation({}, <{}>)", tx_public_key, tools::type_to_hex(ack.m_view_secret_key));
       memcpy(&recv_derivation, rct::identity().bytes, sizeof(recv_derivation));
     }
 
@@ -280,7 +279,7 @@ namespace cryptonote
       r = hwdev.generate_key_derivation(additional_tx_public_keys[i], ack.m_view_secret_key, additional_recv_derivation);
       if (!r)
       {
-        log::warning(logcat, "key image helper: failed to generate_key_derivation({}, {})", additional_tx_public_keys[i], expose_secret(ack.m_view_secret_key));
+        log::warning(logcat, "key image helper: failed to generate_key_derivation({}, {})", additional_tx_public_keys[i], tools::type_to_hex(ack.m_view_secret_key));
       }
       else
       {
@@ -902,13 +901,13 @@ namespace cryptonote
   {
     if (!tx.is_transfer() && tx.vout.size() != 0)
     {
-      log::warning(logcat, "tx type: {} must have 0 outputs, received: {}, id={}", transaction::type_to_string(tx.type), tx.vout.size(), get_transaction_hash(tx));
+      log::warning(logcat, "tx type: {} must have 0 outputs, received: {}, id={}", tx.type, tx.vout.size(), get_transaction_hash(tx));
       return false;
     }
 
     if (tx.version >= txversion::v3_per_output_unlock_times && tx.vout.size() != tx.output_unlock_times.size())
     {
-      log::warning(logcat, "tx version: {} must have equal number of output unlock times and outputs", transaction::version_to_string(tx.version));
+      log::warning(logcat, "tx version: {} must have equal number of output unlock times and outputs", tx.version);
       return false;
 
     }
@@ -1104,7 +1103,7 @@ namespace cryptonote
     if (tvc.m_key_image_blacklisted)     os << "Key image is blacklisted on the service node network, ";
 
     if (tx)
-      os << "TX Version: " << tx->version << ", Type: " << tx->type;
+      os << "TX Version: {}, Type: {}"_format(tx->version, tx->type);
 
     std::string buf = os.str();
     if (buf.size() >= 2 && buf[buf.size() - 2] == ',')

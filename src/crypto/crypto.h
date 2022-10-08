@@ -41,6 +41,8 @@
 #include "epee/mlocker.h"
 #include "generic-ops.h"
 #include "common/hex.h"
+#include "common/format.h"
+#include "common/formattable.h"
 #include "hash.h"
 
 namespace crypto {
@@ -284,27 +286,11 @@ namespace crypto {
       const public_key& pub,
       const signature& sig);
 
-  inline std::ostream &operator <<(std::ostream &o, const crypto::public_key &v) {
-    return o << '<' << tools::type_to_hex(v) << '>';
-  }
-  inline std::ostream &operator <<(std::ostream &o, const crypto::secret_key &v) {
-    return o << '<' << tools::type_to_hex(v) << '>';
-  }
-  inline std::ostream &operator <<(std::ostream &o, const crypto::key_derivation &v) {
-    return o << '<' << tools::type_to_hex(v) << '>';
-  }
-  inline std::ostream &operator <<(std::ostream &o, const crypto::key_image &v) {
-    return o << '<' << tools::type_to_hex(v) << '>';
-  }
-  inline std::ostream &operator <<(std::ostream &o, const crypto::signature &v) {
-    return o << '<' << tools::type_to_hex(v) << '>';
-  }
-  inline std::ostream &operator <<(std::ostream &o, const crypto::ed25519_public_key &v) {
-    return o << '<' << tools::type_to_hex(v) << '>';
-  }
-  inline std::ostream &operator <<(std::ostream &o, const crypto::x25519_public_key &v) {
-    return o << '<' << tools::type_to_hex(v) << '>';
-  }
+  inline std::string to_string(const ec_point& P) { return "<{}>"_format(tools::type_to_hex(P)); }
+  inline std::string to_string(const signature& s) { return "<{}>"_format(tools::type_to_hex(s)); }
+  inline std::string to_string(const ed25519_public_key& P) { return "<{}>"_format(tools::type_to_hex(P)); }
+  inline std::string to_string(const x25519_public_key& P) { return "<{}>"_format(tools::type_to_hex(P)); }
+
   constexpr inline crypto::public_key null_pkey{};
   const inline crypto::secret_key null_skey{};
 }
@@ -315,3 +301,8 @@ CRYPTO_MAKE_HASHABLE(key_image)
 CRYPTO_MAKE_HASHABLE(signature)
 CRYPTO_MAKE_HASHABLE(ed25519_public_key)
 CRYPTO_MAKE_HASHABLE(x25519_public_key)
+
+template <> inline constexpr bool formattable::via_to_string<crypto::ec_point> = true;
+template <> inline constexpr bool formattable::via_to_string<crypto::signature> = true;
+template <> inline constexpr bool formattable::via_to_string<crypto::ed25519_public_key> = true;
+template <> inline constexpr bool formattable::via_to_string<crypto::x25519_public_key> = true;

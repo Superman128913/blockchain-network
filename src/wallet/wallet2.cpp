@@ -64,6 +64,7 @@
 #include "common/i18n.h"
 #include "common/util.h"
 #include "common/file.h"
+#include "common/fs-format.h"
 #include "common/apply_permutation.h"
 #include "rapidjson/document.h"
 #include "rapidjson/writer.h"
@@ -249,7 +250,7 @@ namespace {
       if (auto got = m_vote_ctx.find("m_votes_not_sorted"); got != m_vote_ctx.end()) os << "Votes are not stored in ascending order";
 
       if (tx)
-        os << "TX Version: " << tx->version << ", Type: " << tx->type;
+        os << "TX Version: {}, Type: {}"_format(tx->version, tx->type);
 
       std::string buf = os.str();
       if (buf.size() >= 2 && buf[buf.size() - 2] == ',')

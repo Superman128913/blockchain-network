@@ -33,6 +33,7 @@
 #include "common/i18n.h"
 #include "common/util.h"
 #include "common/file.h"
+#include "common/fs-format.h"
 #include "epee/misc_log_ex.h"
 #include "epee/string_tools.h"
 #include "version.h"

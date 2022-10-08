@@ -45,6 +45,7 @@
 #include "cryptonote_core/uptime_proof.h"
 #include "cryptonote_core/cryptonote_core.h"
 #include "common/hex.h"
+#include "common/fs-format.h"
 #include <fmt/color.h>
 
 namespace

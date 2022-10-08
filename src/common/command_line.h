@@ -31,7 +31,6 @@
 #pragma once
 
 #include <functional>
-#include <sstream>
 #include <array>
 #include <type_traits>
 

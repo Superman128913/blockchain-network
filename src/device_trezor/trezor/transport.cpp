@@ -34,7 +34,6 @@
 #include <algorithm>
 #include <chrono>
 #include <iomanip>
-#include <sstream>
 #include <oxenc/endian.h>
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/udp.hpp>
@@ -877,11 +876,7 @@ namespace trezor{
   }
 
   static std::string get_usb_path(uint8_t bus_id, const std::vector<uint8_t> &path){
-    std::ostringstream ss;
-    ss << WebUsbTransport::PATH_PREFIX << std::setw(3) << std::setfill('0') << (int)bus_id;
-    for (int port : path)
-      ss << ':' << port;
-    return ss.str();
+    return fmt::format("{}{:03d}:{:d}", WebUsbTransport::PATH_PREFIX, bus_id, fmt::join(path, ":"));
   }
 
   const char * WebUsbTransport::PATH_PREFIX = "webusb:";

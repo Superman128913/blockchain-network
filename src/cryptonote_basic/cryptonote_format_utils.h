@@ -248,12 +248,10 @@ namespace cryptonote
 
   bool is_valid_address(const std::string address, cryptonote::network_type nettype, bool allow_subaddress = true, bool allow_integrated = true);
 
-  inline std::ostream &operator<<(std::ostream &stream, transaction const &tx)
+  inline std::string to_string(const transaction& tx)
   {
-    stream << "tx={version=" << tx.version << ", type=" << tx.type << ", hash=" << get_transaction_hash(tx) << "}";
-    return stream;
+    return "tx={{version={}, type={}, hash={}}}"_format(tx.version, tx.type, get_transaction_hash(tx));
   }
-
   //---------------------------------------------------------------
   template <typename T>
   bool t_serializable_object_from_blob(T& to, const std::string& blob)

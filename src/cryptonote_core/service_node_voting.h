@@ -75,10 +75,6 @@ namespace service_nodes
     }
   };
 
-  inline std::ostream &operator<<(std::ostream &os, quorum_type q) {
-    return os << to_string(q);
-  }
-
   enum struct quorum_group : uint8_t { invalid, validator, worker, _count };
   struct quorum_vote_t
   {
@@ -176,11 +172,5 @@ namespace service_nodes
     mutable std::recursive_mutex m_lock;
   };
 }; // namespace service_nodes
-   //
-template <>
-struct fmt::formatter<service_nodes::quorum_type> : fmt::formatter<std::string_view> {
-  auto format(service_nodes::quorum_type quorum, format_context& ctx) {
-    return formatter<std::string_view>::format(to_string(quorum), ctx);
-  }
-};
 
+template <> inline constexpr bool formattable::via_to_string<service_nodes::quorum_type> = true;

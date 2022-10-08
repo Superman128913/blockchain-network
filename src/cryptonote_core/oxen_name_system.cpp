@@ -9,6 +9,7 @@
 
 #include "common/oxen.h"
 #include "common/string_util.h"
+#include "common/fs-format.h"
 #include "crypto/hash.h"
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/cryptonote_basic_impl.h"
@@ -132,20 +133,18 @@ namespace {
 
 std::string ons_extra_string(cryptonote::network_type nettype, cryptonote::tx_extra_oxen_name_system const &data)
 {
-  std::stringstream stream;
-  stream << "ONS Extra={";
+  std::string extra = "ONS Extra={";
+  auto append = std::back_inserter(extra);
   if (data.is_buying())
-  {
-    stream << "owner=" << data.owner.to_string(nettype);
-    stream << ", backup_owner=" << (data.backup_owner ? data.backup_owner.to_string(nettype) : "(none)");
-  }
+    fmt::format_to(append, "owner={}, backup_owner={}",
+        data.owner.to_string(nettype), (data.backup_owner ? data.backup_owner.to_string(nettype) : "(none)"));
   else if (data.is_renewing())
-    stream << "renewal";
+    extra += "renewal";
   else
-    stream << "signature=" << tools::type_to_hex(data.signature.data);
+    fmt::format_to(append, "signature={}", tools::type_to_hex(data.signature.data));
 
-  stream << ", type=" << data.type << ", name_hash=" << data.name_hash << "}";
-  return stream.str();
+  fmt::format_to(append, ", type={}, name_hash={}}}", data.type, data.name_hash);
+  return extra;
 }
 
 /// Clears any existing bindings
@@ -742,13 +741,9 @@ static constexpr bool char_is_alphanum_or(char c)
 static constexpr bool char_is_alphanum(char c) { return char_is_alphanum_or<>(c); }
 
 template <typename... T>
-static bool check_condition(bool condition, std::string* reason, T&&... args) {
+static bool check_condition(bool condition, std::string* reason, std::string_view format, T&&... args) {
   if (condition && reason)
-  {
-    std::ostringstream os;
-    (os << ... << std::forward<T>(args));
-    *reason = os.str();
-  }
+    *reason = fmt::format(format, std::forward<T>(args)...);
   return condition;
 }
 
@@ -766,17 +761,15 @@ bool validate_ons_name(mapping_type type, std::string name, std::string *reason)
   else
   {
     if (reason)
-    {
-      std::stringstream err_stream;
-      err_stream << "ONS type=" << mapping_type_str(type) << ", specifies unhandled mapping type in name validation";
-      *reason = err_stream.str();
-    }
+      *reason = "ONS type={} specifies unhandled mapping type in name validation"_format(type);
     return false;
   }
 
   // NOTE: Validate name length
   name = tools::lowercase_ascii_string(name);
-  if (check_condition((name.empty() || name.size() > max_name_len), reason, "ONS type=", type, ", specifies mapping from name->value where the name's length=", name.size(), " is 0 or exceeds the maximum length=", max_name_len, ", given name=", name))
+  if (check_condition((name.empty() || name.size() > max_name_len), reason,
+        "ONS type={} specifies mapping from name->value where the name's length={} is 0 or exceeds the maximum length={}, given name={}",
+        type, name.size(), max_name_len, name))
     return false;
 
   std::string_view name_view{name}; // Will chop this down as we validate each part
@@ -796,41 +789,46 @@ bool validate_ons_name(mapping_type type, std::string name, std::string *reason)
     //   domains (in which case the user looking up "foo.loki" would try end up trying to resolve
     //   "foo.loki.loki").
     for (auto& reserved : {"localhost.loki"sv, "loki.loki"sv, "snode.loki"sv})
-      if (check_condition(name == reserved, reason, "ONS type=", type, ", specifies mapping from name->value using protocol reserved name=", name))
+      if (check_condition(name == reserved, reason,
+            "ONS type={} specifies mapping from name->value using protocol reserved name={}", type, name))
         return false;
 
     auto constexpr SHORTEST_DOMAIN = "a.loki"sv;
-    if (check_condition(name.size() < SHORTEST_DOMAIN.size(), reason, "ONS type=", type, ", specifies mapping from name->value where the name is shorter than the shortest possible name=", SHORTEST_DOMAIN, ", given name=", name))
+    if (check_condition(name.size() < SHORTEST_DOMAIN.size(), reason,
+          "ONS type={} specifies mapping from name->value where the name is shorter than the shortest possible name={}, given name={}", type, SHORTEST_DOMAIN, name))
       return false;
 
     // Must end with .loki
     auto constexpr SUFFIX = ".loki"sv;
-    if (check_condition(!tools::ends_with(name_view, SUFFIX), reason, "ONS type=", type, ", specifies mapping from name->value where the name does not end with the domain .loki, name=", name))
+    if (check_condition(!tools::ends_with(name_view, SUFFIX), reason,
+          "ONS type={} specifies mapping from name->value where the name does not end with the domain .loki, name={}", type, name))
       return false;
 
     name_view.remove_suffix(SUFFIX.size());
 
     // All domains containing '--' as 3rd/4th letter are reserved except for xn-- punycode domains
     if (check_condition(name_view.size() >= 4 && name_view.substr(2, 2) == "--"sv && !tools::starts_with(name_view, "xn--"sv),
-          reason, "ONS type=", type, ", specifies reserved name `?\?--*.loki': ", name))
+          reason, "ONS type={} specifies reserved name `?\?--*.loki': {}", type, name))
       return false;
 
     // Must start with alphanumeric
-    if (check_condition(!char_is_alphanum(name_view.front()), reason, "ONS type=", type, ", specifies mapping from name->value where the name does not start with an alphanumeric character, name=", name))
+    if (check_condition(!char_is_alphanum(name_view.front()), reason,
+          "ONS type={} specifies mapping from name->value where the name does not start with an alphanumeric character, name={}", type, name))
       return false;
 
     name_view.remove_prefix(1);
 
     if (!name_view.empty()) {
       // Character preceding .loki must be alphanumeric
-      if (check_condition(!char_is_alphanum(name_view.back()), reason, "ONS type=", type ,", specifies mapping from name->value where the character preceding the .loki is not alphanumeric, char=", name_view.back(), ", name=", name))
+      if (check_condition(!char_is_alphanum(name_view.back()), reason,
+            "ONS type={} specifies mapping from name->value where the character preceding the .loki is not alphanumeric, char={}, name={}", type, name_view.back(), name))
         return false;
       name_view.remove_suffix(1);
     }
 
     // Inbetween start and preceding suffix, (alphanumeric or hyphen) characters permitted
     if (check_condition(!std::all_of(name_view.begin(), name_view.end(), char_is_alphanum_or<'-'>),
-          reason, "ONS type=", type, ", specifies mapping from name->value where the domain name contains more than the permitted alphanumeric or hyphen characters, name=", name))
+          reason, "ONS type={} specifies mapping from name->value where the domain name contains more than the permitted alphanumeric or hyphen characters, name={}", type, name))
       return false;
   }
   else if (type == mapping_type::session || type == mapping_type::wallet)
@@ -840,20 +838,22 @@ bool validate_ons_name(mapping_type type, std::string name, std::string *reason)
     // ^[a-z0-9_]([a-z0-9-_]*[a-z0-9_])?$
 
     // Must start with (alphanumeric or underscore)
-    if (check_condition(!char_is_alphanum_or<'_'>(name_view.front()), reason, "ONS type=", type, ", specifies mapping from name->value where the name does not start with an alphanumeric or underscore character, name=", name))
+    if (check_condition(!char_is_alphanum_or<'_'>(name_view.front()), reason,
+          "ONS type={} specifies mapping from name->value where the name does not start with an alphanumeric or underscore character, name={}", type, name))
       return false;
     name_view.remove_prefix(1);
 
     if (!name_view.empty()) {
       // Must NOT end with a hyphen '-'
-      if (check_condition(!char_is_alphanum_or<'_'>(name_view.back()), reason, "ONS type=", type, ", specifies mapping from name->value where the last character is a hyphen '-' which is disallowed, name=", name))
+      if (check_condition(!char_is_alphanum_or<'_'>(name_view.back()), reason,
+            "ONS type={} specifies mapping from name->value where the last character is a hyphen '-' which is disallowed, name={}", type, name))
         return false;
       name_view.remove_suffix(1);
     }
 
     // Inbetween start and preceding suffix, (alphanumeric, hyphen or underscore) characters permitted
     if (check_condition(!std::all_of(name_view.begin(), name_view.end(), char_is_alphanum_or<'-', '_'>),
-          reason, "ONS type=", type, ", specifies mapping from name->value where the name contains more than the permitted alphanumeric, underscore or hyphen characters, name=", name))
+          reason, "ONS type={} specifies mapping from name->value where the name contains more than the permitted alphanumeric, underscore or hyphen characters, name={}", type, name))
       return false;
   }
   else
@@ -886,11 +886,8 @@ static bool check_lengths(mapping_type type, std::string_view value, size_t max,
   {
     if (reason)
     {
-      std::stringstream err_stream;
-      err_stream << "ONS type=" << type << ", specifies mapping from name_hash->encrypted_value where the value's length=" << value.size() << ", does not equal the required length=" << max << ", given value=";
-      if (binary_val) err_stream << oxenc::to_hex(value);
-      else            err_stream << value;
-      *reason = err_stream.str();
+      *reason = "ONS type={} specifies mapping from name_hash->encrypted_value where the value's length={} does not equal the required length={}, given value={}"_format(
+              type, value.size(), max, binary_val ? oxenc::to_hex(value) : value);
     }
   }
 
@@ -903,7 +900,6 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
   if (blob) *blob = {};
 
   // Check length of the value
-  std::stringstream err_stream;
   cryptonote::address_parse_info addr_info = {};
   if (type == mapping_type::wallet)
   {
@@ -912,15 +908,9 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
       if (reason)
       {
         if (value.empty())
-        {
-          err_stream << "The value=" << value;
-          err_stream << ", mapping into the wallet address, specifies a wallet address of 0 length";
-        }
+          *reason = "The value={}, mapping into the wallet address, specifies a wallet address of 0 length"_format(value);
         else
-        {
-          err_stream << "Could not convert the wallet address string, check it is correct, value=" << value;
-        }
-        *reason = err_stream.str();
+          *reason = "Could not convert the wallet address string, check it is correct, value={}"_format(value);
       }
       return false;
     }
@@ -955,7 +945,7 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
     // 51 base32z chars (=255 bits) followed by a 1-bit value ('y'=0, or 'o'=0b10000); anything else
     // in the last spot isn't a valid lokinet address.
     if (check_condition(value.size() != 57 || !tools::ends_with(value, ".loki") || !oxenc::is_base32z(value.substr(0, 52)) || !(value[51] == 'y' || value[51] == 'o'),
-                reason, "'", value, "' is not a valid lokinet address"))
+                reason, "'{}' is not a valid lokinet address", value))
       return false;
 
     if (blob)
@@ -968,14 +958,17 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
   {
     assert(type == mapping_type::session);
     // NOTE: Check value is hex of the right size
-    if (check_condition(value.size() != 2*SESSION_PUBLIC_KEY_BINARY_LENGTH, reason, "The value=", value, " is not the required ", 2*SESSION_PUBLIC_KEY_BINARY_LENGTH, "-character hex string session public key, length=", value.size()))
+    if (check_condition(value.size() != 2*SESSION_PUBLIC_KEY_BINARY_LENGTH, reason,
+          "The value={} is not the required {}-character hex string session public key, length={}", value, 2*SESSION_PUBLIC_KEY_BINARY_LENGTH, value.size()))
       return false;
 
-    if (check_condition(!oxenc::is_hex(value), reason, ", specifies name -> value mapping where the value is not a hex string given value="))
+    if (check_condition(!oxenc::is_hex(value), reason,
+          "value={} specifies name -> value mapping where the value is not a hex string", value))
       return false;
 
     // NOTE: Session public keys are 33 bytes, with the first byte being 0x05 and the remaining 32 being the public key.
-    if (check_condition(!tools::starts_with(value, "05"), reason, "ONS type=session, specifies mapping from name -> ed25519 key where the key is not prefixed with 05, given ed25519=", value))
+    if (check_condition(!tools::starts_with(value, "05"), reason,
+          "ONS type=session specifies mapping from name -> ed25519 key where the key is not prefixed with 05, given ed25519={}", value))
       return false;
 
     if (blob) // NOTE: Given blob, write the binary output
@@ -995,7 +988,6 @@ static_assert(SODIUM_ENCRYPTION_EXTRA_BYTES >= crypto_secretbox_MACBYTES);
 bool mapping_value::validate_encrypted(mapping_type type, std::string_view value, mapping_value* blob, std::string *reason)
 {
   if (blob) *blob = {};
-  std::stringstream err_stream;
 
   int value_len = crypto_aead_xchacha20poly1305_ietf_ABYTES + crypto_aead_xchacha20poly1305_ietf_NPUBBYTES;
 
@@ -1017,10 +1009,7 @@ bool mapping_value::validate_encrypted(mapping_type type, std::string_view value
   else
   {
     if (reason)
-    {
-      err_stream << "Unhandled type passed into " << __func__;
-      *reason = err_stream.str();
-    }
+      *reason = "Unhandled type passed into {}"_format(__func__);
     return false;
   }
 
@@ -1090,9 +1079,6 @@ static bool verify_ons_signature(crypto::hash const &hash, ons::generic_signatur
 
 static bool validate_against_previous_mapping(ons::name_system_db &ons_db, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_oxen_name_system const &ons_extra, std::string *reason)
 {
-  std::stringstream err_stream;
-  OXEN_DEFER { if (reason && reason->empty()) *reason = err_stream.str(); };
-
   crypto::hash expected_prev_txid = crypto::null_hash;
   std::string name_hash           = hash_to_base64(ons_extra.name_hash);
   ons::mapping_record mapping     = ons_db.get_mapping(ons_extra.type, name_hash);
@@ -1102,20 +1088,25 @@ static bool validate_against_previous_mapping(ons::name_system_db &ons_db, uint6
     // Updating: the mapping must exist and be active, the updated fields must actually change from
     // the current value, and a valid signature over the updated values must be present.
 
-    if (check_condition(!mapping, reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), " update requested but mapping does not exist."))
+    if (check_condition(!mapping, reason,
+          "{}, {} update requested but mapping does not exist.", tx, ons_extra_string(ons_db.network_type(), ons_extra)))
       return false;
-    if (check_condition(!mapping.active(blockchain_height), reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), " TX requested to update mapping that has already expired"))
+    if (check_condition(!mapping.active(blockchain_height), reason,
+          "{}, {} TX requested to update mapping that has already expired", tx, ons_extra_string(ons_db.network_type(), ons_extra)))
       return false;
     expected_prev_txid = mapping.txid;
 
-    constexpr auto SPECIFYING_SAME_VALUE_ERR = " field to update is specifying the same mapping "sv;
-    if (check_condition(ons_extra.field_is_set(ons::extra_field::encrypted_value) && ons_extra.encrypted_value == mapping.encrypted_value.to_view(), reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), SPECIFYING_SAME_VALUE_ERR, "value"))
+    constexpr auto SPECIFYING_SAME_VALUE_ERR = "{}, {} field to update is specifying the same mapping {}"sv;
+    if (check_condition(ons_extra.field_is_set(ons::extra_field::encrypted_value) && ons_extra.encrypted_value == mapping.encrypted_value.to_view(), reason,
+          SPECIFYING_SAME_VALUE_ERR, tx, ons_extra_string(ons_db.network_type(), ons_extra), "value"))
       return false;
 
-    if (check_condition(ons_extra.field_is_set(ons::extra_field::owner) && ons_extra.owner == mapping.owner, reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), SPECIFYING_SAME_VALUE_ERR, "owner"))
+    if (check_condition(ons_extra.field_is_set(ons::extra_field::owner) && ons_extra.owner == mapping.owner, reason,
+          SPECIFYING_SAME_VALUE_ERR, tx, ons_extra_string(ons_db.network_type(), ons_extra), "owner"))
       return false;
 
-    if (check_condition(ons_extra.field_is_set(ons::extra_field::backup_owner) && ons_extra.backup_owner == mapping.backup_owner, reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), SPECIFYING_SAME_VALUE_ERR, "backup_owner"))
+    if (check_condition(ons_extra.field_is_set(ons::extra_field::backup_owner) && ons_extra.backup_owner == mapping.backup_owner, reason,
+          SPECIFYING_SAME_VALUE_ERR, tx, ons_extra_string(ons_db.network_type(), ons_extra), "backup_owner"))
       return false;
 
     // Validate signature
@@ -1124,7 +1115,8 @@ static bool validate_against_previous_mapping(ons::name_system_db &ons_db, uint6
         ons_extra.field_is_set(ons::extra_field::owner) ? &ons_extra.owner : nullptr,
         ons_extra.field_is_set(ons::extra_field::backup_owner) ? &ons_extra.backup_owner : nullptr,
         expected_prev_txid);
-    if (check_condition(data.empty(), reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), " unexpectedly failed to generate signature, please inform the Loki developers"))
+    if (check_condition(data.empty(), reason,
+          "{}, {} unexpectedly failed to generate signature, please inform the Oxen developers", tx, ons_extra_string(ons_db.network_type(), ons_extra)))
       return false;
 
     crypto::hash hash;
@@ -1132,52 +1124,65 @@ static bool validate_against_previous_mapping(ons::name_system_db &ons_db, uint6
 
     if (check_condition(!verify_ons_signature(hash, ons_extra.signature, mapping.owner) &&
                         !verify_ons_signature(hash, ons_extra.signature, mapping.backup_owner), reason,
-                        tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), " failed to verify signature for ONS update, current owner=", mapping.owner.to_string(ons_db.network_type()), ", backup owner=", mapping.backup_owner.to_string(ons_db.network_type())))
+                        "{}, {} failed to verify signature for ONS update, current owner={}, backup owner={}",
+                        tx, ons_extra_string(ons_db.network_type(), ons_extra), mapping.owner.to_string(ons_db.network_type()), mapping.backup_owner.to_string(ons_db.network_type())))
       return false;
   }
   else if (ons_extra.is_buying())
   {
     // If buying a new name then the existing name must not be active
     if (check_condition(mapping.active(blockchain_height), reason,
-          "Cannot buy an ONS name that is already registered: name_hash=", mapping.name_hash, ", type=", mapping.type,
-          "; TX: ", tx, "; ", ons_extra_string(ons_db.network_type(), ons_extra)))
+          "Cannot buy an ONS name that is already registered: name_hash={}, type={}; TX: {}; {}",
+          mapping.name_hash, mapping.type, tx, ons_extra_string(ons_db.network_type(), ons_extra)))
         return false;
 
     // If buying a new wallet name then the existing session name must not be active and vice versa
     // The owner of an existing name but different type is allowed to register but the owner and backup owners
     // of the new mapping must be from the same owners and backup owners of the previous mapping ie no
     // new addresses are allowed to be added as owner or backup owner.
-    if (ons_extra.type == mapping_type::wallet)
+    if (ons_extra.type == mapping_type::wallet || ons_extra.type == mapping_type::session)
     {
-      ons::mapping_record session_mapping = ons_db.get_mapping(mapping_type::session, name_hash);
-      if (check_condition(session_mapping.active(blockchain_height) && (!(session_mapping.owner == ons_extra.owner || session_mapping.backup_owner == ons_extra.owner) || !(!ons_extra.field_is_set(ons::extra_field::backup_owner) || session_mapping.backup_owner == ons_extra.backup_owner || session_mapping.owner == ons_extra.backup_owner)), reason,
-            "Cannot buy an ONS wallet name that has an already registered session name: name_hash=", mapping.name_hash, ", type=", mapping.type,
-            "; TX: ", tx, "; ", ons_extra_string(ons_db.network_type(), ons_extra)))
-          return false;
-    } else if (ons_extra.type == mapping_type::session) {
-      ons::mapping_record wallet_mapping = ons_db.get_mapping(mapping_type::wallet, name_hash);
-      if (check_condition(wallet_mapping.active(blockchain_height) && (!(wallet_mapping.owner == ons_extra.owner || wallet_mapping.backup_owner == ons_extra.owner) || !(!ons_extra.field_is_set(ons::extra_field::backup_owner) || wallet_mapping.backup_owner == ons_extra.backup_owner || wallet_mapping.owner == ons_extra.backup_owner)), reason,
-            "Cannot buy an ONS session name that has an already registered wallet name: name_hash=", mapping.name_hash, ", type=", mapping.type,
-            "; TX: ", tx, "; ", ons_extra_string(ons_db.network_type(), ons_extra)))
+      auto buy_type_name = ons_extra.type == mapping_type::wallet ? "wallet"sv : "session"sv;
+      auto alt_type_name = ons_extra.type == mapping_type::wallet ? "session"sv : "wallet"sv;
+      auto alt_type = ons_extra.type == mapping_type::wallet ? mapping_type::session : mapping_type::wallet;
+
+      ons::mapping_record alt_mapping = ons_db.get_mapping(alt_type, name_hash);
+
+      auto is_alt_record_owner = [&alt_mapping](const auto& new_owner) {
+        return new_owner == alt_mapping.owner || new_owner == alt_mapping.backup_owner;
+      };
+
+      if (check_condition(
+            alt_mapping.active(blockchain_height) && // alternative mapping exists
+            (
+             !is_alt_record_owner(ons_extra.owner) ||
+             (ons_extra.field_is_set(ons::extra_field::backup_owner) && !is_alt_record_owner(ons_extra.backup_owner))
+            ),
+            reason,
+            "Cannot buy an ONS {} name that has an already registered {} name: name_hash={}, type={}; TX: {}; {}",
+            buy_type_name, alt_type_name, mapping.name_hash, mapping.type, tx, ons_extra_string(ons_db.network_type(), ons_extra)))
           return false;
     }
   }
   else if (ons_extra.is_renewing())
   {
     // We allow anyone to renew a name, but it has to exist and be currently active
-    if (check_condition(!mapping, reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), " renewal requested but mapping does not exist."))
+    if (check_condition(!mapping, reason, "{}, {} renewal requested but mapping does not exist.", tx, ons_extra_string(ons_db.network_type(), ons_extra)))
       return false;
-    if (check_condition(!mapping.active(blockchain_height), reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), " TX requested to renew mapping that has already expired"))
+    if (check_condition(!mapping.active(blockchain_height), reason,
+          "{}, {} TX requested to renew mapping that has already expired", tx, ons_extra_string(ons_db.network_type(), ons_extra)))
       return false;
     expected_prev_txid = mapping.txid;
   }
   else
   {
-    check_condition(true, reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), " is not a valid buy, update, or renew ONS tx");
+    check_condition(true, reason, "{}, {} is not a valid buy, update, or renew ONS tx", tx, ons_extra_string(ons_db.network_type(), ons_extra));
     return false;
   }
 
-  if (check_condition(ons_extra.prev_txid != expected_prev_txid, reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), " specified prior txid=", ons_extra.prev_txid, ", but ONS DB reports=", expected_prev_txid, ", possible competing TX was submitted and accepted before this TX was processed"))
+  if (check_condition(ons_extra.prev_txid != expected_prev_txid, reason,
+        "{}, {} specified prior txid {} but expected {}; perhaps a competing ONS TX was submitted and accepted before this ONS update TX was processed?",
+        tx, ons_extra_string(ons_db.network_type(), ons_extra), ons_extra.prev_txid, expected_prev_txid))
     return false;
 
   return true;
@@ -1192,10 +1197,12 @@ bool name_system_db::validate_ons_tx(hf hf_version, uint64_t blockchain_height, 
   // Pull out ONS Extra from TX
   // -----------------------------------------------------------------------------------------------
   {
-    if (check_condition(tx.type != cryptonote::txtype::oxen_name_system, reason, tx, ", uses wrong tx type, expected=", cryptonote::txtype::oxen_name_system))
+    if (check_condition(tx.type != cryptonote::txtype::oxen_name_system, reason,
+          "{} uses wrong tx type, expected={}", tx, cryptonote::txtype::oxen_name_system))
       return false;
 
-    if (check_condition(!cryptonote::get_field_from_tx_extra(tx.extra, ons_extra), reason, tx, ", didn't have oxen name service in the tx_extra"))
+    if (check_condition(!cryptonote::get_field_from_tx_extra(tx.extra, ons_extra), reason,
+          "{} didn't have oxen name service in the tx_extra", tx))
       return false;
   }
 
@@ -1204,17 +1211,21 @@ bool name_system_db::validate_ons_tx(hf hf_version, uint64_t blockchain_height, 
   // Check TX ONS Serialized Fields are NULL if they are not specified
   // -----------------------------------------------------------------------------------------------
   {
-    constexpr auto VALUE_SPECIFIED_BUT_NOT_REQUESTED = ", given field but field is not requested to be serialised="sv;
-    if (check_condition(!ons_extra.field_is_set(ons::extra_field::encrypted_value) && ons_extra.encrypted_value.size(), reason, tx, ", ", ons_extra_string(nettype, ons_extra), VALUE_SPECIFIED_BUT_NOT_REQUESTED, "encrypted_value"))
+    constexpr auto VALUE_SPECIFIED_BUT_NOT_REQUESTED = "{}, {} given field {} but field is not requested to be serialised"sv;
+    if (check_condition(!ons_extra.field_is_set(ons::extra_field::encrypted_value) && ons_extra.encrypted_value.size(), reason,
+          VALUE_SPECIFIED_BUT_NOT_REQUESTED, tx, ons_extra_string(nettype, ons_extra), "encrypted_value"))
       return false;
 
-    if (check_condition(!ons_extra.field_is_set(ons::extra_field::owner) && ons_extra.owner, reason, tx, ", ", ons_extra_string(nettype, ons_extra), VALUE_SPECIFIED_BUT_NOT_REQUESTED, "owner"))
+    if (check_condition(!ons_extra.field_is_set(ons::extra_field::owner) && ons_extra.owner, reason,
+          VALUE_SPECIFIED_BUT_NOT_REQUESTED, tx, ons_extra_string(nettype, ons_extra), "owner"))
       return false;
 
-    if (check_condition(!ons_extra.field_is_set(ons::extra_field::backup_owner) && ons_extra.backup_owner, reason, tx, ", ", ons_extra_string(nettype, ons_extra), VALUE_SPECIFIED_BUT_NOT_REQUESTED, "backup_owner"))
+    if (check_condition(!ons_extra.field_is_set(ons::extra_field::backup_owner) && ons_extra.backup_owner, reason,
+          VALUE_SPECIFIED_BUT_NOT_REQUESTED, tx, ons_extra_string(nettype, ons_extra), "backup_owner"))
       return false;
 
-    if (check_condition(!ons_extra.field_is_set(ons::extra_field::signature) && ons_extra.signature, reason, tx, ", ", ons_extra_string(nettype, ons_extra), VALUE_SPECIFIED_BUT_NOT_REQUESTED, "signature"))
+    if (check_condition(!ons_extra.field_is_set(ons::extra_field::signature) && ons_extra.signature, reason,
+          VALUE_SPECIFIED_BUT_NOT_REQUESTED, tx, ons_extra_string(nettype, ons_extra), "signature"))
       return false;
   }
 
@@ -1222,22 +1233,28 @@ bool name_system_db::validate_ons_tx(hf hf_version, uint64_t blockchain_height, 
   // Simple ONS Extra Validation
   // -----------------------------------------------------------------------------------------------
   {
-    if (check_condition(ons_extra.version != 0, reason, tx, ", ", ons_extra_string(nettype, ons_extra), " unexpected version=", std::to_string(ons_extra.version), ", expected=0"))
+    if (check_condition(ons_extra.version != 0, reason,
+          "{}, {} unexpected version={:d}, expected 0", tx, ons_extra_string(nettype, ons_extra), ons_extra.version))
       return false;
 
-    if (check_condition(!ons::mapping_type_allowed(hf_version, ons_extra.type), reason, tx, ", ", ons_extra_string(nettype, ons_extra), " specifying type=", ons_extra.type, " is disallowed in HF", +static_cast<uint8_t>(hf_version)))
+    if (check_condition(!ons::mapping_type_allowed(hf_version, ons_extra.type), reason,
+          "{}, {} specifying type={} is disallowed in HF{:d}", tx, ons_extra_string(nettype, ons_extra), ons_extra.type, static_cast<uint8_t>(hf_version)))
       return false;
 
     // -----------------------------------------------------------------------------------------------
     // Serialized Values Check
     // -----------------------------------------------------------------------------------------------
-    if (check_condition(!ons_extra.is_buying() && !ons_extra.is_updating() && !ons_extra.is_renewing(), reason, tx, ", ", ons_extra_string(nettype, ons_extra), " TX extra does not specify valid combination of bits for serialized fields=", std::bitset<sizeof(ons_extra.fields) * 8>(static_cast<size_t>(ons_extra.fields)).to_string()))
+    if (check_condition(!ons_extra.is_buying() && !ons_extra.is_updating() && !ons_extra.is_renewing(), reason,
+          "{}, {} TX extra does not specify valid combination of bits for serialized fields={}",
+          tx, ons_extra_string(nettype, ons_extra), std::bitset<sizeof(ons_extra.fields) * 8>(static_cast<size_t>(ons_extra.fields)).to_string()))
       return false;
 
     if (check_condition(ons_extra.field_is_set(ons::extra_field::owner) &&
                         ons_extra.field_is_set(ons::extra_field::backup_owner) &&
                         ons_extra.owner == ons_extra.backup_owner,
-                        reason, tx, ", ", ons_extra_string(nettype, ons_extra), " specifying owner the same as the backup owner=", ons_extra.backup_owner.to_string(nettype)))
+                        reason,
+                        "{}, {} specifying owner the same as the backup owner={}",
+                        tx, ons_extra_string(nettype, ons_extra), ons_extra.backup_owner.to_string(nettype)))
     {
       return false;
     }
@@ -1247,7 +1264,8 @@ bool name_system_db::validate_ons_tx(hf hf_version, uint64_t blockchain_height, 
   // ONS Field(s) Validation
   // -----------------------------------------------------------------------------------------------
   {
-    if (check_condition((ons_extra.name_hash == null_name_hash || ons_extra.name_hash == crypto::null_hash), reason, tx, ", ", ons_extra_string(nettype, ons_extra), " specified the null name hash"))
+    if (check_condition((ons_extra.name_hash == null_name_hash || ons_extra.name_hash == crypto::null_hash), reason,
+          "{}, {} specified the null name hash", tx, ons_extra_string(nettype, ons_extra)))
         return false;
 
     if (ons_extra.field_is_set(ons::extra_field::encrypted_value))
@@ -1275,12 +1293,10 @@ bool name_system_db::validate_ons_tx(hf hf_version, uint64_t blockchain_height, 
         burn = burn_required;
     }
 
-    if (burn != burn_required)
-    {
-      char const *over_or_under = burn > burn_required ? "too much " : "insufficient ";
-      if (check_condition(true, reason, tx, ", ", ons_extra_string(nettype, ons_extra), " burned ", over_or_under, "oxen=", burn, ", require=", burn_required))
+    if (check_condition(burn != burn_required, reason,
+          "{}, {} burned {} OXEN={}, required={}",
+          tx, ons_extra_string(nettype, ons_extra), burn > burn_required ? "too much" : "insufficient", burn, burn_required))
         return false;
-    }
   }
 
   return true;

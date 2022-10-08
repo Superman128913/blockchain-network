@@ -48,7 +48,6 @@ namespace
     "6c7251d54154cfa92c173a0dd39c1f948b655970153799af2aeadc9ff1add0ea";
 
   template<typename T> void *addressof(T &t) { return &t; }
-  template<> void *addressof(crypto::secret_key &k) { return addressof(unwrap(unwrap(k))); }
 
   template<typename T>
   bool is_formatted()
@@ -60,9 +59,7 @@ namespace
     static_assert(sizeof(T) * 2 <= sizeof(expected), "T is too large for destination");
     std::memcpy(addressof(value), source, sizeof(T));
 
-    std::stringstream out;
-    out << "BEGIN" << value << "END";  
-    return out.str() == "BEGIN<" + std::string{expected, sizeof(T) * 2} + ">END";
+    return "{}"_format(value) == "<{}>"_format(std::string{expected, sizeof(T) * 2});
   }
 }
 
@@ -71,7 +68,6 @@ TEST(Crypto, Ostream)
   EXPECT_TRUE(is_formatted<crypto::hash8>());
   EXPECT_TRUE(is_formatted<crypto::hash>());
   EXPECT_TRUE(is_formatted<crypto::public_key>());
-  EXPECT_TRUE(is_formatted<crypto::secret_key>());
   EXPECT_TRUE(is_formatted<crypto::signature>());
   EXPECT_TRUE(is_formatted<crypto::key_derivation>());
   EXPECT_TRUE(is_formatted<crypto::key_image>());

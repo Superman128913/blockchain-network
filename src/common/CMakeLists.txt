@@ -64,6 +64,7 @@ target_link_libraries(common
     cncrypto
     oxenmq::oxenmq
     filesystem
+    oxen::logging
     fmt::fmt
     date::date
   PRIVATE

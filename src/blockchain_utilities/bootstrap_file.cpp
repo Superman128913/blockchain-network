@@ -32,7 +32,7 @@
 
 #include "bootstrap_file.h"
 
-namespace po = boost::program_options;
+#include "common/fs-format.h"
 
 using namespace cryptonote;
 

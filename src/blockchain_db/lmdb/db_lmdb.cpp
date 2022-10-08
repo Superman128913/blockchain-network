@@ -41,6 +41,7 @@
 #include "cryptonote_basic/hardfork.h"
 #include "epee/string_tools.h"
 #include "common/file.h"
+#include "common/fs-format.h"
 #include "common/pruning.h"
 #include "common/hex.h"
 #include "common/median.h"

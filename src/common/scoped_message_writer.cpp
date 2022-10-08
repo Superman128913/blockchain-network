@@ -5,18 +5,26 @@ namespace tools {
 
 static auto logcat = log::Cat("msgwriter");
 
+scoped_message_writer& scoped_message_writer::flush()
+{
+  if (!m_content.empty())
+  {
+    logcat->log(m_log_level, "{}{}", m_prefix, m_content);
+
+    if (m_color) {
+      rdln::suspend_readline pause_readline;
+      fmt::print(fg(*m_color), "{}{}\n", m_prefix, m_content);
+    }
+    else
+      fmt::print("{}{}\n", m_prefix, m_content);
+
+    m_content.clear();
+  }
+  return *this;
+}
 scoped_message_writer::~scoped_message_writer()
 {
-  if (m_flush)
-  {
-    m_flush = false;
-    if (fmt::terminal_color::white == m_color)
-      logcat->log(m_log_level, m_oss.str());
-    else
-      logcat->log(m_log_level, "{}",
-              log::detail::text_style_wrapper{fg(m_color), "{}", m_oss.str()});
-    std::cout << std::endl;
-  }
+  flush();
 }
 
 }

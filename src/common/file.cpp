@@ -30,6 +30,7 @@
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 //
 #include "file.h"
+#include "fs-format.h"
 #include "logging/oxen_logger.h"
 #include <unistd.h>
 #include <cstdio>

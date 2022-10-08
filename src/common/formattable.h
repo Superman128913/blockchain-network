@@ -1,3 +1,5 @@
+#pragma once
+
 #include <fmt/format.h>
 #include <string_view>
 #include <type_traits>
@@ -31,6 +33,11 @@ namespace formattable {
     template <typename T, typename SFINAE = void>
     constexpr bool via_to_string = false;
 
+    // Same as above, but looks for a to_hex_string() instead of to_string(), for types that get
+    // dumped as hex.
+    template <typename T, typename SFINAE = void>
+    constexpr bool via_to_hex_string = false;
+
     // Scoped enums can alternatively be formatted as their underlying integer value by specializing
     // this function to true:
     template <typename T, typename SFINAE = void>
@@ -40,10 +47,17 @@ namespace formattable {
 
         template <typename T, typename SFINAE = void>
         constexpr bool has_to_string_method = false;
+        template <typename T, typename SFINAE = void>
+        constexpr bool has_to_hex_string_method = false;
 
         template <typename T>
         inline constexpr bool has_to_string_method<T,
             std::void_t<decltype(std::declval<const T&>().to_string())>
+        > = true;
+
+        template <typename T>
+        inline constexpr bool has_to_hex_string_method<T,
+            std::void_t<decltype(std::declval<const T&>().to_hex_string())>
         > = true;
 
     } // namespace detail
@@ -70,6 +84,22 @@ namespace fmt {
             }
         }
     };
+
+    template <typename T, typename Char>
+    struct formatter<T, Char, std::enable_if_t<::formattable::via_to_hex_string<T>>>
+        : formatter<std::string_view>
+    {
+        template <typename FormatContext>
+        auto format(const T& val, FormatContext& ctx) const {
+            if constexpr (::formattable::detail::has_to_hex_string_method<T>)
+                return formatter<std::string_view>::format(val.to_hex_string(), ctx);
+            else {
+                using namespace formattable;
+                return formatter<std::string_view>::format(to_hex_string(val), ctx);
+            }
+        }
+    };
+
  
     template <typename T, typename Char>
     struct formatter<T, Char, std::enable_if_t<::formattable::via_underlying<T>>>

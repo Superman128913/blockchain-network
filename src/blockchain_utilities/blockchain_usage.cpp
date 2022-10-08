@@ -29,6 +29,7 @@
 
 #include "common/command_line.h"
 #include "common/varint.h"
+#include "common/fs-format.h"
 #include "cryptonote_core/cryptonote_core.h"
 #include "blockchain_objects.h"
 #include "blockchain_db/blockchain_db.h"

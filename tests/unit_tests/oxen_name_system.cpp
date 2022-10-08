@@ -78,7 +78,7 @@ TEST(oxen_name_system, name_tests)
     for (size_t i = 0; i < names_count; i++)
     {
       name_test const &entry = names[i];
-      ASSERT_EQ(ons::validate_ons_name(type, entry.name), entry.allowed) << "Values were {type=" << type << ", name=\"" << entry.name << "\"}";
+      ASSERT_EQ(ons::validate_ons_name(type, entry.name), entry.allowed) << "Values were {{type={}, name=\"{}\"}}"_format(type, entry.name);
     }
   }
 }

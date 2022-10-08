@@ -115,9 +115,8 @@ struct mapping_value
   mapping_value();
   mapping_value(std::string encrypted_value, std::string nonce);
 };
-inline std::ostream &operator<<(std::ostream &os, mapping_value const &v) { return os << oxenc::to_hex(v.to_view()); }
 
-inline std::string_view mapping_type_str(mapping_type type)
+inline constexpr std::string_view mapping_type_str(mapping_type type)
 {
   switch(type)
   {
@@ -130,7 +129,6 @@ inline std::string_view mapping_type_str(mapping_type type)
     default: assert(false);             return "xx_unhandled_type"sv;
   }
 }
-inline std::ostream &operator<<(std::ostream &os, mapping_type type) { return os << mapping_type_str(type); }
 
 constexpr bool mapping_type_allowed(cryptonote::hf hf_version, mapping_type type) {
   return (type == mapping_type::session && hf_version >= cryptonote::hf::hf15_ons)

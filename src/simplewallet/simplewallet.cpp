@@ -35,6 +35,7 @@
  * \brief Source file that defines simple_wallet class.
  */
 
+#include <fmt/color.h>
 #include "common/string_util.h"
 #include "oxen_economy.h"
 #include <algorithm>
@@ -63,6 +64,7 @@
 #include "common/signal_handler.h"
 #include "common/base58.h"
 #include "common/scoped_message_writer.h"
+#include "common/fs-format.h"
 #include "cryptonote_protocol/cryptonote_protocol_handler.h"
 #include "cryptonote_core/service_node_voting.h"
 #include "cryptonote_core/service_node_list.h"
@@ -89,6 +91,12 @@
 extern "C"
 {
 #include <sodium.h>
+}
+
+// grumble, grumble
+namespace formattable {
+  std::string to_string(const boost::basic_format<char>& f) { return f.str(); }
+  template <> constexpr bool via_to_string<boost::basic_format<char>> = true;
 }
 
 namespace cryptonote
@@ -302,22 +310,6 @@ namespace
     return buf;
   }
 
-  std::optional<tools::password_container> password_prompter(const char *prompt, bool verify)
-  {
-    rdln::suspend_readline pause_readline;
-    auto pwd_container = tools::password_container::prompt(verify, prompt);
-    if (!pwd_container)
-    {
-      tools::fail_msg_writer() << sw::tr("failed to read wallet password");
-    }
-    return pwd_container;
-  }
-
-  std::optional<tools::password_container> default_password_prompter(bool verify)
-  {
-    return password_prompter(verify ? sw::tr("Enter a new password for the wallet") : sw::tr("Wallet password"), verify);
-  }
-
   inline std::string interpret_rpc_response(bool ok, const std::string& status)
   {
     std::string err;
@@ -339,25 +331,58 @@ namespace
     return err;
   }
 
-  tools::scoped_message_writer success_msg_writer(bool color = false)
+  // Replacing all the << in here with proper formatting is just too painful, so make a crappy
+  // subclass that provides a << that just slams it through a basic format.
+  class simplewallet_crappy_message_writer : public tools::scoped_message_writer {
+  public:
+    using tools::scoped_message_writer::scoped_message_writer;
+
+    template <typename T>
+    auto& operator<<(T&& val) {
+      append("{}", std::forward<T>(val));
+      return *this;
+    }
+  };
+
+  simplewallet_crappy_message_writer success_msg_writer(bool color = false)
   {
-    return tools::scoped_message_writer(color ? fmt::terminal_color::green : fmt::terminal_color::white, std::string{}, spdlog::level::info);
+    std::optional<fmt::terminal_color> c = std::nullopt;
+    if (color)
+      c = fmt::terminal_color::green;
+    return simplewallet_crappy_message_writer(c, std::string{}, spdlog::level::info);
   }
 
-  tools::scoped_message_writer message_writer(fmt::terminal_color color = fmt::terminal_color::white)
+  simplewallet_crappy_message_writer message_writer(std::optional<fmt::terminal_color> color = std::nullopt)
   {
-    return tools::scoped_message_writer(color);
+    return simplewallet_crappy_message_writer(color);
   }
 
-  tools::scoped_message_writer fail_msg_writer()
+  simplewallet_crappy_message_writer fail_msg_writer()
   {
-    return tools::scoped_message_writer(fmt::terminal_color::red, sw::tr("Error: "), spdlog::level::err);
+    return simplewallet_crappy_message_writer(fmt::terminal_color::red, sw::tr("Error: "), spdlog::level::err);
   }
 
-  tools::scoped_message_writer warn_msg_writer()
+  simplewallet_crappy_message_writer warn_msg_writer()
   {
-    return tools::scoped_message_writer(fmt::terminal_color::red, sw::tr("Warning: "), spdlog::level::warn);
+    return simplewallet_crappy_message_writer(fmt::terminal_color::red, sw::tr("Warning: "), spdlog::level::warn);
   }
+
+  std::optional<tools::password_container> password_prompter(const char *prompt, bool verify)
+  {
+    rdln::suspend_readline pause_readline;
+    auto pwd_container = tools::password_container::prompt(verify, prompt);
+    if (!pwd_container)
+    {
+      fail_msg_writer() << sw::tr("failed to read wallet password");
+    }
+    return pwd_container;
+  }
+
+  std::optional<tools::password_container> default_password_prompter(bool verify)
+  {
+    return password_prompter(verify ? sw::tr("Enter a new password for the wallet") : sw::tr("Wallet password"), verify);
+  }
+
 
   bool parse_bool(const std::string& s, bool& result)
   {
@@ -498,7 +523,7 @@ namespace
     }
     catch (const tools::error::tx_rejected& e)
     {
-      fail_msg_writer() << (boost::format(sw::tr("transaction %s was rejected by daemon")) % get_transaction_hash(e.tx()));
+      fail_msg_writer() << (boost::format(sw::tr("transaction %s was rejected by daemon")) % get_transaction_hash(e.tx())).str();
       std::string reason = e.reason();
       if (!reason.empty())
         fail_msg_writer() << sw::tr("Reason: ") << reason;
@@ -2468,7 +2493,7 @@ bool simple_wallet::set_track_uses(const std::vector<std::string> &args/* = std:
 bool simple_wallet::set_inactivity_lock_timeout(const std::vector<std::string> &args/* = std::vector<std::string>()*/)
 {
 #ifdef _WIN32
-  tools::fail_msg_writer() << tr("Inactivity lock timeout disabled on Windows");
+  fail_msg_writer() << tr("Inactivity lock timeout disabled on Windows");
   return true;
 #endif
   const auto pwd_container = get_and_verify_password();
@@ -2482,7 +2507,7 @@ bool simple_wallet::set_inactivity_lock_timeout(const std::vector<std::string> &
     }
     else
     {
-      tools::fail_msg_writer() << tr("Invalid number of seconds");
+      fail_msg_writer() << tr("Invalid number of seconds");
     }
   }
   return true;
@@ -5608,7 +5633,7 @@ void simple_wallet::check_for_inactivity_lock(bool user)
     m_in_command = true;
     if (!user)
     {
-        tools::msg_writer() << R"(
+        message_writer() << R"(
       ...........
     ...............
   ....OOOOOOOOOOO....   Your Oxen Wallet was locked to
@@ -5624,7 +5649,7 @@ void simple_wallet::check_for_inactivity_lock(bool user)
     while (1)
     {
       const char *inactivity_msg = user ? "" : tr("Locked due to inactivity.");
-      tools::msg_writer() << inactivity_msg << (inactivity_msg[0] ? " " : "") << tr("The wallet password is required to unlock the console.");
+      message_writer() << inactivity_msg << (inactivity_msg[0] ? " " : "") << tr("The wallet password is required to unlock the console.");
       try
       {
         if (get_and_verify_password())
@@ -6178,7 +6203,7 @@ bool simple_wallet::stake(const std::vector<std::string> &args_)
       }
 
       if (!stake_result.msg.empty()) // i.e. warnings
-        tools::msg_writer() << stake_result.msg;
+        message_writer() << stake_result.msg;
 
       std::vector<tools::wallet2::pending_tx> ptx_vector = {stake_result.ptx};
       cryptonote::address_parse_info info = {};
@@ -6233,7 +6258,7 @@ bool simple_wallet::request_stake_unlock(const std::vector<std::string> &args_)
   tools::wallet2::request_stake_unlock_result unlock_result = m_wallet->can_request_stake_unlock(snode_key);
   if (unlock_result.success)
   {
-    tools::msg_writer() << unlock_result.msg;
+    message_writer() << unlock_result.msg;
   }
   else
   {
@@ -6542,7 +6567,7 @@ bool simple_wallet::query_locked_stakes(bool print_details, bool print_key_image
   if (msg.empty() && print_details)
     msg = "No locked stakes known for this wallet on the network";
   if (!msg.empty())
-    tools::msg_writer() << msg;
+    message_writer() << msg;
 
   return has_locked_stakes;
 }
@@ -6574,7 +6599,7 @@ static std::optional<ons::mapping_type> guess_ons_type(tools::wallet2& wallet, s
   auto hf_version = wallet.get_hard_fork_version();
   if (!hf_version)
   {
-    tools::fail_msg_writer() << tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED;
+    fail_msg_writer() << tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED;
     return std::nullopt;
   }
 
@@ -6633,7 +6658,7 @@ bool simple_wallet::ons_buy_mapping(std::vector<std::string> args)
 
     if (ptx_vector.empty())
     {
-      tools::fail_msg_writer() << reason;
+      fail_msg_writer() << reason;
       return true;
     }
 
@@ -6731,7 +6756,7 @@ bool simple_wallet::ons_renew_mapping(std::vector<std::string> args)
         &response);
     if (ptx_vector.empty())
     {
-      tools::fail_msg_writer() << reason;
+      fail_msg_writer() << reason;
       return true;
     }
 
@@ -6816,7 +6841,7 @@ bool simple_wallet::ons_update_mapping(std::vector<std::string> args)
                                                         &response);
     if (ptx_vector.empty())
     {
-      tools::fail_msg_writer() << reason;
+      fail_msg_writer() << reason;
       return true;
     }
 
@@ -6929,32 +6954,32 @@ bool simple_wallet::ons_encrypt(std::vector<std::string> args)
   auto hf_version = m_wallet->get_hard_fork_version();
   if (!hf_version)
   {
-    tools::fail_msg_writer() << tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED;
+    fail_msg_writer() << tools::wallet2::ERR_MSG_NETWORK_VERSION_QUERY_FAILED;
     return false;
   }
 
   std::string reason;
   if (!ons::validate_ons_name(type, name, &reason))
   {
-    tools::fail_msg_writer() << "Invalid ONS name '" << name << "': " << reason;
+    fail_msg_writer() << "Invalid ONS name '" << name << "': " << reason;
     return false;
   }
 
   ons::mapping_value mval;
   if (!ons::mapping_value::validate(m_wallet->nettype(), type, value, &mval, &reason))
   {
-    tools::fail_msg_writer() << "Invalid ONS value '" << value << "': " << reason;
+    fail_msg_writer() << "Invalid ONS value '" << value << "': " << reason;
     return false;
   }
 
   bool old_argon2 = type == ons::mapping_type::session && hf_version < hf::hf16_pulse;
   if (!mval.encrypt(name, nullptr, old_argon2))
   {
-    tools::fail_msg_writer() << "Value encryption failed";
+    fail_msg_writer() << "Value encryption failed";
     return false;
   }
 
-  tools::success_msg_writer() << "encrypted value=" << oxenc::to_hex(mval.to_view());
+  success_msg_writer() << "encrypted value=" << oxenc::to_hex(mval.to_view());
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -6984,7 +7009,7 @@ bool simple_wallet::ons_make_update_mapping_signature(std::vector<std::string> a
                                                   signature_binary,
                                                   m_current_subaddress_account,
                                                   &reason))
-    tools::success_msg_writer() << "signature=" << tools::type_to_hex(signature_binary.ed25519);
+    success_msg_writer() << "signature=" << tools::type_to_hex(signature_binary.ed25519);
   else
     fail_msg_writer() << reason;
 
@@ -7091,7 +7116,7 @@ bool simple_wallet::ons_lookup(std::vector<std::string> args)
       return false;
     }
 
-    auto writer = tools::msg_writer();
+    auto writer = message_writer();
     writer
       << "Name: " << name
       << "\n    Type: " << static_cast<ons::mapping_type>(mapping["type"])
@@ -7182,7 +7207,7 @@ bool simple_wallet::ons_by_owner(const std::vector<std::string>& args)
         value = mv.to_readable_value(nettype, ons_type);
     }
 
-    auto writer = tools::msg_writer();
+    auto writer = message_writer();
     writer
       << "Name (hashed): " << entry["name_hash"];
     if (!name.empty()) writer
@@ -10336,7 +10361,7 @@ int main(int argc, char* argv[])
     desc_params,
     hidden_params,
     positional_options,
-    [](const std::string &s){ tools::scoped_message_writer(fmt::terminal_color::white) << s; },
+    [](const std::string &s){ tools::scoped_message_writer() + s; },
     "oxen-wallet-cli.log"
   );
 

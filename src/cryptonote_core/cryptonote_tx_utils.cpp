@@ -41,7 +41,6 @@
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
-#include "crypto/fmt.h"
 #include "ringct/rctSigs.h"
 #include "multisig/multisig.h"
 #include "epee/int-util.h"

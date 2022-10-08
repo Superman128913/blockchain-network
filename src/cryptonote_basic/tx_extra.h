@@ -113,6 +113,7 @@ struct alignas(size_t) generic_owner
   std::string to_string(cryptonote::network_type nettype) const;
   explicit operator bool() const { return (type == generic_owner_sig_type::monero) ? wallet.address != cryptonote::null_address : ed25519; }
   bool operator==(generic_owner const &other) const;
+  bool operator!=(generic_owner const &other) const { return !(*this == other); }
 
   BEGIN_SERIALIZE()
     ENUM_FIELD(type, type < generic_owner_sig_type::_count)
@@ -149,9 +150,6 @@ struct generic_signature
 };
 
 static_assert(sizeof(crypto::ed25519_signature) == sizeof(crypto::signature), "ONS allows storing either ed25519 or monero style signatures, we store all signatures into crypto::signature in ONS");
-inline std::ostream &operator<<(std::ostream &o, const generic_signature &v) {
-    return o << '<' << tools::type_to_hex(v.data) << '>';
-}
 
 } // namespace ons
 

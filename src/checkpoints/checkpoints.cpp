@@ -41,6 +41,7 @@
 
 #include "common/oxen.h"
 #include "common/file.h"
+#include "common/fs-format.h"
 #include "common/hex.h"
 
 namespace cryptonote

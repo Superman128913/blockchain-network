@@ -28,6 +28,7 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
+#include "common/string_util.h"
 #include "device/io_ledger_tcp.hpp"
 #include "io_hid.hpp"
 #include "version.h"
@@ -388,7 +389,7 @@ namespace hw::ledger {
 
     void device_ledger::logRESP() {
       if (apdu_verbose)
-        log::debug(logcat, "RESP (+{}): {} {}", tools::short_duration(std::chrono::steady_clock::now() - last_cmd), oxenc::to_hex(std::string_view{reinterpret_cast<const char*>(&sw), sizeof(sw)}), oxenc::to_hex(buffer_recv, buffer_recv + length_recv));
+        log::debug(logcat, "RESP (+{}): {} {}", tools::friendly_duration(std::chrono::steady_clock::now() - last_cmd), oxenc::to_hex(std::string_view{reinterpret_cast<const char*>(&sw), sizeof(sw)}), oxenc::to_hex(buffer_recv, buffer_recv + length_recv));
     }
 
     int device_ledger::set_command_header(unsigned char ins, unsigned char p1, unsigned char p2) {

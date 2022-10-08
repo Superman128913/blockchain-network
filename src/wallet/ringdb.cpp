@@ -29,6 +29,7 @@
 
 #include <lmdb.h>
 #include "common/file.h"
+#include "common/fs-format.h"
 #include "epee/misc_log_ex.h"
 #include "wallet_errors.h"
 #include "ringdb.h"

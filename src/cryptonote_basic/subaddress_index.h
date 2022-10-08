@@ -34,6 +34,8 @@
 #include <ostream>
 
 #include "common/oxen.h"
+#include "common/formattable.h"
+#include "common/format.h"
 
 namespace cryptonote
 {
@@ -48,7 +50,7 @@ namespace cryptonote
 
     std::string to_string() const
     {
-      return std::to_string(major) + '/' + std::to_string(minor);
+      return "{}/{}"_format(major, minor);
     }
 
     BEGIN_KV_SERIALIZE_MAP()
@@ -62,13 +64,9 @@ namespace cryptonote
     field(ar, "major", x.major);
     field(ar, "minor", x.minor);
   }
-
-  inline std::ostream& operator<<(std::ostream& out, const cryptonote::subaddress_index& subaddr_index)
-  {
-    return out << subaddr_index.major << '/' << subaddr_index.minor;
-  }
-
 }
+
+template <> inline constexpr bool formattable::via_to_string<cryptonote::subaddress_index> = true;
 
 namespace std
 {

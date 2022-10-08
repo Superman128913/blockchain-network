@@ -68,11 +68,6 @@ namespace service_nodes
     END_SERIALIZE()
   };
 
-  inline std::ostream &operator<<(std::ostream &os, quorum const &q)
-  {
-    return os << q.to_string();
-  }
-
 
   struct quorum_manager
   {
@@ -166,9 +161,4 @@ namespace service_nodes
   uint64_t quorum_checksum(const std::vector<crypto::public_key> &pubkeys, size_t offset = 0);
 }
 
-template <>
-struct fmt::formatter<service_nodes::quorum> : fmt::formatter<std::string> {
-  auto format(service_nodes::quorum quorum, format_context& ctx) {
-    return formatter<std::string>::format(quorum.to_string(), ctx);
-  }
-};
+template <> inline constexpr bool formattable::via_to_string<service_nodes::quorum> = true;

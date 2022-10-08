@@ -34,7 +34,6 @@
 #include "epee/string_tools.h"
 
 #include <unordered_set>
-#include <sstream>
 #include <iomanip>
 #include <oxenc/base32z.h>
 
@@ -50,6 +49,7 @@ extern "C" {
 #include "cryptonote_core.h"
 #include "uptime_proof.h"
 #include "common/file.h"
+#include "common/fs-format.h"
 #include "common/sha256sum.h"
 #include "common/threadpool.h"
 #include "common/command_line.h"
@@ -1488,11 +1488,11 @@ namespace cryptonote
       }
       else
       {
-        std::ostringstream os;
-        os << "Blink validation failed:";
+        std::string blink_error = "Blink validation failed:";
+        auto append = std::back_inserter(blink_error);
         for (auto &f : failures)
-          os << " [" << int(bdata.quorum[f.first]) << ":" << int(bdata.position[f.first]) << "]: " << f.second;
-        log::info(logcat, "Invalid blink tx {}: {}", bdata.tx_hash, os.str());
+          fmt::format_to(append, " [{}:{}]: {}", int(bdata.quorum[f.first]), int(bdata.position[f.first]), f.second);
+        log::info(logcat, "Invalid blink tx {}: {}", bdata.tx_hash, blink_error);
       }
     }
 
