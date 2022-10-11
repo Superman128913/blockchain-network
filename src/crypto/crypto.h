@@ -302,7 +302,11 @@ CRYPTO_MAKE_HASHABLE(signature)
 CRYPTO_MAKE_HASHABLE(ed25519_public_key)
 CRYPTO_MAKE_HASHABLE(x25519_public_key)
 
-template <> inline constexpr bool formattable::via_to_string<crypto::ec_point> = true;
+// ec_point is formattable via to_string, as are any subclasses (such as public_key):
+template <typename T>
+inline constexpr bool formattable::via_to_string<T,
+    std::enable_if_t<std::is_base_of_v<crypto::ec_point, T>>
+> = true;
 template <> inline constexpr bool formattable::via_to_string<crypto::signature> = true;
 template <> inline constexpr bool formattable::via_to_string<crypto::ed25519_public_key> = true;
 template <> inline constexpr bool formattable::via_to_string<crypto::x25519_public_key> = true;

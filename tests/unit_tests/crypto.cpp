@@ -36,41 +36,40 @@
 
 namespace
 {
-  alignas(size_t) static constexpr const std::uint8_t source[] = {
+  constexpr const std::array<uint8_t, 64> source = {
     0x8b, 0x65, 0x59, 0x70, 0x15, 0x37, 0x99, 0xaf, 0x2a, 0xea, 0xdc, 0x9f, 0xf1, 0xad, 0xd0, 0xea,
     0x6c, 0x72, 0x51, 0xd5, 0x41, 0x54, 0xcf, 0xa9, 0x2c, 0x17, 0x3a, 0x0d, 0xd3, 0x9c, 0x1f, 0x94,
     0x6c, 0x72, 0x51, 0xd5, 0x41, 0x54, 0xcf, 0xa9, 0x2c, 0x17, 0x3a, 0x0d, 0xd3, 0x9c, 0x1f, 0x94,
     0x8b, 0x65, 0x59, 0x70, 0x15, 0x37, 0x99, 0xaf, 0x2a, 0xea, 0xdc, 0x9f, 0xf1, 0xad, 0xd0, 0xea
   };
 
-  static constexpr const char expected[] =
+  constexpr std::string_view hex_full =
     "8b655970153799af2aeadc9ff1add0ea6c7251d54154cfa92c173a0dd39c1f94"
-    "6c7251d54154cfa92c173a0dd39c1f948b655970153799af2aeadc9ff1add0ea";
+    "6c7251d54154cfa92c173a0dd39c1f948b655970153799af2aeadc9ff1add0ea"sv;
 
-  template<typename T> void *addressof(T &t) { return &t; }
+  template <size_t Size, std::enable_if_t<(2*Size <= hex_full.size()), int> = 0>
+  constexpr std::string_view hex_data = hex_full.substr(0, 2*Size);
 
-  template<typename T>
-  bool is_formatted()
-  {
-    T value{};
 
-    static_assert(alignof(T) <= alignof(size_t), "T must have size_t-or-smaller alignment");
-    static_assert(sizeof(T) <= sizeof(source), "T is too large for source");
-    static_assert(sizeof(T) * 2 <= sizeof(expected), "T is too large for destination");
-    std::memcpy(addressof(value), source, sizeof(T));
+  template <typename T>
+  T shove_into() {
+    T val;
+    static_assert(alignof(T) <= alignof(size_t), "T must have size_t (or smaller) alignment");
+    static_assert(sizeof(T) <= source.size(), "T is too large for this test");
 
-    return "{}"_format(value) == "<{}>"_format(std::string{expected, sizeof(T) * 2});
+    std::memcpy(&val, source.data(), sizeof(T));
+    return val;
   }
 }
 
-TEST(Crypto, Ostream)
+TEST(Crypto, Format)
 {
-  EXPECT_TRUE(is_formatted<crypto::hash8>());
-  EXPECT_TRUE(is_formatted<crypto::hash>());
-  EXPECT_TRUE(is_formatted<crypto::public_key>());
-  EXPECT_TRUE(is_formatted<crypto::signature>());
-  EXPECT_TRUE(is_formatted<crypto::key_derivation>());
-  EXPECT_TRUE(is_formatted<crypto::key_image>());
+  EXPECT_EQ("{}"_format(shove_into<crypto::hash8>()), "<{}>"_format(hex_data<8>));
+  EXPECT_EQ("{}"_format(shove_into<crypto::hash>()), "<{}>"_format(hex_data<32>));
+  EXPECT_EQ("{}"_format(shove_into<crypto::public_key>()), "<{}>"_format(hex_data<32>));
+  EXPECT_EQ("{}"_format(shove_into<crypto::signature>()), "<{}>"_format(hex_data<64>));
+  EXPECT_EQ("{}"_format(shove_into<crypto::key_derivation>()), "<{}>"_format(hex_data<32>));
+  EXPECT_EQ("{}"_format(shove_into<crypto::key_image>()), "<{}>"_format(hex_data<32>));
 }
 
 TEST(Crypto, null_keys)
