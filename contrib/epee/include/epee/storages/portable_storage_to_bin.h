@@ -31,7 +31,7 @@
 #include "../pragma_comp_defs.h"
 #include "portable_storage_base.h"
 #include <oxenc/endian.h>
-#include <oxenmq/variant.h>
+#include <oxenc/variant.h>
 #include <limits>
 
 namespace epee
