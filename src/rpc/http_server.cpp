@@ -2,7 +2,7 @@
 #include "http_server.h"
 #include <chrono>
 #include <exception>
-#include <oxenmq/variant.h>
+#include <oxenc/variant.h>
 #include "common/command_line.h"
 #include "common/string_util.h"
 #include "cryptonote_config.h"
