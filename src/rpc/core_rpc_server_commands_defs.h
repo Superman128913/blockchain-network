@@ -1894,6 +1894,7 @@ namespace cryptonote::rpc {
       uint16_t https_port; // Storage server https port to include in uptime proofs
       uint16_t omq_port; // Storage Server oxenmq port to include in uptime proofs
       std::string ed25519_pubkey; // Service node Ed25519 pubkey for verifying that storage server is using the right one
+      std::string error; // If given and non-empty then this is an error message telling oxend to *not* submit an uptime proof and to report this error in the logs instead.  Oxend won't send proofs until it gets another ping (without an error).
     } request;
   };
 
@@ -1917,6 +1918,7 @@ namespace cryptonote::rpc {
     {
       std::array<uint16_t, 3> version; // Lokinet version
       std::string ed25519_pubkey; // Service node Ed25519 pubkey for verifying that lokinet is using the right one
+      std::string error; // If given and non-empty then this is an error message telling oxend to *not* submit an uptime proof and to report this error in the logs instead.  Oxend won't send proofs until it gets another ping (without an error).
     } request;
   };
 
