@@ -3278,6 +3278,7 @@ namespace cryptonote { namespace rpc {
             std::array<uint16_t, 3> cur_version,
             std::array<uint16_t, 3> required,
             std::string_view ed25519_pubkey,
+            std::string_view error,
             std::string_view name,
             std::atomic<std::time_t>& update,
             std::chrono::seconds lifetime,
@@ -3285,7 +3286,13 @@ namespace cryptonote { namespace rpc {
     {
       std::string our_ed25519_pubkey = tools::type_to_hex(core.get_service_keys().pub_ed25519);
       typename RPC::response res{};
-      if (cur_version < required) {
+      if (!error.empty()) {
+        res.status = fmt::format("Error: {}", error);
+        MERROR(fmt::format("{0} reported an error: {1}. Check {0} logs for more details.", name, error));
+        update = 0; // Reset our last ping time to 0 so that we won't send a ping until we get
+                    // success back again (even if we had an earlier acceptable ping within the
+                    // cutoff time).
+      } else if (cur_version < required) {
         res.status = fmt::format("Outdated {}. Current: {}.{}.{}, Required: {}.{}.{}",
             name, cur_version[0], cur_version[1], cur_version[2], required[0], required[1], required[2]);
         MERROR(res.status);
@@ -3315,7 +3322,7 @@ namespace cryptonote { namespace rpc {
     m_core.ss_version = req.version;
     return handle_ping<STORAGE_SERVER_PING>(m_core,
       req.version, service_nodes::MIN_STORAGE_SERVER_VERSION,
-      req.ed25519_pubkey,
+      req.ed25519_pubkey, req.error,
       "Storage Server", m_core.m_last_storage_server_ping, m_core.get_net_config().UPTIME_PROOF_FREQUENCY,
       [this, &req](bool significant) {
         m_core.m_storage_https_port = req.https_port;
@@ -3330,7 +3337,7 @@ namespace cryptonote { namespace rpc {
     m_core.lokinet_version = req.version;
     return handle_ping<LOKINET_PING>(m_core,
         req.version, service_nodes::MIN_LOKINET_VERSION,
-        req.ed25519_pubkey,
+        req.ed25519_pubkey, req.error,
         "Lokinet", m_core.m_last_lokinet_ping, m_core.get_net_config().UPTIME_PROOF_FREQUENCY,
         [this](bool significant) { if (significant) m_core.reset_proof_interval(); });
   }
