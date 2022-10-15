@@ -32,6 +32,7 @@
 #include <sstream>
 #include <string>
 
+#include "common/string_util.h"
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 
 namespace
@@ -76,8 +77,36 @@ TEST(Crypto, null_keys)
 {
   char zero[32];
   memset(zero, 0, 32);
-  ASSERT_EQ(memcmp(crypto::null_skey.data, zero, 32), 0);
-  ASSERT_EQ(memcmp(crypto::null_pkey.data, zero, 32), 0);
+  ASSERT_EQ(memcmp(crypto::null<crypto::secret_key>.data(), zero, 32), 0);
+  ASSERT_EQ(memcmp(crypto::null<crypto::public_key>.data(), zero, 32), 0);
+  ASSERT_EQ(memcmp(crypto::public_key{}.data(), zero, 32), 0);
+  ASSERT_EQ(memcmp(crypto::secret_key{}.data(), zero, 32), 0);
+}
+
+TEST(Crypto, equality)
+{
+  crypto::public_key pk1{};
+  std::copy(source.data(), source.data() + 32, pk1.begin());
+  ASSERT_EQ("{}"_format(pk1), "<{}>"_format(hex_full.substr(0, 64)));
+  crypto::public_key pk2 = pk1;
+  ASSERT_EQ(tools::view_guts(pk1), tools::view_guts(pk2));
+  EXPECT_EQ(pk1, pk2);
+  crypto::public_key pk3;
+  std::copy(source.data(), source.data() + 32, pk3.begin());
+  ASSERT_EQ(tools::view_guts(pk1), tools::view_guts(pk3));
+  EXPECT_EQ(pk1, pk3);
+  pk3.zero();
+  ASSERT_EQ("{}"_format(pk3), "<{:064x}>"_format(0));
+  ASSERT_NE(tools::view_guts(pk1), tools::view_guts(pk3));
+  EXPECT_NE(pk1, pk3);
+  EXPECT_LT(pk3, pk1);
+
+  std::copy(source.data() + 32, source.data() + 64, pk2.begin());
+  ASSERT_EQ("{}"_format(pk2), "<{}>"_format(hex_full.substr(64)));
+  EXPECT_NE(pk1, pk2);
+  EXPECT_LT(pk2, pk1);
+  EXPECT_FALSE(pk1 == pk2);
+  EXPECT_FALSE(pk1 < pk2);
 }
 
 TEST(Crypto, verify_32)

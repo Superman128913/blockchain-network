@@ -111,7 +111,7 @@ struct alignas(size_t) generic_owner
   char                   padding02_[7];
 
   std::string to_string(cryptonote::network_type nettype) const;
-  explicit operator bool() const { return (type == generic_owner_sig_type::monero) ? wallet.address != cryptonote::null_address : ed25519; }
+  explicit operator bool() const { return (type == generic_owner_sig_type::monero) ? wallet.address != cryptonote::null_address : (bool) ed25519; }
   bool operator==(generic_owner const &other) const;
   bool operator!=(generic_owner const &other) const { return !(*this == other); }
 
@@ -521,11 +521,11 @@ namespace cryptonote
 
     // The value we sign when signing an unlock request.  For backwards compatibility we send this as a
     // "nonce" (although it isn't and never was a nonce), which is required to be an unsigned 32-bit
-    // value.  We could just as easily sign with crypto::null_hash, but using a distinct value makes it
+    // value.  We could just as easily sign with a null crypto::null, but using a distinct value makes it
     // slightly less likely that we could end up using the same message as some other signing process.
-    static constexpr crypto::hash HASH{
+    static constexpr crypto::hash HASH{{
       'U','N','L','K','U','N','L','K','U','N','L','K','U','N','L','K',
-      'U','N','L','K','U','N','L','K','U','N','L','K','U','N','L','K'};
+      'U','N','L','K','U','N','L','K','U','N','L','K','U','N','L','K'}};
     // For now, we still have to send that (not a) "nonce" value in the unlock tx on the wire, but
     // future HF versions could remove it from the wire (though at 4 bytes it isn't worth doing
     // until we also need to make some other change to unlocks here).  So for now, we always send
@@ -556,7 +556,7 @@ namespace cryptonote
     uint8_t                 version = 0;
     ons::mapping_type       type;
     crypto::hash            name_hash;
-    crypto::hash            prev_txid = crypto::null_hash;  // previous txid that purchased the mapping
+    crypto::hash            prev_txid = crypto::null<crypto::hash>;  // previous txid that purchased the mapping
     ons::extra_field        fields;
     ons::generic_owner      owner        = {};
     ons::generic_owner      backup_owner = {};

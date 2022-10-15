@@ -63,7 +63,7 @@ namespace cryptonote
     uint64_t m_last_response_height{0};
     std::optional<std::chrono::steady_clock::time_point> m_last_request_time;
     epee::copyable_atomic m_callback_request_count{0}; //in debug purpose: problem with double callback rise
-    crypto::hash m_last_known_hash{crypto::null_hash};
+    crypto::hash m_last_known_hash{};
     uint32_t m_pruning_seed{0};
     bool m_anchor{false};
     //size_t m_score{0};  TODO: add score calculations

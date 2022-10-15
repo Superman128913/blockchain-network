@@ -52,15 +52,7 @@ namespace service_nodes
     std::vector<crypto::public_key> validators; // Array of public keys identifying service nodes who validate and sign.
     std::vector<crypto::public_key> workers;    // Array of public keys of tested service nodes (if applicable).
                                                 //
-    inline std::string to_string() const
-    {
-      std::stringstream result;
-      for (size_t i = 0; i < validators.size(); i++)
-        result << "V[" << i << "] " << validators[i] << "\n";
-      for (size_t i = 0; i < workers.size(); i++)
-        result << "W[" << std::to_string(i) + "] " << workers[i] << "\n";
-      return result.str();
-    };
+    std::string to_string() const;
 
     BEGIN_SERIALIZE()
       FIELD(validators)

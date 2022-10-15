@@ -89,13 +89,13 @@ DISABLE_VS_WARNINGS(4244 4345)
     epee::wipeable_string key_stream = get_key_stream(key, m_encryption_iv, sizeof(crypto::secret_key) * (2 + m_multisig_keys.size()));
     const char *ptr = key_stream.data();
     for (size_t i = 0; i < sizeof(crypto::secret_key); ++i)
-      m_spend_secret_key.data[i] ^= *ptr++;
+      m_spend_secret_key[i] ^= *ptr++;
     for (size_t i = 0; i < sizeof(crypto::secret_key); ++i)
-      m_view_secret_key.data[i] ^= *ptr++;
+      m_view_secret_key[i] ^= *ptr++;
     for (crypto::secret_key &k: m_multisig_keys)
     {
       for (size_t i = 0; i < sizeof(crypto::secret_key); ++i)
-        k.data[i] ^= *ptr++;
+        k[i] ^= *ptr++;
     }
   }
   //-----------------------------------------------------------------
@@ -117,7 +117,7 @@ DISABLE_VS_WARNINGS(4244 4345)
     const char *ptr = key_stream.data();
     ptr += sizeof(crypto::secret_key);
     for (size_t i = 0; i < sizeof(crypto::secret_key); ++i)
-      m_view_secret_key.data[i] ^= *ptr++;
+      m_view_secret_key[i] ^= *ptr++;
   }
   //-----------------------------------------------------------------
   void account_keys::decrypt_viewkey(const crypto::chacha_key &key)

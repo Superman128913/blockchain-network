@@ -1358,31 +1358,24 @@ namespace service_nodes
 
   static std::string dump_pulse_block_data(cryptonote::block const &block, service_nodes::quorum const *quorum)
   {
-    std::stringstream stream;
     std::bitset<8 * sizeof(block.pulse.validator_bitset)> const validator_bitset = block.pulse.validator_bitset;
-    stream << "Block(" << cryptonote::get_block_height(block) << "): " << cryptonote::get_block_hash(block) << "\n";
-    stream << "Leader: ";
-    if (quorum) stream << (quorum->workers.empty() ? "(invalid leader)" : oxenc::to_hex(tools::view_guts(quorum->workers[0]))) << "\n";
-    else        stream << "(invalid quorum)\n";
-    stream << "Round: " << +block.pulse.round << "\n";
-    stream << "Validator Bitset: " << validator_bitset << "\n";
-
-    stream << "Signatures: ";
-    if (block.signatures.empty()) stream << "(none)";
-
-    for (service_nodes::quorum_signature const &entry : block.signatures)
+    std::string s = "Block({}): {}\nLeader: {}\nRound: {:d}\nValidator Bitset: {}\nSignatures:"_format(
+        cryptonote::get_block_height(block),
+        cryptonote::get_block_hash(block),
+        !quorum ? "(invalid quorum)" : quorum->workers.empty() ? "(invalid leader)" :
+          oxenc::to_hex(tools::view_guts(quorum->workers[0])),
+        validator_bitset.to_string());
+    auto append = std::back_inserter(s);
+    if (block.signatures.empty())
+      fmt::format_to(append, " (none)");
+    for (const auto& sig : block.signatures)
     {
-      stream << "\n";
-      stream << "  [" << +entry.voter_index << "] validator: ";
-      if (quorum)
-      {
-        stream << ((entry.voter_index >= quorum->validators.size()) ? "(invalid quorum index)" : oxenc::to_hex(tools::view_guts(quorum->validators[entry.voter_index])));
-        stream << ", signature: " << oxenc::to_hex(tools::view_guts(entry.signature));
-      }
-      else stream << "(invalid quorum)";
+      fmt::format_to(append, "\n  [{:d}] validator: {}", sig.voter_index,
+          !quorum ? "(invalid quorum)" :
+          sig.voter_index >= quorum->validators.size() ? "(invalid quorum index)" :
+          "{}: {}"_format(quorum->validators[sig.voter_index], sig.signature));
     }
-
-    return stream.str();
+    return s;
   }
 
   static bool verify_block_components(cryptonote::network_type nettype,
@@ -1790,7 +1783,7 @@ namespace service_nodes
     else
     {
       uint64_t seed = 0;
-      std::memcpy(&seed, hash.data, sizeof(seed));
+      std::memcpy(&seed, hash.data(), sizeof(seed));
       oxenc::little_to_host_inplace(seed);
       seed += static_cast<uint64_t>(type);
       result.seed(seed);
@@ -1853,17 +1846,17 @@ namespace service_nodes
       {
         std::array<uint8_t, 1 + sizeof(block.pulse.random_value)> src = {pulse_round};
         std::copy(std::begin(block.pulse.random_value.data), std::end(block.pulse.random_value.data), src.begin() + 1);
-        crypto::cn_fast_hash(src.data(), src.size(), hash.data);
+        crypto::cn_fast_hash(src.data(), src.size(), hash);
       }
       else
       {
         crypto::hash block_hash = cryptonote::get_block_hash(block);
         std::array<uint8_t, 1 + sizeof(hash)> src = {pulse_round};
-        std::copy(std::begin(block_hash.data), std::end(block_hash.data), src.begin() + 1);
-        crypto::cn_fast_hash(src.data(), src.size(), hash.data);
+        std::copy(std::begin(block_hash), std::end(block_hash), src.begin() + 1);
+        crypto::cn_fast_hash(src.data(), src.size(), hash);
       }
 
-      assert(hash != crypto::null_hash);
+      assert(hash);
       result.push_back(hash);
     }
 
@@ -2014,7 +2007,7 @@ namespace service_nodes
 
   static void generate_other_quorums(service_node_list::state_t &state, std::vector<pubkey_and_sninfo> const &active_snode_list, cryptonote::network_type nettype, hf hf_version)
   {
-    assert(state.block_hash != crypto::null_hash);
+    assert(state.block_hash);
 
     // The two quorums here have different selection criteria: the entire checkpoint quorum and the
     // state change *validators* want only active service nodes, but the state change *workers*
@@ -2247,7 +2240,7 @@ namespace service_nodes
     {
       crypto::hash const block_hash = cryptonote::get_block_hash(block);
       uint64_t seed = 0;
-      std::memcpy(&seed, block_hash.data, sizeof(seed));
+      std::memcpy(&seed, block_hash.data(), sizeof(seed));
 
       /// Gather existing swarms from infos
       swarm_snode_map_t existing_swarms;
@@ -2441,10 +2434,10 @@ namespace service_nodes
 
   service_nodes::payout service_node_list::state_t::get_block_leader() const
   {
-    crypto::public_key key = crypto::null_pkey;
+    crypto::public_key key{};
     service_node_info const *info = nullptr;
     {
-      auto oldest_waiting = std::make_tuple(std::numeric_limits<uint64_t>::max(), std::numeric_limits<uint32_t>::max(), crypto::null_pkey);
+      auto oldest_waiting = std::make_tuple(std::numeric_limits<uint64_t>::max(), std::numeric_limits<uint32_t>::max(), crypto::null<crypto::public_key>);
       for (const auto &info_it : service_nodes_infos)
       {
         const auto &sninfo = *info_it.second;
@@ -2461,7 +2454,7 @@ namespace service_nodes
       key = std::get<2>(oldest_waiting);
     }
 
-    if (key == crypto::null_pkey)
+    if (!key)
       return service_nodes::null_payout;
     return service_node_payout_portions(key, *info);
   }
@@ -2929,7 +2922,7 @@ namespace service_nodes
     size_t buf_size;
     crypto::hash result;
 
-    auto buf = tools::memcpy_le(proof.pubkey.data, proof.timestamp, proof.public_ip, proof.storage_https_port, proof.pubkey_ed25519.data, proof.qnet_port, proof.storage_omq_port);
+    auto buf = tools::memcpy_le(proof.pubkey, proof.timestamp, proof.public_ip, proof.storage_https_port, proof.pubkey_ed25519, proof.qnet_port, proof.storage_omq_port);
     buf_size = buf.size();
     crypto::cn_fast_hash(buf.data(), buf_size, result);
     return result;
@@ -2952,7 +2945,7 @@ namespace service_nodes
 
     crypto::hash hash = hash_uptime_proof(result);
     crypto::generate_signature(hash, keys.pub, keys.key, result.sig);
-    crypto_sign_detached(result.sig_ed25519.data, NULL, reinterpret_cast<unsigned char *>(hash.data), sizeof(hash.data), keys.key_ed25519.data);
+    crypto_sign_detached(result.sig_ed25519.data(), NULL, hash.data(), hash.size(), keys.key_ed25519.data());
     return result;
   }
 
@@ -3069,12 +3062,12 @@ namespace service_nodes
   void proof_info::update_pubkey(const crypto::ed25519_public_key &pk) {
     if (pk == proof->pubkey_ed25519)
       return;
-    if (pk && 0 == crypto_sign_ed25519_pk_to_curve25519(pubkey_x25519.data, pk.data)) {
+    if (pk && 0 == crypto_sign_ed25519_pk_to_curve25519(pubkey_x25519.data(), pk.data())) {
       proof->pubkey_ed25519 = pk;
     } else {
       log::warning(logcat, "Failed to derive x25519 pubkey from ed25519 pubkey {}", proof->pubkey_ed25519);
-      pubkey_x25519 = crypto::x25519_public_key::null();
-      proof->pubkey_ed25519 = crypto::ed25519_public_key::null();
+      pubkey_x25519.zero();
+      proof->pubkey_ed25519.zero();
     }
   }
 
@@ -3125,20 +3118,20 @@ namespace service_nodes
       return false;
     }
 
-    crypto::x25519_public_key derived_x25519_pubkey = crypto::x25519_public_key::null();
+    crypto::x25519_public_key derived_x25519_pubkey{};
     if (!proof.pubkey_ed25519)
     {
       log::debug(logcat, "Rejecting uptime proof from {}: required ed25519 auxiliary pubkey {} not included in proof", proof.pubkey, proof.pubkey_ed25519);
       return false;
     }
 
-    if (0 != crypto_sign_verify_detached(proof.sig_ed25519.data, reinterpret_cast<unsigned char *>(hash.data), sizeof(hash.data), proof.pubkey_ed25519.data))
+    if (0 != crypto_sign_verify_detached(proof.sig_ed25519.data(), hash.data(), hash.size(), proof.pubkey_ed25519.data()))
     {
       log::debug(logcat, "Rejecting uptime proof from {}: ed25519 signature validation failed", proof.pubkey);
       return false;
     }
 
-    if (0 != crypto_sign_ed25519_pk_to_curve25519(derived_x25519_pubkey.data, proof.pubkey_ed25519.data) || !derived_x25519_pubkey)
+    if (0 != crypto_sign_ed25519_pk_to_curve25519(derived_x25519_pubkey.data(), proof.pubkey_ed25519.data()) || !derived_x25519_pubkey)
     {
       log::debug(logcat, "Rejecting uptime proof from {}: invalid ed25519 pubkey included in proof (x25519 derivation failed)", proof.pubkey);
       return false;
@@ -3255,20 +3248,20 @@ namespace service_nodes
       return false;
     }
 
-    crypto::x25519_public_key derived_x25519_pubkey = crypto::x25519_public_key::null();
+    crypto::x25519_public_key derived_x25519_pubkey{};
     if (!proof->pubkey_ed25519)
     {
       log::debug(logcat, "Rejecting uptime proof from {}: required ed25519 auxiliary pubkey {} not included in proof", proof->pubkey, proof->pubkey_ed25519);
       return false;
     }
 
-    if (0 != crypto_sign_verify_detached(proof->sig_ed25519.data, reinterpret_cast<unsigned char *>(hash.data), sizeof(hash.data), proof->pubkey_ed25519.data))
+    if (0 != crypto_sign_verify_detached(proof->sig_ed25519.data(), hash.data(), hash.size(), proof->pubkey_ed25519.data()))
     {
       log::debug(logcat, "Rejecting uptime proof from {}: ed25519 signature validation failed", proof->pubkey);
       return false;
     }
 
-    if (0 != crypto_sign_ed25519_pk_to_curve25519(derived_x25519_pubkey.data, proof->pubkey_ed25519.data) || !derived_x25519_pubkey)
+    if (0 != crypto_sign_ed25519_pk_to_curve25519(derived_x25519_pubkey.data(), proof->pubkey_ed25519.data()) || !derived_x25519_pubkey)
     {
       log::debug(logcat, "Rejecting uptime proof from {}: invalid ed25519 pubkey included in proof (x25519 derivation failed)", proof->pubkey);
       return false;
@@ -3364,7 +3357,7 @@ namespace service_nodes
     auto it = x25519_to_pub.find(x25519);
     if (it != x25519_to_pub.end())
       return it->second.first;
-    return crypto::null_pkey;
+    return crypto::null<crypto::public_key>;
   }
 
   crypto::public_key service_node_list::get_random_pubkey() {
@@ -3395,7 +3388,7 @@ namespace service_nodes
     if (xpk.size() != sizeof(crypto::x25519_public_key))
       return "";
     crypto::x25519_public_key x25519_pub;
-    std::memcpy(x25519_pub.data, xpk.data(), xpk.size());
+    std::memcpy(x25519_pub.data(), xpk.data(), xpk.size());
 
     auto pubkey = get_pubkey_from_x25519(x25519_pub);
     if (!pubkey) {
@@ -3728,7 +3721,7 @@ namespace service_nodes
         for (size_t i = 0; i < last_index; i++)
         {
           state_serialized &entry = data_in.states[i];
-          if (entry.block_hash == crypto::null_hash) entry.block_hash = m_blockchain.get_block_id_by_height(entry.height);
+          if (!entry.block_hash) entry.block_hash = m_blockchain.get_block_id_by_height(entry.height);
           m_transient.state_history.emplace_hint(m_transient.state_history.end(), this, std::move(entry));
         }
 

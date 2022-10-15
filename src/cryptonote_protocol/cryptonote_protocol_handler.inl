@@ -1139,7 +1139,7 @@ namespace cryptonote
 
     size_t size = blocks_size + others_size;
     for (const auto &element : arg.missed_ids)
-      size += sizeof(element.data);
+      size += element.size();
 
     size += sizeof(arg.current_blockchain_height);
     {
@@ -2203,7 +2203,7 @@ skip:
       if (!start_from_current_chain)
       {
         // we'll want to start off from where we are on that peer, which may not be added yet
-        if (context.m_last_known_hash != crypto::null_hash && r.block_ids.front() != context.m_last_known_hash)
+        if (context.m_last_known_hash && r.block_ids.front() != context.m_last_known_hash)
           r.block_ids.push_front(context.m_last_known_hash);
       }
 

@@ -164,17 +164,12 @@ std::vector<cryptonote::tx_verification_batch_info> tests::proxy_core::parse_inc
 
     for (size_t i = 0; i < tx_blobs.size(); i++) {
         auto &txi = tx_info[i];
-        crypto::hash tx_prefix_hash = null_hash;
+        crypto::hash tx_prefix_hash{};
         if (opts.kept_by_block) {
             txi.result = txi.parsed = true;
         } else if (parse_and_validate_tx_from_blob(tx_blobs[i], txi.tx, txi.tx_hash, tx_prefix_hash)) {
-            std::cout << "TX\n\n";
-            std::cout << txi.tx_hash << "\n";
-            std::cout << tx_prefix_hash << "\n";
-            std::cout << tx_blobs[i].size() << "\n";
-            //std::cout << oxenc::to_hex(tx_blob) << "\n\n";
-            std::cout << obj_to_json_str(txi.tx) << "\n";
-            std::cout << "\nENDTX\n";
+          fmt::print("TX\n\n{}\n{}\n{}\n{}\n\nENDTX\n",
+              txi.tx_hash, tx_prefix_hash, tx_blobs[i].size(), obj_to_json_str(txi.tx));
             txi.result = txi.parsed = true;
             txi.blob = &tx_blobs[i];
         } else {
@@ -228,13 +223,8 @@ bool tests::proxy_core::handle_incoming_block(const std::string& block_blob, con
 
     crypto::hash h = get_block_hash(b);
     crypto::hash lh = get_block_longhash_w_blockchain(network_type::FAKECHAIN, NULL, b, 0, 0);
-    std::cout << "BLOCK\n\n";
-    std::cout << h << '\n';
-    std::cout << lh << '\n';
-    std::cout << get_transaction_hash(b.miner_tx) << '\n';
-    std::cout << get_object_blobsize(b.miner_tx) << '\n';
-    std::cout << obj_to_json_str(b) << '\n';
-    std::cout << "\nENDBLOCK\n\n";
+    fmt::print("BLOCK\n\n{}\n{}\n{}\n{}\n{}\n\nENDBLOCK\n\n",
+        h, lh, get_transaction_hash(b.miner_tx), get_object_blobsize(b.miner_tx), obj_to_json_str(b));
 
     if (!add_block(h, lh, b, block_blob, checkpoint))
         return false;
@@ -284,7 +274,7 @@ void tests::proxy_core::build_short_history(std::list<crypto::hash> &m_history, 
         m_history.push_front(cit->first);
 
         size_t n = 1 << m_history.size();
-        while (m_hash2blkidx.end() != cit && crypto::null_hash != cit->second.blk.prev_id && n > 0) {
+        while (m_hash2blkidx.end() != cit && cit->second.blk.prev_id && n > 0) {
             n--;
             cit = m_hash2blkidx.find(cit->second.blk.prev_id);
         }
@@ -294,10 +284,10 @@ void tests::proxy_core::build_short_history(std::list<crypto::hash> &m_history, 
 bool tests::proxy_core::add_block(const crypto::hash &_id, const crypto::hash &_longhash, const cryptonote::block &_blk, const std::string &_blob, cryptonote::checkpoint_t const *) {
     size_t height = 0;
 
-    if (crypto::null_hash != _blk.prev_id) {
+    if (_blk.prev_id) {
         std::unordered_map<crypto::hash, tests::block_index>::const_iterator cit = m_hash2blkidx.find(_blk.prev_id);
         if (m_hash2blkidx.end() == cit) {
-            std::cerr << "ERROR: can't find previous block with id \"" << _blk.prev_id << "\"\n";
+            fmt::print(stderr, "ERROR: can't find previous block with id \"{}\"\n", _blk.prev_id);
             return false;
         }
 

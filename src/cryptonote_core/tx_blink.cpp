@@ -51,17 +51,17 @@ crypto::public_key blink_tx::get_sn_pubkey(subquorum q, int position, const serv
         // TODO FIXME XXX - we don't want a failure here; if this happens we need to go back into state
         // history to retrieve the state info.  (Or maybe this can't happen?)
         log::error(globallogcat, "FIXME: could not get blink quorum for blink_tx");
-        return crypto::null_pkey;
+        return crypto::null<crypto::public_key>;
     }
 
     if (position < (int) blink_quorum->validators.size())
         return blink_quorum->validators[position];
 
-    return crypto::null_pkey;
+    return crypto::null<crypto::public_key>;
 };
 
 crypto::hash blink_tx::hash(bool approved) const {
-    auto buf = tools::memcpy_le(height, get_txhash().data, uint8_t{approved});
+    auto buf = tools::memcpy_le(height, get_txhash(), uint8_t{approved});
     crypto::hash blink_hash;
     crypto::cn_fast_hash(buf.data(), buf.size(), blink_hash);
     return blink_hash;

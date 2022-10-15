@@ -523,7 +523,7 @@ namespace
     }
     catch (const tools::error::tx_rejected& e)
     {
-      fail_msg_writer() << (boost::format(sw::tr("transaction %s was rejected by daemon")) % get_transaction_hash(e.tx())).str();
+      fail_msg_writer() << (boost::format(sw::tr("transaction %s was rejected by daemon")) % "{}"_format(get_transaction_hash(e.tx()))).str();
       std::string reason = e.reason();
       if (!reason.empty())
         fail_msg_writer() << sw::tr("Reason: ") << reason;
@@ -585,9 +585,8 @@ namespace
 
   void print_secret_key(const crypto::secret_key &k)
   {
-    std::string_view data{k.data, sizeof(k.data)};
     std::ostream_iterator<char> osi{std::cout};
-    oxenc::to_hex(data.begin(), data.end(), osi);
+    oxenc::to_hex(k.begin(), k.end(), osi);
   }
 
   bool long_payment_id_failure(bool ret)
@@ -3551,7 +3550,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
         {
           crypto::secret_key key;
           crypto::cn_slow_hash(seed_pass.data(), seed_pass.size(), (crypto::hash&)key, crypto::cn_slow_hash_type::heavy_v1);
-          sc_reduce32((unsigned char*)key.data);
+          sc_reduce32(key.data());
           multisig_keys = m_wallet->decrypt(std::string(multisig_keys.data(), multisig_keys.size()), key, true);
         }
         else
@@ -4795,7 +4794,7 @@ void simple_wallet::on_money_received(uint64_t height, const crypto::hash &txid,
     parse_tx_extra(tx.extra, tx_extra_fields); // failure ok
     tx_extra_nonce extra_nonce;
     tx_extra_pub_key extra_pub_key;
-    crypto::hash8 payment_id8 = crypto::null_hash8;
+    crypto::hash8 payment_id8{};
     if (find_tx_extra_field_by_type(tx_extra_fields, extra_pub_key))
     {
       const crypto::public_key &tx_pub_key = extra_pub_key.pub_key;
@@ -4808,11 +4807,11 @@ void simple_wallet::on_money_received(uint64_t height, const crypto::hash &txid,
      }
     }
 
-    if (payment_id8 != crypto::null_hash8)
+    if (payment_id8)
       message_writer() <<
         tr("NOTE: this transaction uses an encrypted payment ID: consider using subaddresses instead");
 
-    crypto::hash payment_id = crypto::null_hash;
+    crypto::hash payment_id{};
     if (get_payment_id_from_tx_extra_nonce(extra_nonce.nonce, payment_id))
       message_writer(fmt::terminal_color::red) <<
         tr("WARNING: this transaction uses an unencrypted payment ID: these are obsolete and ignored. Use subaddresses instead.");
@@ -5227,7 +5226,11 @@ bool simple_wallet::show_incoming_transfers(const std::vector<std::string>& args
       }
       std::string extra_string;
       if (verbose)
-        extra_string += (boost::format("%68s%68s") % td.get_public_key() % (td.m_key_image_known ? tools::type_to_hex(td.m_key_image) : td.m_key_image_partial ? (tools::type_to_hex(td.m_key_image) + "/p") : std::string(64, '?'))).str();
+        extra_string += "{:68}{:68}"_format(
+            td.get_public_key(), 
+            (td.m_key_image_known ? tools::type_to_hex(td.m_key_image) :
+             td.m_key_image_partial ? tools::type_to_hex(td.m_key_image) + "/p" :
+             std::string(64, '?')));
       if (uses)
       {
         std::vector<uint64_t> heights;
@@ -5242,15 +5245,15 @@ bool simple_wallet::show_incoming_transfers(const std::vector<std::string>& args
         extra_string += std::string("\n    ") + tr("Used at heights: ") + line.first + "\n    " + line.second;
       }
       message_writer(td.m_spent ? fmt::terminal_color::magenta : fmt::terminal_color::green) <<
-        boost::format("%21s%8s%12s%8s%16u%68s%16u%s") %
-        print_money(td.amount()) %
-        (td.m_spent ? tr("T") : tr("F")) %
-        (m_wallet->frozen(td) ? tr("[frozen]") : m_wallet->is_transfer_unlocked(td) ? tr("unlocked") : tr("locked")) %
-        (td.is_rct() ? tr("RingCT") : tr("-")) %
-        td.m_global_output_index %
-        td.m_txid %
-        td.m_subaddr_index.minor %
-        extra_string;
+        "{:21}{:8}{:12}{:8}{:16d}{:68s}{:16d}{}"_format(
+        print_money(td.amount()),
+        td.m_spent ? tr("T") : tr("F"),
+        tr(m_wallet->frozen(td) ? "[frozen]" : m_wallet->is_transfer_unlocked(td) ? "unlocked" : "locked"),
+        tr(td.is_rct() ? "RingCT" : "-"),
+        td.m_global_output_index,
+        td.m_txid,
+        td.m_subaddr_index.minor,
+        extra_string);
       ++transfers_found;
     }
   }
@@ -5290,8 +5293,9 @@ bool simple_wallet::show_payments(const std::vector<std::string> &args)
 
   rdln::suspend_readline pause_readline;
 
-  message_writer() << boost::format("%68s%68s%12s%21s%16s%16s") %
-    tr("payment") % tr("transaction") % tr("height") % tr("amount") % tr("unlock time") % tr("addr index");
+  constexpr auto payment_format = "{:68}{:68}{:12}{:21}{:16}{:16}"sv;
+  message_writer() << fmt::format(payment_format,
+    tr("payment"), tr("transaction"), tr("height"), tr("amount"), tr("unlock time"), tr("addr index"));
 
   bool payments_found = false;
   for(std::string arg : args)
@@ -5313,14 +5317,13 @@ bool simple_wallet::show_payments(const std::vector<std::string> &args)
         {
           payments_found = true;
         }
-        success_msg_writer(true) <<
-          boost::format("%68s%68s%12s%21s%16s%16s") %
-          payment_id %
-          pd.m_tx_hash %
-          pd.m_block_height %
-          print_money(pd.m_amount) %
-          pd.m_unlock_time %
-          pd.m_subaddr_index.minor;
+        success_msg_writer(true) << fmt::format(payment_format,
+          payment_id,
+          pd.m_tx_hash,
+          pd.m_block_height,
+          print_money(pd.m_amount),
+          pd.m_unlock_time,
+          pd.m_subaddr_index.minor);
       }
     }
     else
@@ -5503,7 +5506,7 @@ bool simple_wallet::process_ring_members(const std::vector<tools::wallet2::pendi
     const cryptonote::transaction& tx = ptx_vector[n].tx;
     const wallet::tx_construction_data& construction_data = ptx_vector[n].construction_data;
     if (verbose)
-      ostr << boost::format(tr("\nTransaction %llu/%llu: txid=%s")) % (n + 1) % ptx_vector.size() % cryptonote::get_transaction_hash(tx);
+      ostr << boost::format(tr("\nTransaction %llu/%llu: txid=%s")) % (n + 1) % ptx_vector.size() % "{}"_format(cryptonote::get_transaction_hash(tx));
     // for each input
     std::vector<uint64_t>     spent_key_height(tx.vin.size());
     std::vector<crypto::hash> spent_key_txid  (tx.vin.size());
@@ -7778,7 +7781,7 @@ bool simple_wallet::accept_loaded_tx(const std::function<size_t()> get_num_txes,
 
     std::vector<tx_extra_field> tx_extra_fields;
     bool has_encrypted_payment_id = false;
-    crypto::hash8 payment_id8 = crypto::null_hash8;
+    crypto::hash8 payment_id8{};
     if (cryptonote::parse_tx_extra(cd.extra, tx_extra_fields))
     {
       tx_extra_nonce extra_nonce;

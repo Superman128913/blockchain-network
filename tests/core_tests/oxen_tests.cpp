@@ -1070,8 +1070,10 @@ static ons_keys_t make_ons_keys(cryptonote::account_base const &src)
   auto iter = result.wallet_value.buffer.begin();
   uint8_t identifier = 0;
   iter = std::copy_n(&identifier, 1, iter);
-  iter = std::copy_n(src.get_keys().m_account_address.m_spend_public_key.data, sizeof(src.get_keys().m_account_address.m_spend_public_key.data), iter);
-  iter = std::copy_n(src.get_keys().m_account_address.m_view_public_key.data, sizeof(src.get_keys().m_account_address.m_view_public_key.data), iter);
+  auto& spubkey = src.get_keys().m_account_address.m_spend_public_key;
+  iter = std::copy(spubkey.begin(), spubkey.end(), iter);
+  auto& vpubkey = src.get_keys().m_account_address.m_view_public_key;
+  iter = std::copy(vpubkey.begin(), vpubkey.end(), iter);
 
   // NOTE: Just needs a 32 byte key. Reuse spend key
   memcpy(&result.lokinet_value.buffer[0], (char *)&result.owner.wallet.address.m_spend_public_key, result.lokinet_value.len);
@@ -1551,7 +1553,7 @@ bool oxen_name_system_invalid_tx_extra_params::generate(std::vector<test_event_e
       // Blockchain name empty
       {
         cryptonote::tx_extra_oxen_name_system data = valid_data;
-        data.name_hash                             = {};
+        data.name_hash.zero();
         data.encrypted_value                       = miner_key.wallet_value.make_encrypted("").to_string();
         make_ons_tx_with_custom_extra(gen, events, miner, data, false, "(Blockchain) Empty wallet name in ONS is invalid");
       }
@@ -1579,7 +1581,7 @@ bool oxen_name_system_invalid_tx_extra_params::generate(std::vector<test_event_e
       // Lokinet name empty
       {
         cryptonote::tx_extra_oxen_name_system data = valid_data;
-        data.name_hash                             = {};
+        data.name_hash.zero();
         data.encrypted_value                       = miner_key.lokinet_value.make_encrypted("").to_string();
         make_ons_tx_with_custom_extra(gen, events, miner, data, false, "(Lokinet) Empty domain name in ONS is invalid");
       }
@@ -1624,7 +1626,7 @@ bool oxen_name_system_invalid_tx_extra_params::generate(std::vector<test_event_e
     // Session name empty
     {
       cryptonote::tx_extra_oxen_name_system data = valid_data;
-      data.name_hash                             = {};
+      data.name_hash.zero();
       data.encrypted_value                       = miner_key.session_value.make_encrypted("").to_string();
       make_ons_tx_with_custom_extra(gen, events, miner, data, false, "(Session) Name empty");
     }
@@ -2119,7 +2121,7 @@ static crypto::hash ons_signature_hash(Args&&... args) {
   crypto::hash hash{};
   auto data = ons::tx_extra_signature(std::forward<Args>(args)...);
   if (!data.empty())
-    crypto_generichash(reinterpret_cast<unsigned char*>(hash.data), sizeof(hash), reinterpret_cast<const unsigned char*>(data.data()), data.size(), nullptr, 0);
+    crypto_generichash(hash.data(), hash.size(), reinterpret_cast<const unsigned char*>(data.data()), data.size(), nullptr, 0);
   return hash;
 }
 
@@ -2148,8 +2150,8 @@ bool oxen_name_system_update_mapping_multiple_owners::generate(std::vector<test_
     crypto::ed25519_secret_key owner1_key;
     crypto::ed25519_secret_key owner2_key;
 
-    crypto_sign_ed25519_keypair(owner1.ed25519.data, owner1_key.data);
-    crypto_sign_ed25519_keypair(owner2.ed25519.data, owner2_key.data);
+    crypto_sign_ed25519_keypair(owner1.ed25519.data(), owner1_key.data());
+    crypto_sign_ed25519_keypair(owner2.ed25519.data(), owner2_key.data());
     owner1.type = ons::generic_owner_sig_type::ed25519;
     owner2.type = ons::generic_owner_sig_type::ed25519;
 
@@ -2277,7 +2279,7 @@ bool oxen_name_system_update_mapping_multiple_owners::generate(std::vector<test_
     ons::generic_owner owner2 = ons::make_monero_owner(account2.get_keys().m_account_address, false /*subaddress*/);
     crypto::ed25519_secret_key owner1_key;
 
-    crypto_sign_ed25519_keypair(owner1.ed25519.data, owner1_key.data);
+    crypto_sign_ed25519_keypair(owner1.ed25519.data(), owner1_key.data());
     owner1.type = ons::generic_owner_sig_type::ed25519;
 
     std::string name = "hello_driver";
@@ -2337,7 +2339,7 @@ bool oxen_name_system_update_mapping_multiple_owners::generate(std::vector<test_
     ons::generic_owner owner2;
 
     crypto::ed25519_secret_key owner2_key;
-    crypto_sign_ed25519_keypair(owner2.ed25519.data, owner2_key.data);
+    crypto_sign_ed25519_keypair(owner2.ed25519.data(), owner2_key.data());
     owner2.type = ons::generic_owner_sig_type::ed25519;
 
     std::string name = "hello_passenger";

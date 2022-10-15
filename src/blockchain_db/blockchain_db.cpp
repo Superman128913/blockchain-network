@@ -201,7 +201,7 @@ uint64_t BlockchainDB::add_block( const std::pair<block, std::string>& blck
     num_rct_outs += blk.miner_tx.vout.size();
 
   int tx_i = 0;
-  crypto::hash tx_hash = crypto::null_hash;
+  crypto::hash tx_hash{};
   for (const std::pair<transaction, std::string>& tx : txs)
   {
     tx_hash = blk.tx_hashes[tx_i];

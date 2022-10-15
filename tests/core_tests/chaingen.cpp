@@ -706,7 +706,7 @@ cryptonote::transaction oxen_chain_generator::create_oxen_name_system_tx(crypton
   auto lcname = tools::lowercase_ascii_string(name);
   crypto::hash name_hash       = ons::name_to_hash(lcname);
   std::string name_base64_hash = ons::name_to_base64_hash(lcname);
-  crypto::hash prev_txid = crypto::null_hash;
+  crypto::hash prev_txid{};
   if (ons::mapping_record mapping = ons_db_->get_mapping(type, name_base64_hash, new_height))
     prev_txid = mapping.txid;
 
@@ -767,7 +767,7 @@ cryptonote::transaction oxen_chain_generator::create_oxen_name_system_tx_update(
     auto data = ons::tx_extra_signature(encrypted_value.to_view(), owner, backup_owner, prev_txid);
     crypto::hash hash{};
     if (!data.empty())
-        crypto_generichash(reinterpret_cast<unsigned char*>(hash.data), sizeof(hash), reinterpret_cast<const unsigned char*>(data.data()), data.size(), nullptr, 0);
+        crypto_generichash(hash.data(), hash.size(), reinterpret_cast<const unsigned char*>(data.data()), data.size(), nullptr, 0);
     generate_signature(hash, src.get_keys().m_account_address.m_spend_public_key, src.get_keys().m_spend_secret_key, signature->monero);
     signature->type = ons::generic_owner_sig_type::monero;
   }
@@ -849,7 +849,7 @@ static void fill_nonce_with_test_generator(test_generator *generator, cryptonote
   cryptonote::randomx_longhash_context randomx_context = {};
   if (generator->m_hf_version >= hf::hf12_checkpointing)
   {
-    randomx_context.seed_height = crypto::rx_seedheight(height);
+    randomx_context.seed_height = rx_seedheight(height);
     cryptonote::block prev      = blk;
     do
     {
@@ -876,7 +876,7 @@ void fill_nonce_with_oxen_generator(oxen_chain_generator const *generator, crypt
   cryptonote::randomx_longhash_context randomx_context = {};
   if (generator->blocks().size() && generator->hardfork() >= hf::hf12_checkpointing)
   {
-    randomx_context.seed_height = crypto::rx_seedheight(height);
+    randomx_context.seed_height = rx_seedheight(height);
     randomx_context.seed_block_hash = cryptonote::get_block_hash(generator->blocks()[randomx_context.seed_height].block);
     randomx_context.current_blockchain_height = height;
   }
@@ -899,14 +899,15 @@ oxen_blockchain_entry oxen_chain_generator::create_genesis_block(const cryptonot
   blk.major_version            = hf_version_;
   blk.minor_version            = static_cast<uint8_t>(hf_version_);
   blk.timestamp                = timestamp;
-  blk.prev_id                  = crypto::null_hash;
+  blk.prev_id.zero();
 
   // TODO(doyle): Does this evaluate to 0? If so we can simplify this a lot more
   size_t target_block_weight = get_transaction_weight(blk.miner_tx);
 
   while (true)
   {
-    auto [constructed, block_rewards] = construct_miner_tx(height,
+    [[maybe_unused]] auto [constructed, block_rewards] = construct_miner_tx(
+                                          height,
                                           0 /*median_weight*/,
                                           0 /*already_generated_coins*/,
                                           target_block_weight,
@@ -1237,7 +1238,7 @@ std::vector<uint64_t> oxen_chain_generator::last_n_block_weights(uint64_t height
 void test_generator::get_block_chain(std::vector<block_info>& blockchain, const crypto::hash& head, size_t n) const
 {
   crypto::hash curr = head;
-  while (crypto::null_hash != curr && blockchain.size() < n)
+  while (curr && blockchain.size() < n)
   {
     auto it = m_blocks_info.find(curr);
     if (m_blocks_info.end() == it)
@@ -1258,7 +1259,7 @@ void test_generator::get_block_chain(std::vector<cryptonote::block> &blockchain,
                                      size_t n) const
 {
   crypto::hash curr = head;
-  while (crypto::null_hash != curr && blockchain.size() < n)
+  while (curr && blockchain.size() < n)
   {
     auto it = m_blocks_info.find(curr);
     if (m_blocks_info.end() == it)
@@ -1455,7 +1456,7 @@ bool test_generator::construct_block(cryptonote::block &blk,
 {
   std::vector<uint64_t> block_weights;
   std::list<cryptonote::transaction> tx_list;
-  return construct_block(blk, 0, crypto::null_hash, miner_acc, timestamp, 0, block_weights, tx_list);
+  return construct_block(blk, 0, crypto::null<crypto::hash>, miner_acc, timestamp, 0, block_weights, tx_list);
 }
 
 bool test_generator::construct_block(cryptonote::block &blk,
@@ -2048,9 +2049,9 @@ std::string block_tracker::dump_data()
       ss << "    idx: " << oi.idx
       << ", rct: " << oi.rct
       << ", xmr: " << oi.amount
-      << ", key: " << dump_keys(out.key.data)
+      << ", key: " << dump_keys(out.key.data())
       << ", msk: " << dump_keys(oi.comm.bytes)
-      << ", txid: " << dump_keys(oi.p_tx->hash.data)
+      << ", txid: " << dump_keys(oi.p_tx->hash.data())
       << '\n';
     }
   }
@@ -2510,7 +2511,7 @@ bool find_block_chain(const std::vector<test_event_entry> &events, std::vector<c
   {
     blockchain.push_back(*it->second);
     id = it->second->prev_id;
-    if (crypto::null_hash == id)
+    if (!id)
     {
       b_success = true;
       break;
@@ -2568,7 +2569,7 @@ bool find_block_chain(const std::vector<test_event_entry> &events, std::vector<c
   {
     blockchain.push_back(it->second);
     id = it->second->prev_id;
-    if (crypto::null_hash == id)
+    if (!id)
     {
       b_success = true;
       break;

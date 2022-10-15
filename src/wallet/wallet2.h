@@ -193,7 +193,7 @@ private:
   class hashchain
   {
   public:
-    hashchain(): m_genesis(crypto::null_hash), m_offset(0) {}
+    hashchain(): m_genesis(crypto::null<crypto::hash>), m_offset(0) {}
 
     size_t size() const { return m_blockchain.size() + m_offset; }
     size_t offset() const { return m_offset; }
@@ -373,7 +373,7 @@ private:
       uint64_t m_change = std::numeric_limits<std::uint64_t>::max();
       uint64_t m_block_height = 0;
       std::vector<cryptonote::tx_destination_entry> m_dests;
-      crypto::hash m_payment_id = crypto::null_hash;
+      crypto::hash m_payment_id = crypto::null<crypto::hash>;
       uint64_t m_timestamp = 0;
       uint64_t m_unlock_time = 0; // NOTE(oxen): Not used after TX v2.
       std::vector<uint64_t> m_unlock_times;
@@ -1934,20 +1934,20 @@ namespace boost::serialization
       {
         crypto::hash payment_id;
         a & payment_id;
-        x.m_has_payment_id = !(payment_id == crypto::null_hash);
+        x.m_has_payment_id = (bool) payment_id;
         if (x.m_has_payment_id)
         {
           bool is_long = false;
           for (int i = 8; i < 32; ++i)
-            is_long |= payment_id.data[i];
+            is_long |= payment_id[i];
           if (is_long)
           {
             oxen::log::warning(oxen::log::Cat("wallet.wallet2"), "Long payment ID ignored on address book load");
-            x.m_payment_id = crypto::null_hash8;
+            x.m_payment_id.zero();
             x.m_has_payment_id = false;
           }
           else
-            memcpy(x.m_payment_id.data, payment_id.data, 8);
+            memcpy(x.m_payment_id.data(), payment_id.data(), 8);
         }
       }
       a & x.m_description;

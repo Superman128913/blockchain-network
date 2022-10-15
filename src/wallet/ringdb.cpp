@@ -116,7 +116,7 @@ crypto::chacha_iv make_iv(const crypto::key_image &key_image, const crypto::chac
   memcpy(buffer + sizeof(key_image) + sizeof(key) + cryptonote::hashkey::RINGDB.size(), &field, sizeof(field));
   crypto::hash hash;
   // if field is 0, backward compat mode: hash without the field
-  crypto::cn_fast_hash(buffer, sizeof(buffer) - !field, hash.data);
+  crypto::cn_fast_hash(buffer, sizeof(buffer) - !field, hash.data());
   static_assert(sizeof(hash) >= CHACHA_IV_SIZE, "Incompatible hash and chacha IV sizes");
   crypto::chacha_iv iv;
   memcpy(&iv, &hash, CHACHA_IV_SIZE);

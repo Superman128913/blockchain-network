@@ -111,7 +111,7 @@ namespace cryptonote
   //---------------------------------------------------------------  
   crypto::hash get_transaction_prefix_hash(const transaction_prefix& tx, hw::device &hwdev)
   {
-    crypto::hash h = null_hash;
+    crypto::hash h{};
     get_transaction_prefix_hash(tx, h, hwdev);
     return h;
   }
@@ -119,7 +119,7 @@ namespace cryptonote
   //---------------------------------------------------------------
   crypto::hash get_transaction_prefix_hash(const transaction_prefix& tx)
   {
-    crypto::hash h = null_hash;
+    crypto::hash h{};
     get_transaction_prefix_hash(tx, h);
     return h;
   }
@@ -300,11 +300,11 @@ namespace cryptonote
       return true;
     }
 
-    if (ack.m_spend_secret_key == crypto::null_skey)
+    if (!ack.m_spend_secret_key)
     {
       // for watch-only wallet, simply copy the known output pubkey
       in_ephemeral.pub = out_key;
-      in_ephemeral.sec = crypto::null_skey;
+      in_ephemeral.sec.zero();
     }
     else
     {
@@ -561,7 +561,7 @@ namespace cryptonote
     tx_extra_pub_key pub_key_field;
     if (get_field_from_tx_extra(tx_extra, pub_key_field, pk_index))
       return pub_key_field.pub_key;
-    return null_pkey;
+    return null<public_key>;
   }
   //---------------------------------------------------------------
   crypto::public_key get_tx_pub_key_from_extra(const transaction_prefix& tx_prefix, size_t pk_index)
@@ -765,7 +765,7 @@ namespace cryptonote
     tx_extra_service_node_winner winner;
     if (get_field_from_tx_extra(tx_extra, winner))
       return winner.m_service_node_key;
-    return crypto::null_pkey;
+    return null<public_key>;
   }
   //---------------------------------------------------------------
   void add_oxen_name_system_to_tx_extra(std::vector<uint8_t> &tx_extra, tx_extra_oxen_name_system const &entry)
@@ -1022,7 +1022,7 @@ namespace cryptonote
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, std::vector<size_t>& outs, uint64_t& money_transfered)
   {
     crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(tx);
-    if(null_pkey == tx_pub_key)
+    if (!tx_pub_key)
       return false;
     std::vector<crypto::public_key> additional_tx_pub_keys = get_additional_tx_pub_keys_from_extra(tx);
     return lookup_acc_outs(acc, tx, tx_pub_key, additional_tx_pub_keys, outs, money_transfered);
@@ -1194,7 +1194,7 @@ namespace cryptonote
   //---------------------------------------------------------------
   crypto::hash get_transaction_hash(const transaction& t)
   {
-    crypto::hash h = null_hash;
+    crypto::hash h{};
     get_transaction_hash(t, h, NULL);
     CHECK_AND_ASSERT_THROW_MES(get_transaction_hash(t, h, NULL), "Failed to calculate transaction hash");
     return h;
@@ -1265,7 +1265,7 @@ namespace cryptonote
 
     // prunable rct
     if (t.rct_signatures.type == rct::RCTType::Null)
-      hashes[2] = crypto::null_hash;
+      hashes[2].zero();
     else
       hashes[2] = pruned_data_hash;
 
@@ -1321,7 +1321,7 @@ namespace cryptonote
     // prunable rct
     if (t.rct_signatures.type == rct::RCTType::Null)
     {
-      hashes[2] = crypto::null_hash;
+      hashes[2].zero();
     }
     else if (!calculate_transaction_prunable_hash(t, &blob, hashes[2]))
     {
@@ -1412,7 +1412,7 @@ namespace cryptonote
   //---------------------------------------------------------------
   crypto::hash get_block_hash(const block& b)
   {
-    crypto::hash p = null_hash;
+    crypto::hash p{};
     get_block_hash(b, p);
     return p;
   }
@@ -1496,7 +1496,7 @@ namespace cryptonote
   //---------------------------------------------------------------
   crypto::hash get_tx_tree_hash(const std::vector<crypto::hash>& tx_hashes)
   {
-    crypto::hash h = null_hash;
+    crypto::hash h{};
     get_tx_tree_hash(tx_hashes, h);
     return h;
   }
@@ -1505,7 +1505,7 @@ namespace cryptonote
   {
     std::vector<crypto::hash> txs_ids;
     txs_ids.reserve(1 + b.tx_hashes.size());
-    crypto::hash h = null_hash;
+    crypto::hash h{};
     size_t bl_sz = 0;
     CHECK_AND_ASSERT_THROW_MES(get_transaction_hash(b.miner_tx, h, bl_sz), "Failed to calculate transaction hash");
     txs_ids.push_back(h);
@@ -1518,7 +1518,7 @@ namespace cryptonote
   {
     crypto::hash hash;
     crypto::cn_slow_hash(passphrase.data(), passphrase.size(), hash, crypto::cn_slow_hash_type::heavy_v1);
-    sc_add((unsigned char*)key.data, (const unsigned char*)key.data, (const unsigned char*)hash.data);
+    sc_add(key.data(), key.data(), hash.data());
     return key;
   }
   //---------------------------------------------------------------
@@ -1526,27 +1526,8 @@ namespace cryptonote
   {
     crypto::hash hash;
     crypto::cn_slow_hash(passphrase.data(), passphrase.size(), hash, crypto::cn_slow_hash_type::heavy_v1);
-    sc_sub((unsigned char*)key.data, (const unsigned char*)key.data, (const unsigned char*)hash.data);
+    sc_sub(key.data(), key.data(), hash.data());
     return key;
   }
 
-}
-
-std::string ons::generic_owner::to_string(cryptonote::network_type nettype) const
-{
-  if (type == ons::generic_owner_sig_type::monero)
-    return cryptonote::get_account_address_as_str(nettype, wallet.is_subaddress, wallet.address);
-  else
-    return tools::type_to_hex(ed25519);
-}
-
-bool ons::generic_owner::operator==(generic_owner const &other) const
-{
-  if (type != other.type)
-    return false;
-
-  if (type == ons::generic_owner_sig_type::monero)
-    return wallet.is_subaddress == other.wallet.is_subaddress && wallet.address == other.wallet.address;
-  else
-    return ed25519 == other.ed25519;
 }

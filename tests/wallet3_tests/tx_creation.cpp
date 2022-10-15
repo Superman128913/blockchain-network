@@ -11,8 +11,6 @@
 #include "mock_daemon_comms.hpp"
 #include "mock_decoy_selector.hpp"
 
-#include <oxenmq/hex.h>
-
 namespace wallet
 {
 class MockSigningKeyring : public Keyring

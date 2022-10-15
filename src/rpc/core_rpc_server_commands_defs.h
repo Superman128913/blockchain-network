@@ -1823,7 +1823,7 @@ namespace cryptonote::rpc {
       /// If specified then only return results if the current top block hash is different than the
       /// hash given here.  This is intended to allow quick polling of results without needing to do
       /// anything if the block (and thus SN registrations) have not changed since the last request.
-      crypto::hash poll_block_hash = crypto::hash::null();
+      crypto::hash poll_block_hash{};
     } request;
   };
 

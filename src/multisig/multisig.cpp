@@ -81,7 +81,7 @@ namespace cryptonote
       crypto::secret_key msk = get_multisig_blinded_secret_key(rct::rct2sk(sk));
       memwipe(&sk, sizeof(sk));
       multisig_keys.push_back(msk);
-      sc_add(spend_skey.bytes, spend_skey.bytes, (const unsigned char*)msk.data);
+      sc_add(spend_skey.bytes, spend_skey.bytes, msk.data());
     }
   }
   //-----------------------------------------------------------------
@@ -103,7 +103,7 @@ namespace cryptonote
     rct::key secret_key = rct::zero();
     for (const auto &k: multisig_keys)
     {
-      sc_add(secret_key.bytes, secret_key.bytes, (const unsigned char*)k.data);
+      sc_add(secret_key.bytes, secret_key.bytes, k.data());
     }
 
     return rct::rct2sk(secret_key);
@@ -126,7 +126,7 @@ namespace cryptonote
   {
     crypto::secret_key view_skey = get_multisig_blinded_secret_key(skey);
     for (const auto &k: skeys)
-      sc_add(reinterpret_cast<unsigned char*>(view_skey.data), rct::sk2rct(view_skey).bytes, rct::sk2rct(k).bytes);
+      sc_add(view_skey.data(), rct::sk2rct(view_skey).bytes, rct::sk2rct(k).bytes);
     return view_skey;
   }
   //-----------------------------------------------------------------

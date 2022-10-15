@@ -206,7 +206,7 @@ namespace wallet
   crypto::hash
   Keyring::get_transaction_prefix_hash(const cryptonote::transaction_prefix& tx)
   {
-    crypto::hash h = crypto::null_hash;
+    crypto::hash h{};
     key_device.get_transaction_prefix_hash(tx, h);
     return h;
   }

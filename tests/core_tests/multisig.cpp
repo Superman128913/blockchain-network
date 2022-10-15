@@ -40,6 +40,12 @@ using namespace cryptonote;
 
 //#define NO_MULTISIG
 
+struct secret_key_hasher {
+    size_t operator()(const crypto::secret_key& k) const {
+        return *reinterpret_cast<const size_t*>(k.data());
+    }
+};
+
 void make_multisig_accounts(std::vector<cryptonote::account_base>& account, uint32_t threshold)
 {
   std::vector<crypto::secret_key> all_view_keys;
@@ -96,7 +102,7 @@ void make_multisig_accounts(std::vector<cryptonote::account_base>& account, uint
   std::unordered_set<crypto::public_key> all_multisig_keys;
   for (size_t msidx = 0; msidx < account.size(); ++msidx)
   {
-    std::unordered_set<crypto::secret_key> view_keys(all_view_keys.begin(), all_view_keys.end());
+    std::unordered_set<crypto::secret_key, secret_key_hasher> view_keys(all_view_keys.begin(), all_view_keys.end());
     view_keys.erase(all_view_keys[msidx]);
 
     crypto::secret_key view_skey = cryptonote::generate_multisig_view_secret_key(account[msidx].get_keys().m_view_secret_key, std::vector<secret_key>(view_keys.begin(), view_keys.end()));
@@ -388,7 +394,7 @@ bool gen_multisig_tx_validation_base::generate_with(std::vector<test_event_entry
 
 #ifndef NO_MULTISIG
   // sign
-  std::unordered_set<crypto::secret_key> used_keys;
+  std::unordered_set<crypto::secret_key, secret_key_hasher> used_keys;
   const std::vector<crypto::secret_key> &msk0 = miner_account[creator].get_multisig_keys();
   for (const auto &sk: msk0)
     used_keys.insert(sk);

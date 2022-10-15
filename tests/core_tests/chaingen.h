@@ -359,22 +359,12 @@ public:
   }
 };
 
-template<typename T>
-std::string dump_keys(T * buff32)
+// Dumps the 32-byte contents of some pointer as: [0x01,0xf1,0xbb,....,0xff].
+// (I have no idea why this makes any sense, look, squirrel!)
+inline std::string dump_keys(const void* buff32)
 {
-  std::ostringstream ss;
-  char buff[10];
-
-  ss << "[";
-  for(int i = 0; i < 32; i++)
-  {
-    snprintf(buff, 10, "0x%02x", ((uint8_t)buff32[i] & 0xff));
-    ss << buff;
-    if (i < 31)
-      ss << ",";
-  }
-  ss << "]";
-  return ss.str();
+  auto* begin = reinterpret_cast<const unsigned char*>(buff32);
+  return "[{:#04x}]"_format(fmt::join(begin, begin+32, ","));
 }
 
 struct output_index {
@@ -454,7 +444,7 @@ struct output_index {
 
 typedef std::tuple<uint64_t, crypto::public_key, rct::key> get_outs_entry;
 typedef std::pair<crypto::hash, size_t> output_hasher;
-struct output_hasher_hasher { size_t operator()(const output_hasher &h) const { return *reinterpret_cast<const size_t *>(h.first.data) + h.second; } };
+struct output_hasher_hasher { size_t operator()(const output_hasher &h) const { return *reinterpret_cast<const size_t *>(h.first.data()) + h.second; } };
 typedef std::map<uint64_t, std::vector<size_t> > map_output_t;
 typedef std::map<uint64_t, std::vector<output_index> > map_output_idx_t;
 typedef std::unordered_map<crypto::hash, cryptonote::block> map_block_t;

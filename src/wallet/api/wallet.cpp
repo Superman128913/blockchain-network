@@ -50,6 +50,7 @@
 #include "mnemonics/electrum-words.h"
 #include "mnemonics/english.h"
 #include <boost/format.hpp>
+#include <cinttypes>
 #include <sstream>
 #include <unordered_map>
 #include <thread>
@@ -1703,7 +1704,7 @@ PendingTransaction *WalletImpl::createTransactionMultDest(const std::vector<std:
             setStatusError(tr("transaction was not constructed"));
         } catch (const tools::error::tx_rejected& e) {
             std::ostringstream writer;
-            writer << (boost::format(tr("transaction %s was rejected by daemon with status: ")) % get_transaction_hash(e.tx())) <<  e.status();
+            writer << (boost::format(tr("transaction %s was rejected by daemon with status: ")) % "{}"_format(get_transaction_hash(e.tx()))) <<  e.status();
             setStatusError(writer.str());
         } catch (const tools::error::tx_sum_overflow& e) {
             setStatusError(e.what());
@@ -1795,7 +1796,7 @@ PendingTransaction *WalletImpl::createSweepUnmixableTransaction()
         setStatusError(tr("transaction was not constructed"));
     } catch (const tools::error::tx_rejected& e) {
         std::ostringstream writer;
-        writer << (boost::format(tr("transaction %s was rejected by daemon with status: ")) % get_transaction_hash(e.tx())) <<  e.status();
+        writer << (boost::format(tr("transaction %s was rejected by daemon with status: ")) % "{}"_format(get_transaction_hash(e.tx()))) <<  e.status();
         setStatusError(writer.str());
     } catch (const tools::error::tx_sum_overflow& e) {
         setStatusError(e.what());

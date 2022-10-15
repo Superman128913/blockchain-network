@@ -52,57 +52,50 @@ static std::string extra_nonce_to_string(const cryptonote::tx_extra_nonce &extra
 }
 
 struct extra_printer {
-  void operator()(const tx_extra_padding& x) { std::cout << "padding: " << x.size << " bytes"; }
-  void operator()(const tx_extra_pub_key& x) { std::cout << "pub key: " << x.pub_key; }
-  void operator()(const tx_extra_nonce& x) { std::cout << "nonce: " << extra_nonce_to_string(x); }
-  void operator()(const tx_extra_merge_mining_tag& x) { std::cout << "merge mining tag: depth " << x.depth << ", merkle root " << x.merkle_root; }
-  void operator()(const tx_extra_additional_pub_keys& x) {
-    std::cout << "additional tx pubkeys: ";
-    bool first = true;
-    for (auto& pk : x.data) {
-      if (first) first = false;
-      else std::cout << ", ";
-      std::cout << pk;
-    }
-  }
-  void operator()(const tx_extra_mysterious_minergate& x) { std::cout << "minergate custom: " << oxenc::to_hex(x.data); }
-  void operator()(const tx_extra_service_node_winner& x) { std::cout << "SN reward winner: " << x.m_service_node_key; }
-  void operator()(const tx_extra_service_node_register& x) { std::cout << "SN registration data"; } // TODO: could parse this further
-  void operator()(const tx_extra_service_node_pubkey& x) { std::cout << "SN pubkey: " << x.m_service_node_key; }
-  void operator()(const tx_extra_service_node_contributor& x) { std::cout << "SN contribution"; } // Can't actually print the address without knowing the network type
-  void operator()(const tx_extra_service_node_deregister_old& x) { std::cout << "SN deregistration (pre-HF12)"; }
-  void operator()(const tx_extra_tx_secret_key& x) { std::cout << "TX secret key: " << tools::type_to_hex(x.key); }
-  void operator()(const tx_extra_tx_key_image_proofs& x) { std::cout << "TX key image proofs (" << x.proofs.size() << ")"; }
-  void operator()(const tx_extra_tx_key_image_unlock& x) { std::cout << "TX key image unlock: " << x.key_image; }
-  void operator()(const tx_extra_burn& x) { std::cout << "Transaction burned fee/payment: " << print_money(x.amount); }
-  void operator()(const tx_extra_oxen_name_system& x) {
-    std::cout << "ONS " << (x.is_buying() ? "registration" : x.is_updating() ? "update" : "(unknown)");
+  std::string operator()(const tx_extra_padding& x) { return "padding: {} bytes"_format(x.size); }
+  std::string operator()(const tx_extra_pub_key& x) { return "pub key: {}"_format(x.pub_key); }
+  std::string operator()(const tx_extra_nonce& x) { return "nonce: {}"_format(extra_nonce_to_string(x)); }
+  std::string operator()(const tx_extra_merge_mining_tag& x) { return "merge mining tag: depth {}, markle root {}"_format(x.depth, x.merkle_root); }
+  std::string operator()(const tx_extra_additional_pub_keys& x) { return "additional tx pubkeys: {}"_format(fmt::join(x.data, ", ")); }
+  std::string operator()(const tx_extra_mysterious_minergate& x) { return "minergate custom: {}"_format(oxenc::to_hex(x.data)); }
+  std::string operator()(const tx_extra_service_node_winner& x) { return "SN reward winner: {}"_format(x.m_service_node_key); }
+  std::string operator()(const tx_extra_service_node_register& x) { return "SN registration data"; } // TODO: could parse this further
+  std::string operator()(const tx_extra_service_node_pubkey& x) { return "SN pubkey: {}"_format(x.m_service_node_key); }
+  std::string operator()(const tx_extra_service_node_contributor& x) { return "SN contribution"; } // Can't actually print the address without knowing the network type
+  std::string operator()(const tx_extra_service_node_deregister_old& x) { return "SN deregistration (pre-HF12)"; }
+  std::string operator()(const tx_extra_tx_secret_key& x) { return "TX secret key: {}" + tools::type_to_hex(x.key); }
+  std::string operator()(const tx_extra_tx_key_image_proofs& x) { return "TX key image proofs ({})"_format(x.proofs.size()); }
+  std::string operator()(const tx_extra_tx_key_image_unlock& x) { return "TX key image unlock: {}"_format(x.key_image); }
+  std::string operator()(const tx_extra_burn& x) { return "Transaction burned fee/payment: {}"_format(print_money(x.amount)); }
+  std::string operator()(const tx_extra_oxen_name_system& x) {
+    std::string val = "ONS {}"_format(x.is_buying() ? "registration" : x.is_updating() ? "update" : "(unknown)");
     switch (x.type)
     {
-      case ons::mapping_type::lokinet: std::cout << " - Lokinet (1y)"; break;
-      case ons::mapping_type::lokinet_2years: std::cout << " - Lokinet (2y)"; break;
-      case ons::mapping_type::lokinet_5years: std::cout << " - Lokinet (5y)"; break;
-      case ons::mapping_type::lokinet_10years: std::cout << " - Lokinet (10y)"; break;
-      case ons::mapping_type::session: std::cout << " - Session address"; break;
-      case ons::mapping_type::wallet: std::cout << " - Wallet address"; break;
+      case ons::mapping_type::lokinet: val += " - Lokinet (1y)"; break;
+      case ons::mapping_type::lokinet_2years: val += " - Lokinet (2y)"; break;
+      case ons::mapping_type::lokinet_5years: val += " - Lokinet (5y)"; break;
+      case ons::mapping_type::lokinet_10years: val += " - Lokinet (10y)"; break;
+      case ons::mapping_type::session: val += " - Session address"; break;
+      case ons::mapping_type::wallet: val += " - Wallet address"; break;
       case ons::mapping_type::update_record_internal:
       case ons::mapping_type::_count:
           break;
     }
+    return val;
   }
-  void operator()(const tx_extra_service_node_state_change& x) {
-    std::cout << "SN state change: ";
+  std::string operator()(const tx_extra_service_node_state_change& x) {
+    std::string_view type;
     switch (x.state)
     {
-      case service_nodes::new_state::decommission: std::cout << "decommission"; break;
-      case service_nodes::new_state::recommission: std::cout << "recommission"; break;
-      case service_nodes::new_state::deregister: std::cout << "deregister"; break;
-      case service_nodes::new_state::ip_change_penalty: std::cout << "ip change penalty"; break;
-      case service_nodes::new_state::_count: std::cout << "(unknown)"; break;
+      case service_nodes::new_state::decommission: type = "decommission"; break;
+      case service_nodes::new_state::recommission: type = "recommission"; break;
+      case service_nodes::new_state::deregister: type = "deregister"; break;
+      case service_nodes::new_state::ip_change_penalty: type = "ip change penalty"; break;
+      case service_nodes::new_state::_count: type = "(unknown)"; break;
     }
-    std::cout << " for block height " << x.block_height << ", SN index " << x.service_node_index;
+    return "SN state change: {} for block height {}, SN index {}"_format(
+            type, x.block_height, x.service_node_index);
   }
-  template <typename T> void operator()(const T&) { std::cout << "unknown"; }
 };
 
 
@@ -112,7 +105,7 @@ static void print_extra_fields(const std::vector<cryptonote::tx_extra_field> &fi
   for (size_t n = 0; n < fields.size(); ++n)
   {
     std::cout << "- " << n << ": ";
-    var::visit(extra_printer{}, fields[n]);
+    std::cout << var::visit(extra_printer{}, fields[n]);
     std::cout << "\n";
   }
 }
@@ -246,12 +239,15 @@ int main(int argc, char* argv[])
       {
         addr_decoded = true;
         cryptonote::account_public_address const &address = addr_info.address;
-        std::cout << "Network Type: " << network_type_str(static_cast<cryptonote::network_type>(nettype)) << "\n";
-        std::cout << "Address: " << input << "\n";
-        std::cout << "Subaddress: " << (addr_info.is_subaddress ? "Yes" : "No") << "\n";
-        std::cout << "Payment ID: " << (addr_info.has_payment_id ? tools::type_to_hex(addr_info.payment_id) : "(none)") << "\n";
-        std::cout << "Spend Public Key: " << address.m_spend_public_key << "\n";
-        std::cout << "View Public Key: " << address.m_view_public_key << "\n";
+        fmt::print("Network Type: {}\n", network_type_str(nettype));
+        fmt::print("Address: {}\n", input);
+        fmt::print("Subaddress: {}\n", addr_info.is_subaddress ? "Yes" : "No");
+        if (addr_info.has_payment_id)
+          fmt::print("Payment ID: {}\n", addr_info.payment_id);
+        else
+          fmt::print("Payment ID: (none)\n");
+        fmt::print("Spend Public Key: {}\n", address.m_spend_public_key);
+        fmt::print("View Public Key: {}\n", address.m_view_public_key);
       }
     }
 

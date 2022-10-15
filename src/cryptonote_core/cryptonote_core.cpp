@@ -897,15 +897,15 @@ namespace cryptonote
     // Ed25519 signing).
     //
     if (!init_key(m_config_folder / "key_ed25519", keys.key_ed25519, keys.pub_ed25519,
-          [](crypto::ed25519_secret_key &sk, crypto::ed25519_public_key &pk) { crypto_sign_ed25519_sk_to_pk(pk.data, sk.data); return true; },
-          [](crypto::ed25519_secret_key &sk, crypto::ed25519_public_key &pk) { crypto_sign_ed25519_keypair(pk.data, sk.data); })
+          [](crypto::ed25519_secret_key &sk, crypto::ed25519_public_key &pk) { crypto_sign_ed25519_sk_to_pk(pk.data(), sk.data()); return true; },
+          [](crypto::ed25519_secret_key &sk, crypto::ed25519_public_key &pk) { crypto_sign_ed25519_keypair(pk.data(), sk.data()); })
        )
       return false;
 
     // Standard x25519 keys generated from the ed25519 keypair, used for encrypted communication between SNs
-    int rc = crypto_sign_ed25519_pk_to_curve25519(keys.pub_x25519.data, keys.pub_ed25519.data);
+    int rc = crypto_sign_ed25519_pk_to_curve25519(keys.pub_x25519.data(), keys.pub_ed25519.data());
     CHECK_AND_ASSERT_MES(rc == 0, false, "failed to convert ed25519 pubkey to x25519");
-    crypto_sign_ed25519_sk_to_curve25519(keys.key_x25519.data, keys.key_ed25519.data);
+    crypto_sign_ed25519_sk_to_curve25519(keys.key_x25519.data(), keys.key_ed25519.data());
 
     // Legacy primary SN key file; we only load this if it exists, otherwise we use `key_ed25519`
     // for the primary SN keypair.  (This key predates the Ed25519 keys and so is needed for
@@ -917,7 +917,7 @@ namespace cryptonote
         epee::wipeable_string privkey_signhash;
         privkey_signhash.resize(crypto_hash_sha512_BYTES);
         unsigned char* pk_sh_data = reinterpret_cast<unsigned char*>(privkey_signhash.data());
-        crypto_hash_sha512(pk_sh_data, keys.key_ed25519.data, 32 /* first 32 bytes are the seed to be SHA512 hashed (the last 32 are just the pubkey) */);
+        crypto_hash_sha512(pk_sh_data, keys.key_ed25519.data(), 32 /* first 32 bytes are the seed to be SHA512 hashed (the last 32 are just the pubkey) */);
         // Clamp private key (as libsodium does and expects -- see https://www.jcraige.com/an-explainer-on-ed25519-clamping if you want the broader reasons)
         pk_sh_data[0] &= 248;
         pk_sh_data[31] &= 63; // (some implementations put 127 here, but with the |64 in the next line it is the same thing)
@@ -925,10 +925,11 @@ namespace cryptonote
         // Monero crypto requires a pointless check that the secret key is < basepoint, so calculate
         // it mod basepoint to make it happy:
         sc_reduce32(pk_sh_data);
-        std::memcpy(keys.key.data, pk_sh_data, 32);
+        std::memcpy(keys.key.data(), pk_sh_data, 32);
         if (!crypto::secret_key_to_public_key(keys.key, keys.pub))
           throw std::runtime_error{"Failed to derive primary key from ed25519 key"};
-        assert(0 == std::memcmp(keys.pub.data, keys.pub_ed25519.data, 32));
+        if (std::memcmp(keys.pub.data(), keys.pub_ed25519.data(), 32))
+          throw std::runtime_error{"Internal error: unexpected primary pubkey and ed25519 pubkey mismatch"};
       } else if (!init_key(m_config_folder / "key", keys.key, keys.pub,
           crypto::secret_key_to_public_key,
           [](crypto::secret_key &key, crypto::public_key &pubkey) {
@@ -936,8 +937,8 @@ namespace cryptonote
           }))
         return false;
     } else {
-      keys.key = crypto::null_skey;
-      keys.pub = crypto::null_pkey;
+      keys.key.zero();
+      keys.pub.zero();
     }
 
     if (m_service_node) {
@@ -979,7 +980,7 @@ namespace cryptonote
     AuthLevel auth = default_auth;
     if (x25519_pubkey_str.size() == sizeof(crypto::x25519_public_key)) {
       crypto::x25519_public_key x25519_pubkey;
-      std::memcpy(x25519_pubkey.data, x25519_pubkey_str.data(), x25519_pubkey_str.size());
+      std::memcpy(x25519_pubkey.data(), x25519_pubkey_str.data(), x25519_pubkey_str.size());
       auto user_auth = omq_check_access(x25519_pubkey);
       if (user_auth >= AuthLevel::basic) {
         if (user_auth > auth)
@@ -1936,7 +1937,7 @@ namespace cryptonote
     if (!parse_and_validate_tx_from_blob(tx_blob, tx, tx_hash))
     {
       log::error(logcat, "Failed to parse relayed transaction");
-      return crypto::null_hash;
+      return crypto::null<crypto::hash>;
     }
     txs.push_back(std::make_pair(tx_hash, std::move(tx_blob)));
     m_mempool.set_relayed(txs);
@@ -2265,7 +2266,7 @@ namespace cryptonote
           return;
 
         auto pubkey = m_service_node_list.get_pubkey_from_x25519(m_service_keys.pub_x25519);
-        if (pubkey != crypto::null_pkey && pubkey != m_service_keys.pub && m_service_node_list.is_service_node(pubkey, false /*don't require active*/))
+        if (pubkey && pubkey != m_service_keys.pub && m_service_node_list.is_service_node(pubkey, false /*don't require active*/))
         {
         log::info(logcat, fg(fmt::terminal_color::red),
               "Failed to submit uptime proof: another service node on the network is using the same ed/x25519 keys as this service node. This typically means both have the same 'key_ed25519' private key file.");

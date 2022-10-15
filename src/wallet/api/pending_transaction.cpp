@@ -138,7 +138,7 @@ bool PendingTransactionImpl::commit(std::string_view filename_, bool overwrite, 
         m_status = {Status_Error, tr("no connection to daemon. Please make sure daemon is running.")};
     } catch (const tools::error::tx_rejected& e) {
         m_status.first = Status_Error;
-        m_status.second += (boost::format(tr("transaction %s was rejected by daemon with status: ")) % get_transaction_hash(e.tx())).str();
+        m_status.second += (boost::format(tr("transaction %s was rejected by daemon with status: ")) % "{}"_format(get_transaction_hash(e.tx()))).str();
         m_status.second += e.status();
         if (auto& reason = e.reason(); !reason.empty())
             m_status.second += tr(". Reason: ") + reason;

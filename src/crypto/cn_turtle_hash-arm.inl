@@ -217,7 +217,7 @@ STATIC INLINE void aligned_free(void *ptr)
 }
 #endif /* FORCE_USE_HEAP */
 
-void cn_turtle_hash(const void *data, size_t length, char *hash, int light, int variant, int prehashed, uint32_t scratchpad, uint32_t iterations)
+void cn_turtle_hash(const void *data, size_t length, unsigned char *hash, int light, int variant, int prehashed, uint32_t scratchpad, uint32_t iterations)
 {
   uint32_t TOTALBLOCKS = (CN_TURTLE_PAGE_SIZE / AES_BLOCK_SIZE);
   uint32_t init_rounds = (scratchpad / INIT_SIZE_BYTE);
@@ -244,7 +244,7 @@ void cn_turtle_hash(const void *data, size_t length, char *hash, int light, int 
   size_t i, j;
   uint64_t *p = NULL;
 
-  static void (*const extra_hashes[4])(const void *, size_t, char *) =
+  static void (*const extra_hashes[4])(const void *, size_t, unsigned char *) =
   {
       hash_extra_blake, hash_extra_groestl, hash_extra_jh, hash_extra_skein
   };
@@ -438,7 +438,7 @@ STATIC INLINE void xor_blocks(uint8_t* a, const uint8_t* b)
   U64(a)[1] ^= U64(b)[1];
 }
 
-void cn_turtle_hash(const void *data, size_t length, char *hash, int light, int variant, int prehashed, uint32_t scratchpad, uint32_t iterations)
+void cn_turtle_hash(const void *data, size_t length, unsigned char *hash, int light, int variant, int prehashed, uint32_t scratchpad, uint32_t iterations)
 {
   fprintf(stderr, "%s:%d OMG", __FILE__, __LINE__);
   uint32_t init_rounds = (scratchpad / INIT_SIZE_BYTE);
@@ -458,7 +458,7 @@ void cn_turtle_hash(const void *data, size_t length, char *hash, int light, int 
 
   size_t i, j;
   uint8_t *p = NULL;
-  static void (*const extra_hashes[4])(const void *, size_t, char *) =
+  static void (*const extra_hashes[4])(const void *, size_t, unsigned char *) =
   {
       hash_extra_blake, hash_extra_groestl, hash_extra_jh, hash_extra_skein
   };

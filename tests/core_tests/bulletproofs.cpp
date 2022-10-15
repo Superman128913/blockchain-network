@@ -251,11 +251,11 @@ bool gen_bp_tx_validation_base::generate_with(std::vector<test_event_entry>& eve
       // that it looks obviously fake, then fill the rest with randomness (so that it is still
       // unique).
       for (size_t i = 0; i < 8; i++)
-        tx_hash.data[i] = 0x01 + (0x22 * i);
+        tx_hash[i] = 0x01 + (0x22 * i);
       static std::mt19937_64 rng{std::random_device{}()};
       std::uniform_int_distribution<char> unif{std::numeric_limits<char>::min()};
-      for (size_t i = 8; i < sizeof(tx_hash.data); i++)
-        tx_hash.data[i] = unif(rng);
+      for (size_t i = 8; i < tx_hash.size(); i++)
+        tx_hash[i] = unif(rng);
     }
     starting_rct_tx_hashes.push_back(tx_hash);
     oxen::log::warning(globallogcat, "Test tx: {}", obj_to_json_str(rct_txes.back()));

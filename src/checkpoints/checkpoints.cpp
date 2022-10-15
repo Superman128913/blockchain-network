@@ -76,7 +76,7 @@ namespace cryptonote
 
   crypto::hash get_newest_hardcoded_checkpoint(cryptonote::network_type nettype, uint64_t *height)
   {
-    crypto::hash result = crypto::null_hash;
+    crypto::hash result{};
     *height = 0;
     if (nettype != network_type::MAINNET && nettype != network_type::TESTNET)
       return result;
@@ -129,7 +129,7 @@ namespace cryptonote
   //---------------------------------------------------------------------------
   bool checkpoints::add_checkpoint(uint64_t height, const std::string& hash_str)
   {
-    crypto::hash h = crypto::null_hash;
+    crypto::hash h{};
     bool r         = tools::hex_to_type(hash_str, h);
     CHECK_AND_ASSERT_MES(r, false, "Failed to parse checkpoint hash string into binary representation!");
 

@@ -45,6 +45,16 @@ namespace service_nodes
 {
   static auto logcat = log::Cat("quorum_cop");
 
+  std::string quorum::to_string() const {
+      std::string result;
+      auto append = std::back_inserter(result);
+      for (size_t i = 0; i < validators.size(); i++)
+        fmt::format_to(append, "V[{}] {}\n", i, validators[i]);
+      for (size_t i = 0; i < workers.size(); i++)
+        fmt::format_to(append, "W[{}] {}\n", i, workers[i]);
+      return result;
+  }
+
   std::optional<std::vector<std::string_view>> service_node_test_results::why() const
   {
     if (passed())

@@ -113,9 +113,9 @@ std::string get_data_as_string(const T &key) {
 }
 
 crypto::x25519_public_key x25519_from_string(std::string_view pubkey) {
-    crypto::x25519_public_key x25519_pub = crypto::x25519_public_key::null();
+    crypto::x25519_public_key x25519_pub{};
     if (pubkey.size() == sizeof(crypto::x25519_public_key))
-        std::memcpy(x25519_pub.data, pubkey.data(), pubkey.size());
+        std::memcpy(x25519_pub.data(), pubkey.data(), pubkey.size());
     return x25519_pub;
 }
 
@@ -455,7 +455,7 @@ bt_dict serialize_vote(const quorum_vote_t &vote) {
         {"s", get_data_as_string(vote.signature)},
     };
     if (vote.type == quorum_type::checkpointing)
-        result["bh"] = std::string{vote.checkpoint.block_hash.data, sizeof(crypto::hash)};
+        result["bh"] = std::string{tools::view_guts(vote.checkpoint.block_hash)};
     else {
         result["wi"] = vote.state_change.worker_index;
         result["sc"] = static_cast<std::underlying_type_t<new_state>>(vote.state_change.state);
@@ -478,8 +478,8 @@ quorum_vote_t deserialize_vote(std::string_view v) {
     std::memcpy(&vote.signature, sig.data(), sizeof(vote.signature));
     if (vote.type == quorum_type::checkpointing) {
         auto &bh = var::get<std::string>(d.at("bh"));
-        if (bh.size() != sizeof(vote.checkpoint.block_hash.data)) throw std::invalid_argument("invalid vote checkpoint block hash");
-        std::memcpy(vote.checkpoint.block_hash.data, bh.data(), sizeof(vote.checkpoint.block_hash.data));
+        if (bh.size() != vote.checkpoint.block_hash.size()) throw std::invalid_argument("invalid vote checkpoint block hash");
+        std::memcpy(vote.checkpoint.block_hash.data(), bh.data(), bh.size());
     } else {
         vote.state_change.worker_index = get_int<uint16_t>(d.at("wi"));
         vote.state_change.state = get_enum<new_state>(d, "sc");
@@ -897,7 +897,7 @@ void handle_blink(Message& m, QnetState& qnet) {
     auto &tx_hash_str = var::get<std::string>(data.at("#"));
     bool already_approved = false, already_rejected = false;
     if (tx_hash_str.size() == sizeof(crypto::hash)) {
-        std::memcpy(tx_hash.data, tx_hash_str.data(), sizeof(crypto::hash));
+        std::memcpy(tx_hash.data(), tx_hash_str.data(), tx_hash_str.size());
         std::shared_lock lock{qnet.mutex};
         auto bit = qnet.blinks.find(blink_height);
         if (bit != qnet.blinks.end()) {
@@ -927,7 +927,7 @@ void handle_blink(Message& m, QnetState& qnet) {
                 }
             }
         }
-        log::trace(logcat, "Blink tx hash: {}", to_hex(tx_hash.data));
+        log::trace(logcat, "Blink tx hash: {}", tx_hash);
     } else {
         log::info(logcat, "Rejecting blink tx: invalid tx hash included in request");
         if (tag)
@@ -1137,7 +1137,7 @@ void handle_blink_signature(Message& m, QnetState& qnet) {
     if (hash_str.size() != sizeof(crypto::hash))
         throw std::invalid_argument("Invalid blink signature data: invalid tx hash");
     crypto::hash tx_hash;
-    std::memcpy(tx_hash.data, hash_str.data(), sizeof(crypto::hash));
+    std::memcpy(tx_hash.data(), hash_str.data(), hash_str.size());
 
     // h - height
     if (!data.skip_until("h")) throw std::invalid_argument("Invalid blink signature data: missing required field 'h'");
@@ -1635,7 +1635,7 @@ void handle_pulse_random_value_hash(Message &m, QnetState &qnet)
     if (str.size() != sizeof(msg.random_value_hash.hash))
       throw std::invalid_argument("Invalid hash data size: " + std::to_string(str.size()));
 
-    std::memcpy(msg.random_value_hash.hash.data, str.data(), str.size());
+    std::memcpy(msg.random_value_hash.hash.data(), str.data(), str.size());
   } else {
     throw std::invalid_argument(std::string(INVALID_ARG_PREFIX) + tag + "'");
   }

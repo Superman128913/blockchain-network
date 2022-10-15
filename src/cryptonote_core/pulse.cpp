@@ -228,23 +228,17 @@ crypto::hash blake2b_hash(void const *data, size_t size)
 {
   crypto::hash result = {};
   static_assert(sizeof(result) == crypto_generichash_BYTES);
-  crypto_generichash(reinterpret_cast<unsigned char *>(result.data), sizeof(result), reinterpret_cast<unsigned char const *>(data), size, nullptr /*key*/, 0 /*key length*/);
+  crypto_generichash(result.data(), result.size(), reinterpret_cast<unsigned char const *>(data), size, nullptr /*key*/, 0 /*key length*/);
   return result;
 }
 
 std::string log_prefix(round_context const &context)
 {
-  std::stringstream result;
-  result << "Pulse B" << context.wait_for_next_block.height << " R";
-  if (context.state >= round_state::prepare_for_round)
-    result << +context.prepare_for_round.round;
-  else
-    result << "0";
-  result << ": ";
-
-  if (context.prepare_for_round.node_name.size()) result << context.prepare_for_round.node_name << " ";
-  result << "'" << round_state_string(context.state) << "' ";
-  return result.str();
+  return "Pulse B{} R{}: {}'{}' "_format(
+      context.wait_for_next_block.height,
+      context.state >= round_state::prepare_for_round ? +context.prepare_for_round.round : 0,
+      context.prepare_for_round.node_name.empty() ? "" : "{} "_format(context.prepare_for_round.node_name),
+      round_state_string(context.state));
 }
 
 std::bitset<sizeof(uint16_t) * 8> bitset_view16(uint16_t val)
@@ -278,14 +272,14 @@ crypto::hash msg_signature_hash(crypto::hash const &top_block_hash, pulse::messa
 
     case pulse::message_type::handshake:
     {
-      auto buf = tools::memcpy_le(top_block_hash.data, msg.quorum_position, msg.round);
+      auto buf = tools::memcpy_le(top_block_hash, msg.quorum_position, msg.round);
       result   = blake2b_hash(buf.data(), buf.size());
     }
     break;
 
     case pulse::message_type::handshake_bitset:
     {
-      auto buf = tools::memcpy_le(msg.handshakes.validator_bitset, top_block_hash.data, msg.quorum_position, msg.round);
+      auto buf = tools::memcpy_le(msg.handshakes.validator_bitset, top_block_hash, msg.quorum_position, msg.round);
       result   = blake2b_hash(buf.data(), buf.size());
     }
     break;
@@ -293,21 +287,21 @@ crypto::hash msg_signature_hash(crypto::hash const &top_block_hash, pulse::messa
     case pulse::message_type::block_template:
     {
       crypto::hash block_hash = blake2b_hash(msg.block_template.blob.data(), msg.block_template.blob.size());
-      auto buf                = tools::memcpy_le(msg.round, block_hash.data);
+      auto buf                = tools::memcpy_le(msg.round, block_hash);
       result                  = blake2b_hash(buf.data(), buf.size());
     }
     break;
 
     case pulse::message_type::random_value_hash:
     {
-      auto buf = tools::memcpy_le(top_block_hash.data, msg.quorum_position, msg.round, msg.random_value_hash.hash.data);
+      auto buf = tools::memcpy_le(top_block_hash, msg.quorum_position, msg.round, msg.random_value_hash.hash);
       result   = blake2b_hash(buf.data(), buf.size());
     }
     break;
 
     case pulse::message_type::random_value:
     {
-      auto buf = tools::memcpy_le(top_block_hash.data, msg.quorum_position, msg.round, msg.random_value.value.data);
+      auto buf = tools::memcpy_le(top_block_hash, msg.quorum_position, msg.round, msg.random_value.value.data);
       result   = blake2b_hash(buf.data(), buf.size());
     }
     break;
@@ -315,7 +309,7 @@ crypto::hash msg_signature_hash(crypto::hash const &top_block_hash, pulse::messa
     case pulse::message_type::signed_block:
     {
       crypto::signature const &final_signature = msg.signed_block.signature_of_final_block_hash;
-      auto buf = tools::memcpy_le(top_block_hash.data, msg.quorum_position, msg.round, final_signature.c.data, final_signature.r.data);
+      auto buf = tools::memcpy_le(top_block_hash, msg.quorum_position, msg.round, final_signature);
       result   = blake2b_hash(buf.data(), buf.size());
     }
     break;
@@ -332,27 +326,14 @@ std::string msg_source_string(round_context const &context, pulse::message const
 {
   if (msg.quorum_position >= context.prepare_for_round.quorum.validators.size()) return "XX";
 
-  std::stringstream stream;
-  stream << "'" << message_type_string(msg.type) << " at round " << +msg.round << " from " << msg.quorum_position;
-  if (context.state >= round_state::prepare_for_round)
-  {
-    if (msg.quorum_position < context.prepare_for_round.quorum.validators.size())
-    {
-      crypto::public_key const &key = context.prepare_for_round.quorum.validators[msg.quorum_position];
-      stream << ":" << key;
-    }
-  }
-
-  return stream.str();
+  return "'{}' at round {:d} from {:d}{}"_format(
+      msg.type, msg.round, msg.quorum_position,
+      context.state >= round_state::prepare_for_round && msg.quorum_position < context.prepare_for_round.quorum.validators.size()
+      ? ":{}"_format(context.prepare_for_round.quorum.validators[msg.quorum_position]) : "");
 }
 
 bool msg_signature_check(pulse::message const &msg, crypto::hash const &top_block_hash, service_nodes::quorum const &quorum, std::string *error)
 {
-  std::stringstream stream;
-  OXEN_DEFER {
-    if (error) *error = stream.str();
-  };
-
   // Get Service Node Key
   crypto::public_key const *key = nullptr;
   switch (msg.type)
@@ -360,7 +341,7 @@ bool msg_signature_check(pulse::message const &msg, crypto::hash const &top_bloc
     case pulse::message_type::invalid:
     {
       assert("Invalid Code Path" == nullptr);
-      if (error) stream << log_prefix(context) << "Unhandled message type '" << pulse::message_type_string(msg.type) << "' can not verify signature.";
+      if (error) *error = "{}Unhandled message type '{}' can not verify signature."_format(log_prefix(context), msg.type);
       return false;
     }
     break;
@@ -373,7 +354,7 @@ bool msg_signature_check(pulse::message const &msg, crypto::hash const &top_bloc
     {
       if (msg.quorum_position >= static_cast<int>(quorum.validators.size()))
       {
-        if (error) stream << log_prefix(context) << "Quorum position " << msg.quorum_position << " in Pulse message indexes oob";
+        if (error) *error = "{}Quorum position {} in Pulse message indexes oob"_format(log_prefix(context), msg.quorum_position);
         return false;
       }
 
@@ -385,7 +366,7 @@ bool msg_signature_check(pulse::message const &msg, crypto::hash const &top_bloc
     {
       if (msg.quorum_position != 0)
       {
-        if (error) stream << log_prefix(context) << "Quorum position " << msg.quorum_position << " in Pulse message indexes oob";
+        if (error) *error = "{}Quorum position {} in Pulse message indexes oob"_format(log_prefix(context), msg.quorum_position);
         return false;
       }
 
@@ -396,7 +377,8 @@ bool msg_signature_check(pulse::message const &msg, crypto::hash const &top_bloc
 
   if (!crypto::check_signature(msg_signature_hash(top_block_hash, msg), *key, msg.signature))
   {
-    if (error) stream << log_prefix(context) << "Signature for " << msg_source_string(context, msg) << " at height " << context.wait_for_next_block.height << "; is invalid";
+    if (error) *error = "{}Signature for {} at height {} is invalid"_format(
+        log_prefix(context), msg_source_string(context, msg), context.wait_for_next_block.height);
     return false;
   }
 
@@ -1055,7 +1037,7 @@ round_state wait_for_next_block(uint64_t hf16_height, round_context &context, cr
   }
 
   crypto::hash prev_hash = blockchain.get_block_id_by_height(chain_height - 1);
-  if (prev_hash == crypto::null_hash)
+  if (!prev_hash)
   {
     for (static uint64_t last_height = 0; last_height != chain_height; last_height = chain_height)
       log::debug(logcat, "{}Failed to query the block hash for height {}", log_prefix(context), chain_height - 1);
@@ -1574,14 +1556,14 @@ round_state send_and_wait_for_random_value(round_context &context, service_nodes
         }
       }
 
-      crypto_generichash_final(&state, reinterpret_cast<unsigned char *>(final_hash.data), sizeof(final_hash));
+      crypto_generichash_final(&state, final_hash.data(), final_hash.size());
     }
 
     // Add final random value to the block
     context.transient.signed_block.final_block = std::move(context.transient.wait_for_block_template.block);
     cryptonote::block &final_block             = context.transient.signed_block.final_block;
     static_assert(sizeof(final_hash) >= sizeof(final_block.pulse.random_value.data));
-    std::memcpy(final_block.pulse.random_value.data, final_hash.data, sizeof(final_block.pulse.random_value.data));
+    std::memcpy(final_block.pulse.random_value.data, final_hash.data(), sizeof(final_block.pulse.random_value.data));
 
     // Generate the signature of the final block (without any of the other
     // Service Node signatures because we allow the first

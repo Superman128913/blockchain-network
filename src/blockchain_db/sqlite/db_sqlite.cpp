@@ -373,7 +373,7 @@ namespace cryptonote {
     if (uint64_t tx_fees = block_reward - service_node_reward;
         tx_fees > 0
         && block.service_node_winner_key // "service_node_winner_key" tracks the pulse winner; 0 if a mined block
-        && crypto_core_ed25519_is_valid_point(reinterpret_cast<const unsigned char *>(block.service_node_winner_key.data))
+        && crypto_core_ed25519_is_valid_point(block.service_node_winner_key.data())
     ) {
 
       if (auto service_node_winner = service_nodes_state.service_nodes_infos.find(block.service_node_winner_key);

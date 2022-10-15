@@ -112,7 +112,7 @@ bool wallet_tools::fill_tx_sources(tools::wallet2 * wallet, std::vector<cryptono
       continue;
     }
     if (selected_kis.find(td.m_key_image) != selected_kis.end()){
-      oxen::log::error(globallogcat, "Should not happen (selected KI): {} ki: {}", i, dump_keys(td.m_key_image.data));
+      oxen::log::error(globallogcat, "Should not happen (selected KI): {} ki: {}", i, dump_keys(td.m_key_image.data()));
       continue;
     }
 
@@ -131,7 +131,7 @@ bool wallet_tools::fill_tx_sources(tools::wallet2 * wallet, std::vector<cryptono
         }
       }
 
-      oxen::log::debug(globallogcat, "Selected {} from tx: {} ki: {} amnt: {} rct: {} glob: {}", i, dump_keys(td.m_txid.data), dump_keys(td.m_key_image.data), td.amount(), td.is_rct(), td.m_global_output_index);
+      oxen::log::debug(globallogcat, "Selected {} from tx: {} ki: {} amnt: {} rct: {} glob: {}", i, dump_keys(td.m_txid.data()), dump_keys(td.m_key_image.data()), td.amount(), td.is_rct(), td.m_global_output_index);
 
       sum += td.amount();
       cur_utxo += 1;
@@ -142,7 +142,7 @@ bool wallet_tools::fill_tx_sources(tools::wallet2 * wallet, std::vector<cryptono
       selected_kis.insert(td.m_key_image);
 
     } catch(const std::exception &e){
-      oxen::log::trace(globallogcat, "Output {}, from: {} amnt: {}, rct: {}, glob: {} is not applicable: {}", i, dump_keys(td.m_txid.data), td.amount(), td.is_rct(), td.m_global_output_index, e.what());
+      oxen::log::trace(globallogcat, "Output {}, from: {} amnt: {}, rct: {}, glob: {} is not applicable: {}", i, dump_keys(td.m_txid.data()), td.amount(), td.is_rct(), td.m_global_output_index, e.what());
     }
   }
 
@@ -201,7 +201,7 @@ void wallet_tools::gen_block_data(block_tracker &bt, const cryptonote::block *bl
 
   for (const auto &h : bl->tx_hashes) {
     const map_hash2tx_t::const_iterator cit = mtx.find(h);
-    CHECK_AND_ASSERT_THROW_MES(mtx.end() != cit, "block contains an unknown tx hash @ " << height << ", " << h);
+    CHECK_AND_ASSERT_THROW_MES(mtx.end() != cit, "block contains an unknown tx hash @ {}, {}"_format(height, h));
     vtx.push_back(cit->second);
   }
 

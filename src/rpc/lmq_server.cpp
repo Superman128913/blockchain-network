@@ -174,7 +174,7 @@ omq_rpc::omq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
   {
     crypto::x25519_public_key my_pubkey;
     const std::string& pk = omq.get_pubkey();
-    std::copy(pk.begin(), pk.end(), my_pubkey.data);
+    std::copy(pk.begin(), pk.end(), my_pubkey.data());
     auth.emplace(std::move(my_pubkey), AuthLevel::admin);
   }
 
@@ -311,7 +311,7 @@ void omq_rpc::send_block_notifications(const block& block)
   auto& omq = core_.get_omq();
   std::string height = "{}"_format(get_block_height(block));
   send_notifies(subs_mutex_, block_subs_, "block", [&](auto& conn, auto& sub) {
-    omq.send(conn, "notify.block", height, std::string_view{block.hash.data, sizeof(block.hash.data)});
+    omq.send(conn, "notify.block", height, tools::view_guts(block.hash));
   });
 }
 
@@ -320,7 +320,7 @@ void omq_rpc::send_mempool_notifications(const crypto::hash& id, const transacti
   auto& omq = core_.get_omq();
   send_notifies(subs_mutex_, mempool_subs_, "mempool", [&](auto& conn, auto& sub) {
     if (sub.type == mempool_sub_type::all || opts.approved_blink)
-      omq.send(conn, "notify.mempool", std::string_view{id.data, sizeof(id.data)}, blob);
+      omq.send(conn, "notify.mempool", tools::view_guts(id), blob);
   });
 }
 
@@ -413,7 +413,7 @@ void omq_rpc::on_get_blocks(oxenmq::Message& m)
       return;
     }
 
-    block_bt["hash"] = std::string_view{hash.data, sizeof(hash.data)};
+    block_bt["hash"] = tools::view_guts(hash);
     block_bt["height"] = i;
     block_bt["timestamp"] = b.timestamp;
 
@@ -442,7 +442,7 @@ void omq_rpc::on_get_blocks(oxenmq::Message& m)
       }
 
       tx_bt["global_indices"] = bt_list(indices.begin(), indices.end());
-      tx_bt["hash"] = std::string{miner_tx_hash.data, sizeof(miner_tx_hash.data)};
+      tx_bt["hash"] = std::string{tools::view_guts(miner_tx_hash)};
       tx_bt["tx"] = tx_to_blob(b.miner_tx);
 
       tx_list_bt.push_back(std::move(tx_bt));
@@ -463,7 +463,7 @@ void omq_rpc::on_get_blocks(oxenmq::Message& m)
       }
 
       tx_bt["global_indices"] = bt_list(indices.begin(), indices.end());
-      tx_bt["hash"] = std::string{txhash.data, sizeof(txhash.data)};
+      tx_bt["hash"] = std::string{tools::view_guts(txhash)};
       tx_bt["tx"] = std::move(txs[tx_index]);
 
       tx_list_bt.push_back(std::move(tx_bt));

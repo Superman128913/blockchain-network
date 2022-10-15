@@ -5,7 +5,7 @@
 
 TEST_CASE("DB Schema", "[wallet,db]")
 {
-  wallet::WalletDB db{std::filesystem::path(":memory:"), ""};
+  wallet::WalletDB db{fs::path(":memory:"), ""};
 
   SECTION("db schema creation succeeds")
   {
@@ -61,7 +61,7 @@ TEST_CASE("DB Schema", "[wallet,db]")
 
 TEST_CASE("DB Triggers", "[wallet,db]")
 {
-  wallet::WalletDB db{std::filesystem::path(":memory:"), ""};
+  wallet::WalletDB db{fs::path(":memory:"), ""};
 
   REQUIRE_NOTHROW(db.create_schema());
   REQUIRE(db.db.tableExists("blocks"));

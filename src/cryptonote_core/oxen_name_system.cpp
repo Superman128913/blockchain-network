@@ -219,6 +219,7 @@ struct blob_view {
   std::string_view data;
   /// Constructor that simply forwards anything to the `data` (string_view) member constructor
   template <typename... T> explicit blob_view(T&&... args) : data{std::forward<T>(args)...} {}
+  blob_view(const unsigned char* data, size_t size) : blob_view{reinterpret_cast<const char*>(data), size} {}
 };
 
 // Binds a blob wrapped in a blob_view decorator
@@ -402,7 +403,7 @@ mapping_record sql_get_mapping_from_statement(sql_compiled_statement& statement)
     result.name_hash.append(value.data(), value.size());
   }
 
-  if (!sql_copy_blob(statement, mapping_record_column::txid, result.txid.data, sizeof(result.txid)))
+  if (!sql_copy_blob(statement, mapping_record_column::txid, result.txid.data(), result.txid.size()))
     return result;
 
   int owner_column = tools::enum_count<mapping_record_column>;
@@ -451,7 +452,7 @@ bool sql_run_statement(ons_sql_type type, sql_compiled_statement& statement, voi
           {
             auto *entry       = reinterpret_cast<settings_record *>(context);
             get(statement, ons_db_setting_column::top_height, entry->top_height);
-            if (!sql_copy_blob(statement, ons_db_setting_column::top_hash, entry->top_hash.data, sizeof(entry->top_hash.data)))
+            if (!sql_copy_blob(statement, ons_db_setting_column::top_hash, entry->top_hash.data(), entry->top_hash.size()))
               return false;
             get(statement, ons_db_setting_column::version, entry->version);
             data_loaded = true;
@@ -681,7 +682,7 @@ ons::generic_signature make_ed25519_signature(crypto::hash const &hash, crypto::
 {
   ons::generic_signature result = {};
   result.type                   = ons::generic_owner_sig_type::ed25519;
-  crypto_sign_detached(result.ed25519.data, NULL, reinterpret_cast<unsigned char const *>(hash.data), sizeof(hash), skey.data);
+  crypto_sign_detached(result.ed25519.data(), NULL, hash.data(), hash.size(), skey.data());
   return result;
 }
 
@@ -710,9 +711,9 @@ bool parse_owner_to_generic_owner(cryptonote::network_type nettype, std::string_
   {
     result = ons::make_monero_owner(parsed_addr.address, parsed_addr.is_subaddress);
   }
-  else if (owner.size() == 2*sizeof(ed_owner.data) && oxenc::is_hex(owner))
+  else if (owner.size() == 2*ed_owner.size() && oxenc::is_hex(owner))
   {
-    oxenc::from_hex(owner.begin(), owner.end(), ed_owner.data);
+    oxenc::from_hex(owner.begin(), owner.end(), ed_owner.data());
     result = ons::make_ed25519_owner(ed_owner);
   }
   else
@@ -926,13 +927,13 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
         identifier |= ONS_WALLET_TYPE_INTEGRATED;
       }
       iter = std::copy_n(&identifier, 1, iter);
-      iter = std::copy_n(addr_info.address.m_spend_public_key.data, sizeof(addr_info.address.m_spend_public_key.data), iter);
-      iter = std::copy_n(addr_info.address.m_view_public_key.data, sizeof(addr_info.address.m_view_public_key.data), iter);
+      iter = std::copy_n(addr_info.address.m_spend_public_key.data(), addr_info.address.m_spend_public_key.size(), iter);
+      iter = std::copy_n(addr_info.address.m_view_public_key.data(), addr_info.address.m_view_public_key.size(), iter);
 
       size_t counter = 65;
       assert(std::distance(blob->buffer.begin(), iter) == static_cast<int>(counter));
       if (addr_info.has_payment_id) {
-        std::copy_n(addr_info.payment_id.data, sizeof(addr_info.payment_id.data), iter);
+        std::copy_n(addr_info.payment_id.data(), addr_info.payment_id.size(), iter);
         counter+=sizeof(addr_info.payment_id);
       }
 
@@ -1073,13 +1074,13 @@ static bool verify_ons_signature(crypto::hash const &hash, ons::generic_signatur
   }
   else
   {
-    return (crypto_sign_verify_detached(signature.data, reinterpret_cast<unsigned char const *>(hash.data), sizeof(hash.data), owner.ed25519.data) == 0);
+    return (crypto_sign_verify_detached(signature.data, hash.data(), hash.size(), owner.ed25519.data()) == 0);
   }
 }
 
 static bool validate_against_previous_mapping(ons::name_system_db &ons_db, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_oxen_name_system const &ons_extra, std::string *reason)
 {
-  crypto::hash expected_prev_txid = crypto::null_hash;
+  crypto::hash expected_prev_txid{};
   std::string name_hash           = hash_to_base64(ons_extra.name_hash);
   ons::mapping_record mapping     = ons_db.get_mapping(ons_extra.type, name_hash);
 
@@ -1120,7 +1121,7 @@ static bool validate_against_previous_mapping(ons::name_system_db &ons_db, uint6
       return false;
 
     crypto::hash hash;
-    crypto_generichash(reinterpret_cast<unsigned char*>(hash.data), sizeof(hash), reinterpret_cast<const unsigned char*>(data.data()), data.size(), nullptr /*key*/, 0 /*key_len*/);
+    crypto_generichash(hash.data(), hash.size(), reinterpret_cast<const unsigned char*>(data.data()), data.size(), nullptr /*key*/, 0 /*key_len*/);
 
     if (check_condition(!verify_ons_signature(hash, ons_extra.signature, mapping.owner) &&
                         !verify_ons_signature(hash, ons_extra.signature, mapping.backup_owner), reason,
@@ -1264,7 +1265,7 @@ bool name_system_db::validate_ons_tx(hf hf_version, uint64_t blockchain_height, 
   // ONS Field(s) Validation
   // -----------------------------------------------------------------------------------------------
   {
-    if (check_condition((ons_extra.name_hash == null_name_hash || ons_extra.name_hash == crypto::null_hash), reason,
+    if (check_condition((ons_extra.name_hash == null_name_hash || !ons_extra.name_hash), reason,
           "{}, {} specified the null name hash", tx, ons_extra_string(nettype, ons_extra)))
         return false;
 
@@ -1349,12 +1350,12 @@ crypto::hash name_to_hash(std::string_view name, const std::optional<crypto::has
   assert(std::none_of(name.begin(), name.end(), [](char c) { return std::isupper(c); }));
   crypto::hash result = {};
   static_assert(sizeof(result) >= crypto_generichash_BYTES, "Sodium can generate arbitrary length hashes, but recommend the minimum size for a secure hash must be >= crypto_generichash_BYTES");
-  crypto_generichash_blake2b(reinterpret_cast<unsigned char *>(result.data),
-                             sizeof(result),
+  crypto_generichash_blake2b(result.data(),
+                             result.size(),
                              reinterpret_cast<const unsigned char *>(name.data()),
                              static_cast<unsigned long long>(name.size()),
-                             key ? reinterpret_cast<const unsigned char*>(key->data) : nullptr,
-                             key ? sizeof(key->data) : 0);
+                             key ? key->data() : nullptr,
+                             key ? key->size() : 0);
   return result;
 }
 
@@ -1370,7 +1371,8 @@ struct alignas(size_t) secretbox_secret_key {
 
   secretbox_secret_key& operator=(const crypto::hash& h) {
     static_assert(sizeof(secretbox_secret_key::data) == crypto_aead_xchacha20poly1305_ietf_KEYBYTES);
-    std::memcpy(data, h.data, sizeof(data));
+    static_assert(sizeof(secretbox_secret_key::data) == crypto::hash::size());
+    std::memcpy(data, h.data(), sizeof(data));
     return *this;
   }
 };
@@ -1558,12 +1560,12 @@ std::optional<cryptonote::address_parse_info> mapping_value::get_wallet_address_
 
   cryptonote::address_parse_info addr_info{};
   auto* bufpos = &buffer[1];
-  std::memcpy(&addr_info.address.m_spend_public_key.data, bufpos, 32);
+  std::memcpy(addr_info.address.m_spend_public_key.data(), bufpos, 32);
   bufpos += 32;
-  std::memcpy(&addr_info.address.m_view_public_key.data, bufpos, 32);
+  std::memcpy(addr_info.address.m_view_public_key.data(), bufpos, 32);
   if (buffer[0] == ONS_WALLET_TYPE_INTEGRATED) {
     bufpos += 32;
-    std::copy_n(bufpos,8,addr_info.payment_id.data);
+    std::copy_n(bufpos, 8, addr_info.payment_id.data());
     addr_info.has_payment_id = true;
   } else if (buffer[0] == ONS_WALLET_TYPE_SUBADDRESS) {
     addr_info.is_subaddress = true;
@@ -1989,7 +1991,7 @@ std::pair<std::string, std::vector<update_variant>> update_record_query(name_sys
 INSERT INTO mappings (type, name_hash, txid, update_height, expiration_height, owner_id, backup_owner_id, encrypted_value)
 SELECT                type, name_hash, ?,    ?)";
 
-  bind.emplace_back(blob_view{tx_hash.data, sizeof(tx_hash)});
+  bind.emplace_back(blob_view{tx_hash.data(), tx_hash.size()});
   bind.emplace_back(height);
 
   constexpr auto suffix = " FROM mappings WHERE type = ? AND name_hash = ? ORDER BY update_height DESC LIMIT 1"sv;
@@ -2222,7 +2224,7 @@ bool name_system_db::save_mapping(crypto::hash const &tx_hash, cryptonote::tx_ex
   bind(statement, mapping_record_column::type, db_mapping_type(src.type));
   bind(statement, mapping_record_column::name_hash, name_hash);
   bind(statement, mapping_record_column::encrypted_value, blob_view{src.encrypted_value});
-  bind(statement, mapping_record_column::txid, blob_view{tx_hash.data, sizeof(tx_hash)});
+  bind(statement, mapping_record_column::txid, blob_view{tx_hash.data(), tx_hash.size()});
   bind(statement, mapping_record_column::update_height, height);
   bind(statement, mapping_record_column::expiration_height, expiration);
   bind(statement, mapping_record_column::owner_id, owner_id);
@@ -2236,7 +2238,7 @@ bool name_system_db::save_settings(uint64_t top_height, crypto::hash const &top_
 {
   auto& statement = save_settings_sql;
   bind(statement, ons_db_setting_column::top_height, top_height);
-  bind(statement, ons_db_setting_column::top_hash, blob_view{top_hash.data, sizeof(top_hash)});
+  bind(statement, ons_db_setting_column::top_hash, blob_view{top_hash.data(), top_hash.size()});
   bind(statement, ons_db_setting_column::version, version);
   bool result = sql_run_statement(ons_sql_type::save_setting, statement, nullptr);
   return result;

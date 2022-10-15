@@ -894,7 +894,7 @@ namespace
   //------------------------------------------------------------------------------------------------------------------------------
   void wallet_rpc_server::validate_transfer(const std::list<wallet::transfer_destination>& destinations, const std::string& payment_id, std::vector<cryptonote::tx_destination_entry>& dsts, std::vector<uint8_t>& extra, bool at_least_one_destination)
   {
-    crypto::hash8 integrated_payment_id = crypto::null_hash8;
+    crypto::hash8 integrated_payment_id{};
     std::string extra_nonce;
     for (auto it = destinations.begin(); it != destinations.end(); it++)
     {
@@ -910,7 +910,7 @@ namespace
 
       if (info.has_payment_id)
       {
-        if (!payment_id.empty() || integrated_payment_id != crypto::null_hash8)
+        if (!payment_id.empty() || integrated_payment_id)
           throw wallet_rpc_error{error_code::WRONG_PAYMENT_ID, "A single payment id is allowed per transaction"};
         integrated_payment_id = info.payment_id;
         cryptonote::set_encrypted_payment_id_to_tx_extra_nonce(extra_nonce, integrated_payment_id);
@@ -977,10 +977,10 @@ namespace
   }
 
   void append_hex_tx_keys(std::string& to, const crypto::secret_key& k, const std::vector<crypto::secret_key>& more) {
-    to.reserve(to.size() + oxenc::to_hex_size(sizeof(k.data) * (1 + more.size())));
-    oxenc::to_hex(std::begin(k.data), std::end(k.data), std::back_inserter(to));
+    to.reserve(to.size() + oxenc::to_hex_size(k.size() * (1 + more.size())));
+    oxenc::to_hex(k.begin(), k.end(), std::back_inserter(to));
     for (const auto& key : more)
-      oxenc::to_hex(std::begin(key.data), std::end(key.data), std::back_inserter(to));
+      oxenc::to_hex(key.begin(), key.end(), std::back_inserter(to));
   }
   std::string hex_tx_keys(const crypto::secret_key& k, const std::vector<crypto::secret_key>& more) {
     std::string s;
@@ -1205,7 +1205,7 @@ namespace
 
         std::vector<cryptonote::tx_extra_field> tx_extra_fields;
         bool has_encrypted_payment_id = false;
-        crypto::hash8 payment_id8 = crypto::null_hash8;
+        crypto::hash8 payment_id8{};
         if (cryptonote::parse_tx_extra(cd.extra, tx_extra_fields))
         {
           cryptonote::tx_extra_nonce extra_nonce;
@@ -1214,7 +1214,7 @@ namespace
             crypto::hash payment_id;
             if(cryptonote::get_encrypted_payment_id_from_tx_extra_nonce(extra_nonce.nonce, payment_id8))
             {
-              if (payment_id8 != crypto::null_hash8)
+              if (payment_id8)
               {
                 desc.payment_id = tools::type_to_hex(payment_id8);
                 has_encrypted_payment_id = true;
@@ -1529,8 +1529,7 @@ namespace
     std::string payment_id_blob;
     if (!tools::hex_to_type(req.payment_id, payment_id)) {
       if (crypto::hash8 payment_id8; tools::hex_to_type(req.payment_id, payment_id8)) {
-        memcpy(payment_id.data, payment_id8.data, 8);
-        memset(payment_id.data + 8, 0, 24);
+        payment_id = payment_id8;
       } else {
         throw wallet_rpc_error{error_code::WRONG_PAYMENT_ID, "Payment ID has invalid format"};
       }
@@ -1598,8 +1597,7 @@ namespace
         r = tools::hex_to_type(payment_id_str, payment_id8);
         if (r)
         {
-          memcpy(payment_id.data, payment_id8.data, 8);
-          memset(payment_id.data + 8, 0, 24);
+          payment_id = payment_id8;
         }
       }
       else
@@ -1703,16 +1701,16 @@ namespace
       else if (req.key_type == "view_key")
       {
           res.key.reserve(64);
-          const auto& vsk_data = m_wallet->get_account().get_keys().m_view_secret_key.data;
-          oxenc::to_hex(std::begin(vsk_data), std::end(vsk_data), std::back_inserter(res.key));
+          const auto& vsk = m_wallet->get_account().get_keys().m_view_secret_key;
+          oxenc::to_hex(vsk.begin(), vsk.end(), std::back_inserter(res.key));
       }
       else if (req.key_type == "spend_key")
       {
           if (m_wallet->watch_only())
             throw wallet_rpc_error{error_code::WATCH_ONLY, "The wallet is watch-only. Cannot retrieve spend key."};
           res.key.reserve(64);
-          const auto& ssk_data = m_wallet->get_account().get_keys().m_spend_secret_key.data;
-          oxenc::to_hex(std::begin(ssk_data), std::end(ssk_data), std::back_inserter(res.key));
+          const auto& ssk = m_wallet->get_account().get_keys().m_spend_secret_key;
+          oxenc::to_hex(ssk.begin(), ssk.end(), std::back_inserter(res.key));
       }
       else
         throw wallet_rpc_error{error_code::UNKNOWN_ERROR, "key_type " + req.key_type + " not found"};
@@ -1842,13 +1840,13 @@ namespace
     if (tx_keys.size() < 64 || tx_keys.size() % 64 || !oxenc::is_hex(tx_keys))
       throw wallet_rpc_error{error_code::WRONG_KEY, "Tx key has invalid format"};
     crypto::secret_key tx_key;
-    oxenc::from_hex(tx_keys.begin(), tx_keys.begin() + 64, tx_key.data);
+    oxenc::from_hex(tx_keys.begin(), tx_keys.begin() + 64, tx_key.begin());
     tx_keys.remove_prefix(64);
 
     std::vector<crypto::secret_key> additional_tx_keys;
     while (!tx_keys.empty())
     {
-      oxenc::from_hex(tx_keys.begin(), tx_keys.begin() + 64, additional_tx_keys.emplace_back().data);
+      oxenc::from_hex(tx_keys.begin(), tx_keys.begin() + 64, additional_tx_keys.emplace_back().begin());
       tx_keys.remove_prefix(64);
     }
 

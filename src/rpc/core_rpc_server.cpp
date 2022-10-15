@@ -347,8 +347,7 @@ namespace cryptonote::rpc {
       res.blocks.back().txs.reserve(bd.second.size());
       for (auto& [txhash, txdata] : bd.second)
       {
-        auto& entry = res.blocks.back().txs.emplace_back(std::move(txdata), crypto::null_hash);
-        size += entry.size();
+        size += res.blocks.back().txs.emplace_back(std::move(txdata)).size();
       }
 
       const size_t n_txes_to_lookup = bd.second.size() + (req.no_miner_tx ? 0 : 1);
@@ -876,7 +875,7 @@ namespace cryptonote::rpc {
       // If the transaction was pruned then the prunable part will be empty but the prunable hash
       // will be non-null.  (Some txes, like coinbase txes, are non-prunable and will have empty
       // *and* null prunable hash).
-      bool prunable = prunable_hash != crypto::null_hash;
+      bool prunable = (bool) prunable_hash;
       bool pruned = prunable && prunable_data.empty();
 
       if (pruned || (prunable && (get.request.split || get.request.prune)))
@@ -1972,8 +1971,8 @@ namespace cryptonote::rpc {
       std::mutex mutex;
       std::vector<std::uint64_t> cached_distribution;
       std::uint64_t cached_from = 0, cached_to = 0, cached_start_height = 0, cached_base = 0;
-      crypto::hash cached_m10_hash = crypto::null_hash;
-      crypto::hash cached_top_hash = crypto::null_hash;
+      crypto::hash cached_m10_hash{};
+      crypto::hash cached_top_hash{};
       bool cached = false;
     } output_dist_cache;
   }
@@ -1991,7 +1990,7 @@ namespace cryptonote::rpc {
       auto& d = output_dist_cache;
       const std::unique_lock lock{d.mutex};
 
-      crypto::hash top_hash = crypto::null_hash;
+      crypto::hash top_hash{};
       if (d.cached_to < blockchain_height)
         top_hash = get_hash(d.cached_to);
       if (d.cached && amount == 0 && d.cached_from == from_height && d.cached_to == to_height && d.cached_top_hash == top_hash)
@@ -2013,7 +2012,7 @@ namespace cryptonote::rpc {
           {
             d.cached_to -= 10;
             d.cached_top_hash = hash10;
-            d.cached_m10_hash = crypto::null_hash;
+            d.cached_m10_hash = crypto::null<crypto::hash>;
             CHECK_AND_ASSERT_MES(d.cached_distribution.size() >= 10, std::nullopt, "Cached distribution size does not match cached bounds");
             for (int p = 0; p < 10; ++p)
               d.cached_distribution.pop_back();
@@ -2051,7 +2050,7 @@ namespace cryptonote::rpc {
         d.cached_from = from_height;
         d.cached_to = to_height;
         d.cached_top_hash = get_hash(d.cached_to);
-        d.cached_m10_hash = d.cached_to >= 10 ? get_hash(d.cached_to - 10) : crypto::null_hash;
+        d.cached_m10_hash = d.cached_to >= 10 ? get_hash(d.cached_to - 10) : crypto::null<crypto::hash>;
         d.cached_distribution = distribution;
         d.cached_start_height = start_height;
         d.cached_base = base;
@@ -2368,10 +2367,10 @@ namespace cryptonote::rpc {
   void core_rpc_server::invoke(GET_SERVICE_PRIVKEYS& get_service_privkeys, rpc_context context)
   {
     const auto& keys = m_core.get_service_keys();
-    if (keys.key != crypto::null_skey)
-      get_service_privkeys.response["service_node_privkey"] = tools::type_to_hex(keys.key.data);
-    get_service_privkeys.response["service_node_ed25519_privkey"] = tools::type_to_hex(keys.key_ed25519.data);
-    get_service_privkeys.response["service_node_x25519_privkey"] = tools::type_to_hex(keys.key_x25519.data);
+    if (keys.key)
+      get_service_privkeys.response["service_node_privkey"] = tools::type_to_hex(keys.key);
+    get_service_privkeys.response["service_node_ed25519_privkey"] = tools::type_to_hex(keys.key_ed25519);
+    get_service_privkeys.response["service_node_x25519_privkey"] = tools::type_to_hex(keys.key_x25519);
     get_service_privkeys.response["status"] = STATUS_OK;
     return;
   }
