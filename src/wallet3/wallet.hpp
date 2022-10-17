@@ -52,7 +52,7 @@ namespace wallet
       return p;
     }
 
-    ~Wallet();
+    virtual ~Wallet();
 
     Config config;
 
