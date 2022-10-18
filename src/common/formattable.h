@@ -14,9 +14,6 @@ namespace formattable {
     //   it as a string.
     // - a `to_string(val)` function in the same namespace as the type; we will call it to format it
     //   as a string.
-    // - a `to_string(val)` function defined in the `formattable` namespace.  (Prefer its own
-    //   namespace, but sometimes that may be ugly/infeasible, e.g. if making some external library
-    //   type printable).
     //
     // The function should return something string-like (string, string_view, const char*).
     //
@@ -62,49 +59,30 @@ namespace formattable {
 
     } // namespace detail
 
-}  // namespace formattable
-
-
-
-namespace fmt {
-
-    template <typename T, typename Char>
-    struct formatter<T, Char, std::enable_if_t<::formattable::via_to_string<T>>>
-        : formatter<std::string_view>
-    {
+    template <typename T>
+    struct to_string_formatter : fmt::formatter<std::string_view> {
         template <typename FormatContext>
         auto format(const T& val, FormatContext& ctx) const {
             if constexpr (::formattable::detail::has_to_string_method<T>)
                 return formatter<std::string_view>::format(val.to_string(), ctx);
-            else {
-                // This `using namespace` is so that you can also put the to_string function in the
-                // formattable namespace if it can't go in its own namespace for some reason:
-                using namespace formattable;
+            else
                 return formatter<std::string_view>::format(to_string(val), ctx);
-            }
         }
     };
 
-    template <typename T, typename Char>
-    struct formatter<T, Char, std::enable_if_t<::formattable::via_to_hex_string<T>>>
-        : formatter<std::string_view>
-    {
+    template <typename T>
+    struct to_hex_string_formatter : fmt::formatter<std::string_view> {
         template <typename FormatContext>
         auto format(const T& val, FormatContext& ctx) const {
             if constexpr (::formattable::detail::has_to_hex_string_method<T>)
                 return formatter<std::string_view>::format(val.to_hex_string(), ctx);
-            else {
-                using namespace formattable;
+            else
                 return formatter<std::string_view>::format(to_hex_string(val), ctx);
-            }
         }
     };
 
- 
-    template <typename T, typename Char>
-    struct formatter<T, Char, std::enable_if_t<::formattable::via_underlying<T>>>
-        : formatter<std::underlying_type_t<T>>
-    {
+    template <typename T>
+    struct underlying_t_formatter : fmt::formatter<std::underlying_type_t<T>> {
 #ifdef __cpp_lib_is_scoped_enum // C++23
         static_assert(std::is_scoped_enum_v<T>);
 #else
@@ -114,8 +92,26 @@ namespace fmt {
         template <typename FormatContext>
         auto format(const T& val, FormatContext& ctx) const {
             using Underlying = std::underlying_type_t<T>;
-            return formatter<Underlying>::format(static_cast<Underlying>(val), ctx);
+            return fmt::formatter<Underlying>::format(static_cast<Underlying>(val), ctx);
         }
     };
+
+}  // namespace formattable
+
+
+
+namespace fmt {
+
+    template <typename T, typename Char>
+    struct formatter<T, Char, std::enable_if_t<::formattable::via_to_string<T>>>
+        : ::formattable::to_string_formatter<T> {};
+
+    template <typename T, typename Char>
+    struct formatter<T, Char, std::enable_if_t<::formattable::via_to_hex_string<T>>>
+        : ::formattable::to_hex_string_formatter<T> {};
+
+    template <typename T, typename Char>
+    struct formatter<T, Char, std::enable_if_t<::formattable::via_underlying<T>>>
+        : ::formattable::underlying_t_formatter<T> {};
 
 }  // namespace fmt

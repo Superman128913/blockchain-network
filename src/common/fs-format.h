@@ -5,13 +5,16 @@
 #ifndef USE_GHC_FILESYSTEM
 #include <fmt/std.h>
 #else
-#include "formattable.h"
+#include <fmt/core.h>
 
-namespace formattable {
-  template <> inline constexpr bool via_to_string<ghc::filesystem::path> = true;
-
-  inline std::string to_string(const ghc::filesystem::path& path) {
-    return path.string();
-  }
+namespace fmt {
+    template <>
+    struct formatter<ghc::filesystem::path> : formatter<std::string>
+    {
+        template <typename FormatContext>
+        auto format(const ghc::filesystem::path& val, FormatContext& ctx) const {
+            return formatter<std::string>::format(val.u8string(), ctx);
+        }
+    };
 }
 #endif

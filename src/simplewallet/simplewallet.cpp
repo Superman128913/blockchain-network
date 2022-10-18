@@ -94,9 +94,15 @@ extern "C"
 }
 
 // grumble, grumble
-namespace formattable {
-  std::string to_string(const boost::basic_format<char>& f) { return f.str(); }
-  template <> constexpr bool via_to_string<boost::basic_format<char>> = true;
+namespace fmt {
+  template <>
+  struct formatter<boost::basic_format<char>> : formatter<std::string>
+  {
+    template <typename FormatContext>
+    auto format(const boost::basic_format<char>& val, FormatContext& ctx) const {
+      return formatter<std::string>::format(val.str(), ctx);
+    }
+  };
 }
 
 namespace cryptonote
