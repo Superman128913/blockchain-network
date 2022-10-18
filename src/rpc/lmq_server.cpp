@@ -2,20 +2,20 @@
 #include "lmq_server.h"
 #include "rpc/common/param_parser.hpp"
 #include "cryptonote_config.h"
-#include "oxenmq/oxenmq.h"
+#include <oxenc/bt.h>
+#include <oxenmq/oxenmq.h>
+#include <oxenmq/fmt.h>
 #include <fmt/core.h>
-#include "oxenc/bt.h"
 
 // FIXME: Rename this to omq_server.{h,cpp}
-
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "daemon.rpc"
 
 namespace cryptonote { namespace rpc {
 
 using oxenmq::AuthLevel;
 
 namespace {
+
+static auto logcat = log::Cat("daemon.rpc");
 
 // TODO: all of this --lmq-blah options really should be renamed to --omq-blah, but then we *also*
 // need some sort of backwards compatibility shim, and that is a nuissance.
@@ -112,21 +112,21 @@ omq_rpc::omq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
   // the quorumnet listener set up in cryptonote_core).
   for (const auto &addr : command_line::get_arg(vm, arg_omq_public)) {
     check_omq_listen_addr(addr);
-    MGINFO("LMQ listening on " << addr << " (public unencrypted)");
+    log::info(logcat, "LMQ listening on {} (public unencrypted)", addr);
     omq.listen_plain(addr,
         [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.omq_allow(ip, pk, AuthLevel::basic); });
   }
 
   for (const auto &addr : command_line::get_arg(vm, arg_omq_curve_public)) {
     check_omq_listen_addr(addr);
-    MGINFO("LMQ listening on " << addr << " (public curve)");
+    log::info(logcat, "LMQ listening on {} (public curve)", addr);
     omq.listen_curve(addr,
         [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.omq_allow(ip, pk, AuthLevel::basic); });
   }
 
   for (const auto &addr : command_line::get_arg(vm, arg_omq_curve)) {
     check_omq_listen_addr(addr);
-    MGINFO("LMQ listening on " << addr << " (curve restricted)");
+    log::info(logcat, "LMQ listening on {} (curve restricted)", addr);
     omq.listen_curve(addr,
         [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.omq_allow(ip, pk, AuthLevel::denied); });
   }
@@ -148,7 +148,7 @@ omq_rpc::omq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
   }
   for (const auto &addr : locals) {
     check_omq_listen_addr(addr);
-    MGINFO("LMQ listening on " << addr << " (unauthenticated local admin)");
+    log::info(logcat, "OMQ listening on {} (unauthenticated local admin)", addr);
     omq.listen_plain(addr,
         [&core](std::string_view ip, std::string_view pk, bool /*sn*/) { return core.omq_allow(ip, pk, AuthLevel::admin); });
   }
@@ -174,7 +174,7 @@ omq_rpc::omq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
   {
     crypto::x25519_public_key my_pubkey;
     const std::string& pk = omq.get_pubkey();
-    std::copy(pk.begin(), pk.end(), my_pubkey.data);
+    std::copy(pk.begin(), pk.end(), my_pubkey.data());
     auth.emplace(std::move(my_pubkey), AuthLevel::admin);
   }
 
@@ -207,9 +207,9 @@ omq_rpc::omq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
         request.body = m.data[0];
 
       try {
-        auto result = std::visit([](auto&& v) -> std::string {
+        auto result = var::visit([](auto&& v) -> std::string {
           using T = decltype(v);
-          if constexpr (std::is_same_v<oxenmq::bt_value&&, T>)
+          if constexpr (std::is_same_v<oxenc::bt_value&&, T>)
             return bt_serialize(std::move(v));
           else if constexpr (std::is_same_v<nlohmann::json&&, T>)
             return v.dump();
@@ -227,19 +227,17 @@ omq_rpc::omq_rpc(cryptonote::core& core, core_rpc_server& rpc, const boost::prog
         // warnings that get generated deep inside epee, for example when passing a string or
         // number instead of a JSON object.  If you want to find some, `grep number2 epee` (for
         // real).
-        MINFO("LMQ RPC request '" << (call.is_public ? "rpc." : "admin.") << name << "' called with invalid/unparseable data: " << e.what());
+        log::info(logcat, "LMQ RPC request '{}{}' called with invalid/unparseable data: {}", (call.is_public ? "rpc." : "admin."), name, e.what());
         m.send_reply(LMQ_BAD_REQUEST, "Unable to parse request: "s + e.what());
         return;
       } catch (const rpc_error& e) {
-        MWARNING("LMQ RPC request '" << (call.is_public ? "rpc." : "admin.") << name << "' failed with: " << e.what());
+        log::warning(logcat, "LMQ RPC request '{}{}' failed with: {}", (call.is_public ? "rpc." : "admin."), name, e.what());
         m.send_reply(LMQ_ERROR, e.what());
         return;
       } catch (const std::exception& e) {
-        MWARNING("LMQ RPC request '" << (call.is_public ? "rpc." : "admin.") << name << "' "
-            "raised an exception: " << e.what());
+        log::warning(logcat, "LMQ RPC request '{}{}' raised an exception: {}", (call.is_public ? "rpc." : "admin."), name, e.what());
       } catch (...) {
-        MWARNING("LMQ RPC request '" << (call.is_public ? "rpc." : "admin.") << name << "' "
-            "raised an unknown exception");
+        log::warning(logcat, "LMQ RPC request '{}{}' raised an unknown exception", (call.is_public ? "rpc." : "admin."), name);
       }
       // Don't include the exception message in case it contains something that we don't want go
       // back to the user.  If we want to support it eventually we could add some sort of
@@ -302,7 +300,7 @@ static void send_notifies(Mutex& mutex, Subs& subs, const char* desc, Call call)
   for (auto& conn : remove) {
     auto it = subs.find(conn);
     if (it != subs.end() && it->second.expiry < now /* recheck: client might have resubscribed in between locks */) {
-      MDEBUG("Removing " << conn << " from " << desc << " subscriptions: subscription timed out");
+      log::debug(logcat, "Removing {} from {} subscriptions: subscription timed out", conn, desc);
       subs.erase(it);
     }
   }
@@ -311,9 +309,9 @@ static void send_notifies(Mutex& mutex, Subs& subs, const char* desc, Call call)
 void omq_rpc::send_block_notifications(const block& block)
 {
   auto& omq = core_.get_omq();
-  std::string height = fmt::format("{}", get_block_height(block));
+  std::string height = "{}"_format(get_block_height(block));
   send_notifies(subs_mutex_, block_subs_, "block", [&](auto& conn, auto& sub) {
-    omq.send(conn, "notify.block", height, std::string_view{block.hash.data, sizeof(block.hash.data)});
+    omq.send(conn, "notify.block", height, tools::view_guts(block.hash));
   });
 }
 
@@ -322,7 +320,7 @@ void omq_rpc::send_mempool_notifications(const crypto::hash& id, const transacti
   auto& omq = core_.get_omq();
   send_notifies(subs_mutex_, mempool_subs_, "mempool", [&](auto& conn, auto& sub) {
     if (sub.type == mempool_sub_type::all || opts.approved_blink)
-      omq.send(conn, "notify.mempool", std::string_view{id.data, sizeof(id.data)}, blob);
+      omq.send(conn, "notify.mempool", tools::view_guts(id), blob);
   });
 }
 
@@ -415,7 +413,7 @@ void omq_rpc::on_get_blocks(oxenmq::Message& m)
       return;
     }
 
-    block_bt["hash"] = std::string_view{hash.data, sizeof(hash.data)};
+    block_bt["hash"] = tools::view_guts(hash);
     block_bt["height"] = i;
     block_bt["timestamp"] = b.timestamp;
 
@@ -444,7 +442,7 @@ void omq_rpc::on_get_blocks(oxenmq::Message& m)
       }
 
       tx_bt["global_indices"] = bt_list(indices.begin(), indices.end());
-      tx_bt["hash"] = std::string{miner_tx_hash.data, sizeof(miner_tx_hash.data)};
+      tx_bt["hash"] = std::string{tools::view_guts(miner_tx_hash)};
       tx_bt["tx"] = tx_to_blob(b.miner_tx);
 
       tx_list_bt.push_back(std::move(tx_bt));
@@ -465,7 +463,7 @@ void omq_rpc::on_get_blocks(oxenmq::Message& m)
       }
 
       tx_bt["global_indices"] = bt_list(indices.begin(), indices.end());
-      tx_bt["hash"] = std::string{txhash.data, sizeof(txhash.data)};
+      tx_bt["hash"] = std::string{tools::view_guts(txhash)};
       tx_bt["tx"] = std::move(txs[tx_index]);
 
       tx_list_bt.push_back(std::move(tx_bt));
@@ -536,13 +534,13 @@ void omq_rpc::on_mempool_sub_request(oxenmq::Message& m)
     if (!result.second) {
       result.first->second.expiry = expiry;
       if (result.first->second.type == sub_type) {
-        MTRACE("Renewed mempool subscription request from conn id " << m.conn << " @ " << m.remote);
+        log::trace(logcat, "Renewed mempool subscription request from conn id {}@{}", m.conn, m.remote);
         m.send_reply("ALREADY");
         return;
       }
       result.first->second.type = sub_type;
     }
-    MDEBUG("New " << (sub_type == mempool_sub_type::blink ? "blink" : "all") << " mempool subscription request from conn " << m.conn << " @ " << m.remote);
+    log::debug(logcat, "New {} mempool subscription request from conn {}@{}", (sub_type == mempool_sub_type::blink ? "blink" : "all"), m.conn, m.remote);
     m.send_reply("OK");
   }
 }
@@ -565,10 +563,10 @@ void omq_rpc::on_block_sub_request(oxenmq::Message& m)
   auto result = block_subs_.emplace(m.conn, block_sub{expiry});
   if (!result.second) {
     result.first->second.expiry = expiry;
-    MTRACE("Renewed block subscription request from conn id " << m.conn << " @ " << m.remote);
+    log::trace(logcat, "Renewed block subscription request from conn id {}@{}", m.conn, m.remote);
     m.send_reply("ALREADY");
   } else {
-    MDEBUG("New block subscription request from conn " << m.conn << " @ " << m.remote);
+    log::debug(logcat, "New block subscription request from conn {}@{}", m.conn, m.remote);
     m.send_reply("OK");
   }
 }

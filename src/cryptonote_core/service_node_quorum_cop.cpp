@@ -39,13 +39,22 @@
 #include "epee/net/local_ip.h"
 #include <oxenc/endian.h>
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "quorum_cop"
-
 using cryptonote::hf;
 
 namespace service_nodes
 {
+  static auto logcat = log::Cat("quorum_cop");
+
+  std::string quorum::to_string() const {
+      std::string result;
+      auto append = std::back_inserter(result);
+      for (size_t i = 0; i < validators.size(); i++)
+        fmt::format_to(append, "V[{}] {}\n", i, validators[i]);
+      for (size_t i = 0; i < workers.size(); i++)
+        fmt::format_to(append, "W[{}] {}\n", i, workers[i]);
+      return result;
+  }
+
   std::optional<std::vector<std::string_view>> service_node_test_results::why() const
   {
     if (passed())
@@ -112,23 +121,20 @@ namespace service_nodes
 
     if (check_uptime_obligation && time_since_last_uptime_proof > netconf.UPTIME_PROOF_VALIDITY)
     {
-      LOG_PRINT_L1(
-          "Service Node: " << pubkey << ", failed uptime proof obligation check: the last uptime proof (" <<
-          tools::get_human_readable_timespan(time_since_last_uptime_proof) << ") was older than max validity (" <<
-          tools::get_human_readable_timespan(netconf.UPTIME_PROOF_VALIDITY) << ")");
+      log::info(logcat, "Service Node: {}, failed uptime proof obligation check: the last uptime proof ({}) was older than max validity ({})", pubkey, tools::get_human_readable_timespan(time_since_last_uptime_proof), tools::get_human_readable_timespan(netconf.UPTIME_PROOF_VALIDITY));
       result.uptime_proved = false;
     }
 
     if (!ss_reachable)
     {
-      LOG_PRINT_L1("Service Node storage server is not reachable for node: " << pubkey);
+      log::info(logcat, "Service Node storage server is not reachable for node: {}", pubkey);
       result.storage_server_reachable = false;
     }
 
     // TODO: perhaps come back and make this activate on some "soft fork" height before HF19?
     if (!lokinet_reachable && hf_version >= hf::hf19_reward_batching)
     {
-      LOG_PRINT_L1("Service Node lokinet is not reachable for node: " << pubkey);
+      log::info(logcat, "Service Node lokinet is not reachable for node: {}", pubkey);
       result.lokinet_reachable = false;
     }
 
@@ -150,24 +156,24 @@ namespace service_nodes
     {
       if (check_checkpoint_obligation && checkpoint_participation.failures() > CHECKPOINT_MAX_MISSABLE_VOTES)
       {
-        LOG_PRINT_L1("Service Node: " << pubkey << ", failed checkpoint obligation check");
+        log::info(logcat, "Service Node: {}, failed checkpoint obligation check", pubkey);
         result.checkpoint_participation = false;
       }
 
       if (pulse_participation.failures() > PULSE_MAX_MISSABLE_VOTES)
       {
-        LOG_PRINT_L1("Service Node: " << pubkey << ", failed pulse obligation check");
+        log::info(logcat, "Service Node: {}, failed pulse obligation check", pubkey);
         result.pulse_participation = false;
       }
 
       if (timestamp_participation.failures() > TIMESTAMP_MAX_MISSABLE_VOTES)
       {
-        LOG_PRINT_L1("Service Node: " << pubkey << ", failed timestamp obligation check");
+        log::info(logcat, "Service Node: {}, failed timestamp obligation check", pubkey);
         result.timestamp_participation = false;
       }
       if (timesync_status.failures() > TIMESYNC_MAX_UNSYNCED_VOTES)
       {
-        LOG_PRINT_L1("Service Node: " << pubkey << ", failed timesync obligation check");
+        log::info(logcat, "Service Node: {}, failed timesync obligation check", pubkey);
         result.timesync_status = false;
       }
     }
@@ -186,8 +192,8 @@ namespace service_nodes
     {
       if (!by_pop_blocks)
       {
-        LOG_ERROR("The blockchain was detached to height: " << height << ", but quorum cop has already processed votes for obligations up to " << m_obligations_height);
-        LOG_ERROR("This implies a reorg occured that was over " << REORG_SAFETY_BUFFER_BLOCKS << ". This should rarely happen! Please report this to the devs.");
+        log::error(logcat, "The blockchain was detached to height: {}, but quorum cop has already processed votes for obligations up to {}", height, m_obligations_height);
+        log::error(logcat, "This implies a reorg occured that was over {}. This should rarely happen! Please report this to the devs.", REORG_SAFETY_BUFFER_BLOCKS);
       }
       m_obligations_height = height;
     }
@@ -196,8 +202,8 @@ namespace service_nodes
     {
       if (!by_pop_blocks)
       {
-        LOG_ERROR("The blockchain was detached to height: " << height << ", but quorum cop has already processed votes for checkpointing up to " << m_last_checkpointed_height);
-        LOG_ERROR("This implies a reorg occured that was over " << REORG_SAFETY_BUFFER_BLOCKS << ". This should rarely happen! Please report this to the devs.");
+        log::error(logcat, "The blockchain was detached to height: {}, but quorum cop has already processed votes for checkpointing up to {}", height, m_last_checkpointed_height);
+        log::error(logcat, "This implies a reorg occured that was over {}. This should rarely happen! Please report this to the devs.", REORG_SAFETY_BUFFER_BLOCKS);
       }
       m_last_checkpointed_height = height - (height % CHECKPOINT_INTERVAL);
     }
@@ -261,7 +267,7 @@ namespace service_nodes
         default:
         {
           assert("Unhandled quorum type " == 0);
-          LOG_ERROR("Unhandled quorum type with value: " << (int)type);
+          log::error(logcat, "Unhandled quorum type with value: {}", (int)type);
         } break;
 
         case quorum_type::obligations:
@@ -313,7 +319,7 @@ namespace service_nodes
             if (!quorum)
             {
               // TODO(oxen): Fatal error
-              LOG_ERROR("Obligations quorum for height: " << m_obligations_height << " was not cached in daemon!");
+              log::error(logcat, "Obligations quorum for height: {} was not cached in daemon!", m_obligations_height);
               continue;
             }
 
@@ -352,12 +358,12 @@ namespace service_nodes
                 if (passed) {
                   if (info.is_decommissioned()) {
                     vote_for_state = new_state::recommission;
-                    LOG_PRINT_L2("Decommissioned service node " << quorum->workers[node_index] << " is now passing required checks; voting to recommission");
+                    log::debug(logcat, "Decommissioned service node {} is now passing required checks; voting to recommission", quorum->workers[node_index]);
                   } else if (!test_results.single_ip) {
                       // Don't worry about this if the SN is getting recommissioned (above) -- it'll
                       // already reenter at the bottom.
                       vote_for_state = new_state::ip_change_penalty;
-                      LOG_PRINT_L2("Service node " << quorum->workers[node_index] << " was observed with multiple IPs recently; voting to reset reward position");
+                      log::debug(logcat, "Service node {} was observed with multiple IPs recently; voting to reset reward position", quorum->workers[node_index]);
                   } else {
                       good++;
                       continue;
@@ -376,46 +382,35 @@ namespace service_nodes
 
                   if (info.is_decommissioned()) {
                     if (credit >= 0) {
-                      LOG_PRINT_L2("Decommissioned service node "
-                                   << quorum->workers[node_index]
-                                   << " is still not passing required checks, but has remaining credit (" << credit
-                                   << " blocks); abstaining (to leave decommissioned)");
+                      log::debug(logcat, "Decommissioned service node {} is still not passing required checks, but has remaining credit ({} blocks); abstaining (to leave decommissioned)", quorum->workers[node_index], credit);
                       continue;
                     }
 
-                    LOG_PRINT_L2("Decommissioned service node " << quorum->workers[node_index] << " has no remaining credit; voting to deregister");
+                    log::debug(logcat, "Decommissioned service node {} has no remaining credit; voting to deregister", quorum->workers[node_index]);
                     vote_for_state = new_state::deregister; // Credit ran out!
                   } else {
                     if (credit >= DECOMMISSION_MINIMUM) {
                       vote_for_state = new_state::decommission;
-                      LOG_PRINT_L2("Service node "
-                                   << quorum->workers[node_index]
-                                   << " has stopped passing required checks, but has sufficient earned credit (" << credit << " blocks) to avoid deregistration; voting to decommission");
+                      log::debug(logcat, "Service node {} has stopped passing required checks, but has sufficient earned credit ({} blocks) to avoid deregistration; voting to decommission", quorum->workers[node_index], credit);
                     } else {
                       vote_for_state = new_state::deregister;
-                      LOG_PRINT_L2("Service node "
-                                   << quorum->workers[node_index]
-                                   << " has stopped passing required checks, but does not have sufficient earned credit ("
-                                   << credit << " blocks, " << DECOMMISSION_MINIMUM
-                                   << " required) to decommission; voting to deregister");
+                      log::debug(logcat, "Service node {} has stopped passing required checks, but does not ahve sufficient earned credit ({} blocks, {} required) to decommission; voting to deregister", quorum->workers[node_index], credit, DECOMMISSION_MINIMUM);
                     }
                   }
                 }
 
                 if (vote_for_state == new_state::deregister && height - *cryptonote::get_hard_fork_heights(m_core.get_nettype(), hf_version).first < netconf.HARDFORK_DEREGISTRATION_GRACE_PERIOD) {
-                  LOG_PRINT_L2("Decommissioned service node "
-                               << quorum->workers[node_index]
-                               << " is still not passing required checks, and has no remaining credits left. However it is within the grace period of a hardfork so has not been deregistered.");
+                  log::debug(logcat, "Decommissioned service node {} is still not passing required checks, and has no remaining credits left. However it is within the grace period of a hardfork so has not been deregistered.", quorum->workers[node_index]);
                   continue;
                 }
 
                 quorum_vote_t vote = service_nodes::make_state_change_vote(m_obligations_height, static_cast<uint16_t>(index_in_group), node_index, vote_for_state, reason, my_keys);
                 cryptonote::vote_verification_context vvc;
                 if (!handle_vote(vote, vvc))
-                  LOG_ERROR("Failed to add state change vote; reason: " << print_vote_verification_context(vvc, &vote));
+                  log::error(logcat, "Failed to add state change vote; reason: {}", print_vote_verification_context(vvc, &vote));
               }
               if (good > 0)
-                LOG_PRINT_L2(good << " of " << total << " service nodes are active and passing checks; no state change votes required");
+                log::debug(logcat, "{} of {} service nodes are active and passing checks; no state change votes required", good, total);
             }
             else if (!tested_myself_once_per_block && (find_index_in_quorum_group(quorum->workers, my_keys.pub) >= 0))
             {
@@ -439,16 +434,15 @@ namespace service_nodes
 
                   if (print_failings)
                   {
-                    LOG_PRINT_L0(
-                        (info.is_decommissioned()
+                    log::warning(logcat, "{}{}", (info.is_decommissioned()
                           ? "Service Node (yours) is currently decommissioned and being tested in quorum: "
-                          : "Service Node (yours) is active but is not passing tests for quorum: ")
-                        << m_obligations_height);
+                          : "Service Node (yours) is active but is not passing tests for quorum: "),
+                        m_obligations_height);
                     if (auto why = my_test_results.why())
-                      LOG_PRINT_L0(tools::join("\n", *why));
+                      log::warning(logcat, tools::join("\n", *why));
                     else
-                      LOG_PRINT_L0("Service Node is passing all local tests");
-                    LOG_PRINT_L0("(Note that some tests, such as storage server and lokinet reachability, can only assessed by remote service nodes)");
+                      log::warning(logcat, "Service Node is passing all local tests");
+                    log::warning(logcat, "(Note that some tests, such as storage server and lokinet reachability, can only assessed by remote service nodes)");
                   }
                 }
               }
@@ -482,7 +476,7 @@ namespace service_nodes
               if (!quorum)
               {
                 // TODO(oxen): Fatal error
-                LOG_ERROR("Checkpoint quorum for height: " << m_last_checkpointed_height << " was not cached in daemon!");
+                log::error(logcat, "Checkpoint quorum for height: {} was not cached in daemon!", m_last_checkpointed_height);
                 continue;
               }
 
@@ -496,7 +490,7 @@ namespace service_nodes
               quorum_vote_t vote = make_checkpointing_vote(checkpointed_height_hf_version, block_hash, m_last_checkpointed_height, static_cast<uint16_t>(index_in_group), my_keys);
               cryptonote::vote_verification_context vvc = {};
               if (!handle_vote(vote, vvc))
-                LOG_ERROR("Failed to add checkpoint vote; reason: " << print_vote_verification_context(vvc, &vote));
+                log::error(logcat, "Failed to add checkpoint vote; reason: {}", print_vote_verification_context(vvc, &vote));
             }
           }
         }
@@ -521,7 +515,7 @@ namespace service_nodes
   {
     if (votes.size() < STATE_CHANGE_MIN_VOTES_TO_CHANGE_STATE)
     {
-      LOG_PRINT_L2("Don't have enough votes yet to submit a state change transaction: have " << votes.size() << " of " << STATE_CHANGE_MIN_VOTES_TO_CHANGE_STATE << " required");
+      log::debug(logcat, "Don't have enough votes yet to submit a state change transaction: have {} of {} required", votes.size(), STATE_CHANGE_MIN_VOTES_TO_CHANGE_STATE);
       return true;
     }
 
@@ -567,16 +561,12 @@ namespace service_nodes
       bool result = core.handle_incoming_tx(cryptonote::tx_to_blob(state_change_tx), tvc, cryptonote::tx_pool_options::new_tx());
       if (!result || tvc.m_verifivation_failed)
       {
-        LOG_PRINT_L1("A full state change tx for height: " << vote.block_height <<
-            " and service node: " << vote.state_change.worker_index <<
-            " could not be verified and was not added to the memory pool, reason: " <<
-            print_tx_verification_context(tvc, &state_change_tx));
+        log::info(logcat, "A full state change tx for height: {} and service node: {} could not be verified and was not added to the memory pool, reason: {}", vote.block_height, vote.state_change.worker_index, print_tx_verification_context(tvc, &state_change_tx));
         return false;
       }
     }
     else
-      LOG_PRINT_L1("Failed to add state change to tx extra for height: "
-          << vote.block_height << " and service node: " << vote.state_change.worker_index);
+      log::info(logcat, "Failed to add state change to tx extra for height: {} and service node: {}", vote.block_height, vote.state_change.worker_index);
 
     return true;
   }
@@ -585,7 +575,7 @@ namespace service_nodes
   {
     if (votes.size() < CHECKPOINT_MIN_VOTES)
     {
-      LOG_PRINT_L2("Don't have enough votes yet to submit a checkpoint: have " << votes.size() << " of " << CHECKPOINT_MIN_VOTES << " required");
+      log::debug(logcat, "Don't have enough votes yet to submit a checkpoint: have {} of {} required", votes.size(), CHECKPOINT_MIN_VOTES);
       return true;
     }
 
@@ -677,7 +667,7 @@ namespace service_nodes
     {
       default:
       {
-        LOG_PRINT_L1("Unhandled vote type with value: " << (int)vote.type);
+        log::info(logcat, "Unhandled vote type with value: {}", (int)vote.type);
         assert("Unhandled vote type" == 0);
         return false;
       };

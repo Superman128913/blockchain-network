@@ -56,7 +56,7 @@ public:
   bool deinit(){return true;}
   bool get_short_chain_history(std::list<crypto::hash>& ids) const { return true; }
   bool have_block(const crypto::hash& id) const {return true;}
-  std::pair<uint64_t, crypto::hash> get_blockchain_top() const { return {0, crypto::null_hash};}
+  std::pair<uint64_t, crypto::hash> get_blockchain_top() const { return {0, crypto::null<crypto::hash>};}
   std::vector<cryptonote::tx_verification_batch_info> parse_incoming_txs(const std::vector<std::string>& tx_blobs, const cryptonote::tx_pool_options &opts) { return {}; }
   bool handle_parsed_txs(std::vector<cryptonote::tx_verification_batch_info> &parsed_txs, const cryptonote::tx_pool_options &opts, uint64_t *blink_rollback_height = nullptr) { if (blink_rollback_height) *blink_rollback_height = 0; return true; }
   std::vector<cryptonote::tx_verification_batch_info> handle_incoming_txs(const std::vector<std::string>& tx_blobs, const cryptonote::tx_pool_options &opts) { return {}; }
@@ -78,7 +78,7 @@ public:
   bool cleanup_handle_incoming_blocks(bool force_sync = false) { return true; }
   uint64_t get_target_blockchain_height() const { return 1; }
   size_t get_block_sync_size(uint64_t height) const { return cryptonote::BLOCKS_SYNCHRONIZING_DEFAULT_COUNT; }
-  virtual crypto::hash on_transaction_relayed(const std::string& tx) { return crypto::null_hash; }
+  virtual crypto::hash on_transaction_relayed(const std::string& tx) { return crypto::null<crypto::hash>; }
   cryptonote::network_type get_nettype() const { return cryptonote::network_type::MAINNET; }
   bool get_blocks(uint64_t start_offset, size_t count, std::vector<std::pair<std::string, cryptonote::block>>& blocks, std::vector<std::string>& txs) const { return false; }
   bool get_transactions(const std::vector<crypto::hash>& txs_ids, std::vector<cryptonote::transaction>& txs, std::unordered_set<crypto::hash>* missed_txs) const { return false; }

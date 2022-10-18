@@ -93,7 +93,6 @@ set(enabled_tests
     difficulty
     block_weight
     hash
-    performance_tests
     core_proxy
     fuzz
     wallet3_tests

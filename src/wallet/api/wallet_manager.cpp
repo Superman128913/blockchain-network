@@ -39,9 +39,6 @@
 #include "version.h"
 #include "common/fs.h"
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "WalletAPI"
-
 namespace Wallet {
 
 EXPORT
@@ -191,13 +188,13 @@ std::vector<std::string> WalletManagerImpl::findWallets(std::string_view path_)
             continue;
         auto filename = p.path();
 
-        LOG_PRINT_L3("Checking filename: " << filename);
+        log::trace(logcat, "Checking filename: {}", filename.string());
 
         if (filename.extension() == ".keys") {
             // if keys file found, checking if there's wallet file itself
             filename.replace_extension();
             if (fs::exists(filename)) {
-                LOG_PRINT_L3("Found wallet: " << filename);
+                log::trace(logcat, "Found wallet: {}", filename.string());
                 result.push_back(filename.u8string());
             }
         }
@@ -224,26 +221,17 @@ bool WalletManagerImpl::connected(uint32_t *version)
 {
     using namespace cryptonote::rpc;
     try {
-        auto res = m_http_client.json_rpc<GET_VERSION>(GET_VERSION::names()[0], {});
-        if (version) *version = res.version;
+        auto res = m_http_client.json_rpc("get_version");
+        if (version) *version = res["version"];
         return true;
     } catch (...) {}
 
     return false;
 }
 
-template <typename RPC>
-static std::optional<typename RPC::response> json_rpc(cryptonote::rpc::http_client& http, const typename RPC::request& req = {})
+static nlohmann::json get_info(cryptonote::rpc::http_client& http)
 {
-    using namespace cryptonote::rpc;
-    try { return http.json_rpc<RPC>(RPC::names()[0], req); }
-    catch (...) {}
-    return std::nullopt;
-}
-
-static std::optional<cryptonote::rpc::GET_INFO::response> get_info(cryptonote::rpc::http_client& http)
-{
-    return json_rpc<cryptonote::rpc::GET_INFO>(http);
+    return http.json_rpc("get_info");
 }
 
 
@@ -251,7 +239,7 @@ EXPORT
 uint64_t WalletManagerImpl::blockchainHeight()
 {
     auto res = get_info(m_http_client);
-    return res ? res->height : 0;
+    return res ? res["height"].get<uint64_t>() : 0;
 }
 
 EXPORT
@@ -260,14 +248,14 @@ uint64_t WalletManagerImpl::blockchainTargetHeight()
     auto res = get_info(m_http_client);
     if (!res)
         return 0;
-    return std::max(res->target_height, res->height);
+    return std::max(res["target_height"].get<uint64_t>(), res["height"].get<uint64_t>());
 }
 
 EXPORT
 uint64_t WalletManagerImpl::blockTarget()
 {
     auto res = get_info(m_http_client);
-    return res ? res->target : 0;
+    return res ? res["target"].get<uint64_t>() : 0;
 }
 
 ///////////////////// WalletManagerFactory implementation //////////////////////
@@ -287,13 +275,15 @@ WalletManagerBase *WalletManagerFactory::getWalletManager()
 EXPORT
 void WalletManagerFactory::setLogLevel(int level)
 {
-    mlog_set_log_level(level);
+    auto log_level = oxen::logging::parse_level(level);
+    if (log_level.has_value())
+      log::reset_level(*log_level);
 }
 
 EXPORT
 void WalletManagerFactory::setLogCategories(const std::string &categories)
 {
-    mlog_set_log(categories.c_str());
+    oxen::logging::process_categories_string(categories);
 }
 
 

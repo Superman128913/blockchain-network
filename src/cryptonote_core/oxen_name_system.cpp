@@ -9,6 +9,7 @@
 
 #include "common/oxen.h"
 #include "common/string_util.h"
+#include "common/fs-format.h"
 #include "crypto/hash.h"
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/cryptonote_basic_impl.h"
@@ -34,13 +35,13 @@ extern "C"
 #include <sodium/randombytes.h>
 }
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "ons"
-
 using cryptonote::hf;
 
 namespace ons
 {
+
+namespace log = oxen::log;
+static auto logcat = log::Cat("ons");
 
 enum struct ons_sql_type
 {
@@ -132,20 +133,18 @@ namespace {
 
 std::string ons_extra_string(cryptonote::network_type nettype, cryptonote::tx_extra_oxen_name_system const &data)
 {
-  std::stringstream stream;
-  stream << "ONS Extra={";
+  std::string extra = "ONS Extra={";
+  auto append = std::back_inserter(extra);
   if (data.is_buying())
-  {
-    stream << "owner=" << data.owner.to_string(nettype);
-    stream << ", backup_owner=" << (data.backup_owner ? data.backup_owner.to_string(nettype) : "(none)");
-  }
+    fmt::format_to(append, "owner={}, backup_owner={}",
+        data.owner.to_string(nettype), (data.backup_owner ? data.backup_owner.to_string(nettype) : "(none)"));
   else if (data.is_renewing())
-    stream << "renewal";
+    extra += "renewal";
   else
-    stream << "signature=" << tools::type_to_hex(data.signature.data);
+    fmt::format_to(append, "signature={}", tools::type_to_hex(data.signature.data));
 
-  stream << ", type=" << data.type << ", name_hash=" << data.name_hash << "}";
-  return stream.str();
+  fmt::format_to(append, ", type={}, name_hash={}}}", data.type, data.name_hash);
+  return extra;
 }
 
 /// Clears any existing bindings
@@ -220,6 +219,7 @@ struct blob_view {
   std::string_view data;
   /// Constructor that simply forwards anything to the `data` (string_view) member constructor
   template <typename... T> explicit blob_view(T&&... args) : data{std::forward<T>(args)...} {}
+  blob_view(const unsigned char* data, size_t size) : blob_view{reinterpret_cast<const char*>(data), size} {}
 };
 
 // Binds a blob wrapped in a blob_view decorator
@@ -361,7 +361,7 @@ bool sql_copy_blob(sql_compiled_statement& statement, I column, void *dest, size
   auto blob = get<blob_view>(statement, column);
   if (blob.data.size() != dest_size)
   {
-    LOG_PRINT_L0("Unexpected blob size=" << blob.data.size() << ", in ONS DB does not match expected size=" << dest_size);
+    log::warning(logcat, "Unexpected blob size={}, in ONS DB does not match expected size={}", blob.data.size(), dest_size);
     assert(blob.data.size() == dest_size);
     return false;
   }
@@ -389,7 +389,7 @@ mapping_record sql_get_mapping_from_statement(sql_compiled_statement& statement)
     auto value = get<std::string_view>(statement, mapping_record_column::encrypted_value);
     if (value.size() > result.encrypted_value.buffer.size())
     {
-      MERROR("Unexpected encrypted value blob with size=" << value.size() << ", in ONS db larger than the available size=" << result.encrypted_value.buffer.size());
+      log::error(logcat, "Unexpected encrypted value blob with size={}, in ONS db larger than the available size={}", value.size(), result.encrypted_value.buffer.size());
       return result;
     }
     result.encrypted_value.len = value.size();
@@ -403,7 +403,7 @@ mapping_record sql_get_mapping_from_statement(sql_compiled_statement& statement)
     result.name_hash.append(value.data(), value.size());
   }
 
-  if (!sql_copy_blob(statement, mapping_record_column::txid, result.txid.data, sizeof(result.txid)))
+  if (!sql_copy_blob(statement, mapping_record_column::txid, result.txid.data(), result.txid.size()))
     return result;
 
   int owner_column = tools::enum_count<mapping_record_column>;
@@ -435,7 +435,7 @@ bool sql_run_statement(ons_sql_type type, sql_compiled_statement& statement, voi
       {
         switch (type)
         {
-          default: MERROR("Unhandled ons type enum with value: " << (int)type << ", in: " << __func__); break;
+          default: log::error(logcat, "Unhandled ons type enum with value: {}, in: {}", (int)type, __func__); break;
 
           case ons_sql_type::internal_cmd: break;
           case ons_sql_type::get_owner:
@@ -452,7 +452,7 @@ bool sql_run_statement(ons_sql_type type, sql_compiled_statement& statement, voi
           {
             auto *entry       = reinterpret_cast<settings_record *>(context);
             get(statement, ons_db_setting_column::top_height, entry->top_height);
-            if (!sql_copy_blob(statement, ons_db_setting_column::top_hash, entry->top_hash.data, sizeof(entry->top_hash.data)))
+            if (!sql_copy_blob(statement, ons_db_setting_column::top_hash, entry->top_hash.data(), entry->top_hash.size()))
               return false;
             get(statement, ons_db_setting_column::version, entry->version);
             data_loaded = true;
@@ -499,7 +499,7 @@ bool sql_run_statement(ons_sql_type type, sql_compiled_statement& statement, voi
 
       default:
       {
-        LOG_PRINT_L1("Failed to execute statement: " << sqlite3_sql(statement.statement) <<", reason: " << sqlite3_errstr(step_result));
+        log::info(logcat, "Failed to execute statement: {}, reason: {}", sqlite3_sql(statement.statement), sqlite3_errstr(step_result));
         infinite_loop = false;
         break;
       }
@@ -541,7 +541,7 @@ bool sql_compiled_statement::compile(std::string_view query, bool optimise_for_m
 #endif
 
   if (prepare_result != SQLITE_OK) {
-    MERROR("Can not compile SQL statement:\n" << query << "\nReason: " << sqlite3_errstr(prepare_result));
+    log::error(logcat, "Can not compile SQL statement:\n{}\nReason: {}", query, sqlite3_errstr(prepare_result));
     return false;
   }
   sqlite3_finalize(statement);
@@ -568,7 +568,7 @@ sqlite3 *init_oxen_name_system(const fs::path& file_path, bool read_only)
   int sql_init    = sqlite3_initialize();
   if (sql_init != SQLITE_OK)
   {
-    MERROR("Failed to initialize sqlite3: " << sqlite3_errstr(sql_init));
+    log::error(logcat, "Failed to initialize sqlite3: {}", sqlite3_errstr(sql_init));
     return nullptr;
   }
 
@@ -576,7 +576,7 @@ sqlite3 *init_oxen_name_system(const fs::path& file_path, bool read_only)
   int sql_open    = sqlite3_open_v2(file_path.u8string().c_str(), &result, flags, nullptr);
   if (sql_open != SQLITE_OK)
   {
-    MERROR("Failed to open ONS db at: " << file_path << ", reason: " << sqlite3_errstr(sql_open));
+    log::error(logcat, "Failed to open ONS db at: {}, reason: {}", file_path, sqlite3_errstr(sql_open));
     return nullptr;
   }
 
@@ -591,7 +591,7 @@ sqlite3 *init_oxen_name_system(const fs::path& file_path, bool read_only)
   int exec = sqlite3_exec(result, "PRAGMA journal_mode = WAL", nullptr, nullptr, nullptr);
   if (exec != SQLITE_OK)
   {
-    MERROR("Failed to set journal mode to WAL: " << sqlite3_errstr(exec));
+    log::error(logcat, "Failed to set journal mode to WAL: {}", sqlite3_errstr(exec));
     return nullptr;
   }
 
@@ -605,7 +605,7 @@ sqlite3 *init_oxen_name_system(const fs::path& file_path, bool read_only)
   exec = sqlite3_exec(result, "PRAGMA synchronous = NORMAL", nullptr, nullptr, nullptr);
   if (exec != SQLITE_OK)
   {
-    MERROR("Failed to set synchronous mode to NORMAL: " << sqlite3_errstr(exec));
+    log::error(logcat, "Failed to set synchronous mode to NORMAL: {}", sqlite3_errstr(exec));
     return nullptr;
   }
 
@@ -664,7 +664,7 @@ std::string tx_extra_signature(std::string_view value, ons::generic_owner const 
   static_assert(sizeof(crypto::hash) == crypto_generichash_BYTES, "Using libsodium generichash for signature hash, require we fit into crypto::hash");
   if (value.size() > mapping_value::BUFFER_SIZE)
   {
-    MERROR("Unexpected value len=" << value.size() << " greater than the expected capacity=" << mapping_value::BUFFER_SIZE);
+    log::error(logcat, "Unexpected value len={} greater than the expected capacity={}", value.size(), mapping_value::BUFFER_SIZE);
     return ""s;
   }
 
@@ -682,7 +682,7 @@ ons::generic_signature make_ed25519_signature(crypto::hash const &hash, crypto::
 {
   ons::generic_signature result = {};
   result.type                   = ons::generic_owner_sig_type::ed25519;
-  crypto_sign_detached(result.ed25519.data, NULL, reinterpret_cast<unsigned char const *>(hash.data), sizeof(hash), skey.data);
+  crypto_sign_detached(result.ed25519.data(), NULL, hash.data(), hash.size(), skey.data());
   return result;
 }
 
@@ -711,9 +711,9 @@ bool parse_owner_to_generic_owner(cryptonote::network_type nettype, std::string_
   {
     result = ons::make_monero_owner(parsed_addr.address, parsed_addr.is_subaddress);
   }
-  else if (owner.size() == 2*sizeof(ed_owner.data) && oxenc::is_hex(owner))
+  else if (owner.size() == 2*ed_owner.size() && oxenc::is_hex(owner))
   {
-    oxenc::from_hex(owner.begin(), owner.end(), ed_owner.data);
+    oxenc::from_hex(owner.begin(), owner.end(), ed_owner.data());
     result = ons::make_ed25519_owner(ed_owner);
   }
   else
@@ -742,13 +742,9 @@ static constexpr bool char_is_alphanum_or(char c)
 static constexpr bool char_is_alphanum(char c) { return char_is_alphanum_or<>(c); }
 
 template <typename... T>
-static bool check_condition(bool condition, std::string* reason, T&&... args) {
+static bool check_condition(bool condition, std::string* reason, std::string_view format, T&&... args) {
   if (condition && reason)
-  {
-    std::ostringstream os;
-    (os << ... << std::forward<T>(args));
-    *reason = os.str();
-  }
+    *reason = fmt::format(format, std::forward<T>(args)...);
   return condition;
 }
 
@@ -766,17 +762,15 @@ bool validate_ons_name(mapping_type type, std::string name, std::string *reason)
   else
   {
     if (reason)
-    {
-      std::stringstream err_stream;
-      err_stream << "ONS type=" << mapping_type_str(type) << ", specifies unhandled mapping type in name validation";
-      *reason = err_stream.str();
-    }
+      *reason = "ONS type={} specifies unhandled mapping type in name validation"_format(type);
     return false;
   }
 
   // NOTE: Validate name length
   name = tools::lowercase_ascii_string(name);
-  if (check_condition((name.empty() || name.size() > max_name_len), reason, "ONS type=", type, ", specifies mapping from name->value where the name's length=", name.size(), " is 0 or exceeds the maximum length=", max_name_len, ", given name=", name))
+  if (check_condition((name.empty() || name.size() > max_name_len), reason,
+        "ONS type={} specifies mapping from name->value where the name's length={} is 0 or exceeds the maximum length={}, given name={}",
+        type, name.size(), max_name_len, name))
     return false;
 
   std::string_view name_view{name}; // Will chop this down as we validate each part
@@ -796,41 +790,46 @@ bool validate_ons_name(mapping_type type, std::string name, std::string *reason)
     //   domains (in which case the user looking up "foo.loki" would try end up trying to resolve
     //   "foo.loki.loki").
     for (auto& reserved : {"localhost.loki"sv, "loki.loki"sv, "snode.loki"sv})
-      if (check_condition(name == reserved, reason, "ONS type=", type, ", specifies mapping from name->value using protocol reserved name=", name))
+      if (check_condition(name == reserved, reason,
+            "ONS type={} specifies mapping from name->value using protocol reserved name={}", type, name))
         return false;
 
     auto constexpr SHORTEST_DOMAIN = "a.loki"sv;
-    if (check_condition(name.size() < SHORTEST_DOMAIN.size(), reason, "ONS type=", type, ", specifies mapping from name->value where the name is shorter than the shortest possible name=", SHORTEST_DOMAIN, ", given name=", name))
+    if (check_condition(name.size() < SHORTEST_DOMAIN.size(), reason,
+          "ONS type={} specifies mapping from name->value where the name is shorter than the shortest possible name={}, given name={}", type, SHORTEST_DOMAIN, name))
       return false;
 
     // Must end with .loki
     auto constexpr SUFFIX = ".loki"sv;
-    if (check_condition(!tools::ends_with(name_view, SUFFIX), reason, "ONS type=", type, ", specifies mapping from name->value where the name does not end with the domain .loki, name=", name))
+    if (check_condition(!tools::ends_with(name_view, SUFFIX), reason,
+          "ONS type={} specifies mapping from name->value where the name does not end with the domain .loki, name={}", type, name))
       return false;
 
     name_view.remove_suffix(SUFFIX.size());
 
     // All domains containing '--' as 3rd/4th letter are reserved except for xn-- punycode domains
     if (check_condition(name_view.size() >= 4 && name_view.substr(2, 2) == "--"sv && !tools::starts_with(name_view, "xn--"sv),
-          reason, "ONS type=", type, ", specifies reserved name `?\?--*.loki': ", name))
+          reason, "ONS type={} specifies reserved name `?\?--*.loki': {}", type, name))
       return false;
 
     // Must start with alphanumeric
-    if (check_condition(!char_is_alphanum(name_view.front()), reason, "ONS type=", type, ", specifies mapping from name->value where the name does not start with an alphanumeric character, name=", name))
+    if (check_condition(!char_is_alphanum(name_view.front()), reason,
+          "ONS type={} specifies mapping from name->value where the name does not start with an alphanumeric character, name={}", type, name))
       return false;
 
     name_view.remove_prefix(1);
 
     if (!name_view.empty()) {
       // Character preceding .loki must be alphanumeric
-      if (check_condition(!char_is_alphanum(name_view.back()), reason, "ONS type=", type ,", specifies mapping from name->value where the character preceding the .loki is not alphanumeric, char=", name_view.back(), ", name=", name))
+      if (check_condition(!char_is_alphanum(name_view.back()), reason,
+            "ONS type={} specifies mapping from name->value where the character preceding the .loki is not alphanumeric, char={}, name={}", type, name_view.back(), name))
         return false;
       name_view.remove_suffix(1);
     }
 
     // Inbetween start and preceding suffix, (alphanumeric or hyphen) characters permitted
     if (check_condition(!std::all_of(name_view.begin(), name_view.end(), char_is_alphanum_or<'-'>),
-          reason, "ONS type=", type, ", specifies mapping from name->value where the domain name contains more than the permitted alphanumeric or hyphen characters, name=", name))
+          reason, "ONS type={} specifies mapping from name->value where the domain name contains more than the permitted alphanumeric or hyphen characters, name={}", type, name))
       return false;
   }
   else if (type == mapping_type::session || type == mapping_type::wallet)
@@ -840,25 +839,27 @@ bool validate_ons_name(mapping_type type, std::string name, std::string *reason)
     // ^[a-z0-9_]([a-z0-9-_]*[a-z0-9_])?$
 
     // Must start with (alphanumeric or underscore)
-    if (check_condition(!char_is_alphanum_or<'_'>(name_view.front()), reason, "ONS type=", type, ", specifies mapping from name->value where the name does not start with an alphanumeric or underscore character, name=", name))
+    if (check_condition(!char_is_alphanum_or<'_'>(name_view.front()), reason,
+          "ONS type={} specifies mapping from name->value where the name does not start with an alphanumeric or underscore character, name={}", type, name))
       return false;
     name_view.remove_prefix(1);
 
     if (!name_view.empty()) {
       // Must NOT end with a hyphen '-'
-      if (check_condition(!char_is_alphanum_or<'_'>(name_view.back()), reason, "ONS type=", type, ", specifies mapping from name->value where the last character is a hyphen '-' which is disallowed, name=", name))
+      if (check_condition(!char_is_alphanum_or<'_'>(name_view.back()), reason,
+            "ONS type={} specifies mapping from name->value where the last character is a hyphen '-' which is disallowed, name={}", type, name))
         return false;
       name_view.remove_suffix(1);
     }
 
     // Inbetween start and preceding suffix, (alphanumeric, hyphen or underscore) characters permitted
     if (check_condition(!std::all_of(name_view.begin(), name_view.end(), char_is_alphanum_or<'-', '_'>),
-          reason, "ONS type=", type, ", specifies mapping from name->value where the name contains more than the permitted alphanumeric, underscore or hyphen characters, name=", name))
+          reason, "ONS type={} specifies mapping from name->value where the name contains more than the permitted alphanumeric, underscore or hyphen characters, name={}", type, name))
       return false;
   }
   else
   {
-    MERROR("Type not implemented");
+    log::error(logcat, "Type not implemented");
     return false;
   }
 
@@ -886,11 +887,8 @@ static bool check_lengths(mapping_type type, std::string_view value, size_t max,
   {
     if (reason)
     {
-      std::stringstream err_stream;
-      err_stream << "ONS type=" << type << ", specifies mapping from name_hash->encrypted_value where the value's length=" << value.size() << ", does not equal the required length=" << max << ", given value=";
-      if (binary_val) err_stream << oxenc::to_hex(value);
-      else            err_stream << value;
-      *reason = err_stream.str();
+      *reason = "ONS type={} specifies mapping from name_hash->encrypted_value where the value's length={} does not equal the required length={}, given value={}"_format(
+              type, value.size(), max, binary_val ? oxenc::to_hex(value) : value);
     }
   }
 
@@ -903,7 +901,6 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
   if (blob) *blob = {};
 
   // Check length of the value
-  std::stringstream err_stream;
   cryptonote::address_parse_info addr_info = {};
   if (type == mapping_type::wallet)
   {
@@ -912,15 +909,9 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
       if (reason)
       {
         if (value.empty())
-        {
-          err_stream << "The value=" << value;
-          err_stream << ", mapping into the wallet address, specifies a wallet address of 0 length";
-        }
+          *reason = "The value={}, mapping into the wallet address, specifies a wallet address of 0 length"_format(value);
         else
-        {
-          err_stream << "Could not convert the wallet address string, check it is correct, value=" << value;
-        }
-        *reason = err_stream.str();
+          *reason = "Could not convert the wallet address string, check it is correct, value={}"_format(value);
       }
       return false;
     }
@@ -936,13 +927,13 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
         identifier |= ONS_WALLET_TYPE_INTEGRATED;
       }
       iter = std::copy_n(&identifier, 1, iter);
-      iter = std::copy_n(addr_info.address.m_spend_public_key.data, sizeof(addr_info.address.m_spend_public_key.data), iter);
-      iter = std::copy_n(addr_info.address.m_view_public_key.data, sizeof(addr_info.address.m_view_public_key.data), iter);
+      iter = std::copy_n(addr_info.address.m_spend_public_key.data(), addr_info.address.m_spend_public_key.size(), iter);
+      iter = std::copy_n(addr_info.address.m_view_public_key.data(), addr_info.address.m_view_public_key.size(), iter);
 
       size_t counter = 65;
       assert(std::distance(blob->buffer.begin(), iter) == static_cast<int>(counter));
       if (addr_info.has_payment_id) {
-        std::copy_n(addr_info.payment_id.data, sizeof(addr_info.payment_id.data), iter);
+        std::copy_n(addr_info.payment_id.data(), addr_info.payment_id.size(), iter);
         counter+=sizeof(addr_info.payment_id);
       }
 
@@ -955,7 +946,7 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
     // 51 base32z chars (=255 bits) followed by a 1-bit value ('y'=0, or 'o'=0b10000); anything else
     // in the last spot isn't a valid lokinet address.
     if (check_condition(value.size() != 57 || !tools::ends_with(value, ".loki") || !oxenc::is_base32z(value.substr(0, 52)) || !(value[51] == 'y' || value[51] == 'o'),
-                reason, "'", value, "' is not a valid lokinet address"))
+                reason, "'{}' is not a valid lokinet address", value))
       return false;
 
     if (blob)
@@ -968,14 +959,17 @@ bool mapping_value::validate(cryptonote::network_type nettype, mapping_type type
   {
     assert(type == mapping_type::session);
     // NOTE: Check value is hex of the right size
-    if (check_condition(value.size() != 2*SESSION_PUBLIC_KEY_BINARY_LENGTH, reason, "The value=", value, " is not the required ", 2*SESSION_PUBLIC_KEY_BINARY_LENGTH, "-character hex string session public key, length=", value.size()))
+    if (check_condition(value.size() != 2*SESSION_PUBLIC_KEY_BINARY_LENGTH, reason,
+          "The value={} is not the required {}-character hex string session public key, length={}", value, 2*SESSION_PUBLIC_KEY_BINARY_LENGTH, value.size()))
       return false;
 
-    if (check_condition(!oxenc::is_hex(value), reason, ", specifies name -> value mapping where the value is not a hex string given value="))
+    if (check_condition(!oxenc::is_hex(value), reason,
+          "value={} specifies name -> value mapping where the value is not a hex string", value))
       return false;
 
     // NOTE: Session public keys are 33 bytes, with the first byte being 0x05 and the remaining 32 being the public key.
-    if (check_condition(!tools::starts_with(value, "05"), reason, "ONS type=session, specifies mapping from name -> ed25519 key where the key is not prefixed with 05, given ed25519=", value))
+    if (check_condition(!tools::starts_with(value, "05"), reason,
+          "ONS type=session specifies mapping from name -> ed25519 key where the key is not prefixed with 05, given ed25519={}", value))
       return false;
 
     if (blob) // NOTE: Given blob, write the binary output
@@ -995,7 +989,6 @@ static_assert(SODIUM_ENCRYPTION_EXTRA_BYTES >= crypto_secretbox_MACBYTES);
 bool mapping_value::validate_encrypted(mapping_type type, std::string_view value, mapping_value* blob, std::string *reason)
 {
   if (blob) *blob = {};
-  std::stringstream err_stream;
 
   int value_len = crypto_aead_xchacha20poly1305_ietf_ABYTES + crypto_aead_xchacha20poly1305_ietf_NPUBBYTES;
 
@@ -1017,10 +1010,7 @@ bool mapping_value::validate_encrypted(mapping_type type, std::string_view value
   else
   {
     if (reason)
-    {
-      err_stream << "Unhandled type passed into " << __func__;
-      *reason = err_stream.str();
-    }
+      *reason = "Unhandled type passed into {}"_format(__func__);
     return false;
   }
 
@@ -1084,16 +1074,13 @@ static bool verify_ons_signature(crypto::hash const &hash, ons::generic_signatur
   }
   else
   {
-    return (crypto_sign_verify_detached(signature.data, reinterpret_cast<unsigned char const *>(hash.data), sizeof(hash.data), owner.ed25519.data) == 0);
+    return (crypto_sign_verify_detached(signature.data, hash.data(), hash.size(), owner.ed25519.data()) == 0);
   }
 }
 
 static bool validate_against_previous_mapping(ons::name_system_db &ons_db, uint64_t blockchain_height, cryptonote::transaction const &tx, cryptonote::tx_extra_oxen_name_system const &ons_extra, std::string *reason)
 {
-  std::stringstream err_stream;
-  OXEN_DEFER { if (reason && reason->empty()) *reason = err_stream.str(); };
-
-  crypto::hash expected_prev_txid = crypto::null_hash;
+  crypto::hash expected_prev_txid{};
   std::string name_hash           = hash_to_base64(ons_extra.name_hash);
   ons::mapping_record mapping     = ons_db.get_mapping(ons_extra.type, name_hash);
 
@@ -1102,20 +1089,25 @@ static bool validate_against_previous_mapping(ons::name_system_db &ons_db, uint6
     // Updating: the mapping must exist and be active, the updated fields must actually change from
     // the current value, and a valid signature over the updated values must be present.
 
-    if (check_condition(!mapping, reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), " update requested but mapping does not exist."))
+    if (check_condition(!mapping, reason,
+          "{}, {} update requested but mapping does not exist.", tx, ons_extra_string(ons_db.network_type(), ons_extra)))
       return false;
-    if (check_condition(!mapping.active(blockchain_height), reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), " TX requested to update mapping that has already expired"))
+    if (check_condition(!mapping.active(blockchain_height), reason,
+          "{}, {} TX requested to update mapping that has already expired", tx, ons_extra_string(ons_db.network_type(), ons_extra)))
       return false;
     expected_prev_txid = mapping.txid;
 
-    constexpr auto SPECIFYING_SAME_VALUE_ERR = " field to update is specifying the same mapping "sv;
-    if (check_condition(ons_extra.field_is_set(ons::extra_field::encrypted_value) && ons_extra.encrypted_value == mapping.encrypted_value.to_view(), reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), SPECIFYING_SAME_VALUE_ERR, "value"))
+    constexpr auto SPECIFYING_SAME_VALUE_ERR = "{}, {} field to update is specifying the same mapping {}"sv;
+    if (check_condition(ons_extra.field_is_set(ons::extra_field::encrypted_value) && ons_extra.encrypted_value == mapping.encrypted_value.to_view(), reason,
+          SPECIFYING_SAME_VALUE_ERR, tx, ons_extra_string(ons_db.network_type(), ons_extra), "value"))
       return false;
 
-    if (check_condition(ons_extra.field_is_set(ons::extra_field::owner) && ons_extra.owner == mapping.owner, reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), SPECIFYING_SAME_VALUE_ERR, "owner"))
+    if (check_condition(ons_extra.field_is_set(ons::extra_field::owner) && ons_extra.owner == mapping.owner, reason,
+          SPECIFYING_SAME_VALUE_ERR, tx, ons_extra_string(ons_db.network_type(), ons_extra), "owner"))
       return false;
 
-    if (check_condition(ons_extra.field_is_set(ons::extra_field::backup_owner) && ons_extra.backup_owner == mapping.backup_owner, reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), SPECIFYING_SAME_VALUE_ERR, "backup_owner"))
+    if (check_condition(ons_extra.field_is_set(ons::extra_field::backup_owner) && ons_extra.backup_owner == mapping.backup_owner, reason,
+          SPECIFYING_SAME_VALUE_ERR, tx, ons_extra_string(ons_db.network_type(), ons_extra), "backup_owner"))
       return false;
 
     // Validate signature
@@ -1124,60 +1116,74 @@ static bool validate_against_previous_mapping(ons::name_system_db &ons_db, uint6
         ons_extra.field_is_set(ons::extra_field::owner) ? &ons_extra.owner : nullptr,
         ons_extra.field_is_set(ons::extra_field::backup_owner) ? &ons_extra.backup_owner : nullptr,
         expected_prev_txid);
-    if (check_condition(data.empty(), reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), " unexpectedly failed to generate signature, please inform the Loki developers"))
+    if (check_condition(data.empty(), reason,
+          "{}, {} unexpectedly failed to generate signature, please inform the Oxen developers", tx, ons_extra_string(ons_db.network_type(), ons_extra)))
       return false;
 
     crypto::hash hash;
-    crypto_generichash(reinterpret_cast<unsigned char*>(hash.data), sizeof(hash), reinterpret_cast<const unsigned char*>(data.data()), data.size(), nullptr /*key*/, 0 /*key_len*/);
+    crypto_generichash(hash.data(), hash.size(), reinterpret_cast<const unsigned char*>(data.data()), data.size(), nullptr /*key*/, 0 /*key_len*/);
 
     if (check_condition(!verify_ons_signature(hash, ons_extra.signature, mapping.owner) &&
                         !verify_ons_signature(hash, ons_extra.signature, mapping.backup_owner), reason,
-                        tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), " failed to verify signature for ONS update, current owner=", mapping.owner.to_string(ons_db.network_type()), ", backup owner=", mapping.backup_owner.to_string(ons_db.network_type())))
+                        "{}, {} failed to verify signature for ONS update, current owner={}, backup owner={}",
+                        tx, ons_extra_string(ons_db.network_type(), ons_extra), mapping.owner.to_string(ons_db.network_type()), mapping.backup_owner.to_string(ons_db.network_type())))
       return false;
   }
   else if (ons_extra.is_buying())
   {
     // If buying a new name then the existing name must not be active
     if (check_condition(mapping.active(blockchain_height), reason,
-          "Cannot buy an ONS name that is already registered: name_hash=", mapping.name_hash, ", type=", mapping.type,
-          "; TX: ", tx, "; ", ons_extra_string(ons_db.network_type(), ons_extra)))
+          "Cannot buy an ONS name that is already registered: name_hash={}, type={}; TX: {}; {}",
+          mapping.name_hash, mapping.type, tx, ons_extra_string(ons_db.network_type(), ons_extra)))
         return false;
 
     // If buying a new wallet name then the existing session name must not be active and vice versa
     // The owner of an existing name but different type is allowed to register but the owner and backup owners
     // of the new mapping must be from the same owners and backup owners of the previous mapping ie no
     // new addresses are allowed to be added as owner or backup owner.
-    if (ons_extra.type == mapping_type::wallet)
+    if (ons_extra.type == mapping_type::wallet || ons_extra.type == mapping_type::session)
     {
-      ons::mapping_record session_mapping = ons_db.get_mapping(mapping_type::session, name_hash);
-      if (check_condition(session_mapping.active(blockchain_height) && (!(session_mapping.owner == ons_extra.owner || session_mapping.backup_owner == ons_extra.owner) || !(!ons_extra.field_is_set(ons::extra_field::backup_owner) || session_mapping.backup_owner == ons_extra.backup_owner || session_mapping.owner == ons_extra.backup_owner)), reason,
-            "Cannot buy an ONS wallet name that has an already registered session name: name_hash=", mapping.name_hash, ", type=", mapping.type,
-            "; TX: ", tx, "; ", ons_extra_string(ons_db.network_type(), ons_extra)))
-          return false;
-    } else if (ons_extra.type == mapping_type::session) {
-      ons::mapping_record wallet_mapping = ons_db.get_mapping(mapping_type::wallet, name_hash);
-      if (check_condition(wallet_mapping.active(blockchain_height) && (!(wallet_mapping.owner == ons_extra.owner || wallet_mapping.backup_owner == ons_extra.owner) || !(!ons_extra.field_is_set(ons::extra_field::backup_owner) || wallet_mapping.backup_owner == ons_extra.backup_owner || wallet_mapping.owner == ons_extra.backup_owner)), reason,
-            "Cannot buy an ONS session name that has an already registered wallet name: name_hash=", mapping.name_hash, ", type=", mapping.type,
-            "; TX: ", tx, "; ", ons_extra_string(ons_db.network_type(), ons_extra)))
+      auto buy_type_name = ons_extra.type == mapping_type::wallet ? "wallet"sv : "session"sv;
+      auto alt_type_name = ons_extra.type == mapping_type::wallet ? "session"sv : "wallet"sv;
+      auto alt_type = ons_extra.type == mapping_type::wallet ? mapping_type::session : mapping_type::wallet;
+
+      ons::mapping_record alt_mapping = ons_db.get_mapping(alt_type, name_hash);
+
+      auto is_alt_record_owner = [&alt_mapping](const auto& new_owner) {
+        return new_owner == alt_mapping.owner || new_owner == alt_mapping.backup_owner;
+      };
+
+      if (check_condition(
+            alt_mapping.active(blockchain_height) && // alternative mapping exists
+            (
+             !is_alt_record_owner(ons_extra.owner) ||
+             (ons_extra.field_is_set(ons::extra_field::backup_owner) && !is_alt_record_owner(ons_extra.backup_owner))
+            ),
+            reason,
+            "Cannot buy an ONS {} name that has an already registered {} name: name_hash={}, type={}; TX: {}; {}",
+            buy_type_name, alt_type_name, mapping.name_hash, mapping.type, tx, ons_extra_string(ons_db.network_type(), ons_extra)))
           return false;
     }
   }
   else if (ons_extra.is_renewing())
   {
     // We allow anyone to renew a name, but it has to exist and be currently active
-    if (check_condition(!mapping, reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), " renewal requested but mapping does not exist."))
+    if (check_condition(!mapping, reason, "{}, {} renewal requested but mapping does not exist.", tx, ons_extra_string(ons_db.network_type(), ons_extra)))
       return false;
-    if (check_condition(!mapping.active(blockchain_height), reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), " TX requested to renew mapping that has already expired"))
+    if (check_condition(!mapping.active(blockchain_height), reason,
+          "{}, {} TX requested to renew mapping that has already expired", tx, ons_extra_string(ons_db.network_type(), ons_extra)))
       return false;
     expected_prev_txid = mapping.txid;
   }
   else
   {
-    check_condition(true, reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), " is not a valid buy, update, or renew ONS tx");
+    check_condition(true, reason, "{}, {} is not a valid buy, update, or renew ONS tx", tx, ons_extra_string(ons_db.network_type(), ons_extra));
     return false;
   }
 
-  if (check_condition(ons_extra.prev_txid != expected_prev_txid, reason, tx, ", ", ons_extra_string(ons_db.network_type(), ons_extra), " specified prior txid=", ons_extra.prev_txid, ", but ONS DB reports=", expected_prev_txid, ", possible competing TX was submitted and accepted before this TX was processed"))
+  if (check_condition(ons_extra.prev_txid != expected_prev_txid, reason,
+        "{}, {} specified prior txid {} but expected {}; perhaps a competing ONS TX was submitted and accepted before this ONS update TX was processed?",
+        tx, ons_extra_string(ons_db.network_type(), ons_extra), ons_extra.prev_txid, expected_prev_txid))
     return false;
 
   return true;
@@ -1192,10 +1198,12 @@ bool name_system_db::validate_ons_tx(hf hf_version, uint64_t blockchain_height, 
   // Pull out ONS Extra from TX
   // -----------------------------------------------------------------------------------------------
   {
-    if (check_condition(tx.type != cryptonote::txtype::oxen_name_system, reason, tx, ", uses wrong tx type, expected=", cryptonote::txtype::oxen_name_system))
+    if (check_condition(tx.type != cryptonote::txtype::oxen_name_system, reason,
+          "{} uses wrong tx type, expected={}", tx, cryptonote::txtype::oxen_name_system))
       return false;
 
-    if (check_condition(!cryptonote::get_field_from_tx_extra(tx.extra, ons_extra), reason, tx, ", didn't have oxen name service in the tx_extra"))
+    if (check_condition(!cryptonote::get_field_from_tx_extra(tx.extra, ons_extra), reason,
+          "{} didn't have oxen name service in the tx_extra", tx))
       return false;
   }
 
@@ -1204,17 +1212,21 @@ bool name_system_db::validate_ons_tx(hf hf_version, uint64_t blockchain_height, 
   // Check TX ONS Serialized Fields are NULL if they are not specified
   // -----------------------------------------------------------------------------------------------
   {
-    constexpr auto VALUE_SPECIFIED_BUT_NOT_REQUESTED = ", given field but field is not requested to be serialised="sv;
-    if (check_condition(!ons_extra.field_is_set(ons::extra_field::encrypted_value) && ons_extra.encrypted_value.size(), reason, tx, ", ", ons_extra_string(nettype, ons_extra), VALUE_SPECIFIED_BUT_NOT_REQUESTED, "encrypted_value"))
+    constexpr auto VALUE_SPECIFIED_BUT_NOT_REQUESTED = "{}, {} given field {} but field is not requested to be serialised"sv;
+    if (check_condition(!ons_extra.field_is_set(ons::extra_field::encrypted_value) && ons_extra.encrypted_value.size(), reason,
+          VALUE_SPECIFIED_BUT_NOT_REQUESTED, tx, ons_extra_string(nettype, ons_extra), "encrypted_value"))
       return false;
 
-    if (check_condition(!ons_extra.field_is_set(ons::extra_field::owner) && ons_extra.owner, reason, tx, ", ", ons_extra_string(nettype, ons_extra), VALUE_SPECIFIED_BUT_NOT_REQUESTED, "owner"))
+    if (check_condition(!ons_extra.field_is_set(ons::extra_field::owner) && ons_extra.owner, reason,
+          VALUE_SPECIFIED_BUT_NOT_REQUESTED, tx, ons_extra_string(nettype, ons_extra), "owner"))
       return false;
 
-    if (check_condition(!ons_extra.field_is_set(ons::extra_field::backup_owner) && ons_extra.backup_owner, reason, tx, ", ", ons_extra_string(nettype, ons_extra), VALUE_SPECIFIED_BUT_NOT_REQUESTED, "backup_owner"))
+    if (check_condition(!ons_extra.field_is_set(ons::extra_field::backup_owner) && ons_extra.backup_owner, reason,
+          VALUE_SPECIFIED_BUT_NOT_REQUESTED, tx, ons_extra_string(nettype, ons_extra), "backup_owner"))
       return false;
 
-    if (check_condition(!ons_extra.field_is_set(ons::extra_field::signature) && ons_extra.signature, reason, tx, ", ", ons_extra_string(nettype, ons_extra), VALUE_SPECIFIED_BUT_NOT_REQUESTED, "signature"))
+    if (check_condition(!ons_extra.field_is_set(ons::extra_field::signature) && ons_extra.signature, reason,
+          VALUE_SPECIFIED_BUT_NOT_REQUESTED, tx, ons_extra_string(nettype, ons_extra), "signature"))
       return false;
   }
 
@@ -1222,22 +1234,28 @@ bool name_system_db::validate_ons_tx(hf hf_version, uint64_t blockchain_height, 
   // Simple ONS Extra Validation
   // -----------------------------------------------------------------------------------------------
   {
-    if (check_condition(ons_extra.version != 0, reason, tx, ", ", ons_extra_string(nettype, ons_extra), " unexpected version=", std::to_string(ons_extra.version), ", expected=0"))
+    if (check_condition(ons_extra.version != 0, reason,
+          "{}, {} unexpected version={:d}, expected 0", tx, ons_extra_string(nettype, ons_extra), ons_extra.version))
       return false;
 
-    if (check_condition(!ons::mapping_type_allowed(hf_version, ons_extra.type), reason, tx, ", ", ons_extra_string(nettype, ons_extra), " specifying type=", ons_extra.type, " is disallowed in HF", +static_cast<uint8_t>(hf_version)))
+    if (check_condition(!ons::mapping_type_allowed(hf_version, ons_extra.type), reason,
+          "{}, {} specifying type={} is disallowed in HF{:d}", tx, ons_extra_string(nettype, ons_extra), ons_extra.type, static_cast<uint8_t>(hf_version)))
       return false;
 
     // -----------------------------------------------------------------------------------------------
     // Serialized Values Check
     // -----------------------------------------------------------------------------------------------
-    if (check_condition(!ons_extra.is_buying() && !ons_extra.is_updating() && !ons_extra.is_renewing(), reason, tx, ", ", ons_extra_string(nettype, ons_extra), " TX extra does not specify valid combination of bits for serialized fields=", std::bitset<sizeof(ons_extra.fields) * 8>(static_cast<size_t>(ons_extra.fields)).to_string()))
+    if (check_condition(!ons_extra.is_buying() && !ons_extra.is_updating() && !ons_extra.is_renewing(), reason,
+          "{}, {} TX extra does not specify valid combination of bits for serialized fields={}",
+          tx, ons_extra_string(nettype, ons_extra), std::bitset<sizeof(ons_extra.fields) * 8>(static_cast<size_t>(ons_extra.fields)).to_string()))
       return false;
 
     if (check_condition(ons_extra.field_is_set(ons::extra_field::owner) &&
                         ons_extra.field_is_set(ons::extra_field::backup_owner) &&
                         ons_extra.owner == ons_extra.backup_owner,
-                        reason, tx, ", ", ons_extra_string(nettype, ons_extra), " specifying owner the same as the backup owner=", ons_extra.backup_owner.to_string(nettype)))
+                        reason,
+                        "{}, {} specifying owner the same as the backup owner={}",
+                        tx, ons_extra_string(nettype, ons_extra), ons_extra.backup_owner.to_string(nettype)))
     {
       return false;
     }
@@ -1247,7 +1265,8 @@ bool name_system_db::validate_ons_tx(hf hf_version, uint64_t blockchain_height, 
   // ONS Field(s) Validation
   // -----------------------------------------------------------------------------------------------
   {
-    if (check_condition((ons_extra.name_hash == null_name_hash || ons_extra.name_hash == crypto::null_hash), reason, tx, ", ", ons_extra_string(nettype, ons_extra), " specified the null name hash"))
+    if (check_condition((ons_extra.name_hash == null_name_hash || !ons_extra.name_hash), reason,
+          "{}, {} specified the null name hash", tx, ons_extra_string(nettype, ons_extra)))
         return false;
 
     if (ons_extra.field_is_set(ons::extra_field::encrypted_value))
@@ -1275,12 +1294,10 @@ bool name_system_db::validate_ons_tx(hf hf_version, uint64_t blockchain_height, 
         burn = burn_required;
     }
 
-    if (burn != burn_required)
-    {
-      char const *over_or_under = burn > burn_required ? "too much " : "insufficient ";
-      if (check_condition(true, reason, tx, ", ", ons_extra_string(nettype, ons_extra), " burned ", over_or_under, "oxen=", burn, ", require=", burn_required))
+    if (check_condition(burn != burn_required, reason,
+          "{}, {} burned {} OXEN={}, required={}",
+          tx, ons_extra_string(nettype, ons_extra), burn > burn_required ? "too much" : "insufficient", burn, burn_required))
         return false;
-    }
   }
 
   return true;
@@ -1333,12 +1350,12 @@ crypto::hash name_to_hash(std::string_view name, const std::optional<crypto::has
   assert(std::none_of(name.begin(), name.end(), [](char c) { return std::isupper(c); }));
   crypto::hash result = {};
   static_assert(sizeof(result) >= crypto_generichash_BYTES, "Sodium can generate arbitrary length hashes, but recommend the minimum size for a secure hash must be >= crypto_generichash_BYTES");
-  crypto_generichash_blake2b(reinterpret_cast<unsigned char *>(result.data),
-                             sizeof(result),
+  crypto_generichash_blake2b(result.data(),
+                             result.size(),
                              reinterpret_cast<const unsigned char *>(name.data()),
                              static_cast<unsigned long long>(name.size()),
-                             key ? reinterpret_cast<const unsigned char*>(key->data) : nullptr,
-                             key ? sizeof(key->data) : 0);
+                             key ? key->data() : nullptr,
+                             key ? key->size() : 0);
   return result;
 }
 
@@ -1354,7 +1371,8 @@ struct alignas(size_t) secretbox_secret_key {
 
   secretbox_secret_key& operator=(const crypto::hash& h) {
     static_assert(sizeof(secretbox_secret_key::data) == crypto_aead_xchacha20poly1305_ietf_KEYBYTES);
-    std::memcpy(data, h.data, sizeof(data));
+    static_assert(sizeof(secretbox_secret_key::data) == crypto::hash::size());
+    std::memcpy(data, h.data(), sizeof(data));
     return *this;
   }
 };
@@ -1410,7 +1428,7 @@ bool mapping_value::encrypt(std::string_view name, const crypto::hash* name_hash
 
   if (encryption_len > buffer.size())
   {
-    MERROR("Encrypted value pre-allocated buffer too small=" << buffer.size() << ", required=" << encryption_len);
+    log::error(logcat, "Encrypted value pre-allocated buffer too small={}, required={}", buffer.size(), encryption_len);
     return false;
   }
 
@@ -1482,18 +1500,18 @@ bool mapping_value::decrypt(std::string_view name, mapping_type type, const cryp
             plain_len == WALLET_ACCOUNT_BINARY_LENGTH_INC_PAYMENT_ID || plain_len == WALLET_ACCOUNT_BINARY_LENGTH_NO_PAYMENT_ID) {
           dec_length = plain_len;
         } else {
-          MERROR("Invalid wallet mapping_type length passed to mapping_value::decrypt");
+          log::error(logcat, "Invalid wallet mapping_type length passed to mapping_value::decrypt");
           return false;
         }
         break;
-      default: MERROR("Invalid mapping_type passed to mapping_value::decrypt");
+      default: log::error(logcat, "Invalid mapping_type passed to mapping_value::decrypt");
       return false;
     }
 
     auto expected_len = dec_length + crypto_aead_xchacha20poly1305_ietf_ABYTES + crypto_aead_xchacha20poly1305_ietf_NPUBBYTES;
     if (len != expected_len)
     {
-      MERROR("Encrypted value size is invalid=" << len << ", expected=" << expected_len);
+      log::error(logcat, "Encrypted value size is invalid={}, expected={}", len, expected_len);
       return false;
     }
     const auto& [enc, nonce] = value_nonce(type);
@@ -1542,12 +1560,12 @@ std::optional<cryptonote::address_parse_info> mapping_value::get_wallet_address_
 
   cryptonote::address_parse_info addr_info{};
   auto* bufpos = &buffer[1];
-  std::memcpy(&addr_info.address.m_spend_public_key.data, bufpos, 32);
+  std::memcpy(addr_info.address.m_spend_public_key.data(), bufpos, 32);
   bufpos += 32;
-  std::memcpy(&addr_info.address.m_view_public_key.data, bufpos, 32);
+  std::memcpy(addr_info.address.m_view_public_key.data(), bufpos, 32);
   if (buffer[0] == ONS_WALLET_TYPE_INTEGRATED) {
     bufpos += 32;
-    std::copy_n(bufpos,8,addr_info.payment_id.data);
+    std::copy_n(bufpos, 8, addr_info.payment_id.data());
     addr_info.has_payment_id = true;
   } else if (buffer[0] == ONS_WALLET_TYPE_SUBADDRESS) {
     addr_info.is_subaddress = true;
@@ -1597,7 +1615,7 @@ CREATE INDEX IF NOT EXISTS mapping_type_name_exp ON mappings (type, name_hash, e
   int table_created   = sqlite3_exec(ons_db.db, BUILD_TABLE_SQL.c_str(), nullptr /*callback*/, nullptr /*callback context*/, &table_err_msg);
   if (table_created != SQLITE_OK)
   {
-    MERROR("Can not generate SQL table for ONS: " << (table_err_msg ? table_err_msg : "??"));
+    log::error(logcat, "Can not generate SQL table for ONS: {}", (table_err_msg ? table_err_msg : "??"));
     sqlite3_free(table_err_msg);
     return false;
   }
@@ -1627,7 +1645,7 @@ CREATE INDEX IF NOT EXISTS mapping_type_name_exp ON mappings (type, name_hash, e
         "ALTER TABLE mappings ADD COLUMN update_height INTEGER NOT NULL DEFAULT register_height",
         nullptr /*callback*/, nullptr /*callback ctx*/, nullptr /*errstr*/);
 
-    LOG_PRINT_L1("Migrating ONS mappings database to new format");
+    log::info(logcat, "Migrating ONS mappings database to new format");
     const std::string migrate = R"(
 BEGIN TRANSACTION;
 ALTER TABLE mappings RENAME TO mappings_old;
@@ -1646,7 +1664,7 @@ COMMIT TRANSACTION;
     int migrated = sqlite3_exec(ons_db.db, migrate.c_str(), nullptr /*callback*/, nullptr /*callback context*/, &table_err_msg);
     if (migrated != SQLITE_OK)
     {
-      MERROR("Can not migrate SQL mappings table for ONS: " << (table_err_msg ? table_err_msg : "??"));
+      log::error(logcat, "Can not migrate SQL mappings table for ONS: {}", (table_err_msg ? table_err_msg : "??"));
       sqlite3_free(table_err_msg);
       return false;
     }
@@ -1687,14 +1705,14 @@ scoped_db_transaction::scoped_db_transaction(name_system_db &ons_db)
 {
   if (ons_db.transaction_begun)
   {
-    MERROR("Failed to begin transaction, transaction exists previously that was not closed properly");
+    log::error(logcat, "Failed to begin transaction, transaction exists previously that was not closed properly");
     return;
   }
 
   char *sql_err = nullptr;
   if (sqlite3_exec(ons_db.db, "BEGIN;", nullptr, nullptr, &sql_err) != SQLITE_OK)
   {
-    MERROR("Failed to begin transaction " << ", reason=" << (sql_err ? sql_err : "??"));
+    log::error(logcat, "Failed to begin transaction , reason={}", (sql_err ? sql_err : "??"));
     sqlite3_free(sql_err);
     return;
   }
@@ -1708,14 +1726,14 @@ scoped_db_transaction::~scoped_db_transaction()
   if (!initialised) return;
   if (!ons_db.transaction_begun)
   {
-    MERROR("Trying to apply non-existent transaction (no prior history of a db transaction beginning) to the ONS DB");
+    log::error(logcat, "Trying to apply non-existent transaction (no prior history of a db transaction beginning) to the ONS DB");
     return;
   }
 
   char *sql_err = nullptr;
   if (sqlite3_exec(ons_db.db, commit ? "END;" : "ROLLBACK;", NULL, NULL, &sql_err) != SQLITE_OK)
   {
-    MERROR("Failed to " << (commit ? "end " : "rollback ") << " transaction to ONS DB, reason=" << (sql_err ? sql_err : "??"));
+    log::error(logcat, "Failed to {} transaction to ONS DB, reason={}", (commit ? "end " : "rollback "), (sql_err ? sql_err : "??"));
     sqlite3_free(sql_err);
     return;
   }
@@ -1792,13 +1810,13 @@ AND NOT EXISTS   (SELECT * FROM mappings WHERE owner.id = mappings.backup_owner_
     {
       if (!blockchain)
       {
-        MERROR("Migration required, blockchain can not be nullptr");
+        log::error(logcat, "Migration required, blockchain can not be nullptr");
         return false;
       }
 
       if (blockchain->get_db().is_read_only())
       {
-        MERROR("DB is opened in read-only mode, unable to migrate ONS DB");
+        log::error(logcat, "DB is opened in read-only mode, unable to migrate ONS DB");
         return false;
       }
 
@@ -1949,7 +1967,7 @@ std::optional<int64_t> add_or_get_owner_id(ons::name_system_db &ons_db, crypto::
   {
     if (!ons_db.save_owner(key, &result))
     {
-      LOG_PRINT_L1("Failed to save ONS owner to DB tx: " << tx_hash << ", type: " << entry.type << ", name_hash: " << entry.name_hash << ", owner: " << entry.owner.to_string(ons_db.network_type()));
+      log::info(logcat, "Failed to save ONS owner to DB tx: {}, type: {}, name_hash: {}, owner: {}", tx_hash, entry.type, entry.name_hash, entry.owner.to_string(ons_db.network_type()));
       return std::nullopt;
     }
   }
@@ -1973,7 +1991,7 @@ std::pair<std::string, std::vector<update_variant>> update_record_query(name_sys
 INSERT INTO mappings (type, name_hash, txid, update_height, expiration_height, owner_id, backup_owner_id, encrypted_value)
 SELECT                type, name_hash, ?,    ?)";
 
-  bind.emplace_back(blob_view{tx_hash.data, sizeof(tx_hash)});
+  bind.emplace_back(blob_view{tx_hash.data(), tx_hash.size()});
   bind.emplace_back(height);
 
   constexpr auto suffix = " FROM mappings WHERE type = ? AND name_hash = ? ORDER BY update_height DESC LIMIT 1"sv;
@@ -1994,7 +2012,7 @@ SELECT                type, name_hash, ?,    ?)";
       auto opt_id = add_or_get_owner_id(ons_db, tx_hash, entry, entry.owner);
       if (!opt_id)
       {
-        MERROR("Failed to add or get owner with key=" << entry.owner.to_string(ons_db.network_type()));
+        log::error(logcat, "Failed to add or get owner with key={}", entry.owner.to_string(ons_db.network_type()));
         assert(opt_id);
         return {};
       }
@@ -2009,7 +2027,7 @@ SELECT                type, name_hash, ?,    ?)";
       auto opt_id = add_or_get_owner_id(ons_db, tx_hash, entry, entry.backup_owner);
       if (!opt_id)
       {
-        MERROR("Failed to add or get backup owner with key=" << entry.backup_owner.to_string(ons_db.network_type()));
+        log::error(logcat, "Failed to add or get backup owner with key={}", entry.backup_owner.to_string(ons_db.network_type()));
         assert(opt_id);
         return {};
       }
@@ -2046,7 +2064,7 @@ bool add_ons_entry(ons::name_system_db &ons_db, uint64_t height, cryptonote::tx_
     auto owner_id = add_or_get_owner_id(ons_db, tx_hash, entry, entry.owner);
     if (!owner_id)
     {
-      MERROR("Failed to add or get owner with key=" << entry.owner.to_string(ons_db.network_type()));
+      log::error(logcat, "Failed to add or get owner with key={}", entry.owner.to_string(ons_db.network_type()));
       assert(owner_id);
       return false;
     }
@@ -2057,7 +2075,7 @@ bool add_ons_entry(ons::name_system_db &ons_db, uint64_t height, cryptonote::tx_
       backup_owner_id = add_or_get_owner_id(ons_db, tx_hash, entry, entry.backup_owner);
       if (!backup_owner_id)
       {
-        MERROR("Failed to add or get backup owner with key=" << entry.backup_owner.to_string(ons_db.network_type()));
+        log::error(logcat, "Failed to add or get backup owner with key={}", entry.backup_owner.to_string(ons_db.network_type()));
         assert(backup_owner_id);
         return false;
       }
@@ -2067,7 +2085,7 @@ bool add_ons_entry(ons::name_system_db &ons_db, uint64_t height, cryptonote::tx_
     if (expiry) *expiry += height;
     if (!ons_db.save_mapping(tx_hash, entry, height, expiry, *owner_id, backup_owner_id))
     {
-      LOG_PRINT_L1("Failed to save ONS entry to DB tx: " << tx_hash << ", type: " << entry.type << ", name_hash: " << entry.name_hash << ", owner: " << entry.owner.to_string(ons_db.network_type()));
+      log::info(logcat, "Failed to save ONS entry to DB tx: {}, type: {}, name_hash: {}, owner: {}", tx_hash, entry.type, entry.name_hash, entry.owner.to_string(ons_db.network_type()));
       return false;
     }
   }
@@ -2085,7 +2103,7 @@ bool add_ons_entry(ons::name_system_db &ons_db, uint64_t height, cryptonote::tx_
     sql_compiled_statement statement{ons_db};
     if (!statement.compile(sql, false /*optimise_for_multiple_usage*/))
     {
-      MERROR("Failed to compile SQL statement for updating ONS record=" << sql);
+      log::error(logcat, "Failed to compile SQL statement for updating ONS record={}", sql);
       return false;
     }
 
@@ -2123,7 +2141,7 @@ bool name_system_db::add_block(const cryptonote::block &block, const std::vector
       std::string fail_reason;
       if (!validate_ons_tx(block.major_version, height, tx, entry, &fail_reason))
       {
-        MFATAL("ONS TX: Failed to validate for tx=" << get_transaction_hash(tx) << ". This should have failed validation earlier reason=" << fail_reason);
+        log::error(logcat, "ONS TX: Failed to validate for tx={}. This should have failed validation earlier reason={}", get_transaction_hash(tx), fail_reason);
         assert("Failed to validate acquire name service. Should already have failed validation prior" == nullptr);
         return false;
       }
@@ -2206,7 +2224,7 @@ bool name_system_db::save_mapping(crypto::hash const &tx_hash, cryptonote::tx_ex
   bind(statement, mapping_record_column::type, db_mapping_type(src.type));
   bind(statement, mapping_record_column::name_hash, name_hash);
   bind(statement, mapping_record_column::encrypted_value, blob_view{src.encrypted_value});
-  bind(statement, mapping_record_column::txid, blob_view{tx_hash.data, sizeof(tx_hash)});
+  bind(statement, mapping_record_column::txid, blob_view{tx_hash.data(), tx_hash.size()});
   bind(statement, mapping_record_column::update_height, height);
   bind(statement, mapping_record_column::expiration_height, expiration);
   bind(statement, mapping_record_column::owner_id, owner_id);
@@ -2220,7 +2238,7 @@ bool name_system_db::save_settings(uint64_t top_height, crypto::hash const &top_
 {
   auto& statement = save_settings_sql;
   bind(statement, ons_db_setting_column::top_height, top_height);
-  bind(statement, ons_db_setting_column::top_hash, blob_view{top_hash.data, sizeof(top_hash)});
+  bind(statement, ons_db_setting_column::top_hash, blob_view{top_hash.data(), top_hash.size()});
   bind(statement, ons_db_setting_column::version, version);
   bool result = sql_run_statement(ons_sql_type::save_setting, statement, nullptr);
   return result;

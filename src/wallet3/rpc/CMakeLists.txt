@@ -39,6 +39,7 @@ target_link_libraries(wallet3_rpc
     common
     nlohmann_json::nlohmann_json
     oxenmq::oxenmq
+    oxenc::oxenc
   PRIVATE
     cryptonote_protocol
     extra)

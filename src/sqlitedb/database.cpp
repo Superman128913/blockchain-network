@@ -5,7 +5,6 @@
 
 namespace db
 {
-
   std::string multi_in_query(std::string_view prefix, size_t count, std::string_view suffix)
   {
     std::string query;
@@ -45,20 +44,20 @@ namespace db
   {
     // Don't fail on these because we can still work even if they fail
     if (int rc = db.tryExec("PRAGMA journal_mode = WAL"); rc != SQLITE_OK)
-      MERROR("Failed to set journal mode to WAL: {}" << sqlite3_errstr(rc));
+      log::error(sqlitedb_logcat, "Failed to set journal mode to WAL: {}{}", sqlite3_errstr(rc));
 
     if (int rc = db.tryExec("PRAGMA synchronous = NORMAL"); rc != SQLITE_OK)
-      MERROR("Failed to set synchronous mode to NORMAL: {}" << sqlite3_errstr(rc));
+      log::error(sqlitedb_logcat, "Failed to set synchronous mode to NORMAL: {}{}", sqlite3_errstr(rc));
 
-    if (int rc = db.tryExec("PRAGMA foreign_keys = ON");
-        rc != SQLITE_OK) {
-      auto m = fmt::format("Failed to enable foreign keys constraints: {}", sqlite3_errstr(rc));
-      MERROR(m);
-      throw std::runtime_error{m};
+    if (int rc = db.tryExec("PRAGMA foreign_keys = ON"); rc != SQLITE_OK)
+    {
+      log::error(sqlitedb_logcat, "Failed to enable foreign keys constraints: {}", sqlite3_errstr(rc));
+      throw std::runtime_error{"Foreign key constrains required"};
     }
     int fk_enabled = db.execAndGet("PRAGMA foreign_keys").getInt();
-    if (fk_enabled != 1) {
-      MERROR("Failed to enable foreign key constraints; perhaps this sqlite3 is compiled without it?");
+    if (fk_enabled != 1)
+    {
+      log::error(sqlitedb_logcat, "Failed to enable foreign key constraints; perhaps this sqlite3 is compiled without it?");
       throw std::runtime_error{"Foreign key support is required"};
     }
 

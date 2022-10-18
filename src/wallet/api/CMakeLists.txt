@@ -137,7 +137,6 @@ if (STATIC AND BUILD_STATIC_DEPS)
             CURL::libcurl
             oxenmq::oxenmq
             lmdb
-            easylogging
             randomx
             uSockets
             cpr

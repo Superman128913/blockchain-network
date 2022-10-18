@@ -149,7 +149,7 @@ namespace service_nodes
     std::unique_ptr<uptime_proof::Proof> proof{};
 
     // Derived from pubkey_ed25519, not serialized
-    crypto::x25519_public_key pubkey_x25519 = crypto::x25519_public_key::null();
+    crypto::x25519_public_key pubkey_x25519 = crypto::null<crypto::x25519_public_key>;
 
     // Updates pubkey_ed25519 to the given key, re-deriving the x25519 key if it actually changes
     // (does nothing if the key is the same as the current value).  If x25519 derivation fails then
@@ -316,7 +316,7 @@ namespace service_nodes
       if (version >= version_t::v1_add_registration_hf_version)
         VARINT_FIELD(registration_hf_version);
       if (version >= version_t::v2_ed25519 && version < version_t::v4_noproofs) {
-        crypto::ed25519_public_key fake_pk = crypto::ed25519_public_key::null();
+        crypto::ed25519_public_key fake_pk = crypto::null<crypto::ed25519_public_key>;
         FIELD_N("pubkey_ed25519", fake_pk)
         if (version >= version_t::v3_quorumnet) {
           uint16_t fake_port = 0;
@@ -647,7 +647,7 @@ namespace service_nodes
     using block_height = uint64_t;
     struct state_t
     {
-      crypto::hash                           block_hash{crypto::null_hash};
+      crypto::hash                           block_hash{};
       bool                                   only_loaded_quorums{false};
       service_nodes_infos_t                  service_nodes_infos;
       std::vector<key_image_blacklist_entry> key_image_blacklist;
@@ -823,5 +823,5 @@ namespace service_nodes
   payout service_node_payout_portions(const crypto::public_key& key, const service_node_info& info);
 
   const static payout_entry null_payout_entry = {cryptonote::null_address, cryptonote::old::STAKING_PORTIONS};
-  const static payout null_payout             = {crypto::null_pkey, {null_payout_entry}};
+  const static payout null_payout             = {crypto::null<crypto::public_key>, {null_payout_entry}};
 }

@@ -2,11 +2,11 @@
 
 #include "commands.h"
 #include <nlohmann/json.hpp>
-#include <oxenmq/bt_serialize.h>
+#include <oxenc/bt_serialize.h>
 
 namespace wallet::rpc {
 
-using rpc_input = std::variant<std::monostate, nlohmann::json, oxenmq::bt_dict_consumer>;
+using rpc_input = std::variant<std::monostate, nlohmann::json, oxenc::bt_dict_consumer>;
 
 inline void parse_request(NO_ARGS&, rpc_input) {}
 

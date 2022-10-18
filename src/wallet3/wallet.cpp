@@ -12,7 +12,7 @@
 #include <sqlitedb/database.hpp>
 #include <oxenmq/oxenmq.h>
 
-#include <filesystem>
+#include "common/fs.h"
 #include <future>
 #include <chrono>
 #include <thread>
@@ -30,7 +30,7 @@ namespace wallet
       std::string_view dbPassword,
       wallet::Config config_in)
       : omq(omq)
-      , db{std::make_shared<WalletDB>(std::filesystem::path(dbFilename), dbPassword)}
+      , db{std::make_shared<WalletDB>(fs::path(dbFilename), dbPassword)}
       , keys{keys}
       , tx_scanner{keys, db}
       , tx_constructor{tx_constructor}

@@ -115,9 +115,8 @@ struct mapping_value
   mapping_value();
   mapping_value(std::string encrypted_value, std::string nonce);
 };
-inline std::ostream &operator<<(std::ostream &os, mapping_value const &v) { return os << oxenc::to_hex(v.to_view()); }
 
-inline std::string_view mapping_type_str(mapping_type type)
+inline constexpr std::string_view mapping_type_str(mapping_type type)
 {
   switch(type)
   {
@@ -130,7 +129,6 @@ inline std::string_view mapping_type_str(mapping_type type)
     default: assert(false);             return "xx_unhandled_type"sv;
   }
 }
-inline std::ostream &operator<<(std::ostream &os, mapping_type type) { return os << mapping_type_str(type); }
 
 constexpr bool mapping_type_allowed(cryptonote::hf hf_version, mapping_type type) {
   return (type == mapping_type::session && hf_version >= cryptonote::hf::hf15_ons)
@@ -324,7 +322,7 @@ struct name_system_db
 private:
   cryptonote::network_type nettype;
   uint64_t last_processed_height = 0;
-  crypto::hash last_processed_hash = crypto::null_hash;
+  crypto::hash last_processed_hash{};
   sql_compiled_statement save_owner_sql{*this};
   sql_compiled_statement save_mapping_sql{*this};
   sql_compiled_statement save_settings_sql{*this};
@@ -340,5 +338,21 @@ private:
   sql_compiled_statement get_mappings_on_height_and_newer_sql{*this};
 };
 
-}; // namespace service_nodes
+}; // namespace ons
+   
+template <>
+struct fmt::formatter<ons::mapping_value> : fmt::formatter<std::string> {
+  auto format(const ons::mapping_value& v, format_context& ctx) {
+    return formatter<std::string>::format(
+        oxenc::to_hex(v.to_view()), ctx);
+  }
+};
+template <>
+struct fmt::formatter<ons::mapping_type> : fmt::formatter<std::string_view> {
+  auto format(const ons::mapping_type& t, format_context& ctx) {
+    return formatter<std::string_view>::format(
+        ons::mapping_type_str(t), ctx);
+  }
+};
+
 #endif // OXEN_NAME_SYSTEM_H

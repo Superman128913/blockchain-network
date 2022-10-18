@@ -33,6 +33,7 @@
 #include <string>
 #include <iomanip>
 #include <thread>
+#include <fmt/color.h>
 
 #include <date/date.h>
 
@@ -42,6 +43,7 @@
 #include "util.h"
 #include "epee/readline_buffer.h"
 #include "epee/misc_log_ex.h"
+#include "logging/oxen_logger.h"
 #include "string_util.h"
 
 #include "i18n.h"
@@ -51,11 +53,9 @@
 #include <gnu/libc-version.h>
 #endif
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "util"
-
 namespace tools
 {
+  static auto logcat = log::Cat("util");
 
   bool disable_core_dumps()
   {
@@ -65,7 +65,7 @@ namespace tools
     rlimit.rlim_cur = rlimit.rlim_max = 0;
     if (setrlimit(RLIMIT_CORE, &rlimit))
     {
-      MWARNING("Failed to disable core dumps");
+      log::warning(logcat, "Failed to disable core dumps");
       return false;
     }
 #endif
@@ -78,7 +78,7 @@ namespace tools
     struct rlimit rlim;
     if (getrlimit(RLIMIT_MEMLOCK, &rlim) < 0)
     {
-      MERROR("Failed to determine the lockable memory limit");
+      log::error(logcat, "Failed to determine the lockable memory limit");
       return -1;
     }
     return rlim.rlim_cur;
@@ -89,12 +89,10 @@ namespace tools
 
   bool on_startup()
   {
-    mlog_configure("", true);
-
 #ifdef __GLIBC__
     const char *ver = ::gnu_get_libc_version();
     if (!strcmp(ver, "2.25"))
-      MCLOG_RED(el::Level::Warning, "global", "Running with glibc " << ver << ", hangs may occur - change glibc version if possible");
+      log::warning(logcat, fg(fmt::terminal_color::red), "Running with glibc {}, hangs may occur - change glibc version if possible", ver);
 #endif
 
     return true;
@@ -164,7 +162,7 @@ namespace tools
     }
     else
     {
-      return {};
+      return std::nullopt;
     }
   }
 

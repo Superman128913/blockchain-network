@@ -496,9 +496,9 @@ bool oxen_core_block_reward_unpenalized_post_pulse::generate(std::vector<test_ev
       CHECK_TEST_CONDITION_MSG(rewards_from_fee > 0 && rewards_from_fee < tx_fee, "Block producer should receive a penalised tx fee less than " << cryptonote::print_money(tx_fee) << "received, " << cryptonote::print_money(rewards_from_fee) << "");
       CHECK_TEST_CONDITION_MSG(top_block.miner_tx.vout[1].amount == unpenalized_reward, "Service Node should receive full reward " << unpenalized_reward);
 
-      MGINFO("rewards_from_fee: "   << cryptonote::print_money(rewards_from_fee));
-      MGINFO("tx_fee: "             << cryptonote::print_money(tx_fee));
-      MGINFO("unpenalized_amount: " << cryptonote::print_money(unpenalized_reward));
+      oxen::log::info(globallogcat, "rewards_from_fee: {}", cryptonote::print_money(rewards_from_fee));
+      oxen::log::info(globallogcat, "tx_fee: {}", cryptonote::print_money(tx_fee));
+      oxen::log::info(globallogcat, "unpenalized_amount: {}", cryptonote::print_money(unpenalized_reward));
       return true;
       });
   return true;
@@ -1070,8 +1070,10 @@ static ons_keys_t make_ons_keys(cryptonote::account_base const &src)
   auto iter = result.wallet_value.buffer.begin();
   uint8_t identifier = 0;
   iter = std::copy_n(&identifier, 1, iter);
-  iter = std::copy_n(src.get_keys().m_account_address.m_spend_public_key.data, sizeof(src.get_keys().m_account_address.m_spend_public_key.data), iter);
-  iter = std::copy_n(src.get_keys().m_account_address.m_view_public_key.data, sizeof(src.get_keys().m_account_address.m_view_public_key.data), iter);
+  auto& spubkey = src.get_keys().m_account_address.m_spend_public_key;
+  iter = std::copy(spubkey.begin(), spubkey.end(), iter);
+  auto& vpubkey = src.get_keys().m_account_address.m_view_public_key;
+  iter = std::copy(vpubkey.begin(), vpubkey.end(), iter);
 
   // NOTE: Just needs a 32 byte key. Reuse spend key
   memcpy(&result.lokinet_value.buffer[0], (char *)&result.owner.wallet.address.m_spend_public_key, result.lokinet_value.len);
@@ -1551,7 +1553,7 @@ bool oxen_name_system_invalid_tx_extra_params::generate(std::vector<test_event_e
       // Blockchain name empty
       {
         cryptonote::tx_extra_oxen_name_system data = valid_data;
-        data.name_hash                             = {};
+        data.name_hash.zero();
         data.encrypted_value                       = miner_key.wallet_value.make_encrypted("").to_string();
         make_ons_tx_with_custom_extra(gen, events, miner, data, false, "(Blockchain) Empty wallet name in ONS is invalid");
       }
@@ -1579,7 +1581,7 @@ bool oxen_name_system_invalid_tx_extra_params::generate(std::vector<test_event_e
       // Lokinet name empty
       {
         cryptonote::tx_extra_oxen_name_system data = valid_data;
-        data.name_hash                             = {};
+        data.name_hash.zero();
         data.encrypted_value                       = miner_key.lokinet_value.make_encrypted("").to_string();
         make_ons_tx_with_custom_extra(gen, events, miner, data, false, "(Lokinet) Empty domain name in ONS is invalid");
       }
@@ -1624,7 +1626,7 @@ bool oxen_name_system_invalid_tx_extra_params::generate(std::vector<test_event_e
     // Session name empty
     {
       cryptonote::tx_extra_oxen_name_system data = valid_data;
-      data.name_hash                             = {};
+      data.name_hash.zero();
       data.encrypted_value                       = miner_key.session_value.make_encrypted("").to_string();
       make_ons_tx_with_custom_extra(gen, events, miner, data, false, "(Session) Name empty");
     }
@@ -2119,7 +2121,7 @@ static crypto::hash ons_signature_hash(Args&&... args) {
   crypto::hash hash{};
   auto data = ons::tx_extra_signature(std::forward<Args>(args)...);
   if (!data.empty())
-    crypto_generichash(reinterpret_cast<unsigned char*>(hash.data), sizeof(hash), reinterpret_cast<const unsigned char*>(data.data()), data.size(), nullptr, 0);
+    crypto_generichash(hash.data(), hash.size(), reinterpret_cast<const unsigned char*>(data.data()), data.size(), nullptr, 0);
   return hash;
 }
 
@@ -2148,8 +2150,8 @@ bool oxen_name_system_update_mapping_multiple_owners::generate(std::vector<test_
     crypto::ed25519_secret_key owner1_key;
     crypto::ed25519_secret_key owner2_key;
 
-    crypto_sign_ed25519_keypair(owner1.ed25519.data, owner1_key.data);
-    crypto_sign_ed25519_keypair(owner2.ed25519.data, owner2_key.data);
+    crypto_sign_ed25519_keypair(owner1.ed25519.data(), owner1_key.data());
+    crypto_sign_ed25519_keypair(owner2.ed25519.data(), owner2_key.data());
     owner1.type = ons::generic_owner_sig_type::ed25519;
     owner2.type = ons::generic_owner_sig_type::ed25519;
 
@@ -2277,7 +2279,7 @@ bool oxen_name_system_update_mapping_multiple_owners::generate(std::vector<test_
     ons::generic_owner owner2 = ons::make_monero_owner(account2.get_keys().m_account_address, false /*subaddress*/);
     crypto::ed25519_secret_key owner1_key;
 
-    crypto_sign_ed25519_keypair(owner1.ed25519.data, owner1_key.data);
+    crypto_sign_ed25519_keypair(owner1.ed25519.data(), owner1_key.data());
     owner1.type = ons::generic_owner_sig_type::ed25519;
 
     std::string name = "hello_driver";
@@ -2337,7 +2339,7 @@ bool oxen_name_system_update_mapping_multiple_owners::generate(std::vector<test_
     ons::generic_owner owner2;
 
     crypto::ed25519_secret_key owner2_key;
-    crypto_sign_ed25519_keypair(owner2.ed25519.data, owner2_key.data);
+    crypto_sign_ed25519_keypair(owner2.ed25519.data(), owner2_key.data());
     owner2.type = ons::generic_owner_sig_type::ed25519;
 
     std::string name = "hello_passenger";
@@ -2810,7 +2812,7 @@ bool oxen_service_nodes_test_rollback::generate(std::vector<test_event_entry>& e
 
       crypto::public_key pk_b;
       if (!cryptonote::get_service_node_pubkey_from_tx_extra(reg_tx.data.tx.extra, pk_b)) {
-        MERROR("Could not get service node key from tx extra");
+        oxen::log::error(globallogcat, "Could not get service node key from tx extra");
         return false;
       }
 
@@ -3730,7 +3732,7 @@ bool oxen_batch_sn_rewards_bad_address::generate(std::vector<test_event_entry> &
   crypto::public_key bob_deterministic_output_key{};
   if (!cryptonote::get_deterministic_output_key(bob_address, txkey, 0, bob_deterministic_output_key))
   {
-    MERROR("Failed to generate output one-time public key");
+    oxen::log::error(globallogcat, "Failed to generate output one-time public key");
     return false;
   }
   // Switch Alice as recipient of payment to Bob

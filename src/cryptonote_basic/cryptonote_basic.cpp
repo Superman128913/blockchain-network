@@ -165,7 +165,7 @@ void block::set_hash_valid(bool v) const
 uint64_t account_public_address::modulus(uint64_t interval) const
 {
   uint64_t address_as_integer = 0;
-  std::memcpy(&address_as_integer, m_view_public_key.data, sizeof(address_as_integer));
+  std::memcpy(&address_as_integer, m_view_public_key.data(), sizeof(address_as_integer));
   oxenc::host_to_little_inplace(address_as_integer);
   return address_as_integer % interval;
 }

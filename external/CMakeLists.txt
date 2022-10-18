@@ -60,17 +60,19 @@ macro(system_or_submodule BIGNAME smallname pkgconf subdir)
 endmacro()
 
 system_or_submodule(OXENC oxenc liboxenc>=1.0.3 oxen-encoding)
-system_or_submodule(OXENMQ oxenmq liboxenmq>=1.2.12 oxen-mq)
-system_or_submodule(FMT fmt fmt>=8.0.0 fmt)
+system_or_submodule(OXENMQ oxenmq liboxenmq>=1.2.13 oxen-mq)
 
 add_subdirectory(db_drivers)
-add_subdirectory(easylogging++ easyloggingpp)
 add_subdirectory(randomx EXCLUDE_FROM_ALL)
 add_subdirectory(date EXCLUDE_FROM_ALL)
 
 set(JSON_BuildTests OFF CACHE INTERNAL "")
 set(JSON_MultipleHeaders ON CACHE BOOL "") # Allows multi-header nlohmann use
 add_subdirectory(nlohmann-json EXCLUDE_FROM_ALL)
+if(BUILD_STATIC_DEPS)
+  set(OXEN_LOGGING_FORCE_SUBMODULES TRUE CACHE BOOL "" FORCE)
+endif()
+add_subdirectory(oxen-logging)
 
 # uSockets doesn't really have a proper build system (just a very simple Makefile) so build it
 # ourselves.

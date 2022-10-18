@@ -39,6 +39,7 @@
 #include "cryptonote_core/cryptonote_core.h"
 #include "daemonizer/daemonizer.h"
 #include "epee/misc_log_ex.h"
+#include "logging/oxen_logger.h"
 #include "p2p/net_node.h"
 #include "rpc/common/rpc_args.h"
 #include "rpc/core_rpc_server.h"
@@ -48,14 +49,16 @@
 #include "command_server.h"
 #include "daemon.h"
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "daemon"
-
 namespace po = boost::program_options;
+
+namespace Log = oxen::log; // capital Log to avoid conflict with math.h log()
 
 using namespace std::literals;
 
 namespace {
+
+  auto logcat = Log::Cat("daemon");
+
   // Some ANSI color sequences that we use here (before the log system is initialized):
   constexpr auto RESET = "\033[0m";
   constexpr auto RED = "\033[31;1m";
@@ -294,18 +297,21 @@ int main(int argc, char const * argv[])
     //   if log-file argument given:
     //     absolute path
     //     relative path: relative to data_dir
+    Log::Level log_level;
+    if (auto level = oxen::logging::parse_level(command_line::get_arg(vm, daemon_args::arg_log_level).c_str())) {
+        log_level = *level;
+    } else {
+        std::cerr << "Incorrect log level: " << command_line::get_arg(vm, daemon_args::arg_log_level).c_str() << std::endl;
+        throw std::runtime_error{"Incorrect log level"};
+    }
     auto log_file_path = data_dir / cryptonote::LOG_FILENAME;
     if (!command_line::is_arg_defaulted(vm, daemon_args::arg_log_file))
       log_file_path = command_line::get_arg(vm, daemon_args::arg_log_file);
     if (log_file_path.is_relative())
       log_file_path = fs::absolute(data_dir / log_file_path);
-    mlog_configure(log_file_path.string(), true, command_line::get_arg(vm, daemon_args::arg_max_log_file_size), command_line::get_arg(vm, daemon_args::arg_max_log_files));
 
-    // Set log level
-    if (!command_line::is_arg_defaulted(vm, daemon_args::arg_log_level))
-    {
-      mlog_set_log(command_line::get_arg(vm, daemon_args::arg_log_level).c_str());
-    }
+    oxen::logging::init(log_file_path.string(), log_level);
+
     logs_initialized = true;
 
     if (!command_line::is_arg_defaulted(vm, daemon_args::arg_max_concurrency))
@@ -313,7 +319,7 @@ int main(int argc, char const * argv[])
 
     // logging is now set up
     // FIXME: only print this when starting up as a daemon but not when running rpc commands
-    MGINFO_CYAN("Oxen '" << OXEN_RELEASE_NAME << "' (v" << OXEN_VERSION_FULL << ")");
+    Log::info(logcat, "Oxen '{}' (v{})", OXEN_RELEASE_NAME, OXEN_VERSION_FULL);
 
     // If there are positional options, we're running a daemon command
     {
@@ -350,7 +356,7 @@ int main(int argc, char const * argv[])
       }
     }
 
-    MINFO("Moving from main() into the daemonize now.");
+    Log::info(logcat, "Moving from main() into the daemonize now.");
 
     return daemonizer::daemonize<daemonize::daemon>("Oxen Daemon", argc, argv, std::move(vm))
         ? 0 : 1;
@@ -358,14 +364,14 @@ int main(int argc, char const * argv[])
   catch (std::exception const & ex)
   {
     if (logs_initialized)
-      LOG_ERROR("Exception in main! " << ex.what());
+      Log::error(logcat, "Exception in main! {}", ex.what());
     else
       std::cerr << RED << "Exception in main! " << ex.what() << RESET << "\n";
   }
   catch (...)
   {
     if (logs_initialized)
-      LOG_ERROR("Exception in main! (unknown exception type)");
+      Log::error(logcat, "Exception in main! (unknown exception type)");
     else
       std::cerr << RED << "Exception in main! (unknown exception type)" << RESET << "\n";
   }

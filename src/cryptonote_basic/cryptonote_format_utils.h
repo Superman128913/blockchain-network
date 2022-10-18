@@ -38,6 +38,7 @@
 #include "common/meta.h"
 #include "common/string_util.h"
 #include "serialization/binary_utils.h"
+#include "logging/oxen_logger.h"
 #include <unordered_map>
 
 namespace epee
@@ -247,12 +248,10 @@ namespace cryptonote
 
   bool is_valid_address(const std::string address, cryptonote::network_type nettype, bool allow_subaddress = true, bool allow_integrated = true);
 
-  inline std::ostream &operator<<(std::ostream &stream, transaction const &tx)
+  inline std::string to_string(const transaction& tx)
   {
-    stream << "tx={version=" << tx.version << ", type=" << tx.type << ", hash=" << get_transaction_hash(tx) << "}";
-    return stream;
+    return "tx={{version={}, type={}, hash={}}}"_format(tx.version, tx.type, get_transaction_hash(tx));
   }
-
   //---------------------------------------------------------------
   template <typename T>
   bool t_serializable_object_from_blob(T& to, const std::string& blob)
@@ -272,7 +271,7 @@ namespace cryptonote
       blob = serialization::dump_binary(const_cast<std::remove_const_t<T>&>(val));
       return true;
     } catch (const std::exception& e) {
-      LOG_ERROR("Serialization of " << tools::type_name(typeid(T)) << " failed: " << e.what());
+      log::error(globallogcat, "Serialization of {} failed: {}", tools::type_name(typeid(T)), e.what());
       return false;
     }
   }
@@ -317,7 +316,7 @@ namespace cryptonote
     try {
       serialize(ar, obj);
     } catch (const std::exception& e) {
-      LOG_ERROR("obj_to_json_str failed: serialization failed: " << e.what());
+      log::error(globallogcat, "obj_to_json_str failed: serialization failed: {}", e.what());
       return ""s;
     }
     return ss.str();

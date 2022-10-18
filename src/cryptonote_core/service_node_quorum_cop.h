@@ -34,6 +34,7 @@
 #include "cryptonote_core/service_node_voting.h"
 #include <cassert>
 #include <mutex>
+#include <fmt/format.h>
 
 namespace cryptonote
 {
@@ -50,6 +51,8 @@ namespace service_nodes
   {
     std::vector<crypto::public_key> validators; // Array of public keys identifying service nodes who validate and sign.
     std::vector<crypto::public_key> workers;    // Array of public keys of tested service nodes (if applicable).
+                                                //
+    std::string to_string() const;
 
     BEGIN_SERIALIZE()
       FIELD(validators)
@@ -57,12 +60,6 @@ namespace service_nodes
     END_SERIALIZE()
   };
 
-  inline std::ostream &operator<<(std::ostream &os, quorum const &q)
-  {
-    for (size_t i = 0; i < q.validators.size(); i++) os << "V[" << i << "] " << q.validators[i] << "\n";
-    for (size_t i = 0; i < q.workers.size(); i++) os    << "W[" << i << "] " << q.workers[i] << "\n";
-    return os;
-  }
 
   struct quorum_manager
   {
@@ -79,7 +76,7 @@ namespace service_nodes
       else if (type == quorum_type::checkpointing) return checkpointing;
       else if (type == quorum_type::blink) return blink;
       else if (type == quorum_type::pulse) return pulse;
-      MERROR("Developer error: Unhandled quorum enum with value: " << (size_t)type);
+      log::error(log::Cat("quorum_cop"), "Developer error: Unhandled quorum enum with value: {}", (size_t)type);
       assert(!"Developer error: Unhandled quorum enum with value: ");
       return nullptr;
     }
@@ -155,3 +152,5 @@ namespace service_nodes
    */
   uint64_t quorum_checksum(const std::vector<crypto::public_key> &pubkeys, size_t offset = 0);
 }
+
+template <> inline constexpr bool formattable::via_to_string<service_nodes::quorum> = true;

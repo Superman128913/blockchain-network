@@ -39,6 +39,7 @@
 #include "epee/net/levin_protocol_handler_async.h"
 #include "epee/net/abstract_tcp_server2.h"
 #include "epee/serialization/keyvalue_serialization.h"
+#include "ringct/fmt.h"
 
 #include "../unit_tests/unit_tests_utils.h"
 
@@ -152,7 +153,7 @@ namespace net_load_tests
       size_t idx = m_next_opened_conn_idx.fetch_add(1, std::memory_order_relaxed);
       if (idx >= m_connections.size())
       {
-        LOG_PRINT_L0("ERROR: connections overflow");
+        oxen::log::warning(globallogcat, "ERROR: connections overflow");
         exit(1);
       }
       m_connections[idx] = connection_id;
@@ -176,17 +177,17 @@ namespace net_load_tests
       size_t idx = m_next_closed_conn_idx.fetch_add(1, std::memory_order_relaxed);
       if (m_next_opened_conn_idx.load(std::memory_order_relaxed) <= idx)
       {
-        LOG_PRINT_L0("Not enough opened connections");
+        oxen::log::warning(globallogcat, "Not enough opened connections");
         return false;
       }
       if (m_connections[idx].is_nil())
       {
-        LOG_PRINT_L0("Connection isn't opened");
+        oxen::log::warning(globallogcat, "Connection isn't opened");
         return false;
       }
       if (!m_tcp_server.get_config_object().close(m_connections[idx]))
       {
-        LOG_PRINT_L0("Close connection error: " << m_connections[idx]);
+        oxen::log::warning(globallogcat, "Close connection error: {}", boost::lexical_cast<std::string>(m_connections[idx]));
         if (!ignore_close_fails)
         {
           return false;

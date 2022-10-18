@@ -33,6 +33,7 @@
 #include <vector>
 #include <deque>
 #include <cstdint>
+#include <map>
 #include "../misc_log_ex.h"
 #include "../int-util.h"
 

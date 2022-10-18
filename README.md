@@ -1,6 +1,6 @@
 # Oxen
 
-Copyright (c) 2018-2021 The Oxen Project.   
+Copyright (c) 2018-2022 The Oxen Project.   
 Portions Copyright (c) 2014-2019 The Monero Project.   
 Portions Copyright (c) 2012-2013 The Cryptonote developers.
 
@@ -40,7 +40,7 @@ library archives (`.a`).
 | Dep          | Min. version  | Vendored | Debian/Ubuntu pkg      | Arch pkg     | Fedora              | Optional | Purpose          |
 | ------------ | ------------- | -------- | ---------------------- | ------------ | ------------------- | -------- | ---------------- |
 | GCC          | 8.1.0         | NO       | `g++`[1]               | `base-devel` | `gcc`               | NO       |                  |
-| CMake        | 3.10          | NO       | `cmake`                | `cmake`      | `cmake`             | NO       |                  |
+| CMake        | 3.13          | NO       | `cmake`                | `cmake`      | `cmake`             | NO       |                  |
 | pkg-config   | any           | NO       | `pkg-config`           | `base-devel` | `pkgconf`           | NO       |                  |
 | Boost        | 1.65          | NO       | `libboost-all-dev`[2]  | `boost`      | `boost-devel`       | NO       | C++ libraries    |
 | libzmq       | 4.3.0         | YES      | `libzmq3-dev`          | `zeromq`     | `zeromq-devel`      | NO       | ZeroMQ library   |

@@ -40,11 +40,10 @@
 #include "lmdb/db_lmdb.h"
 #include <chrono>
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "blockchain.db"
-
 namespace cryptonote
 {
+
+  static auto logcat = log::Cat("blockchain.db");
 
 const command_line::arg_descriptor<std::string> arg_db_sync_mode = {
   "db-sync-mode"
@@ -85,7 +84,7 @@ void BlockchainDB::add_transaction(const crypto::hash& blk_hash, const std::pair
   {
     // should only need to compute hash for miner transactions
     tx_hash = get_transaction_hash(tx);
-    LOG_PRINT_L3("null tx_hash_ptr - needed to compute: " << tx_hash);
+    log::trace(logcat, "null tx_hash_ptr - needed to compute: {}", tx_hash);
   }
   else
   {
@@ -119,7 +118,7 @@ void BlockchainDB::add_transaction(const crypto::hash& blk_hash, const std::pair
     }
     else
     {
-      LOG_PRINT_L1("Unsupported input type, removing key images and aborting transaction addition");
+      log::info(logcat, "Unsupported input type, removing key images and aborting transaction addition");
       for (const txin_v& tx_input : tx.vin)
       {
         if (std::holds_alternative<txin_to_key>(tx_input))
@@ -202,7 +201,7 @@ uint64_t BlockchainDB::add_block( const std::pair<block, std::string>& blck
     num_rct_outs += blk.miner_tx.vout.size();
 
   int tx_i = 0;
-  crypto::hash tx_hash = crypto::null_hash;
+  crypto::hash tx_hash{};
   for (const std::pair<transaction, std::string>& tx : txs)
   {
     tx_hash = blk.tx_hashes[tx_i];
@@ -330,22 +329,21 @@ void BlockchainDB::reset_stats()
 
 void BlockchainDB::show_stats()
 {
-  LOG_PRINT_L1("\n"
-    << "*********************************\n"
-    << "num_calls: " << num_calls << "\n"
-    << "time_blk_hash: " << tools::friendly_duration(time_blk_hash) << "\n"
-    << "time_tx_exists: " << tools::friendly_duration(time_tx_exists) << "\n"
-    << "time_add_block1: " << tools::friendly_duration(time_add_block1) << "\n"
-    << "time_add_transaction: " << tools::friendly_duration(time_add_transaction) << "\n"
-    << "time_commit1: " << tools::friendly_duration(time_commit1) << "\n"
-    << "*********************************\n"
-  );
+  log::info(logcat, "\n*********************************\n \
+      num_calls: {}\n \
+      time_blk_hash: {}\n \
+      time_tx_exists: {}\n \
+      time_add_block1: {}\n \
+      time_add_transaction: {}\n \
+      time_commit1: {}\n \
+      *********************************\n",
+      num_calls, tools::friendly_duration(time_blk_hash), tools::friendly_duration(time_tx_exists), tools::friendly_duration(time_add_block1), tools::friendly_duration(time_add_transaction), tools::friendly_duration(time_commit1));
 }
 
 void BlockchainDB::fixup(cryptonote::network_type)
 {
   if (is_read_only()) {
-    LOG_PRINT_L1("Database is opened read only - skipping fixup check");
+    log::info(logcat, "Database is opened read only - skipping fixup check");
     return;
   }
 
@@ -393,7 +391,7 @@ uint64_t BlockchainDB::get_tx_block_height(const crypto::hash &h) const
   if (result == std::numeric_limits<uint64_t>::max())
   {
     std::string err = "tx_data_t with hash " + tools::type_to_hex(h) + " not found in db";
-    LOG_PRINT_L1(err);
+    log::info(logcat, "{}", err);
     throw TX_DNE(std::move(err));
   }
   return result;

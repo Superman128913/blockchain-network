@@ -3,6 +3,11 @@
 #include <csignal>
 #include <functional>
 #include <mutex>
+#include "logging/oxen_logger.h"
+#ifdef _WIN32
+#include "windows.h"
+#endif
+
 
 namespace tools {
 
@@ -15,7 +20,7 @@ namespace tools {
     template<typename T>
     static bool install(T t)
     {
-#if defined(WIN32)
+#ifdef _WIN32
       bool r = TRUE == ::SetConsoleCtrlHandler(&win_handler, TRUE);
       if (r)
       {
@@ -47,7 +52,7 @@ namespace tools {
       }
       else
       {
-        MGINFO_RED("Got control signal " << type << ". Exiting without saving...");
+        log::info(globallogcat, fg(fmt::terminal_color::red), "Got control signal {}. Exiting without saving...", type);
         return FALSE;
       }
       return TRUE;

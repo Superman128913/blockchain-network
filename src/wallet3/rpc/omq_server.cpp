@@ -4,6 +4,7 @@
 #include "commands.h"
 #include <wallet3/config/config.hpp>
 
+#include <oxenc/variant.h>
 #include <oxenmq/oxenmq.h>
 #include <oxenmq/auth.h>
 
@@ -56,9 +57,9 @@ OmqServer::set_omq(std::shared_ptr<oxenmq::OxenMQ> omq_in, wallet::rpc::Config c
         request.body = m.data[0];
 
       try {
-        auto result = std::visit([](auto&& v) -> std::string {
+        auto result = var::visit([](auto&& v) -> std::string {
           using T = decltype(v);
-          if constexpr (std::is_same_v<oxenmq::bt_value&&, T>)
+          if constexpr (std::is_same_v<oxenc::bt_value&&, T>)
             return bt_serialize(std::move(v));
           else if constexpr (std::is_same_v<nlohmann::json&&, T>)
             return v.dump();

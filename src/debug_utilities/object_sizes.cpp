@@ -45,9 +45,6 @@
 #include "wallet/api/unsigned_transaction.h"
 #include "wallet/api/pending_transaction.h"
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "debugtools.objectsizes"
-
 class size_logger
 {
 public:
@@ -68,7 +65,8 @@ int main(int argc, char* argv[])
 
   tools::on_startup();
 
-  mlog_configure("", true);
+  auto log_file_path = "object_sizes.log";
+  oxen::logging::init(log_file_path, oxen::log::Level::info);
 
   SL(boost::thread);
   SL(boost::asio::io_service);

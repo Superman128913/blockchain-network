@@ -58,6 +58,7 @@ target_link_libraries(cryptonote_core
     Boost::program_options
     SQLiteCpp
     systemd
+    logging
     extra)
 
 if(PER_BLOCK_CHECKPOINT)

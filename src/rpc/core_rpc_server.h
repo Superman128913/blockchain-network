@@ -66,7 +66,7 @@ namespace cryptonote::rpc {
 
   /// Stores an RPC command callback.  These are set up in core_rpc_server.cpp.
   struct rpc_command {
-    using result_type = std::variant<oxenmq::bt_value, nlohmann::json, std::string>;
+    using result_type = std::variant<oxenc::bt_value, nlohmann::json, std::string>;
     // Called with the incoming command data; returns the response body if all goes well,
     // otherwise throws an exception.
     result_type(*invoke)(rpc_request&&, core_rpc_server&);

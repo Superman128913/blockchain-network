@@ -60,14 +60,14 @@ void SubaddressImpl::setLabel(uint32_t accountIndex, uint32_t addressIndex, cons
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR("setLabel: " << e.what());
+    log::error(logcat, "setLabel: {}", e.what());
   }
 }
 
 EXPORT
 void SubaddressImpl::refresh(uint32_t accountIndex) 
 {
-  LOG_PRINT_L2("Refreshing subaddress");
+  log::debug(logcat, "Refreshing subaddress");
   
   clearRows();
   auto w = m_wallet->wallet();

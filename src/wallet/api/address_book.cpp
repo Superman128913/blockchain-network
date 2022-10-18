@@ -70,7 +70,7 @@ bool AddressBookImpl::addRow(const std::string &dst_addr, const std::string &des
 EXPORT
 void AddressBookImpl::refresh() 
 {
-  LOG_PRINT_L2("Refreshing addressbook");
+  log::debug(logcat, "Refreshing addressbook");
   
   clearRows();
   
@@ -93,7 +93,7 @@ void AddressBookImpl::refresh()
 EXPORT
 bool AddressBookImpl::deleteRow(std::size_t rowId)
 {
-  LOG_PRINT_L2("Deleting address book row " << rowId);
+  log::debug(logcat, "Deleting address book row {}", rowId);
   bool r = m_wallet->wallet()->delete_address_book_row(rowId);
   if (r)
     refresh();

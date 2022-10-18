@@ -44,7 +44,7 @@ if(CCACHE_PROGRAM)
   endforeach()
 endif()
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.13...3.24)
 message(STATUS "CMake version ${CMAKE_VERSION}")
 
 # Has to be set before `project()`, and ignored on non-macos:
@@ -299,7 +299,6 @@ if(NOT MANUAL_SUBMODULES)
     endif()
     check_submodule(external/uWebSockets uSockets)
     check_submodule(external/ghc-filesystem)
-    check_submodule(external/SQLiteCpp)
   endif()
 endif()
 
@@ -491,7 +490,6 @@ if(NOT BUILD_STATIC_DEPS)
 endif()
 
 add_subdirectory(external)
-target_compile_definitions(easylogging PRIVATE AUTO_INITIALIZE_EASYLOGGINGPP)
 
 if(USE_DEVICE_TREZOR)
   include(CheckTrezor)

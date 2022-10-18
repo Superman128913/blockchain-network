@@ -30,7 +30,6 @@
 #include <string>
 #include <filesystem>
 
-#include "epee/misc_log_ex.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "cryptonote_core/cryptonote_tx_utils.h"
 #include "sqlitedb/database.hpp"

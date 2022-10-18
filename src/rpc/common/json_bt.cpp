@@ -2,9 +2,9 @@
 
 namespace oxen {
 
-oxenmq::bt_value json_to_bt(json&& j) {
+oxenc::bt_value json_to_bt(json&& j) {
   if (j.is_object()) {
-    oxenmq::bt_dict res;
+    oxenc::bt_dict res;
     for (auto& [k, v] : j.items()) {
       if (v.is_null())
         continue; // skip k-v pairs with a null v (for other nulls we fail).
@@ -13,7 +13,7 @@ oxenmq::bt_value json_to_bt(json&& j) {
     return res;
   }
   if (j.is_array()) {
-    oxenmq::bt_list res;
+    oxenc::bt_list res;
     for (auto& v : j)
       res.push_back(json_to_bt(std::move(v)));
     return res;

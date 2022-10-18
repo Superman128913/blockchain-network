@@ -44,4 +44,5 @@ target_link_libraries(p2p
     filesystem
     Boost::serialization
     SQLiteCpp
+    logging
     extra)

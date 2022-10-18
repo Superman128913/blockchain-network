@@ -38,7 +38,8 @@
 #include <vector>
 #include <unordered_map>
 #include <string>
-#include "epee/misc_log_ex.h"
+#include "epee/wipeable_string.h"
+#include "logging/oxen_logger.h"
 
 /*!
  * \namespace Language
@@ -46,6 +47,9 @@
  */
 namespace Language
 {
+
+  namespace log = oxen::log;
+
   /*!
    * \brief Returns a string made of (at most) the first count characters in s.
    *        Assumes well formedness. No check is made for this.
@@ -192,7 +196,7 @@ namespace Language
         if ((*it).size() < unique_prefix_length)
         {
           if (flags & ALLOW_SHORT_WORDS)
-            MWARNING(language_name << " word '" << *it << "' is shorter than its prefix length, " << unique_prefix_length);
+            log::debug(globallogcat, "{} word '{}' is shorter than its prefix length, {}", language_name, *it, unique_prefix_length);
           else
             throw std::runtime_error("Too short word in " + language_name + " word list: " + *it);
         }
@@ -208,7 +212,7 @@ namespace Language
         if (trimmed_word_map.find(trimmed) != trimmed_word_map.end())
         {
           if (flags & ALLOW_DUPLICATE_PREFIXES)
-            MWARNING("Duplicate prefix in " << language_name << " word list: " << std::string(trimmed.data(), trimmed.size()));
+            log::warning(globallogcat, "Duplicate prefix in {} word list: {}", language_name, std::string(trimmed.data(), trimmed.size()));
           else
             throw std::runtime_error("Duplicate prefix in " + language_name + " word list: " + std::string(trimmed.data(), trimmed.size()));
         }

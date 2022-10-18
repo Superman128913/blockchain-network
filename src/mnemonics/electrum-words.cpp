@@ -62,19 +62,18 @@
 #include "language_base.h"
 #include "singleton.h"
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "mnemonic"
-
 namespace crypto
 {
+
   namespace ElectrumWords
   {
     std::vector<const Language::Base*> get_language_list();
   }
-}
 
 namespace
 {
+  auto logcat = log::Cat("mnemonic");
+
   uint32_t create_checksum_index(const std::vector<epee::wipeable_string> &word_list,
     const Language::Base *language);
   bool checksum_test(std::vector<epee::wipeable_string> seed, const Language::Base *language);
@@ -160,7 +159,7 @@ namespace
       if (full_match)
       {
         *language = *it1;
-        MINFO("Full match for language " << (*language)->get_english_language_name());
+        log::info(logcat, "Full match for language {}", (*language)->get_english_language_name());
         return true;
       }
       // Some didn't match. Clear the index array.
@@ -174,11 +173,11 @@ namespace
     if (fallback)
     {
       *language = fallback;
-      MINFO("Fallback match for language " << (*language)->get_english_language_name());
+      log::info(logcat, "Fallback match for language {}", (*language)->get_english_language_name());
       return true;
     }
 
-    MINFO("No match found");
+    log::info(logcat, "No match found");
     memwipe(matched_indices.data(), matched_indices.size() * sizeof(matched_indices[0]));
     return false;
   }
@@ -234,18 +233,11 @@ namespace
     epee::wipeable_string trimmed_last_word = last_word.length() > unique_prefix_length ? Language::utf8prefix(last_word, unique_prefix_length) :
       last_word;
     bool ret = Language::WordEqual()(trimmed_checksum, trimmed_last_word);
-    MINFO("Checksum is " << (ret ? "valid" : "invalid"));
+    log::info(logcat, "Checksum is {}", (ret ? "valid" : "invalid"));
     return ret;
   }
 }
 
-/*!
- * \namespace crypto
- * 
- * \brief crypto namespace.
- */
-namespace crypto
-{
   /*!
    * \namespace crypto::ElectrumWords
    * 
@@ -271,7 +263,7 @@ namespace crypto
 
       if (len % 4)
       {
-        MERROR("Invalid seed: not a multiple of 4");
+        log::error(logcat, "Invalid seed: not a multiple of 4");
         return false;
       }
 
@@ -283,7 +275,7 @@ namespace crypto
         if (seed.size() != expected/2 && seed.size() != expected &&
           seed.size() != expected + 1)
         {
-          MERROR("Invalid seed: unexpected number of words");
+          log::error(logcat, "Invalid seed: unexpected number of words");
           return false;
         }
 
@@ -296,7 +288,7 @@ namespace crypto
       Language::Base *language;
       if (!find_seed_language(seed, has_checksum, matched_indices, &language))
       {
-        MERROR("Invalid seed: language not found");
+        log::error(logcat, "Invalid seed: language not found");
         return false;
       }
       language_name = language->get_language_name();
@@ -307,7 +299,7 @@ namespace crypto
         if (!checksum_test(seed, language))
         {
           // Checksum fail
-          MERROR("Invalid seed: invalid checksum");
+          log::error(logcat, "Invalid seed: invalid checksum");
           return false;
         }
         seed.pop_back();
@@ -326,7 +318,7 @@ namespace crypto
         if (!(w[0]% word_list_length == w[1]))
         {
           memwipe(w, sizeof(w));
-          MERROR("Invalid seed: mumble mumble");
+          log::error(logcat, "Invalid seed: mumble mumble");
           return false;
         }
 
@@ -360,12 +352,12 @@ namespace crypto
       epee::wipeable_string s;
       if (!words_to_bytes(words, s, sizeof(dst), true, language_name))
       {
-        MERROR("Invalid seed: failed to convert words to bytes");
+        log::error(logcat, "Invalid seed: failed to convert words to bytes");
         return false;
       }
       if (s.size() != sizeof(dst))
       {
-        MERROR("Invalid seed: wrong output size");
+        log::error(logcat, "Invalid seed: wrong output size");
         return false;
       }
       dst = *(const crypto::secret_key*)s.data();
@@ -379,7 +371,7 @@ namespace crypto
      * \param  language_name Seed language name
      * \return               true if successful false if not. Unsuccessful if wrong key size.
      */
-    bool bytes_to_words(const char *src, size_t len, epee::wipeable_string& words,
+    bool bytes_to_words(const unsigned char *src, size_t len, epee::wipeable_string& words,
       const std::string &language_name)
     {
 
@@ -432,14 +424,14 @@ namespace crypto
     bool bytes_to_words(const crypto::secret_key& src, epee::wipeable_string& words,
       const std::string &language_name)
     {
-      return bytes_to_words(src.data, sizeof(src), words, language_name);
+      return bytes_to_words(src.data(), src.size(), words, language_name);
     }
 
     std::string bytes_to_words(const crypto::secret_key& src,
       const std::string &language_name)
     {
       epee::wipeable_string epee_words;
-      if (!bytes_to_words(src.data, sizeof(src), epee_words, language_name))
+      if (!bytes_to_words(src.data(), src.size(), epee_words, language_name))
         throw std::runtime_error("Failed to create seed from key for language: " + language_name);
       return std::string(epee_words.view());
     }

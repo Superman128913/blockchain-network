@@ -45,10 +45,10 @@
 #include <iterator>
 #include <time.h>
 
-#undef OXEN_DEFAULT_LOG_CATEGORY
-#define OXEN_DEFAULT_LOG_CATEGORY "qnet"
-
 namespace quorumnet {
+
+  namespace log = oxen::log;
+  static auto logcat = log::Cat("qnet");
 
 namespace {
 
@@ -113,9 +113,9 @@ std::string get_data_as_string(const T &key) {
 }
 
 crypto::x25519_public_key x25519_from_string(std::string_view pubkey) {
-    crypto::x25519_public_key x25519_pub = crypto::x25519_public_key::null();
+    crypto::x25519_public_key x25519_pub{};
     if (pubkey.size() == sizeof(crypto::x25519_public_key))
-        std::memcpy(x25519_pub.data, pubkey.data(), pubkey.size());
+        std::memcpy(x25519_pub.data(), pubkey.data(), pubkey.size());
     return x25519_pub;
 }
 
@@ -163,19 +163,18 @@ peer_prepare_relay_to_quorum_subset(cryptonote::core &core, It quorum_begin, It 
     for (auto it = quorum_begin; it != quorum_end; it++)
       candidates.insert((*it)->validators.begin(), (*it)->validators.end());
 
-    MDEBUG("Have " << candidates.size() << " SN candidates");
+    log::debug(logcat, "Have {} SN candidates", candidates.size());
 
     std::vector<std::tuple<std::string, std::string, decltype(proof_info{}.proof->version)>> remotes; // {x25519 pubkey, connect string, version}
     remotes.reserve(candidates.size());
     core.get_service_node_list().for_each_service_node_info_and_proof(candidates.begin(), candidates.end(),
         [&remotes](const auto &pubkey, const auto &info, const auto &proof) {
             if (!info.is_active()) {
-                MTRACE("Not include inactive node " << pubkey);
+                log::trace(logcat, "Not include inactive node {}", pubkey);
                 return;
             }
             if (!proof.pubkey_x25519 || !proof.proof->qnet_port || !proof.proof->public_ip) {
-                MTRACE("Not including node " << pubkey << ": missing x25519(" << to_hex(get_data_as_string(proof.pubkey_x25519)) << "), "
-                        "public_ip(" << epee::string_tools::get_ip_string_from_int32(proof.proof->public_ip) << "), or qnet port(" << proof.proof->qnet_port << ")");
+                log::trace(logcat, "Not including node {}: missing x25519({}), public_ip({}), or qnet port({})", pubkey, to_hex(get_data_as_string(proof.pubkey_x25519)), epee::string_tools::get_ip_string_from_int32(proof.proof->public_ip), proof.proof->qnet_port);
                 return;
             }
             remotes.emplace_back(get_data_as_string(proof.pubkey_x25519),
@@ -184,7 +183,7 @@ peer_prepare_relay_to_quorum_subset(cryptonote::core &core, It quorum_begin, It 
         });
 
     // Select 4 random SNs to send the data to, but prefer SNs with newer versions because they may have network fixes.
-    MDEBUG("Have " << remotes.size() << " candidates after checking active status and connection details");
+    log::debug(logcat, "Have {} candidates after checking active status and connection details", remotes.size());
     std::vector<size_t> indices(remotes.size());
     std::iota(indices.begin(), indices.end(), 0);
     std::shuffle(indices.begin(), indices.end(), tools::rng);
@@ -208,7 +207,7 @@ peer_prepare_relay_to_quorum_subset(cryptonote::core &core, It quorum_begin, It 
 void peer_relay_to_prepared_destinations(cryptonote::core &core, std::vector<prepared_relay_destinations> const &destinations, std::string_view command, std::string &&data)
 {
     for (auto const &[x25519_string, connect_string]: destinations) {
-        MINFO("Relaying data to " << to_hex(x25519_string) << " @ " << connect_string);
+        log::info(logcat, "Relaying data to {} @ {}", to_hex(x25519_string), connect_string);
         core.get_omq().send(x25519_string, command, std::move(data), send_option::hint{connect_string});
     }
 }
@@ -362,10 +361,10 @@ private:
         size_t i = 0;
         for (QuorumIt qit = qbegin; qit != qend; ++i, ++qit) {
             if (my_position[i] < 0) {
-                MTRACE("Not in subquorum " << (i == 0 ? "Q" : "Q'"));
+                log::trace(logcat, "Not in subquorum {}", (i == 0 ? "Q" : "Q'"));
                 continue;
             } else {
-                MTRACE("I am in subquorum " << (i == 0 ? "Q" : "Q'") << " position " << my_position[i]);
+                log::trace(logcat, "I am in subquorum {} position {}", (i == 0 ? "Q" : "Q'"), my_position[i]);
             }
 
             auto &validators = (*qit)->validators;
@@ -373,14 +372,14 @@ private:
             // Relay to all my outgoing targets within the quorum (connecting if not already connected)
             for (int j : quorum_outgoing_conns(my_position[i], validators.size())) {
                 if (add_peer(validators[j]))
-                    MTRACE("Relaying within subquorum " << (i == 0 ? "Q" : "Q'") << "[" << my_position[i] << "] to [" << j << "] " << validators[j]);
+                    log::trace(logcat, "Relaying within subquorum {}[{}] to [{}] {}", (i == 0 ? "Q" : "Q'"), my_position[i], j, validators[j]);
             }
 
             // Opportunistically relay to all my *incoming* sources within the quorum *if* I already
             // have a connection open with them, but don't open a new connection if I don't.
             for (int j : quorum_incoming_conns(my_position[i], validators.size())) {
                 if (add_peer(validators[j], false /*!strong*/))
-                    MTRACE("Optional opportunistic relay within quorum " << (i == 0 ? "Q" : "Q'") << "[" << my_position[i] << "] to [" << j << "] " << validators[j]);
+                    log::trace(logcat, "Optional opportunistic relay within quorum {}[{}] to [{}] {}", (i == 0 ? "Q" : "Q'"), my_position[i], j, validators[j]);
             }
 
             // Now establish strong interconnections between quorums, if we have multiple subquorums
@@ -404,13 +403,12 @@ private:
                 if (my_position[i] >= half && my_position[i] < half*2) {
                     int next_pos = my_position[i] - half;
                     bool added = add_peer(next_validators[next_pos]);
-                    MTRACE("Inter-quorum relay from Q[" << my_position[i] << "] (me) to Q'[" << next_pos << "] = " << next_validators[next_pos]
-                            << (added ? "" : " (skipping; already relaying to that SN)"));
+                    log::trace(logcat, "Inter-quorum relay from Q[{}] (me) to Q'[{}] = {}{}", my_position[i], next_pos, next_validators[next_pos], (added ? "" : " (skipping; already relaying to that SN)"));
                 } else {
-                    MTRACE("Q[" << my_position[i] << "] is not a Q -> Q' inter-quorum relay position");
+                    log::trace(logcat, "Q[{}] is not a Q -> Q' inter-quorum relay position", my_position[i]);
                 }
             } else if (qnext != qend) {
-                MTRACE("Not doing inter-quorum relaying because I am in both quorums (Q[" << my_position[i] << "], Q'[" << my_position[i+1] << "])");
+                log::trace(logcat, "Not doing inter-quorum relaying because I am in both quorums (Q[{}], Q'[{}])", my_position[i], my_position[i+1]);
             }
 
             // Exactly the same connections as above, but in reverse: the first half of Q' sends to
@@ -422,13 +420,12 @@ private:
                 if (my_position[i] < half) {
                     int prev_pos = half + my_position[i];
                     bool added = add_peer(prev_validators[prev_pos]);
-                    MTRACE("Inter-quorum relay from Q'[" << my_position[i] << "] (me) to Q[" << prev_pos << "] = " << prev_validators[prev_pos]
-                            << (added ? "" : " (already relaying to that SN)"));
+                    log::trace(logcat, "Inter-quorum relay from Q'[{}] (me) to Q[{}] = {}{}", my_position[i], prev_pos, prev_validators[prev_pos], (added ? "" : " (already relaying to that SN)"));
                 } else {
-                    MTRACE("Q'[" << my_position[i] << "] is not a Q' -> Q inter-quorum relay position");
+                    log::trace(logcat, "Q'[{}] is not a Q' -> Q inter-quorum relay position", my_position[i]);
                 }
             } else if (qit != qbegin) {
-                MTRACE("Not doing inter-quorum relaying because I am in both quorums (Q[" << my_position[i-1] << "], Q'[" << my_position[i] << "])");
+                log::trace(logcat, "Not doing inter-quorum relaying because I am in both quorums (Q[{}], Q'[{}])", my_position[i-1], my_position[i]);
             }
         }
     }
@@ -437,7 +434,7 @@ private:
     template<size_t N, size_t... I>
     void relay_to_peers_impl(const std::string_view &cmd, std::array<std::string, N> relay_data, std::index_sequence<I...>) {
         for (auto &peer : peers) {
-            MTRACE("Relaying " << cmd << " to peer " << to_hex(peer.first) << (peer.second.empty() ? " (if connected)"s : " @ " + peer.second));
+            log::trace(logcat, "Relaying {} to peer {}{}", cmd, to_hex(peer.first), (peer.second.empty() ? " (if connected)"s : " @ " + peer.second));
             if (peer.second.empty())
                 omq.send(peer.first, cmd, relay_data[I]..., send_option::optional{});
             else
@@ -458,7 +455,7 @@ bt_dict serialize_vote(const quorum_vote_t &vote) {
         {"s", get_data_as_string(vote.signature)},
     };
     if (vote.type == quorum_type::checkpointing)
-        result["bh"] = std::string{vote.checkpoint.block_hash.data, sizeof(crypto::hash)};
+        result["bh"] = std::string{tools::view_guts(vote.checkpoint.block_hash)};
     else {
         result["wi"] = vote.state_change.worker_index;
         result["sc"] = static_cast<std::underlying_type_t<new_state>>(vote.state_change.state);
@@ -481,8 +478,8 @@ quorum_vote_t deserialize_vote(std::string_view v) {
     std::memcpy(&vote.signature, sig.data(), sizeof(vote.signature));
     if (vote.type == quorum_type::checkpointing) {
         auto &bh = var::get<std::string>(d.at("bh"));
-        if (bh.size() != sizeof(vote.checkpoint.block_hash.data)) throw std::invalid_argument("invalid vote checkpoint block hash");
-        std::memcpy(vote.checkpoint.block_hash.data, bh.data(), sizeof(vote.checkpoint.block_hash.data));
+        if (bh.size() != vote.checkpoint.block_hash.size()) throw std::invalid_argument("invalid vote checkpoint block hash");
+        std::memcpy(vote.checkpoint.block_hash.data(), bh.data(), bh.size());
     } else {
         vote.state_change.worker_index = get_int<uint16_t>(d.at("wi"));
         vote.state_change.state = get_enum<new_state>(d, "sc");
@@ -498,47 +495,45 @@ void relay_obligation_votes(void *obj, const std::vector<service_nodes::quorum_v
     const auto& my_keys = qnet.core.get_service_keys();
     assert(qnet.core.service_node());
 
-    MDEBUG("Starting relay of " << votes.size() << " votes");
+    log::debug(logcat, "Starting relay of {} votes", votes.size());
     std::vector<service_nodes::quorum_vote_t> relayed_votes;
     relayed_votes.reserve(votes.size());
     for (auto &vote : votes) {
         if (vote.type != quorum_type::obligations) {
-            MERROR("Internal logic error: quorumnet asked to relay a " << vote.type << " vote, but should only be called with obligations votes");
+            log::error(logcat, "Internal logic error: quorumnet asked to relay a {} vote, but should only be called with obligations votes", vote.type);
             continue;
         }
 
         auto quorum = qnet.core.get_service_node_list().get_quorum(vote.type, vote.block_height);
         if (!quorum) {
-            MWARNING("Unable to relay vote: no " << vote.type << " quorum available for height " << vote.block_height);
+            log::warning(logcat, "Unable to relay vote: no {} quorum available for height {}", vote.type, vote.block_height);
             continue;
         }
 
         auto &quorum_voters = quorum->validators;
         if (quorum_voters.size() < service_nodes::min_votes_for_quorum_type(vote.type)) {
-            MWARNING("Invalid vote relay: " << vote.type << " quorum @ height " << vote.block_height <<
-                    " does not have enough validators (" << quorum_voters.size() << ") to reach the minimum required votes ("
-                    << service_nodes::min_votes_for_quorum_type(vote.type) << ")");
+            log::warning(logcat, "Invalid vote relay: {} quorum @ height {} does not have enough validators ({}) to reach the minimum required votes ({})", vote.type, vote.block_height, quorum_voters.size(), service_nodes::min_votes_for_quorum_type(vote.type));
             continue;
         }
 
         peer_info pinfo{qnet, vote.type, quorum.get()};
         if (!pinfo.my_position_count) {
-            MWARNING("Invalid vote relay: vote to relay does not include this service node");
+            log::warning(logcat, "Invalid vote relay: vote to relay does not include this service node");
             continue;
         }
 
         pinfo.relay_to_peers("quorum.vote_ob", serialize_vote(vote));
         relayed_votes.push_back(vote);
     }
-    MDEBUG("Relayed " << relayed_votes.size() << " votes");
+    log::debug(logcat, "Relayed {} votes", relayed_votes.size());
     qnet.core.set_service_node_votes_relayed(relayed_votes);
 }
 
 void handle_obligation_vote(Message& m, QnetState& qnet) {
-    MDEBUG("Received a relayed obligation vote from " << to_hex(m.conn.pubkey()));
+    log::debug(logcat, "Received a relayed obligation vote from {}", to_hex(m.conn.pubkey()));
 
     if (m.data.size() != 1) {
-        MINFO("Ignoring vote: expected 1 data part, not " << m.data.size());
+        log::info(logcat, "Ignoring vote: expected 1 data part, not {}", m.data.size());
         return;
     }
 
@@ -548,11 +543,11 @@ void handle_obligation_vote(Message& m, QnetState& qnet) {
         auto& vote = vvote.back();
 
         if (vote.type != quorum_type::obligations) {
-            MWARNING("Received invalid non-obligations vote via quorumnet; ignoring");
+            log::warning(logcat, "Received invalid non-obligations vote via quorumnet; ignoring");
             return;
         }
         if (vote.block_height > qnet.core.get_current_blockchain_height()) {
-            MDEBUG("Ignoring vote: block height " << vote.block_height << " is too high");
+            log::debug(logcat, "Ignoring vote: block height {} is too high", vote.block_height);
             return;
         }
 
@@ -560,7 +555,7 @@ void handle_obligation_vote(Message& m, QnetState& qnet) {
         qnet.core.add_service_node_vote(vote, vvc);
         if (vvc.m_verification_failed)
         {
-            MWARNING("Vote verification failed; ignoring vote");
+            log::warning(logcat, "Vote verification failed; ignoring vote");
             return;
         }
 
@@ -568,12 +563,12 @@ void handle_obligation_vote(Message& m, QnetState& qnet) {
             relay_obligation_votes(&qnet, std::move(vvote));
     }
     catch (const std::exception &e) {
-        MWARNING("Deserialization of vote from " << to_hex(m.conn.pubkey()) << " failed: " << e.what());
+        log::warning(logcat, "Deserialization of vote from {} failed: {}", to_hex(m.conn.pubkey()), e.what());
     }
 }
 
 void handle_timestamp(Message& m) {
-    MDEBUG("Received a timestamp request from " << to_hex(m.conn.pubkey()));
+    log::debug(logcat, "Received a timestamp request from {}", to_hex(m.conn.pubkey()));
     const time_t seconds = time(nullptr);
     m.send_reply(std::to_string(seconds));
 }
@@ -613,13 +608,13 @@ quorum_array get_blink_quorums(uint64_t blink_height, const service_node_list &s
             throw std::runtime_error("not enough blink nodes to form a quorum");
         local_checksum += quorum_checksum(v, qi * BLINK_SUBQUORUM_SIZE);
     }
-    MTRACE("Verified enough active blink nodes for a quorum; quorum checksum: " << local_checksum);
+    log::trace(logcat, "Verified enough active blink nodes for a quorum; quorum checksum: {}", local_checksum);
 
     if (input_checksum) {
         if (*input_checksum != local_checksum)
             throw std::runtime_error("wrong quorum checksum: expected " + std::to_string(local_checksum) + ", received " + std::to_string(*input_checksum));
 
-        MTRACE("Blink quorum checksum matched");
+        log::trace(logcat, "Blink quorum checksum matched");
     }
     if (output_checksum)
         *output_checksum = local_checksum;
@@ -670,7 +665,7 @@ void process_blink_signatures(QnetState &qnet, const std::shared_ptr<blink_tx> &
             auto &validators = blink_quorums[qi]->validators;
 
             if (position < 0 || position >= (int) validators.size()) {
-                MWARNING("Invalid blink signature: subquorum position is invalid");
+                log::warning(logcat, "Invalid blink signature: subquorum position is invalid");
                 it = signatures.erase(it);
             } else if (btx.get_signature_status(subquorum, position) != blink_tx::signature_status::none) {
                 it = signatures.erase(it);
@@ -694,7 +689,7 @@ void process_blink_signatures(QnetState &qnet, const std::shared_ptr<blink_tx> &
         auto &validators = blink_quorums[qi]->validators;
 
         if (!crypto::check_signature(btx.hash(approval), validators[position], signature)) {
-            MWARNING("Invalid blink signature: signature verification failed");
+            log::warning(logcat, "Invalid blink signature: signature verification failed");
             it = signatures.erase(it);
             continue;
         }
@@ -711,7 +706,7 @@ void process_blink_signatures(QnetState &qnet, const std::shared_ptr<blink_tx> &
         bool already_approved = btx.approved(),
              already_rejected = !already_approved && btx.rejected();
 
-        MTRACE("Before recording new signatures I have existing signatures: " << debug_known_signatures(btx, blink_quorums));
+        log::trace(logcat, "Before recording new signatures I have existing signatures: {}", debug_known_signatures(btx, blink_quorums));
 
         // Now actually add them (and do one last check on them)
         for (auto it = signatures.begin(); it != signatures.end(); ) {
@@ -725,7 +720,7 @@ void process_blink_signatures(QnetState &qnet, const std::shared_ptr<blink_tx> &
             auto &validators = blink_quorums[qi]->validators;
 
             if (btx.add_prechecked_signature(subquorum, position, approval, signature)) {
-                MDEBUG("Validated and stored " << (approval ? "approval" : "rejection") << " signature for tx " << btx.get_txhash() << ", subquorum " << int{qi} << ", position " << position);
+                log::debug(logcat, "Validated and stored {} signature for tx {}, subquorum {}, position {}", (approval ? "approval" : "rejection"), btx.get_txhash(), int{qi}, position);
                 ++it;
             }
             else {
@@ -736,7 +731,7 @@ void process_blink_signatures(QnetState &qnet, const std::shared_ptr<blink_tx> &
         }
 
         if (!signatures.empty()) {
-            MDEBUG("Updated signatures; now have signatures: " << debug_known_signatures(btx, blink_quorums));
+            log::debug(logcat, "Updated signatures; now have signatures: {}", debug_known_signatures(btx, blink_quorums));
 
             if (!already_approved && !already_rejected) {
                 if (btx.approved()) {
@@ -749,7 +744,7 @@ void process_blink_signatures(QnetState &qnet, const std::shared_ptr<blink_tx> &
     }
 
     if (became_approved) {
-        MINFO("Accumulated enough signatures for blink tx: enabling tx relay");
+        log::info(logcat, "Accumulated enough signatures for blink tx: enabling tx relay");
         auto &pool = qnet.core.get_pool();
         {
             auto lock = pool.blink_unique_lock();
@@ -773,8 +768,7 @@ void process_blink_signatures(QnetState &qnet, const std::shared_ptr<blink_tx> &
     peer_info pinfo{qnet, quorum_type::blink, blink_quorums.begin(), blink_quorums.end(), true /*opportunistic*/,
         std::move(relay_exclude)};
 
-    MDEBUG("Relaying " << signatures.size() << " blink signatures to " << pinfo.strong_peers << " (strong) + " <<
-            (pinfo.peers.size() - pinfo.strong_peers) << " (opportunistic) blink peers");
+    log::debug(logcat, "Relaying {} blink signatures to {} (strong) + {} (opportunistic blink peers)", signatures.size(), pinfo.strong_peers, (pinfo.peers.size() - pinfo.strong_peers));
 
     bt_list i_list, p_list, r_list, s_list;
     for (auto &s : signatures) {
@@ -796,14 +790,14 @@ void process_blink_signatures(QnetState &qnet, const std::shared_ptr<blink_tx> &
 
     pinfo.relay_to_peers("quorum.blink_sign", blink_sign_data);
 
-    MTRACE("Done blink signature relay");
+    log::trace(logcat, "Done blink signature relay");
 
     if (reply_tag && reply_conn) {
         if (became_approved) {
-            MINFO("Blink tx became approved; sending result back to originating node");
+            log::info(logcat, "Blink tx became approved; sending result back to originating node");
             qnet.omq.send(reply_conn, "bl.good", bt_serialize(bt_dict{{"!", reply_tag}}), send_option::optional{});
         } else if (became_rejected) {
-            MINFO("Blink tx became rejected; sending result back to originating node");
+            log::info(logcat, "Blink tx became rejected; sending result back to originating node");
             qnet.omq.send(reply_conn, "bl.bad", bt_serialize(bt_dict{{"!", reply_tag}}), send_option::optional{});
         }
     }
@@ -841,7 +835,7 @@ void handle_blink(Message& m, QnetState& qnet) {
     //   message and close it.
     // If an outgoing connection - refuse reconnections via ZAP and just close it.
 
-    MDEBUG("Received a blink tx from " << (m.conn.sn() ? "SN " : "non-SN ") << to_hex(m.conn.pubkey()));
+    log::debug(logcat, "Received a blink tx from {}{}", (m.conn.sn() ? "SN " : "non-SN "), to_hex(m.conn.pubkey()));
 
     assert(qnet.core.service_node());
     if (!qnet.core.service_node())
@@ -849,7 +843,7 @@ void handle_blink(Message& m, QnetState& qnet) {
     const auto& keys = qnet.core.get_service_keys();
 
     if (m.data.size() != 1) {
-        MINFO("Rejecting blink message: expected one data entry not " << m.data.size());
+        log::info(logcat, "Rejecting blink message: expected one data entry not {}", m.data.size());
         // No valid data and so no reply tag; we can't send a response
         return;
     }
@@ -861,7 +855,7 @@ void handle_blink(Message& m, QnetState& qnet) {
 
     auto hf_version = get_network_version(qnet.core.get_nettype(), local_height);
     if (hf_version < cryptonote::feature::BLINK) {
-        MWARNING("Rejecting blink message: blink is not available for hardfork " << (int) hf_version);
+        log::warning(logcat, "Rejecting blink message: blink is not available for hardfork {}", (int) hf_version);
         if (tag)
             m.send_back("bl.nostart", bt_serialize(bt_dict{{"!", tag}, {"e", "Invalid blink authorization height"sv}}));
         return;
@@ -871,29 +865,29 @@ void handle_blink(Message& m, QnetState& qnet) {
     auto blink_height = get_int<uint64_t>(data.at("h"));
 
     if (blink_height < local_height - 2) {
-        MINFO("Rejecting blink tx because blink auth height is too low (" << blink_height << " vs. " << local_height << ")");
+        log::info(logcat, "Rejecting blink tx because blink auth height is too low ({} vs. {})", blink_height, local_height);
         if (tag)
             m.send_back("bl.nostart", bt_serialize(bt_dict{{"!", tag}, {"e", "Invalid blink authorization height"sv}}));
         return;
     } else if (blink_height > local_height + 2) {
         // TODO: if within some threshold (maybe 5-10?) we could hold it and process it once we are
         // within 2.
-        MINFO("Rejecting blink tx because blink auth height is too high (" << blink_height << " vs. " << local_height << ")");
+        log::info(logcat, "Rejecting blink tx because blink auth height is too high ({} vs. {})", blink_height, local_height);
         if (tag)
             m.send_back("bl.nostart", bt_serialize(bt_dict{{"!", tag}, {"e", "Invalid blink authorization height"sv}}));
         return;
     }
-    MTRACE("Blink tx auth height " << blink_height << " is valid (local height is " << local_height << ")");
+    log::trace(logcat, "Blink tx auth height {} is valid (local height is {})", blink_height, local_height);
 
     auto t_it = data.find("t");
     if (t_it == data.end()) {
-        MINFO("Rejecting blink tx: no tx data included in request");
+        log::info(logcat, "Rejecting blink tx: no tx data included in request");
         if (tag)
             m.send_back("bl.nostart", bt_serialize(bt_dict{{"!", tag}, {"e", "No transaction included in blink request"sv}}));
         return;
     }
     const std::string &tx_data = var::get<std::string>(t_it->second);
-    MTRACE("Blink tx data is " << tx_data.size() << " bytes");
+    log::trace(logcat, "Blink tx data is {} bytes", tx_data.size());
 
     // "hash" is optional -- it lets us short-circuit processing the tx if we've already seen it,
     // and is added internally by SN-to-SN forwards but not the original submitter.  We don't trust
@@ -903,7 +897,7 @@ void handle_blink(Message& m, QnetState& qnet) {
     auto &tx_hash_str = var::get<std::string>(data.at("#"));
     bool already_approved = false, already_rejected = false;
     if (tx_hash_str.size() == sizeof(crypto::hash)) {
-        std::memcpy(tx_hash.data, tx_hash_str.data(), sizeof(crypto::hash));
+        std::memcpy(tx_hash.data(), tx_hash_str.data(), tx_hash_str.size());
         std::shared_lock lock{qnet.mutex};
         auto bit = qnet.blinks.find(blink_height);
         if (bit != qnet.blinks.end()) {
@@ -917,8 +911,7 @@ void handle_blink(Message& m, QnetState& qnet) {
                     if (already_approved || already_rejected) {
                         // Quorum approved/rejected the tx before we received the submitted blink,
                         // reply with a bl.good/bl.bad immediately (done below, outside the lock).
-                        MINFO("Submitted blink tx already " << (already_approved ? "approved" : "rejected") <<
-                                "; sending result back to originating node");
+                        log::info(logcat, "Submitted blink tx already {}; sending result back to originating node", (already_approved ? "approved" : "rejected"));
                     } else {
                         // We've already seen it but are still waiting on more signatures to
                         // determine the result, so stash the tag & pubkey in the metadata to delay
@@ -929,14 +922,14 @@ void handle_blink(Message& m, QnetState& qnet) {
                         return;
                     }
                 } else {
-                    MDEBUG("Already seen and forwarded this blink tx, ignoring it.");
+                    log::debug(logcat, "Already seen and forwarded this blink tx, ignoring it.");
                     return;
                 }
             }
         }
-        MTRACE("Blink tx hash: " << to_hex(tx_hash.data));
+        log::trace(logcat, "Blink tx hash: {}", tx_hash);
     } else {
-        MINFO("Rejecting blink tx: invalid tx hash included in request");
+        log::info(logcat, "Rejecting blink tx: invalid tx hash included in request");
         if (tag)
             m.send_back("bl.nostart", bt_serialize(bt_dict{{"!", tag}, {"e", "Invalid transaction hash"s}}));
         return;
@@ -952,7 +945,7 @@ void handle_blink(Message& m, QnetState& qnet) {
     try {
         blink_quorums = get_blink_quorums(blink_height, qnet.core.get_service_node_list(), &checksum);
     } catch (const std::runtime_error &e) {
-        MINFO("Rejecting blink tx: " << e.what());
+        log::info(logcat, "Rejecting blink tx: {}", e.what());
         if (tag)
             m.send_back("bl.nostart", bt_serialize(bt_dict{{"!", tag}, {"e", "Unable to retrieve blink quorum: "s + e.what()}}));
         return;
@@ -963,9 +956,9 @@ void handle_blink(Message& m, QnetState& qnet) {
         };
 
     if (pinfo.my_position_count > 0)
-        MTRACE("Found this SN in " << pinfo.my_position_count << " subquorums");
+        log::trace(logcat, "Found this SN in {} subquorums", pinfo.my_position_count);
     else {
-        MINFO("Rejecting blink tx: this service node is not a member of the blink quorum!");
+        log::info(logcat, "Rejecting blink tx: this service node is not a member of the blink quorum!");
         if (tag)
             m.send_back("bl.nostart", bt_serialize(bt_dict{{"!", tag}, {"e", "Blink tx relayed to non-blink quorum member"sv}}));
         return;
@@ -982,27 +975,27 @@ void handle_blink(Message& m, QnetState& qnet) {
     {
         crypto::hash tx_hash_actual;
         if (!cryptonote::parse_and_validate_tx_from_blob(tx_data, tx, tx_hash_actual)) {
-            MINFO("Rejecting blink tx: failed to parse transaction data");
+            log::info(logcat, "Rejecting blink tx: failed to parse transaction data");
             if (tag)
                 m.send_back("bl.nostart", bt_serialize(bt_dict{{"!", tag}, {"e", "Failed to parse transaction data"sv}}));
             return;
         }
-        MTRACE("Successfully parsed transaction data");
+        log::trace(logcat, "Successfully parsed transaction data");
 
         if (tx_hash != tx_hash_actual) {
-            MINFO("Rejecting blink tx: submitted tx hash " << tx_hash << " did not match actual tx hash " << tx_hash_actual);
+            log::info(logcat, "Rejecting blink tx: submitted tx hash {} did not match actual tx hash {}", tx_hash, tx_hash_actual);
             if (tag)
                 m.send_back("bl.nostart", bt_serialize(bt_dict{{"!", tag}, {"e", "Invalid transaction hash"sv}}));
             return;
         } else {
-            MTRACE("Pre-computed tx hash matches actual tx hash");
+            log::trace(logcat, "Pre-computed tx hash matches actual tx hash");
         }
     }
 
     // Abort if we don't have at least one strong peer to send it to.  This can only happen if it's
     // a brand new SN (not just restarted!) that hasn't received uptime proofs before.
     if (!pinfo.strong_peers) {
-        MWARNING("Could not find connection info for any blink quorum peers.  Aborting blink tx");
+        log::warning(logcat, "Could not find connection info for any blink quorum peers.  Aborting blink tx");
         if (tag)
             m.send_back("bl.nostart", bt_serialize(bt_dict{{"!", tag}, {"e", "No quorum peers are currently reachable"sv}}));
         return;
@@ -1015,7 +1008,7 @@ void handle_blink(Message& m, QnetState& qnet) {
         std::unique_lock lock{qnet.mutex};
         auto &bl_info = qnet.blinks[blink_height][tx_hash];
         if (bl_info.btxptr) {
-            MDEBUG("Already seen and forwarded this blink tx, ignoring it.");
+            log::debug(logcat, "Already seen and forwarded this blink tx, ignoring it.");
             return;
         }
         bl_info.btxptr = btxptr;
@@ -1027,7 +1020,7 @@ void handle_blink(Message& m, QnetState& qnet) {
             bl_info.reply_conn = m.conn;
         }
     }
-    MTRACE("Accepted new blink tx for verification");
+    log::trace(logcat, "Accepted new blink tx for verification");
 
     // The submission looks good.  We distribute it first, *before* we start verifying the actual tx
     // details, for two reasons: we want other quorum members to start verifying ASAP, and we want
@@ -1046,7 +1039,7 @@ void handle_blink(Message& m, QnetState& qnet) {
             {"t", tx_data},
             {"#", tx_hash_str},
         };
-        MDEBUG("Relaying blink tx to " << pinfo.strong_peers << " strong and " << (pinfo.peers.size() - pinfo.strong_peers) << " opportunistic blink peers");
+        log::debug(logcat, "Relaying blink tx to {} strong and {} opportunistic blink peers", pinfo.strong_peers, (pinfo.peers.size() - pinfo.strong_peers));
         pinfo.relay_to_peers("blink.submit", blink_data);
     }
 
@@ -1058,15 +1051,15 @@ void handle_blink(Message& m, QnetState& qnet) {
          max = tx.get_max_version_for_hf(hf_version);
     if (tx.version < min || tx.version > max) {
         approved = false;
-        MINFO("Blink TX " << tx_hash << " rejected because TX version " << tx.version << " invalid: TX version not between " << min << " and " << max);
+        log::info(logcat, "Blink TX {} rejected because TX version {} invalid: TX version not between {} and {}", tx_hash, tx.version, min, max);
     } else {
         bool already_in_mempool;
         cryptonote::tx_verification_context tvc = {};
         approved = qnet.core.get_pool().add_new_blink(btxptr, tvc, already_in_mempool);
 
-        MINFO("Blink TX " << tx_hash << (approved ? " approved and added to mempool" : " rejected"));
+        log::info(logcat, "Blink TX {}{}", tx_hash, (approved ? " approved and added to mempool" : " rejected"));
         if (!approved)
-            MDEBUG("TX rejected because: " << print_tx_verification_context(tvc));
+            log::debug(logcat, "TX rejected because: {}", print_tx_verification_context(tvc));
     }
 
     auto hash_to_sign = btx.hash(approved);
@@ -1129,7 +1122,7 @@ crypto::signature convert_string_view_bytes_to_signature(std::string_view sig_st
 ///
 /// Signatures will be forwarded if new; known signatures will be ignored.
 void handle_blink_signature(Message& m, QnetState& qnet) {
-    MDEBUG("Received a blink tx signature from SN " << to_hex(m.conn.pubkey()));
+    log::debug(logcat, "Received a blink tx signature from SN {}", to_hex(m.conn.pubkey()));
 
     if (m.data.size() != 1)
         throw std::runtime_error("Rejecting blink signature: expected one data entry not " + std::to_string(m.data.size()));
@@ -1144,7 +1137,7 @@ void handle_blink_signature(Message& m, QnetState& qnet) {
     if (hash_str.size() != sizeof(crypto::hash))
         throw std::invalid_argument("Invalid blink signature data: invalid tx hash");
     crypto::hash tx_hash;
-    std::memcpy(tx_hash.data, hash_str.data(), sizeof(crypto::hash));
+    std::memcpy(tx_hash.data(), hash_str.data(), hash_str.size());
 
     // h - height
     if (!data.skip_until("h")) throw std::invalid_argument("Invalid blink signature data: missing required field 'h'");
@@ -1227,7 +1220,7 @@ void handle_blink_signature(Message& m, QnetState& qnet) {
         // exclusive mutex, so check it again before we stash a delayed signature.
         find_blink();
         if (!btxptr) {
-            MINFO("Blink tx not found in local blink cache; delaying signature verification");
+            log::info(logcat, "Blink tx not found in local blink cache; delaying signature verification");
             auto &delayed = qnet.blinks[blink_height][tx_hash].pending_sigs;
             for (auto &sig : signatures)
                 delayed.insert(std::move(sig));
@@ -1235,7 +1228,7 @@ void handle_blink_signature(Message& m, QnetState& qnet) {
         }
     }
 
-    MINFO("Found blink tx in local blink cache");
+    log::info(logcat, "Found blink tx in local blink cache");
 
     process_blink_signatures(qnet, btxptr, blink_quorums, checksum, std::move(signatures), reply_tag, reply_conn, m.conn.pubkey());
 }
@@ -1377,14 +1370,14 @@ void common_blink_response(uint64_t tag, cryptonote::blink_result res, std::stri
 /// promise unless we get a nostart response from a majority of the remotes.
 void handle_blink_not_started(Message& m) {
     if (m.data.size() != 1) {
-        MERROR("Bad blink not started response: expected one data entry not " << m.data.size());
+        log::error(logcat, "Bad blink not started response: expected one data entry not {}", m.data.size());
         return;
     }
     auto data = bt_deserialize<bt_dict>(m.data[0]);
     auto tag = get_int<uint64_t>(data.at("!"));
     auto& error = var::get<std::string>(data.at("e"));
 
-    MINFO("Received no-start blink response: " << error);
+    log::info(logcat, "Received no-start blink response: {}", error);
 
     common_blink_response(tag, cryptonote::blink_result::rejected, std::move(error), true /*nostart*/);
 }
@@ -1396,7 +1389,7 @@ void handle_blink_not_started(Message& m) {
 ///
 void handle_blink_failure(Message &m) {
     if (m.data.size() != 1) {
-        MERROR("Blink failure message not understood: expected one data entry not " << m.data.size());
+        log::error(logcat, "Blink failure message not understood: expected one data entry not {}", m.data.size());
         return;
     }
     auto data = bt_deserialize<bt_dict>(m.data[0]);
@@ -1408,7 +1401,7 @@ void handle_blink_failure(Message &m) {
     // signature receipt, not at rejection time), so for now we don't include it.
     //auto &error = var::get<std::string>(data.at("e"));
 
-    MINFO("Received blink failure response");
+    log::info(logcat, "Received blink failure response");
 
     common_blink_response(tag, cryptonote::blink_result::rejected, "Transaction rejected by quorum"s);
 }
@@ -1420,13 +1413,13 @@ void handle_blink_failure(Message &m) {
 ///
 void handle_blink_success(Message& m) {
     if (m.data.size() != 1) {
-        MERROR("Blink success message not understood: expected one data entry not " << m.data.size());
+        log::error(logcat, "Blink success message not understood: expected one data entry not {}", m.data.size());
         return;
     }
     auto data = bt_deserialize<bt_dict>(m.data[0]);
     auto tag = get_int<uint64_t>(data.at("!"));
 
-    MINFO("Received blink success response");
+    log::info(logcat, "Received blink success response");
 
     common_blink_response(tag, cryptonote::blink_result::accepted, ""s);
 }
@@ -1642,7 +1635,7 @@ void handle_pulse_random_value_hash(Message &m, QnetState &qnet)
     if (str.size() != sizeof(msg.random_value_hash.hash))
       throw std::invalid_argument("Invalid hash data size: " + std::to_string(str.size()));
 
-    std::memcpy(msg.random_value_hash.hash.data, str.data(), str.size());
+    std::memcpy(msg.random_value_hash.hash.data(), str.data(), str.size());
   } else {
     throw std::invalid_argument(std::string(INVALID_ARG_PREFIX) + tag + "'");
   }

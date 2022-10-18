@@ -2,11 +2,11 @@
 
 #include "core_rpc_server_commands_defs.h"
 #include <nlohmann/json.hpp>
-#include <oxenmq/bt_serialize.h>
+#include <oxenc/bt_value.h>
 
 namespace cryptonote::rpc {
 
-  using rpc_input = std::variant<std::monostate, nlohmann::json, oxenmq::bt_dict_consumer>;
+  using rpc_input = std::variant<std::monostate, nlohmann::json, oxenc::bt_dict_consumer>;
 
   inline void parse_request(NO_ARGS&, rpc_input) {}
 
