@@ -33,9 +33,8 @@
 #include <string>
 #include <iomanip>
 #include <thread>
+#include <fmt/chrono.h>
 #include <fmt/color.h>
-
-#include <date/date.h>
 
 #include "epee/string_tools.h"
 #include "epee/wipeable_string.h"
@@ -197,7 +196,7 @@ namespace tools
   {
     if (t < 1234567890)
       return "<unknown>";
-    return date::format("%Y-%m-%d %H:%M:%S UTC", std::chrono::system_clock::from_time_t(t));
+    return "{:%Y-%m-%d %H:%M:%S} UTC"_format(fmt::gmtime(t));
   }
 
   std::string get_human_readable_timespan(std::chrono::seconds seconds)

@@ -49,8 +49,7 @@
 #include <oxenc/base32z.h>
 #include <oxenc/variant.h>
 #include <fmt/core.h>
-#include <date/date.h>
-#include <fmt/core.h>
+#include <fmt/chrono.h>
 
 #include <fstream>
 #include <ctime>
@@ -1544,7 +1543,7 @@ static void append_printable_service_node_list_entry(cryptonote::network_type ne
       stream << expiry_height << " (in " << delta_height << ") blocks\n";
 
       stream << indent2 << "Expiry Date (estimated): " <<
-          date::format("%Y-%m-%d %I:%M:%S %p UTC", std::chrono::system_clock::from_time_t(expiry_epoch_time)) <<
+          "{:%Y-%m-%d %I:%M:%S %p} UTC"_format(fmt::gmtime(expiry_epoch_time)) <<
           " (" << get_human_time_ago(expiry_epoch_time, now) << ")\n";
     }
   }

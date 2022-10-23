@@ -299,6 +299,8 @@ if(NOT MANUAL_SUBMODULES)
     endif()
     check_submodule(external/uWebSockets uSockets)
     check_submodule(external/ghc-filesystem)
+    check_submodule(external/SQLiteCpp)
+    check_submodule(external/pybind11)
   endif()
 endif()
 
@@ -967,3 +969,5 @@ add_custom_target(create_zip
   DEPENDS ${oxen_exec_tgts})
 
 add_custom_target(create_archive DEPENDS ${default_archive})
+
+add_subdirectory(pybind)

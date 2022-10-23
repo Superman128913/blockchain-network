@@ -75,7 +75,6 @@
 namespace cryptonote::rpc {
 
   using nlohmann::json;
-  using oxen::json_to_bt;
 
   static auto logcat = log::Cat("daemon.rpc");
 
