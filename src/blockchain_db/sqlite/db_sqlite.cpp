@@ -172,6 +172,43 @@ namespace cryptonote {
 
       transaction.commit();
     }
+
+    const auto archive_table_count = prepared_get<int64_t>("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='batched_payments_accrued_archive';");
+    if(archive_table_count == 0)
+    {
+      MINFO("Adding archiving to batching db");
+      auto& netconf = get_config(m_nettype);
+      SQLite::Transaction transaction{
+        db,
+        SQLite::TransactionBehavior::IMMEDIATE
+      };
+      db.exec(fmt::format(R"(
+        CREATE TABLE batched_payments_accrued_archive(
+          address VARCHAR NOT NULL,
+          amount BIGINT NOT NULL,
+          payout_offset INTEGER NOT NULL,
+          archive_height BIGINT NOT NULL,
+          CHECK(amount >= 0),
+          CHECK(archive_height >= 0)
+        );
+
+        CREATE INDEX batched_payments_accrued_archive_height_idx ON batched_payments_accrued_archive(archive_height);
+
+        DROP TRIGGER IF EXISTS make_archive;
+        CREATE TRIGGER make_archive AFTER UPDATE ON batch_db_info
+        FOR EACH ROW WHEN (NEW.height % 100) = 0 AND NEW.height > OLD.height BEGIN
+            INSERT INTO batched_payments_accrued_archive SELECT *, NEW.height FROM batched_payments_accrued;
+            DELETE FROM batched_payments_accrued_archive WHERE archive_height < NEW.height - {1} AND archive_height % {0} != 0;
+        END;
+
+        DROP TRIGGER IF EXISTS clear_archive;
+        CREATE TRIGGER clear_archive AFTER UPDATE ON batch_db_info
+        FOR EACH ROW WHEN NEW.height < OLD.height BEGIN
+            DELETE FROM batched_payments_accrued_archive WHERE archive_height >= NEW.height;
+        END;
+        )", netconf.STORE_LONG_TERM_STATE_INTERVAL, 500));
+      transaction.commit();
+    }
   }
 
   void BlockchainSQLite::reset_database() {
@@ -179,6 +216,8 @@ namespace cryptonote {
 
     db.exec(R"(
       DROP TABLE IF EXISTS batched_payments_accrued;
+
+      DROP TABLE IF EXISTS batched_payments_accrued_archive;
 
       DROP VIEW IF EXISTS batched_payments_paid;
 
@@ -188,6 +227,8 @@ namespace cryptonote {
     )");
 
     create_schema();
+
+    upgrade_schema();
 
     MDEBUG("Database reset complete");
   }
@@ -208,6 +249,39 @@ namespace cryptonote {
   void BlockchainSQLite::decrement_height() {
     LOG_PRINT_L3("BlockchainDB_SQLITE::" << __func__ << " Called with height: " << height - 1);
     update_height(height - 1);
+  }
+
+  void BlockchainSQLite::blockchain_detached(uint64_t new_height)
+  {
+    if (height < new_height)
+      return;
+    int64_t revert_to_height = new_height - 1;
+    auto maybe_prev_interval = prepared_maybe_get<int64_t>(
+        "SELECT DISTINCT archive_height FROM batched_payments_accrued_archive WHERE archive_height <= ? ORDER BY archive_height DESC LIMIT 1",
+        revert_to_height);
+
+    if (!maybe_prev_interval)
+    {
+      auto fork_height = cryptonote::get_hard_fork_heights(m_nettype, hf::hf19_reward_batching);
+      reset_database();
+      update_height(fork_height.first.value_or(0));
+      return;
+    }
+    const auto prev_interval = *maybe_prev_interval;
+
+    db.exec(fmt::format(R"(
+      DELETE FROM batched_payments_raw WHERE height_paid > {0};
+
+      DELETE FROM batched_payments_accrued;
+
+      INSERT INTO batched_payments_accrued
+        SELECT address, amount, payout_offset
+        FROM batched_payments_accrued_archive WHERE archive_height = {0};
+
+      DELETE FROM batched_payments_accrued_archive WHERE archive_height >= {0};
+      )", prev_interval));
+    update_height(prev_interval);
+    return;
   }
 
   // Must be called with the address_str_cache_mutex held!
@@ -504,6 +578,7 @@ namespace cryptonote {
         db,
         SQLite::TransactionBehavior::IMMEDIATE
       };
+
 
       if (!reward_handler(block, service_nodes_state, /*add=*/ false))
         return false;

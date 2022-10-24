@@ -1759,17 +1759,12 @@ namespace service_nodes
     }
   }
 
-  void service_node_list::reset_batching_to_latest_height()
-  {
-    m_blockchain.sqlite_db()->reset_database();
-    m_blockchain.sqlite_db()->update_height(0);
-  }
-
   bool service_node_list::state_history_exists(uint64_t height)
   {
     auto it = m_transient.state_history.find(height);
     return it != m_transient.state_history.end();
   }
+
 
   bool service_node_list::process_batching_rewards(const cryptonote::block& block)
   {

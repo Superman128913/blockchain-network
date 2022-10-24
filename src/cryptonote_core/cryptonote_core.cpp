@@ -765,6 +765,8 @@ namespace cryptonote
     m_blockchain_storage.hook_init([this] { m_service_node_list.init(); });
     m_blockchain_storage.hook_validate_miner_tx([this] (const auto& info) { m_service_node_list.validate_miner_tx(info); });
     m_blockchain_storage.hook_alt_block_add([this] (const auto& info) { m_service_node_list.alt_block_add(info); });
+    
+    m_blockchain_storage.hook_blockchain_detached([this] (const auto& info) { m_blockchain_storage.sqlite_db()->blockchain_detached(info.height); });
 
     // NOTE: There is an implicit dependency on service node lists being hooked first!
     m_blockchain_storage.hook_init([this] { m_quorum_cop.init(); });
