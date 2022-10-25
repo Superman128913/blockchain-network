@@ -36,6 +36,7 @@ namespace wallet
     // Output belongs to public key derived as follows:
     //      let `Hs` := hash_to_scalar
     //      let `B`  := recipient public spend key
+    //      let `R`  := transaction public key
     //      `out_key = Hs(R || output_index)*G + B`
     //
     // Output belongs to us if we have a public key B such that

@@ -42,6 +42,7 @@ namespace wallet
     return  rct::rct2pk(aG);
   }
 
+  // Derivation Key = View Private Key * Transaction Pubkey = bR
   crypto::key_derivation
   Keyring::generate_key_derivation(const crypto::public_key& tx_pubkey) const
   {

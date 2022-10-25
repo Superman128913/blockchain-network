@@ -66,13 +66,13 @@ namespace wallet
 
     // Selects all outputs where the amount is greater than the estimated fee for an ADDITIONAL input.
     auto available_outputs = db->available_outputs(additional_input * static_cast<int64_t>(ptx.fee_per_byte));
-    ptx.chosen_outputs = select_outputs(available_outputs, transaction_total);
+    ptx.chosen_outputs = select_outputs(available_outputs, ptx.sum_outputs());
     ptx.fee = ptx.get_fee();
     ptx.update_change();
   }
 
   // select_and_fetch_decoys will choose some available outputs from the database, fetch the
-  // details necessary for a ring signature from teh daemon and add them to the
+  // details necessary for a ring signature from the daemon and add them to the
   // transaction ready to sign at a later point in time.
   void
   TransactionConstructor::select_and_fetch_decoys(PendingTransaction& ptx)
@@ -80,7 +80,8 @@ namespace wallet
     ptx.decoys = {};
     // This initialises the decoys to be selected from global_output_index= 0 to global_output_index = highest_output_index
     int64_t max_output_index = db->chain_output_count();
-    DecoySelector decoy_selection(0, max_output_index);
+    //DecoySelector decoy_selection(0, max_output_index);
+    DecoySelector& decoy_selection = *decoy_selector;
     std::vector<int64_t> indexes;
     for (const auto& output : ptx.chosen_outputs)
     {
@@ -89,9 +90,10 @@ namespace wallet
       decoy_future.wait();
       ptx.decoys.emplace_back(decoy_future.get());
 
-      //TODO: for the below check, check against the actual position of the real
-      //      input once the positions are correctly randomized.
-      if (not (output.key == ptx.decoys.back()[0].key))
+      bool good = false;
+      for(const auto& decoy : ptx.decoys.back())
+        good |= (output.key == decoy.key);
+      if (!good)
         throw std::runtime_error{"Key from daemon for real output does not match our stored key."};
     }
   }
