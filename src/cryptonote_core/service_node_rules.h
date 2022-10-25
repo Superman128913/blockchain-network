@@ -193,7 +193,7 @@ namespace service_nodes {
   inline constexpr uint64_t VOTE_OR_TX_VERIFY_HEIGHT_BUFFER    = 5;
 
   inline constexpr std::array<uint16_t, 3> MIN_STORAGE_SERVER_VERSION{{2, 4, 0}};
-  inline constexpr std::array<uint16_t, 3> MIN_LOKINET_VERSION{{0, 9, 9}};
+  inline constexpr std::array<uint16_t, 3> MIN_LOKINET_VERSION{{0, 9, 10}};
 
   // The minimum accepted version number, broadcasted by Service Nodes via uptime proofs for each hardfork
   struct proof_version
