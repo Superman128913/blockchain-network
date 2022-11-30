@@ -95,11 +95,11 @@ set(ZLIB_SOURCE zlib-${ZLIB_VERSION}.tar.xz)
 set(ZLIB_HASH SHA256=d14c38e313afc35a9a8760dadf26042f51ea0f5d154b0630a31da0540107fb98
     CACHE STRING "zlib source hash")
 
-set(CURL_VERSION 7.85.0 CACHE STRING "curl version")
+set(CURL_VERSION 7.86.0 CACHE STRING "curl version")
 set(CURL_MIRROR ${LOCAL_MIRROR} https://curl.se/download https://curl.askapache.com
   CACHE STRING "curl mirror(s)")
 set(CURL_SOURCE curl-${CURL_VERSION}.tar.xz)
-set(CURL_HASH SHA512=b57cc31649a4f47cc4b482f56a85c86c8e8aaeaf01bc1b51b065fdb9145a9092bc52535e52a85a66432eb163605b2edbf5bc5c33ea6e40e50f26a69ad1365cbd
+set(CURL_HASH SHA512=18e03a3c00f22125e07bddb18becbf5acdca22baeb7b29f45ef189a5c56f95b2d51247813f7a9a90f04eb051739e9aa7d3a1c5be397bae75d763a2b918d1b656
   CACHE STRING "curl source hash")
 
 
@@ -579,7 +579,7 @@ foreach(curl_arch ${curl_arches})
     --enable-http-auth --enable-doh --disable-mime --enable-dateparse --disable-netrc --without-libidn2
     --disable-progress-meter --without-brotli --with-zlib=${DEPS_DESTDIR}
     --without-ssl --without-schannel --without-secure-transport
-    --without-nghttp3 --without-ngtcp2 --without-quiche
+    --without-nghttp2 --without-nghttp3 --without-ngtcp2 --without-quiche
     --without-librtmp --disable-versioned-symbols --enable-hidden-symbols
     --without-zsh-functions-dir --without-fish-functions-dir
     "CC=${deps_cc}" "CFLAGS=${deps_noarch_CFLAGS}${cflags_extra}" ${curl_extra}
