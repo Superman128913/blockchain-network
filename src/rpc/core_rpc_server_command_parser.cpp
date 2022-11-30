@@ -328,4 +328,9 @@ namespace cryptonote::rpc {
   void parse_request(GET_ACCRUED_BATCHED_EARNINGS& get_accrued_batched_earnings, rpc_input in) {
     get_values(in, "addresses", get_accrued_batched_earnings.request.addresses);
   }
+
+  void parse_request(ONS_OWNERS_TO_NAMES& ons_owners_to_names, rpc_input in) {
+    get_values(in, "entries", ons_owners_to_names.request.entries);
+    get_values(in, "include_expired", ons_owners_to_names.request.include_expired);
+  }
 }

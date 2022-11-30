@@ -2278,7 +2278,8 @@ namespace cryptonote::rpc {
     REPORT_PEER_STATUS,
     FLUSH_CACHE,
     GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES,
-    GET_ACCRUED_BATCHED_EARNINGS
+    GET_ACCRUED_BATCHED_EARNINGS,
+    ONS_OWNERS_TO_NAMES
   >;
 
   using FIXME_old_rpc_types = tools::type_list<
@@ -2301,8 +2302,7 @@ namespace cryptonote::rpc {
     GET_SERVICE_PRIVKEYS,
     GET_STAKING_REQUIREMENT,
     GET_CHECKPOINTS,
-    ONS_NAMES_TO_OWNERS,
-    ONS_OWNERS_TO_NAMES
+    ONS_NAMES_TO_OWNERS
   >;
 
 } // namespace cryptonote::rpc

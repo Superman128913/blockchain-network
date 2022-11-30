@@ -46,4 +46,5 @@ namespace cryptonote::rpc {
   void parse_request(GET_BLOCK& get_block, rpc_input in);
   void parse_request(GET_OUTPUT_HISTOGRAM& get_output_histogram, rpc_input in);
   void parse_request(GET_ACCRUED_BATCHED_EARNINGS& get_accrued_batched_earnings, rpc_input in);
+  void parse_request(ONS_OWNERS_TO_NAMES& ons_owners_to_names, rpc_input in);
 }
