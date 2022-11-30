@@ -1955,7 +1955,9 @@ namespace cryptonote::rpc {
   ///   - \p key_image The key image of the transaction that is blacklisted on the network.
   ///   - \p unlock_height The height at which the key image is removed from the blacklist and becomes spendable.
   ///   - \p amount The total amount of locked Loki in atomic units in this blacklisted stake.
-  struct GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES : PUBLIC
+  ///   TODO sean delete this if no args works below
+  //struct GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES : PUBLIC
+  struct GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES : NO_ARGS
   {
     static constexpr auto names() { return NAMES("get_service_node_blacklisted_key_images"); }
   };
@@ -2275,6 +2277,7 @@ namespace cryptonote::rpc {
     TEST_TRIGGER_UPTIME_PROOF,
     REPORT_PEER_STATUS,
     FLUSH_CACHE,
+    GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES,
     GET_ACCRUED_BATCHED_EARNINGS
   >;
 
@@ -2297,7 +2300,6 @@ namespace cryptonote::rpc {
     GET_SERVICE_KEYS,
     GET_SERVICE_PRIVKEYS,
     GET_STAKING_REQUIREMENT,
-    GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES,
     GET_CHECKPOINTS,
     ONS_NAMES_TO_OWNERS,
     ONS_OWNERS_TO_NAMES
