@@ -49,7 +49,7 @@ namespace cryptonote::rpc {
 
     get_values(in,
         "limit", sns.request.limit,
-        "poll_block_hash", sns.request.poll_block_hash,
+        "poll_block_hash", ignore_empty_string{sns.request.poll_block_hash},
         "service_node_pubkeys", sns.request.service_node_pubkeys);
   }
   void parse_request(START_MINING& start_mining, rpc_input in) {
