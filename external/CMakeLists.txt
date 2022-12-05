@@ -170,5 +170,7 @@ add_subdirectory(SQLiteCpp)
 
 add_subdirectory(Catch2)
 
-add_subdirectory(pybind11 EXCLUDE_FROM_ALL)
+if(BUILD_PYBIND)
+  add_subdirectory(pybind11 EXCLUDE_FROM_ALL)
+endif()
 

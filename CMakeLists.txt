@@ -263,6 +263,13 @@ endif()
 
 OPTION(USE_DEVICE_TREZOR "Build Trezor support (currently non-functional)" OFF)
 
+if(NOT MINGW AND NOT ANDROID)
+  set(USE_PYBIND_DEFAULT ON)
+else()
+  set(USE_PYBIND_DEFAULT OFF)
+endif()
+option(BUILD_PYBIND "build python bindings" ${USE_PYBIND_DEFAULT})
+
 find_package(Git)
 if(NOT MANUAL_SUBMODULES)
   if(GIT_FOUND)
@@ -970,4 +977,6 @@ add_custom_target(create_zip
 
 add_custom_target(create_archive DEPENDS ${default_archive})
 
-add_subdirectory(pybind)
+if(BUILD_PYBIND)
+  add_subdirectory(pybind)
+endif()
