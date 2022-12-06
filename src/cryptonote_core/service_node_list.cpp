@@ -66,7 +66,6 @@ extern "C" {
 #include "service_node_rules.h"
 #include "service_node_swarm.h"
 #include "version.h"
-#include <date/date.h>
 
 using cryptonote::hf;
 

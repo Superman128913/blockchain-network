@@ -58,7 +58,7 @@ namespace wallet
   {
     request_handler.set_wallet(weak_from_this());
     omq->start();
-    daemon_comms->set_remote("ipc://./oxend.sock");
+    daemon_comms->set_remote(config.daemon.address);
     daemon_comms->register_wallet(*this, last_scan_height + 1 /*next needed block*/,
         true /* update sync height */,
         true /* new wallet */);

@@ -66,7 +66,6 @@ target_link_libraries(common
     filesystem
     oxen::logging
     fmt::fmt
-    date::date
   PRIVATE
     sodium
     logging

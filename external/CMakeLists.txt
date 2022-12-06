@@ -169,3 +169,8 @@ set(SQLITECPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory(SQLiteCpp)
 
 add_subdirectory(Catch2)
+
+if(BUILD_PYBIND)
+  add_subdirectory(pybind11 EXCLUDE_FROM_ALL)
+endif()
+

@@ -13,6 +13,7 @@ namespace cryptonote::rpc {
   using oxenc::bt_dict_consumer;
   using oxenc::bt_list_consumer;
   using rpc_input = std::variant<std::monostate, json, bt_dict_consumer>;
+  using json_range = std::pair<json::const_iterator, json::const_iterator>;
 
   // Checks that key names are given in ascending order
   template <typename... Ignore>
@@ -45,7 +46,40 @@ namespace cryptonote::rpc {
   template <typename T>
   constexpr bool is_std_optional<std::optional<T>> = true;
 
-  using json_range = std::pair<json::const_iterator, json::const_iterator>;
+  // Wrapper around a reference for get_values that adds special handling to act as if the value was
+  // not given at all if the value is given as an empty string.  This sucks, but is necessary for
+  // backwards compatibility (especially with wallet2 clients).
+  //
+  // Usage:
+  //
+  //     std::string x;
+  //     get_values(input,
+  //         "x", ignore_empty_string{x},
+  //         // ...
+  //     );
+  template <typename T>
+  struct ignore_empty_string {
+    T& value;
+    ignore_empty_string(T& ref) : value{ref} {}
+
+    bool should_ignore(bt_dict_consumer& d) {
+      if (d.is_string()) {
+        auto d2{d}; // Copy because we want to leave d intact
+        if (d2.consume_string_view().empty())
+          return true;
+      }
+      return false;
+    }
+
+    bool should_ignore(json_range& it_range) {
+      auto& e = *it_range.first;
+      return (e.is_string() && e.get<std::string_view>().empty());
+    }
+  };
+  template <typename T>
+  constexpr bool is_ignore_empty_string_wrapper = false;
+  template <typename T>
+  constexpr bool is_ignore_empty_string_wrapper<ignore_empty_string<T>> = true;
 
   // Advances the dict consumer to the first element >= the given name.  Returns true if found,
   // false if it advanced beyond the requested name.  This is exactly the same as
@@ -160,6 +194,23 @@ namespace cryptonote::rpc {
     (load_value(c, std::get<Is>(val)), ...);
   }
 
+  // Takes a json object iterator or bt_dict_consumer and loads the current value at the iterator.
+  // This calls itself recursively, if needed, to unwrap optional/required/ignore_empty_string
+  // wrappers.
+  template <typename In, typename T>
+  void load_curr_value(In& in, T& val) {
+    if constexpr (is_required_wrapper<T>) {
+      load_curr_value(in, val.value);
+    } else if constexpr (is_ignore_empty_string_wrapper<T>) {
+      if (!val.should_ignore(in))
+        load_curr_value(in, val.value);
+    } else if constexpr (is_std_optional<T>) {
+      load_curr_value(in, val.emplace());
+    } else {
+      load_value(in, val);
+    }
+  }
+
   // Gets the next value from a json object iterator or bt_dict_consumer.  Leaves the iterator at
   // the next value, i.e.  found + 1 if found, or the next greater value if not found.  (NB:
   // nlohmann::json objects are backed by an *ordered* map and so both nlohmann iterators and
@@ -168,15 +219,9 @@ namespace cryptonote::rpc {
   void get_next_value(In& in, [[maybe_unused]]std::string_view name, T& val) {
     if constexpr (std::is_same_v<std::monostate, In>)
       ;
-    else if (skip_until(in, name)) {
-      if constexpr (is_required_wrapper<T>)
-        return load_value(in, val.value);
-      else if constexpr (is_std_optional<T>)
-        return load_value(in, val.emplace());
-      else
-        return load_value(in, val);
-    }
-    if constexpr (is_required_wrapper<T>)
+    else if (skip_until(in, name))
+      load_curr_value(in, val);
+    else if constexpr (is_required_wrapper<T>)
       throw std::runtime_error{"Required key '" + std::string{name} + "' not found"};
   }
 

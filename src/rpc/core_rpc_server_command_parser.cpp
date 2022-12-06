@@ -49,7 +49,7 @@ namespace cryptonote::rpc {
 
     get_values(in,
         "limit", sns.request.limit,
-        "poll_block_hash", sns.request.poll_block_hash,
+        "poll_block_hash", ignore_empty_string{sns.request.poll_block_hash},
         "service_node_pubkeys", sns.request.service_node_pubkeys);
   }
   void parse_request(START_MINING& start_mining, rpc_input in) {
@@ -327,5 +327,10 @@ namespace cryptonote::rpc {
 
   void parse_request(GET_ACCRUED_BATCHED_EARNINGS& get_accrued_batched_earnings, rpc_input in) {
     get_values(in, "addresses", get_accrued_batched_earnings.request.addresses);
+  }
+
+  void parse_request(ONS_OWNERS_TO_NAMES& ons_owners_to_names, rpc_input in) {
+    get_values(in, "entries", ons_owners_to_names.request.entries);
+    get_values(in, "include_expired", ons_owners_to_names.request.include_expired);
   }
 }
