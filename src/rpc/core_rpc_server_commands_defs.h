@@ -1576,7 +1576,7 @@ namespace cryptonote::rpc {
   /// - \p service_node_pubkey The queried daemon's service node public key.  Will be empty if not running as a service node.
   /// - \p service_node_ed25519_pubkey The daemon's ed25519 auxiliary public key.
   /// - \p service_node_x25519_pubkey The daemon's x25519 auxiliary public key.
-  struct GET_SERVICE_KEYS : RPC_COMMAND
+  struct GET_SERVICE_KEYS : NO_ARGS
   {
     static constexpr auto names() { return NAMES("get_service_keys", "get_service_node_key"); }
   };
@@ -1594,7 +1594,7 @@ namespace cryptonote::rpc {
   /// - \p service_node_privkey The queried daemon's service node private key.  Will be empty if not running as a service node.
   /// - \p service_node_ed25519_privkey The daemon's ed25519 private key (note that this is in sodium's format, which consists of the private and public keys concatenated together)
   /// - \p service_node_x25519_privkey The daemon's x25519 private key.
-  struct GET_SERVICE_PRIVKEYS : RPC_COMMAND
+  struct GET_SERVICE_PRIVKEYS : NO_ARGS
   {
     static constexpr auto names() { return NAMES("get_service_privkeys", "get_service_node_privkey"); }
   };
