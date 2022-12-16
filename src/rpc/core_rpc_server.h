@@ -166,8 +166,8 @@ namespace cryptonote::rpc {
     void invoke(FLUSH_CACHE& flush_cache, rpc_context context);
     void invoke(GET_LAST_BLOCK_HEADER& get_last_block_header, rpc_context context);
     void invoke(GET_BLOCK_HEADER_BY_HASH& get_block_header_by_hash, rpc_context context);
-    void invoke(GETBANS& get_bans, rpc_context context);
-    void invoke(SETBANS& set_bans, rpc_context context);
+    void invoke(GET_BANS& get_bans, rpc_context context);
+    void invoke(SET_BANS& set_bans, rpc_context context);
     void invoke(GET_CHECKPOINTS& get_checkpoints, rpc_context context);
     void invoke(GET_STAKING_REQUIREMENT& get_staking_requirement, rpc_context context);
     void invoke(GET_SERVICE_KEYS& get_service_keys, rpc_context context);

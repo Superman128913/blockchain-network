@@ -1571,7 +1571,7 @@ namespace cryptonote::rpc {
     hfinfo.response["status"] = STATUS_OK;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  void core_rpc_server::invoke(GETBANS& get_bans, rpc_context context)
+  void core_rpc_server::invoke(GET_BANS& get_bans, rpc_context context)
   {
     auto now = time(nullptr);
     std::map<std::string, time_t> blocked_hosts = m_p2p.get_blocked_hosts();
@@ -1626,7 +1626,7 @@ namespace cryptonote::rpc {
     banned.response["status"] = STATUS_OK;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  void core_rpc_server::invoke(SETBANS& set_bans, rpc_context context)
+  void core_rpc_server::invoke(SET_BANS& set_bans, rpc_context context)
   {
     epee::net_utils::network_address na;
     // try subnet first
