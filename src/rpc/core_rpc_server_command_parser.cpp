@@ -278,7 +278,7 @@ namespace cryptonote::rpc {
   void parse_request(GET_SN_STATE_CHANGES& get_sn_state_changes, rpc_input in) {
     get_values(in,
         "end_height", get_sn_state_changes.request.end_height,
-        "start_height", get_sn_state_changes.request.start_height);
+        "start_height", required{get_sn_state_changes.request.start_height});
   }
 
   void parse_request(REPORT_PEER_STATUS& report_peer_status, rpc_input in) {

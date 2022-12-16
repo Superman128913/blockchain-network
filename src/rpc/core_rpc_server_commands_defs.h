@@ -1988,15 +1988,15 @@ namespace cryptonote::rpc {
     } request;
   };
 
-  /// Query hardcoded/service node checkpoints stored for the blockchain. Omit all arguments to
-  /// retrieve the latest "count" checkpoints.
+  /// Query recent service node state changes processed on the blockchain.
   ///
   /// Inputs:
   /// 
-  /// - \p start_height The starting block's height.
-  /// - \p end_height The ending block's height.
+  /// - \p start_height Returns counts starting from this block height.  Required.
+  /// - \p end_height Optional: returns count ending at this block height; if omitted, counts to the
+  ///   current height.
   ///
-  /// Output values available from a public RPC endpoint:
+  /// Output values available from a private/admin RPC endpoint:
   ///
   /// - \p status Generic RPC error code. "OK" is the success value.
   /// - \p total_deregister
@@ -2006,15 +2006,14 @@ namespace cryptonote::rpc {
   /// - \p total_unlock
   /// - \p start_height
   /// - \p end_height
-  struct GET_SN_STATE_CHANGES : PUBLIC
+  struct GET_SN_STATE_CHANGES : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("get_service_nodes_state_changes"); }
 
-    static constexpr uint64_t HEIGHT_SENTINEL_VALUE = std::numeric_limits<uint64_t>::max() - 1;
     struct request_parameters
     {
       uint64_t start_height;
-      uint64_t end_height;   // Optional: If omitted, the tally runs until the current block
+      std::optional<uint64_t> end_height;
     } request;
   };
 

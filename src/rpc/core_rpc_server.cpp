@@ -2760,22 +2760,15 @@ namespace cryptonote::rpc {
     std::vector<block_pair_t> blocks;
 
     const auto& db = m_core.get_blockchain_storage();
-    const uint64_t current_height = db.get_current_blockchain_height();
 
-    uint64_t end_height;
-    uint64_t start_height = get_sn_state_changes.request.start_height;
-    if (get_sn_state_changes.request.end_height == GET_SN_STATE_CHANGES::HEIGHT_SENTINEL_VALUE) {
-      // current height is the block being mined, so exclude it from the results
-      end_height = current_height - 1;
-    } else {
-      end_height = get_sn_state_changes.request.end_height;
-    }
+    auto start_height = get_sn_state_changes.request.start_height;
+    auto end_height = get_sn_state_changes.request.end_height.value_or(db.get_current_blockchain_height() - 1);
 
     if (end_height < start_height)
       throw rpc_error{ERROR_WRONG_PARAM, "The provided end_height needs to be higher than start_height"};
 
     if (!db.get_blocks(start_height, end_height - start_height + 1, blocks))
-      throw rpc_error{ERROR_INTERNAL, "Could not query block at requested height: " + std::to_string(start_height)};
+      throw rpc_error{ERROR_INTERNAL, "Could not query blocks at requested height {}"_format(start_height)};
 
     get_sn_state_changes.response["start_height"] = start_height;
     get_sn_state_changes.response["end_height"] = end_height;
