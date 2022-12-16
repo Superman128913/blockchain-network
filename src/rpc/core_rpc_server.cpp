@@ -2469,7 +2469,8 @@ namespace cryptonote::rpc {
             "public_ip", epee::string_tools::get_ip_string_from_int32(m_core.sn_public_ip()),
             "storage_port", m_core.storage_https_port(),
             "storage_lmq_port", m_core.storage_omq_port(),
-            "quorumnet_port", m_core.quorumnet_port(),
+            "quorumnet_port", m_core.quorumnet_port());
+        set_if_requested(reqed, binary,
             "pubkey_ed25519", m_core.get_service_keys().pub_ed25519,
             "pubkey_x25519", m_core.get_service_keys().pub_x25519);
       } else {
