@@ -1096,7 +1096,7 @@ namespace cryptonote::rpc {
   ///
   /// - \p status General RPC status string. `"OK"` means everything looks good.
   /// - \p bans List of banned nodes
-  struct GETBANS : RPC_COMMAND
+  struct GET_BANS : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("get_bans"); }
   };
@@ -1120,7 +1120,7 @@ namespace cryptonote::rpc {
   /// Output values available from a restricted/admin RPC endpoint:
   ///
   /// - \p status General RPC status string. `"OK"` means everything looks good.
-  struct SETBANS : RPC_COMMAND
+  struct SET_BANS : RPC_COMMAND
   {
     static constexpr auto names() { return NAMES("set_bans"); }
 

@@ -40,7 +40,7 @@ namespace cryptonote::rpc {
   void parse_request(POP_BLOCKS& pop_blocks, rpc_input in);
   void parse_request(PRUNE_BLOCKCHAIN& prune_blockchain, rpc_input in);
   void parse_request(REPORT_PEER_STATUS& report_peer_status, rpc_input in);
-  void parse_request(SETBANS& set_bans, rpc_input in);
+  void parse_request(SET_BANS& set_bans, rpc_input in);
   void parse_request(SET_LIMIT& limit, rpc_input in);
   void parse_request(SET_LOG_CATEGORIES& set_log_categories, rpc_input in);
   void parse_request(SET_LOG_LEVEL& set_log_level, rpc_input in);

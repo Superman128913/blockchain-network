@@ -20,7 +20,9 @@ namespace cryptonote::rpc {
 
   void parse_request(GET_SERVICE_NODES& sns, rpc_input in) {
     // Remember: key access must be in sorted order (even across get_values() calls).
-    get_values(in, "active_only", sns.request.active_only);
+    get_values(in,
+        "active_only", sns.request.active_only);
+
     bool fields_dict = false;
     if (auto* json_in = std::get_if<json>(&in)) {
         // Deprecated {"field":true, "field2":true, ...} handling:
@@ -124,6 +126,7 @@ namespace cryptonote::rpc {
     get_values(in,
         "limit_down", limit.request.limit_down,
         "limit_up", limit.request.limit_up);
+
     if (limit.request.limit_down < -1)
       throw std::domain_error{"limit_down must be >= -1"};
     if (limit.request.limit_down < -1)
@@ -131,7 +134,8 @@ namespace cryptonote::rpc {
   }
 
   void parse_request(IS_KEY_IMAGE_SPENT& spent, rpc_input in) {
-    get_values(in, "key_images", spent.request.key_images);
+    get_values(in,
+        "key_images", spent.request.key_images);
   }
 
   void parse_request(SUBMIT_TRANSACTION& tx, rpc_input in) {
@@ -190,52 +194,64 @@ namespace cryptonote::rpc {
   }
 
   void parse_request(GET_BLOCK_HASH& bh, rpc_input in) {
-    get_values(in, "heights", bh.request.heights);
+    get_values(in,
+        "heights", bh.request.heights);
+
     if (bh.request.heights.size() > bh.MAX_HEIGHTS)
       throw std::domain_error{"Error: too many block heights requested at once"};
   }
 
   void parse_request(GET_PEER_LIST& pl, rpc_input in) {
-    get_values(in, "public_only", pl.request.public_only);
+    get_values(in,
+        "public_only", pl.request.public_only);
   }
 
   void parse_request(SET_LOG_LEVEL& set_log_level, rpc_input in) {
-    get_values(in, "level", set_log_level.request.level);
+    get_values(in,
+        "level", set_log_level.request.level);
   }
 
   void parse_request(SET_LOG_CATEGORIES& set_log_categories, rpc_input in) {
-    get_values(in, "categories", set_log_categories.request.categories);
+    get_values(in,
+        "categories", set_log_categories.request.categories);
   }
 
   void parse_request(BANNED& banned, rpc_input in) {
-    get_values(in, "address", banned.request.address);
+    get_values(in,
+        "address", banned.request.address);
   }
 
   void parse_request(FLUSH_TRANSACTION_POOL& flush_transaction_pool, rpc_input in) {
-    get_values(in, "txids", flush_transaction_pool.request.txids);
+    get_values(in,
+        "txids", flush_transaction_pool.request.txids);
   }
 
   void parse_request(GET_COINBASE_TX_SUM& get_coinbase_tx_sum, rpc_input in) {
-    get_values(in, "height", get_coinbase_tx_sum.request.height);
-    get_values(in, "count", get_coinbase_tx_sum.request.count);
+    get_values(in,
+        "count", get_coinbase_tx_sum.request.count,
+        "height", get_coinbase_tx_sum.request.height);
   }
 
   void parse_request(GET_BASE_FEE_ESTIMATE& get_base_fee_estimate, rpc_input in) {
-    get_values(in, "grace_blocks", get_base_fee_estimate.request.grace_blocks);
+    get_values(in,
+        "grace_blocks", get_base_fee_estimate.request.grace_blocks);
   }
 
   void parse_request(OUT_PEERS& out_peers, rpc_input in){
-    get_values(in, "set", out_peers.request.set);
-    get_values(in, "out_peers", out_peers.request.out_peers);
+    get_values(in,
+        "out_peers", out_peers.request.out_peers,
+        "set", out_peers.request.set);
   }
 
   void parse_request(IN_PEERS& in_peers, rpc_input in){
-    get_values(in, "set", in_peers.request.set);
-    get_values(in, "in_peers", in_peers.request.in_peers);
+    get_values(in,
+        "in_peers", in_peers.request.in_peers,
+        "set", in_peers.request.set);
   }
 
   void parse_request(POP_BLOCKS& pop_blocks, rpc_input in){
-    get_values(in, "nblocks", pop_blocks.request.nblocks);
+    get_values(in,
+        "nblocks", pop_blocks.request.nblocks);
   }
 
   void parse_request(LOKINET_PING& lokinet_ping, rpc_input in){
@@ -255,42 +271,49 @@ namespace cryptonote::rpc {
   }
 
   void parse_request(PRUNE_BLOCKCHAIN& prune_blockchain, rpc_input in){
-    get_values(in, "check", prune_blockchain.request.check);
+    get_values(in,
+        "check", prune_blockchain.request.check);
   }
 
   void parse_request(GET_SN_STATE_CHANGES& get_sn_state_changes, rpc_input in) {
-    get_values(in, "start_height", get_sn_state_changes.request.start_height);
-    get_values(in, "end_height", get_sn_state_changes.request.end_height);
+    get_values(in,
+        "end_height", get_sn_state_changes.request.end_height,
+        "start_height", get_sn_state_changes.request.start_height);
   }
 
   void parse_request(REPORT_PEER_STATUS& report_peer_status, rpc_input in) {
-    get_values(in, "type", report_peer_status.request.type);
-    get_values(in, "pubkey", report_peer_status.request.pubkey);
-    get_values(in, "passed", report_peer_status.request.passed);
+    get_values(in,
+        "passed", report_peer_status.request.passed,
+        "pubkey", report_peer_status.request.pubkey,
+        "type", report_peer_status.request.type);
   }
 
   void parse_request(FLUSH_CACHE& flush_cache, rpc_input in) {
-    get_values(in, "bad_txs", flush_cache.request.bad_txs);
-    get_values(in, "bad_blocks", flush_cache.request.bad_blocks);
+    get_values(in,
+        "bad_blocks", flush_cache.request.bad_blocks,
+        "bad_txs", flush_cache.request.bad_txs);
   }
 
   void parse_request(GET_LAST_BLOCK_HEADER& get_last_block_header, rpc_input in) {
-    get_values(in, "fill_pow_hash", get_last_block_header.request.fill_pow_hash);
-    get_values(in, "get_tx_hashes", get_last_block_header.request.get_tx_hashes);
+    get_values(in,
+        "fill_pow_hash", get_last_block_header.request.fill_pow_hash,
+        "get_tx_hashes", get_last_block_header.request.get_tx_hashes);
   }
 
   void parse_request(GET_BLOCK_HEADER_BY_HASH& get_block_header_by_hash, rpc_input in) {
-    get_values(in, "hash", get_block_header_by_hash.request.hash);
-    get_values(in, "hashes", get_block_header_by_hash.request.hashes);
-    get_values(in, "fill_pow_hash", get_block_header_by_hash.request.fill_pow_hash);
-    get_values(in, "get_tx_hashes", get_block_header_by_hash.request.get_tx_hashes);
+    get_values(in,
+        "fill_pow_hash", get_block_header_by_hash.request.fill_pow_hash,
+        "get_tx_hashes", get_block_header_by_hash.request.get_tx_hashes,
+        "hash", get_block_header_by_hash.request.hash,
+        "hashes", get_block_header_by_hash.request.hashes);
   }
 
-  void parse_request(SETBANS& set_bans, rpc_input in) {
-    get_values(in, "host", set_bans.request.host);
-    get_values(in, "ip", set_bans.request.ip);
-    get_values(in, "seconds", set_bans.request.seconds);
-    get_values(in, "ban", set_bans.request.ban);
+  void parse_request(SET_BANS& set_bans, rpc_input in) {
+    get_values(in,
+        "ban", set_bans.request.ban,
+        "host", set_bans.request.host,
+        "ip", set_bans.request.ip,
+        "seconds", set_bans.request.seconds);
   }
 
   void parse_request(GET_STAKING_REQUIREMENT& get_staking_requirement, rpc_input in) {
@@ -298,39 +321,45 @@ namespace cryptonote::rpc {
   }
 
   void parse_request(GET_BLOCK_HEADERS_RANGE& get_block_headers_range, rpc_input in) {
-    get_values(in, "start_height", get_block_headers_range.request.start_height);
-    get_values(in, "end_height", get_block_headers_range.request.end_height);
-    get_values(in, "fill_pow_hash", get_block_headers_range.request.fill_pow_hash);
-    get_values(in, "get_tx_hashes", get_block_headers_range.request.get_tx_hashes);
+    get_values(in,
+        "end_height",    get_block_headers_range.request.end_height,
+        "fill_pow_hash", get_block_headers_range.request.fill_pow_hash,
+        "get_tx_hashes", get_block_headers_range.request.get_tx_hashes,
+        "start_height",  get_block_headers_range.request.start_height);
   }
 
   void parse_request(GET_BLOCK_HEADER_BY_HEIGHT& get_block_header_by_height, rpc_input in) {
-    get_values(in, "height",        get_block_header_by_height.request.height);
-    get_values(in, "heights",       get_block_header_by_height.request.heights);
-    get_values(in, "fill_pow_hash", get_block_header_by_height.request.fill_pow_hash);
-    get_values(in, "get_tx_hashes", get_block_header_by_height.request.get_tx_hashes);
+    get_values(in,
+        "fill_pow_hash", get_block_header_by_height.request.fill_pow_hash,
+        "get_tx_hashes", get_block_header_by_height.request.get_tx_hashes,
+        "height",        get_block_header_by_height.request.height,
+        "heights",       get_block_header_by_height.request.heights);
   }
 
   void parse_request(GET_BLOCK& get_block, rpc_input in) {
-    get_values(in, "hash",          get_block.request.hash);
-    get_values(in, "height",        get_block.request.height);
-    get_values(in, "fill_pow_hash", get_block.request.fill_pow_hash);
+    get_values(in,
+        "fill_pow_hash", get_block.request.fill_pow_hash,
+        "hash",          get_block.request.hash,
+        "height",        get_block.request.height);
   }
 
   void parse_request(GET_OUTPUT_HISTOGRAM& get_output_histogram, rpc_input in) {
-    get_values(in, "amounts", get_output_histogram.request.amounts);
-    get_values(in, "min_count", get_output_histogram.request.min_count);
-    get_values(in, "max_count", get_output_histogram.request.max_count);
-    get_values(in, "unlocked", get_output_histogram.request.unlocked);
-    get_values(in, "recent_cutoff", get_output_histogram.request.recent_cutoff);
+    get_values(in,
+        "amounts", get_output_histogram.request.amounts,
+        "max_count", get_output_histogram.request.max_count,
+        "min_count", get_output_histogram.request.min_count,
+        "recent_cutoff", get_output_histogram.request.recent_cutoff,
+        "unlocked", get_output_histogram.request.unlocked);
   }
 
   void parse_request(GET_ACCRUED_BATCHED_EARNINGS& get_accrued_batched_earnings, rpc_input in) {
-    get_values(in, "addresses", get_accrued_batched_earnings.request.addresses);
+    get_values(in,
+        "addresses", get_accrued_batched_earnings.request.addresses);
   }
 
   void parse_request(ONS_OWNERS_TO_NAMES& ons_owners_to_names, rpc_input in) {
-    get_values(in, "entries", ons_owners_to_names.request.entries);
-    get_values(in, "include_expired", ons_owners_to_names.request.include_expired);
+    get_values(in,
+        "entries", ons_owners_to_names.request.entries,
+        "include_expired", ons_owners_to_names.request.include_expired);
   }
 }
