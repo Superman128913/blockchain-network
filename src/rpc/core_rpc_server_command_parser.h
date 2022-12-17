@@ -20,12 +20,15 @@ namespace cryptonote::rpc {
   void parse_request(GET_BLOCK_HEADERS_RANGE& get_block_headers_range, rpc_input in);
   void parse_request(GET_BLOCK_HEADER_BY_HASH& get_block_header_by_hash, rpc_input in);
   void parse_request(GET_BLOCK_HEADER_BY_HEIGHT& get_block_header_by_height, rpc_input in);
+  void parse_request(GET_CHECKPOINTS& getcp, rpc_input in);
   void parse_request(GET_COINBASE_TX_SUM& get_coinbase_tx_sum, rpc_input in);
+  void parse_request(GET_QUORUM_STATE& get_quorum_state, rpc_input in);
   void parse_request(GET_LAST_BLOCK_HEADER& get_last_block_header, rpc_input in);
   void parse_request(GET_OUTPUTS& get_outputs, rpc_input in);
   void parse_request(GET_OUTPUT_HISTOGRAM& get_output_histogram, rpc_input in);
   void parse_request(GET_PEER_LIST& bh, rpc_input in);
   void parse_request(GET_SERVICE_NODES& sns, rpc_input in);
+  void parse_request(GET_SERVICE_NODE_REGISTRATION_CMD_RAW& cmd, rpc_input in);
   void parse_request(GET_SN_STATE_CHANGES& get_sn_state_changes, rpc_input in);
   void parse_request(GET_STAKING_REQUIREMENT& get_staking_requirement, rpc_input in);
   void parse_request(GET_TRANSACTIONS& get, rpc_input in);

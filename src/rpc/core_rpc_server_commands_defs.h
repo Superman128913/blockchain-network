@@ -1096,7 +1096,7 @@ namespace cryptonote::rpc {
   ///
   /// - \p status General RPC status string. `"OK"` means everything looks good.
   /// - \p bans List of banned nodes
-  struct GET_BANS : RPC_COMMAND
+  struct GET_BANS : NO_ARGS
   {
     static constexpr auto names() { return NAMES("get_bans"); }
   };
@@ -1298,7 +1298,7 @@ namespace cryptonote::rpc {
   ///   - \p difficulty The cumulative difficulty of all blocks in the alternative chain.
   ///   - \p block_hashes List containing hex block hashes
   ///   - \p main_chain_parent_block
-  struct GET_ALTERNATE_CHAINS : RPC_COMMAND
+  struct GET_ALTERNATE_CHAINS : NO_ARGS
   {
     static constexpr auto names() { return NAMES("get_alternative_chains"); }
 
@@ -1481,13 +1481,11 @@ namespace cryptonote::rpc {
     static constexpr auto names() { return NAMES("get_quorum_state"); }
 
     static constexpr size_t MAX_COUNT = 256;
-    static constexpr uint64_t HEIGHT_SENTINEL_VALUE = UINT64_MAX;
-    static constexpr uint8_t ALL_QUORUMS_SENTINEL_VALUE = 255;
     struct request_parameters
     {
-      uint64_t start_height; // (Optional): Start height, omit both start and end height to request the latest quorum. Note that "latest" means different heights for different types of quorums as not all quorums exist at every block heights.
-      uint64_t end_height;   // (Optional): End height, omit both start and end height to request the latest quorum
-      uint8_t  quorum_type;  // (Optional): Set value to request a specific quorum, 0 = Obligation, 1 = Checkpointing, 2 = Blink, 3 = Pulse, 255 = all quorums, default is all quorums. For Pulse quorums, requesting the blockchain height (or latest) returns the primary pulse quorum responsible for the next block; for heights with blocks this returns the actual quorum, which may be a backup quorum if the primary quorum did not produce in time.
+      std::optional<uint64_t> start_height; // (Optional): Start height, omit both start and end height to request the latest quorum. Note that "latest" means different heights for different types of quorums as not all quorums exist at every block heights.
+      std::optional<uint64_t> end_height;   // (Optional): End height, omit both start and end height to request the latest quorum
+      std::optional<uint8_t> quorum_type;  // (Optional): Set value to request a specific quorum, 0 = Obligation, 1 = Checkpointing, 2 = Blink, 3 = Pulse, omitted or 255 = all quorums. For Pulse quorums, requesting the blockchain height (or latest) returns the primary pulse quorum responsible for the next block; for heights with blocks this returns the actual quorum, which may be a backup quorum if the primary quorum did not produce in time.
     } request;
 
     struct quorum_t
@@ -1511,7 +1509,6 @@ namespace cryptonote::rpc {
   ///
   /// Inputs:
   ///
-  /// - \p check Instead of running check if the blockchain has already been pruned.
   /// - \p args (Developer) The list of arguments used in raw registration, i.e. portions
   /// - \p make_friendly Provide information about how to use the command in the result.
   /// - \p staking_requirement The staking requirement to become a Service Node the registration command will be generated upon
@@ -1977,14 +1974,13 @@ namespace cryptonote::rpc {
   {
     static constexpr auto names() { return NAMES("get_checkpoints"); }
 
-    static constexpr size_t MAX_COUNT = 256;
+    static constexpr uint32_t MAX_COUNT = 256;
     static constexpr uint32_t NUM_CHECKPOINTS_TO_QUERY_BY_DEFAULT = 60;
-    static constexpr uint64_t HEIGHT_SENTINEL_VALUE               = std::numeric_limits<uint64_t>::max() - 1;
     struct request_parameters
     {
-      uint64_t start_height; // Optional: Get the first count checkpoints starting from this height. Specify both start and end to get the checkpoints inbetween.
-      uint64_t end_height;   // Optional: Get the first count checkpoints before end height. Specify both start and end to get the checkpoints inbetween.
-      uint32_t count;        // Optional: Number of checkpoints to query.
+      std::optional<uint64_t> start_height; // Optional: Get the first count checkpoints starting from this height. Specify both start and end to get the checkpoints inbetween.
+      std::optional<uint64_t> end_height;   // Optional: Get the first count checkpoints before end height. Specify both start and end to get the checkpoints inbetween.
+      std::optional<uint32_t> count;        // Optional: Number of checkpoints to query.
     } request;
   };
 

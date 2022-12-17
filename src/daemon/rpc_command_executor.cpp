@@ -279,24 +279,26 @@ json rpc_command_executor::invoke(
   return result;
 }
 
-bool rpc_command_executor::print_checkpoints(uint64_t start_height, uint64_t end_height, bool print_json)
+bool rpc_command_executor::print_checkpoints(std::optional<uint64_t> start_height, std::optional<uint64_t> end_height, bool print_json)
 {
 
   uint32_t count;
-  if (start_height == GET_CHECKPOINTS::HEIGHT_SENTINEL_VALUE &&
-      end_height   == GET_CHECKPOINTS::HEIGHT_SENTINEL_VALUE)
-  {
+  if (!start_height && !end_height)
     count = GET_CHECKPOINTS::NUM_CHECKPOINTS_TO_QUERY_BY_DEFAULT;
-  }
-  else if (start_height == GET_CHECKPOINTS::HEIGHT_SENTINEL_VALUE ||
-           end_height   == GET_CHECKPOINTS::HEIGHT_SENTINEL_VALUE)
-  {
+  else if (!start_height || !end_height)
     count = 1;
-  }
-  // Otherwise, neither heights are set to HEIGHT_SENTINEL_VALUE, so get all the checkpoints between start and end
+  // Otherwise, both start/end are set so get all the checkpoints between start and end
 
-  auto maybe_checkpoints = try_running([&] { return invoke<GET_CHECKPOINTS>(json{{"start_height", start_height}, {"end_height", end_height}, {"count", count}}); }, "Failed to query blockchain checkpoints");
-  if (!maybe_checkpoints) 
+  auto maybe_checkpoints = try_running([&] {
+    json params{
+      {"count", count}
+    };
+    if (start_height)
+      params["start_height"] = *start_height;
+    if (end_height)
+      params["end_height"] = *end_height;
+    return invoke<GET_CHECKPOINTS>(std::move(params)); }, "Failed to query blockchain checkpoints");
+  if (!maybe_checkpoints)
     return false;
 
   auto checkpoints = *maybe_checkpoints;
@@ -321,9 +323,13 @@ bool rpc_command_executor::print_checkpoints(uint64_t start_height, uint64_t end
   return true;
 }
 
-bool rpc_command_executor::print_sn_state_changes(uint64_t start_height, uint64_t end_height)
+bool rpc_command_executor::print_sn_state_changes(uint64_t start_height, std::optional<uint64_t> end_height)
 {
-  auto maybe_sn_state = try_running([&] { return invoke<GET_SN_STATE_CHANGES>(json{{"start_height", start_height}, {"end_height", end_height}}); }, "Failed to query service node state changes");
+  auto maybe_sn_state = try_running([&] {
+    json params{{"start_height", start_height}};
+    if (end_height)
+      params["end_height"] = *end_height;
+    return invoke<GET_SN_STATE_CHANGES>(std::move(params)); }, "Failed to query service node state changes");
   if (!maybe_sn_state) 
     return false;
 
@@ -720,14 +726,17 @@ bool rpc_command_executor::print_blockchain_info(int64_t start_block_index, uint
   return true;
 }
 
-bool rpc_command_executor::print_quorum_state(uint64_t start_height, uint64_t end_height)
+bool rpc_command_executor::print_quorum_state(std::optional<uint64_t> start_height, std::optional<uint64_t> end_height)
 {
   auto maybe_quorums = try_running([this, start_height, end_height] { 
-      return invoke<GET_QUORUM_STATE>(json{
-          {"start_height", start_height},
-          {"end_height", end_height},
-          {"quorum_type", GET_QUORUM_STATE::ALL_QUORUMS_SENTINEL_VALUE}}); 
-      }, "Failed to retrieve quorum state");
+    json params;
+    if (start_height)
+      params["start_height"] = *start_height;
+    if (end_height)
+      params["end_height"] = *end_height;
+    return invoke<GET_QUORUM_STATE>(std::move(params));
+  }, "Failed to retrieve quorum state");
+
   if (!maybe_quorums)
     return false;
   auto& quorums = *maybe_quorums;
@@ -1134,7 +1143,7 @@ bool rpc_command_executor::in_peers(bool set, uint32_t limit)
 
 bool rpc_command_executor::print_bans()
 {
-    auto maybe_bans = try_running([this] { return invoke<GETBANS>(); }, "Failed to retrieve ban list");
+    auto maybe_bans = try_running([this] { return invoke<GET_BANS>(); }, "Failed to retrieve ban list");
     if (!maybe_bans)
       return false;
     auto bans = *maybe_bans;
@@ -1154,7 +1163,7 @@ bool rpc_command_executor::print_bans()
 
 bool rpc_command_executor::ban(const std::string &address, time_t seconds, bool clear_ban)
 {
-    auto maybe_banned = try_running([this, &address, seconds, clear_ban] { return invoke<SETBANS>(json{{"host", std::move(address)}, {"ip", 0}, {"seconds", seconds}, {"ban", !clear_ban}}); }, clear_ban ? "Failed to clear ban" : "Failed to set ban");
+    auto maybe_banned = try_running([this, &address, seconds, clear_ban] { return invoke<SET_BANS>(json{{"host", std::move(address)}, {"ip", 0}, {"seconds", seconds}, {"ban", !clear_ban}}); }, clear_ban ? "Failed to clear ban" : "Failed to set ban");
     if (!maybe_banned)
       return false;
 

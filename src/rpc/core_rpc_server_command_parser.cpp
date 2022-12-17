@@ -362,4 +362,34 @@ namespace cryptonote::rpc {
         "entries", ons_owners_to_names.request.entries,
         "include_expired", ons_owners_to_names.request.include_expired);
   }
+
+  void parse_request(GET_QUORUM_STATE& qs, rpc_input in) {
+
+    get_values(in,
+        "end_height", qs.request.end_height,
+        "quorum_type", qs.request.quorum_type,
+        "start_height", qs.request.start_height);
+
+    if (qs.request.quorum_type) {
+      if (*qs.request.quorum_type == 255) // backwards-compat magic value
+        qs.request.quorum_type = std::nullopt;
+      else if (*qs.request.quorum_type > tools::enum_count<service_nodes::quorum_type>)
+        throw std::domain_error{
+          "Quorum type specifies an invalid value: "_format(*qs.request.quorum_type)};
+    }
+  }
+
+  void parse_request(GET_CHECKPOINTS& getcp, rpc_input in) {
+    get_values(in,
+        "count", getcp.request.count,
+        "end_height", getcp.request.end_height,
+        "start_height", getcp.request.start_height);
+  }
+
+  void parse_request(GET_SERVICE_NODE_REGISTRATION_CMD_RAW& cmd, rpc_input in) {
+    get_values(in,
+        "args", cmd.request.args,
+        "make_friendly", cmd.request.make_friendly,
+        "staking_requirement", cmd.request.staking_requirement);
+  }
 }
