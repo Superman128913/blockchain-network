@@ -294,6 +294,22 @@ namespace cryptonote::rpc {
     } request;
   };
 
+  /// DEPRECATED.  This endpoint is for backwards compatibility for old clients obtaining
+  /// transactions in the transaction pool.  The replacement is to use `get_transactions` with
+  /// `"memory_pool": true`.
+  ///
+  /// Inputs:
+  ///
+  /// - Takes all the same inputs as get_transactions, except for `memory_pool` and `tx_hashes`.
+  ///
+  /// Outputs:
+  ///
+  /// - Same as get_transactions with `"memory_pool": true`.
+  struct GET_TRANSACTION_POOL : GET_TRANSACTIONS
+  {
+    static constexpr auto names() { return NAMES("get_transaction_pool"); }
+  };
+
   /// Queries whether outputs have been spent using the key image associated with the output.
   ///
   /// Inputs:
@@ -2263,6 +2279,7 @@ namespace cryptonote::rpc {
     GET_SN_STATE_CHANGES,
     GET_STAKING_REQUIREMENT,
     GET_TRANSACTIONS,
+    GET_TRANSACTION_POOL,
     GET_TRANSACTION_POOL_HASHES,
     GET_TRANSACTION_POOL_STATS,
     GET_VERSION,
