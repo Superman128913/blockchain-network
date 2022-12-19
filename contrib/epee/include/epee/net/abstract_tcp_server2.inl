@@ -881,7 +881,7 @@ PRAGMA_WARNING_DISABLE_VS(4355)
     }
     catch (const std::exception &e)
     {
-      throw std::runtime_error(std::string("Error starting server: {}") + e.what());
+      throw std::runtime_error(std::string("Error starting server: ") + e.what());
       return false;
     }
     catch (...)
