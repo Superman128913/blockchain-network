@@ -27,7 +27,7 @@ namespace oxen::logging
   process_categories_string(const std::string& categories);
 
   std::optional<log::Level>
-  parse_level(std::string_view input);
+  parse_level(std::string input);
   std::optional<log::Level>
   parse_level(uint8_t input);
   std::optional<log::Level>

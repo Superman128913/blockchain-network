@@ -113,26 +113,42 @@ namespace oxen::logging
 
   using namespace std::literals;
 
-  static constexpr std::array<std::pair<std::string_view, log::Level>, 12> logLevels = {
-      {{""sv, log::Level::info},
-       {"4"sv, log::Level::trace},
-       {"3", log::Level::trace},
-       {"2", log::Level::debug},
-       {"1", log::Level::info},
-       {"0", log::Level::warn},
-       {"trace", log::Level::trace},
-       {"debug", log::Level::debug},
-       {"info", log::Level::info},
-       {"warning", log::Level::warn},
-       {"error", log::Level::err},
-       {"critical", log::Level::critical}}};
+  using strlvl = std::pair<std::string_view, log::Level>;
+  static constexpr std::array logLevels = {
+      strlvl{""sv, log::Level::info},
+      strlvl{"4"sv, log::Level::trace},
+      strlvl{"3"sv, log::Level::trace},
+      strlvl{"2"sv, log::Level::debug},
+      strlvl{"1"sv, log::Level::info},
+      strlvl{"0"sv, log::Level::warn},
+      strlvl{"trace"sv, log::Level::trace},
+      strlvl{"trc"sv, log::Level::trace},
+      strlvl{"debug"sv, log::Level::debug},
+      strlvl{"dbg"sv, log::Level::debug},
+      strlvl{"info"sv, log::Level::info},
+      strlvl{"inf"sv, log::Level::info},
+      strlvl{"warning"sv, log::Level::warn},
+      strlvl{"warn"sv, log::Level::warn},
+      strlvl{"wrn"sv, log::Level::warn},
+      strlvl{"error"sv, log::Level::err},
+      strlvl{"err"sv, log::Level::err},
+      strlvl{"critical"sv, log::Level::critical},
+      strlvl{"crit"sv, log::Level::critical},
+      strlvl{"crt"sv, log::Level::critical},
+  };
 
   std::optional<spdlog::level::level_enum>
-  parse_level(std::string_view input)
+  parse_level(std::string input)
   {
+    // Lower-case the input:
+    for (auto& c : input)
+        if (c >= 'A' && c <= 'Z')
+            c += ('A' - 'a');
+
     for (const auto& [str, lvl] : logLevels)
       if (str == input)
         return lvl;
+
     return std::nullopt;
   }
 
