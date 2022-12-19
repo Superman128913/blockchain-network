@@ -1330,7 +1330,14 @@ namespace cryptonote::rpc {
     return reward;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  void core_rpc_server::fill_block_header_response(const block& blk, bool orphan_status, uint64_t height, const crypto::hash& hash, block_header_response& response, bool fill_pow_hash, bool get_tx_hashes)
+  void core_rpc_server::fill_block_header_response(
+      const block& blk,
+      bool orphan_status,
+      uint64_t height,
+      const crypto::hash& hash,
+      block_header_response& response,
+      bool fill_pow_hash,
+      bool get_tx_hashes)
   {
     response.major_version = static_cast<uint8_t>(blk.major_version);
     response.minor_version = blk.minor_version;
@@ -1348,9 +1355,18 @@ namespace cryptonote::rpc {
     response.block_size = response.block_weight = m_core.get_blockchain_storage().get_db().get_block_weight(height);
     response.num_txes = blk.tx_hashes.size();
     if (fill_pow_hash)
-      response.pow_hash = tools::type_to_hex(get_block_longhash_w_blockchain(m_core.get_nettype(), &(m_core.get_blockchain_storage()), blk, height, 0));
+      response.pow_hash = tools::type_to_hex(
+          get_block_longhash_w_blockchain(
+            m_core.get_nettype(),
+            &m_core.get_blockchain_storage(),
+            blk,
+            height,
+            0));
     response.long_term_weight = m_core.get_blockchain_storage().get_db().get_block_long_term_weight(height);
-    response.service_node_winner = (tools::type_to_hex(blk.service_node_winner_key) == "") ? tools::type_to_hex(cryptonote::get_service_node_winner_from_tx_extra(blk.miner_tx.extra)) : tools::type_to_hex(blk.service_node_winner_key);
+    response.service_node_winner =
+      tools::type_to_hex(blk.service_node_winner_key) == ""
+        ? tools::type_to_hex(cryptonote::get_service_node_winner_from_tx_extra(blk.miner_tx.extra))
+        : tools::type_to_hex(blk.service_node_winner_key);
     response.coinbase_payouts = get_block_reward(blk);
     if (blk.miner_tx.vout.size() > 0)
       response.miner_tx_hash = tools::type_to_hex(cryptonote::get_transaction_hash(blk.miner_tx));
@@ -1432,14 +1448,14 @@ namespace cryptonote::rpc {
       bool have_block = m_core.get_block_by_height(h, blk);
       if (!have_block)
         throw rpc_error{ERROR_INTERNAL,
-          "Internal error: can't get block by height. Height = " + std::to_string(h) + "."};
+          "Internal error: can't get block by height. Height = {}."_format(h)};
       if (blk.miner_tx.vin.size() != 1 || !std::holds_alternative<txin_gen>(blk.miner_tx.vin.front()))
         throw rpc_error{ERROR_INTERNAL, "Internal error: coinbase transaction in the block has the wrong type"};
       uint64_t block_height = var::get<txin_gen>(blk.miner_tx.vin.front()).height;
       if (block_height != h)
         throw rpc_error{ERROR_INTERNAL, "Internal error: coinbase transaction in the block has the wrong height"};
-      headers.push_back(block_header_response());
-      fill_block_header_response(blk, false, block_height, get_block_hash(blk), headers.back(), get_block_headers_range.request.fill_pow_hash && context.admin, get_block_headers_range.request.get_tx_hashes);
+      auto& hdr = headers.emplace_back();
+      fill_block_header_response(blk, false, block_height, get_block_hash(blk), hdr, get_block_headers_range.request.fill_pow_hash && context.admin, get_block_headers_range.request.get_tx_hashes);
     }
     get_block_headers_range.response["headers"] = headers;
     get_block_headers_range.response["status"] = STATUS_OK;
