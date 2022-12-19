@@ -741,13 +741,13 @@ namespace {
 
 /*
   Pulse progresses via a state-machine that is iterated through job submissions
-  to 1 dedicated Pulse thread, started by LMQ.
+  to 1 dedicated Pulse thread, started by OMQ.
 
   Iterating the state-machine is done by a periodic invocation of
   pulse::main(...) and messages received via Quorumnet for Pulse, which are
   queued in the thread's job queue.
 
-  Using 1 dedicated thread via LMQ avoids any synchronization required in the
+  Using 1 dedicated thread via OMQ avoids any synchronization required in the
   user code when implementing Pulse.
 
   Skip control flow graph for textual description of stages.
