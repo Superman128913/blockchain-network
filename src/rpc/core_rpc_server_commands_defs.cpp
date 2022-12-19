@@ -80,13 +80,14 @@ void to_json(nlohmann::json& j, const block_header_response& h)
     {"block_size", h.block_size},
     {"block_weight", h.block_weight},
     {"num_txes", h.num_txes},
-    {"pow_hash", h.pow_hash ? *h.pow_hash : nullptr},
     {"long_term_weight", h.long_term_weight},
     {"miner_tx_hash", h.miner_tx_hash},
     {"miner_tx_hash", h.miner_tx_hash},
     {"tx_hashes", h.tx_hashes},
     {"service_node_winner", h.service_node_winner},
   };
+  if (h.pow_hash)
+    j["pow_hash"] = *h.pow_hash;
 };
 
 void from_json(const nlohmann::json& j, block_header_response& h)
