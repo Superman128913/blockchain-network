@@ -44,14 +44,8 @@
 #include <vector>
 #include <nlohmann/json.hpp>
 
-// DEBUG
-#include "logging/oxen_logger.h"
-
 namespace serialization {
 
-  // DEBUG
-  namespace log = oxen::log;
-  static auto logcat = log::Cat("j-a-debug");
 
 /*! \struct json_archiver
  * 
@@ -78,7 +72,6 @@ struct json_archiver : public serializer
 
   // Sets the tag for the next object value we will write.
   void tag(std::string_view tag) {
-    log::info(logcat, "tag now = {}", tag);
     tag_ = tag;
   }
 
