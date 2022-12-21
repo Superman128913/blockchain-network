@@ -648,8 +648,8 @@ namespace cryptonote::rpc {
       std::string hash;                       // The hash of this block.
       difficulty_type difficulty;             // The strength of the Loki network based on mining power.
       difficulty_type cumulative_difficulty;  // The cumulative strength of the Loki network based on mining power.
-      uint64_t reward;                        // The amount of new generated in this block and rewarded to the miner, foundation and service Nodes. Note: 1 OXEN = 1e9 atomic units.
-      uint64_t coinbase_payouts;              // The amount of new generated in this block and rewarded to the miner. Note: 1 OXEN = 1e9 atomic units.
+      uint64_t reward;                        // The amount of new OXEN (in atomic units) generated in this block and allocated to service nodes and governance.  As of Oxen 10 (HF 19) this is the *earned* amount, but not the *paid* amount which occurs in batches.
+      uint64_t coinbase_payouts;              // The amount of OXEN paid out in this block.  As of Oxen 10 (HF 19), this reflects the current batched amounts being paid from earnings batched over previous blocks, not the amounts *earned* in the current block.
       uint64_t block_size;                    // The block size in bytes.
       uint64_t block_weight;                  // The block weight in bytes.
       uint64_t num_txes;                      // Number of transactions in the block, not counting the coinbase tx.

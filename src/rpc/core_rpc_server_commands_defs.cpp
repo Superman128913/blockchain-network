@@ -76,7 +76,7 @@ void to_json(nlohmann::json& j, const block_header_response& h)
     {"difficulty", h.difficulty},
     {"cumulative_difficulty", h.cumulative_difficulty},
     {"reward", h.reward},
-    {"miner_reward", h.reward},
+    {"coinbase_payouts", h.coinbase_payouts},
     {"block_size", h.block_size},
     {"block_weight", h.block_weight},
     {"num_txes", h.num_txes},
