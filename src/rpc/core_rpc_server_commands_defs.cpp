@@ -104,7 +104,7 @@ void from_json(const nlohmann::json& j, block_header_response& h)
   j.at("difficulty").get_to(h.difficulty);
   j.at("cumulative_difficulty").get_to(h.cumulative_difficulty);
   j.at("reward").get_to(h.reward);
-  j.at("miner_reward").get_to(h.reward);
+  j.at("coinbase_payouts").get_to(h.coinbase_payouts);
   j.at("block_size").get_to(h.block_size);
   j.at("block_weight").get_to(h.block_weight);
   j.at("num_txes").get_to(h.num_txes);
