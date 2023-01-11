@@ -263,6 +263,7 @@ bool NodeRPCProxy::update_all_service_nodes_cache(uint64_t height) const {
   req["fields"]["active"] = true;
   req["fields"]["contributors"] = true;
   req["fields"]["funded"] = true;
+  req["fields"]["locked_contributions"] = true;
   req["fields"]["registration_height"] = true;
   req["fields"]["requested_unlock_height"] = true;
   req["fields"]["service_node_pubkey"] = true;

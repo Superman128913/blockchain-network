@@ -6686,17 +6686,18 @@ bool wallet2::is_transfer_unlocked(uint64_t unlock_time, uint64_t block_height, 
 
     for (auto const& entry : service_nodes_states)
     {
-      for (auto const& contributor : entry["contributors"])
+      for (auto const& contributor : entry.at("contributors"))
       {
-        if (primary_address != contributor["address"])
+        if (primary_address != contributor.at("address"))
           continue;
 
-        for (auto const &contribution : contributor["locked_contributions"])
+        for (auto const &contribution : contributor.at("locked_contributions"))
         {
+          auto input_ki = contribution.at("key_image").get<std::string_view>();
           crypto::key_image check_image;
-          if(!tools::hex_to_type(contribution["key_image"].get<std::string>(), check_image))
+          if(!tools::hex_to_type(input_ki, check_image))
           {
-            log::error(logcat, "Failed to parse hex representation of key image: {}", contribution["key_image"]);
+            log::error(logcat, "Failed to parse hex representation of key image: {}", input_ki);
             break;
           }
 
