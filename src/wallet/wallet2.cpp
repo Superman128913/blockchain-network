@@ -8116,7 +8116,8 @@ wallet2::stake_result wallet2::check_stake_allowed(const crypto::public_key& sn_
 
   const auto& snode_info  = response.front();
   const auto staking_req = snode_info.at("staking_requirement").get<uint64_t>();
-  const auto total_res = snode_info.at("total_reserved").get<uint64_t>();
+  const auto total_res = snode_info.value<uint64_t>("total_reserved",
+          snode_info.at("total_contributed").get<uint64_t>());
   if (amount == 0)
     amount = staking_req * fraction;
 

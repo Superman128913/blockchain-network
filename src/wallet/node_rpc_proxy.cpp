@@ -260,7 +260,8 @@ bool NodeRPCProxy::update_all_service_nodes_cache(uint64_t height) const {
   req["fields"] = nlohmann::json{};
   for (const auto& field : {
       "active", "contributors", "funded", "locked_contributions", "registration_height",
-      "requested_unlock_height", "service_node_pubkey", "staking_requirement", "total_reserved",
+      "requested_unlock_height", "service_node_pubkey", "staking_requirement", "total_contributed",
+      "total_reserved",
   })
       req["fields"][field] = true;
 
