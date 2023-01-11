@@ -258,15 +258,12 @@ bool NodeRPCProxy::update_all_service_nodes_cache(uint64_t height) const {
 
   nlohmann::json req{};
   req["fields"] = nlohmann::json{};
-  req["fields"]["active"] = true;
-  req["fields"]["contributors"] = true;
-  req["fields"]["funded"] = true;
-  req["fields"]["locked_contributions"] = true;
-  req["fields"]["registration_height"] = true;
-  req["fields"]["requested_unlock_height"] = true;
-  req["fields"]["service_node_pubkey"] = true;
-  req["fields"]["staking_requirement"] = true;
-  req["fields"]["total_reserved"] = true;
+  for (const auto& field : {
+      "active", "contributors", "funded", "locked_contributions", "registration_height",
+      "requested_unlock_height", "service_node_pubkey", "staking_requirement", "total_reserved",
+  })
+      req["fields"][field] = true;
+
   try {
     auto res = m_http_client.json_rpc("get_service_nodes", req);
     m_all_service_nodes_cached_height = height;

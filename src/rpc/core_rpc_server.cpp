@@ -2557,6 +2557,7 @@ namespace cryptonote::rpc {
     });
 
     if (requested(reqed, "contributors")) {
+      bool want_locked_c = requested(reqed, "locked_contributions");
       auto& contributors = (entry["contributors"] = json::array());
       for (const auto& contributor : info.contributors) {
         auto& c = contributors.emplace_back(json{
@@ -2564,7 +2565,7 @@ namespace cryptonote::rpc {
             {"address", cryptonote::get_account_address_as_str(m_core.get_nettype(), false/*subaddress*/, contributor.address)}});
         if (contributor.reserved != contributor.amount)
           c["reserved"] = contributor.reserved;
-        if (requested(reqed, "locked_contributions")) {
+        if (want_locked_c) {
           auto& locked = (c["locked_contributions"] = json::array());
           for (const auto& src : contributor.locked_contributions) {
             auto& lc = locked.emplace_back(json{{"amount", src.amount}});
