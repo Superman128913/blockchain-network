@@ -1969,9 +1969,7 @@ namespace cryptonote::rpc {
   ///   - \p key_image The key image of the transaction that is blacklisted on the network.
   ///   - \p unlock_height The height at which the key image is removed from the blacklist and becomes spendable.
   ///   - \p amount The total amount of locked Loki in atomic units in this blacklisted stake.
-  ///   TODO sean delete this if no args works below
-  //struct GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES : PUBLIC
-  struct GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES : NO_ARGS
+  struct GET_SERVICE_NODE_BLACKLISTED_KEY_IMAGES : PUBLIC, NO_ARGS
   {
     static constexpr auto names() { return NAMES("get_service_node_blacklisted_key_images"); }
   };
