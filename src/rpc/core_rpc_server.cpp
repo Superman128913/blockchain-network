@@ -1554,7 +1554,7 @@ namespace cryptonote::rpc {
     std::vector<std::string> tx_hashes;
     tx_hashes.reserve(blk.tx_hashes.size());
     std::transform(blk.tx_hashes.begin(), blk.tx_hashes.end(), std::back_inserter(tx_hashes), [](const auto& x) { return tools::type_to_hex(x); });
-    get_block.response["tx_hashes"] = tx_hashes;
+    get_block.response["tx_hashes"] = std::move(tx_hashes);
     get_block.response["blob"] = oxenc::to_hex(t_serializable_object_to_blob(blk));
     get_block.response["json"] = obj_to_json_str(blk);
     get_block.response["status"] = STATUS_OK;
