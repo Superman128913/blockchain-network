@@ -3341,7 +3341,7 @@ namespace cryptonote { namespace rpc {
     m_core.ss_version = req.version;
     return handle_ping<STORAGE_SERVER_PING>(m_core,
       req.version, service_nodes::MIN_STORAGE_SERVER_VERSION,
-      req.ed25519_pubkey, req.error,
+      req.pubkey_ed25519, req.error,
       "Storage Server", m_core.m_last_storage_server_ping, m_core.get_net_config().UPTIME_PROOF_FREQUENCY,
       [this, &req](bool significant) {
         m_core.m_storage_https_port = req.https_port;
@@ -3356,7 +3356,7 @@ namespace cryptonote { namespace rpc {
     m_core.lokinet_version = req.version;
     return handle_ping<LOKINET_PING>(m_core,
         req.version, service_nodes::MIN_LOKINET_VERSION,
-        req.ed25519_pubkey, req.error,
+        req.pubkey_ed25519, req.error,
         "Lokinet", m_core.m_last_lokinet_ping, m_core.get_net_config().UPTIME_PROOF_FREQUENCY,
         [this](bool significant) { if (significant) m_core.reset_proof_interval(); });
   }
