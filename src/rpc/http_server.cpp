@@ -329,8 +329,8 @@ namespace cryptonote::rpc {
     std::string call_duration;
     if (time_logging)
       call_duration = " in " + tools::friendly_duration(std::chrono::steady_clock::now() - start);
-    if (OXEN_LOG_ENABLED(info))
-      log::info(logcat, "HTTP RPC {} [{}] OK ({} bytes){}", data.uri, data.request.context.remote, result.size(), call_duration);
+    if (OXEN_LOG_ENABLED(debug))
+      log::debug(logcat, "HTTP RPC {} [{}] OK ({} bytes){}", data.uri, data.request.context.remote, result.size(), call_duration);
 
     queue_response(std::move(dataptr), std::move(result));
   }
