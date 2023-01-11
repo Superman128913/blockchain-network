@@ -3714,26 +3714,16 @@ bool wallet2::get_rct_distribution(uint64_t &start_height, std::vector<uint64_t>
 //----------------------------------------------------------------------------------------------------
 bool wallet2::get_output_blacklist(std::vector<uint64_t> &blacklist)
 {
-  rpc::version_t rpc_version;
-  if (!m_node_rpc_proxy.get_rpc_version(rpc_version))
-  {
-    THROW_WALLET_EXCEPTION(tools::error::no_connection_to_daemon, "getversion");
-  }
-  if (rpc_version < rpc::version_t{2, 3})
-  {
-    log::warning(logcat, "Daemon is too old, not requesting output blacklist");
-    return false;
-  }
-  log::debug(logcat, "Daemon is recent enough, requesting output blacklist");
+  cryptonote::rpc::GET_OUTPUT_BLACKLIST_BIN::response res{};
+  bool r = invoke_http<rpc::GET_OUTPUT_BLACKLIST_BIN>({}, res);
 
-  try {
-    auto res = m_http_client.json_rpc("get_output_blacklist", {});
-    blacklist = res.at("blacklist").get<std::vector<uint64_t>>();
-  } catch (...) {
+  if (!r)
+  {
     log::warning(logcat, "Failed to request output blacklist: no connection to daemon");
     return false;
   }
 
+  blacklist = std::move(res.blacklist);
   return true;
 }
 //----------------------------------------------------------------------------------------------------
