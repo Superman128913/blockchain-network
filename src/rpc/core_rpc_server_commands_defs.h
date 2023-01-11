@@ -2287,7 +2287,7 @@ namespace cryptonote::rpc {
   /// - `version` -- Storage server version (as an array of three integers).
   /// - `https_port` -- Storage server https port to include in uptime proofs.
   /// - `omq_port` -- Storage server oxenmq port to include in uptime proofs.
-  /// - `ed25519_pubkey` -- Service node Ed25519 pubkey for verifying that storage server is running
+  /// - `pubkey_ed25519` -- Service node Ed25519 pubkey for verifying that storage server is running
   ///   with the correct service node keys.
   /// - `error` -- If given and non-empty then this is an error message telling oxend to *not*
   ///   submit an uptime proof and to report this error in the logs instead.  Oxend won't send
@@ -2305,7 +2305,7 @@ namespace cryptonote::rpc {
       std::array<uint16_t, 3> version;
       uint16_t https_port;
       uint16_t omq_port;
-      std::string ed25519_pubkey;
+      std::string pubkey_ed25519;
       std::string error;
     } request;
   };
@@ -2320,7 +2320,7 @@ namespace cryptonote::rpc {
   /// Inputs:
   ///
   /// - `version` -- Lokinet version (as an array of three integers).
-  /// - `ed25519_pubkey` -- Service node Ed25519 pubkey for verifying that lokinet is running with
+  /// - `pubkey_ed25519` -- Service node Ed25519 pubkey for verifying that lokinet is running with
   ///   the correct service node keys.
   /// - `error` -- If given and non-empty then this is an error message telling oxend to *not*
   ///   submit an uptime proof and to report this error in the logs instead.  Oxend won't send
@@ -2336,7 +2336,7 @@ namespace cryptonote::rpc {
     struct request_parameters
     {
       std::array<uint16_t, 3> version;
-      std::string ed25519_pubkey;
+      std::string pubkey_ed25519;
       std::string error;
     } request;
   };

@@ -2694,7 +2694,7 @@ namespace cryptonote::rpc {
     m_core.ss_version = storage_server_ping.request.version;
     storage_server_ping.response["status"] = handle_ping(m_core,
       storage_server_ping.request.version, service_nodes::MIN_STORAGE_SERVER_VERSION,
-      storage_server_ping.request.ed25519_pubkey,
+      storage_server_ping.request.pubkey_ed25519,
       storage_server_ping.request.error,
       "Storage Server", m_core.m_last_storage_server_ping, m_core.get_net_config().UPTIME_PROOF_FREQUENCY,
       [this, &storage_server_ping](bool significant) {
@@ -2710,7 +2710,7 @@ namespace cryptonote::rpc {
     m_core.lokinet_version = lokinet_ping.request.version;
     lokinet_ping.response["status"] = handle_ping(m_core,
       lokinet_ping.request.version, service_nodes::MIN_LOKINET_VERSION,
-      lokinet_ping.request.ed25519_pubkey,
+      lokinet_ping.request.pubkey_ed25519,
       lokinet_ping.request.error,
       "Lokinet", m_core.m_last_lokinet_ping, m_core.get_net_config().UPTIME_PROOF_FREQUENCY,
       [this](bool significant) { if (significant) m_core.reset_proof_interval(); });

@@ -259,17 +259,17 @@ namespace cryptonote::rpc {
 
   void parse_request(LOKINET_PING& lokinet_ping, rpc_input in){
     get_values(in,
-      "ed25519_pubkey", lokinet_ping.request.ed25519_pubkey,
       "error", lokinet_ping.request.error,
+      "pubkey_ed25519", lokinet_ping.request.pubkey_ed25519,
       "version", required{lokinet_ping.request.version});
   }
 
   void parse_request(STORAGE_SERVER_PING& storage_server_ping, rpc_input in){
     get_values(in,
-      "ed25519_pubkey", required{storage_server_ping.request.ed25519_pubkey},
       "error", storage_server_ping.request.error,
       "https_port", required{storage_server_ping.request.https_port},
       "omq_port", required{storage_server_ping.request.omq_port},
+      "pubkey_ed25519", required{storage_server_ping.request.pubkey_ed25519},
       "version", required{storage_server_ping.request.version});
   }
 
