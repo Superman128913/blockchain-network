@@ -8106,7 +8106,7 @@ wallet2::stake_result wallet2::check_stake_allowed(const crypto::public_key& sn_
   if (!success)
   {
     result.status = stake_result_status::service_node_list_query_failed;
-    result.msg    = ERR_MSG_NETWORK_VERSION_QUERY_FAILED;
+    result.msg    = ERR_MSG_SERVICE_NODE_LIST_QUERY_FAILED;
     return result;
   }
 
@@ -8447,7 +8447,7 @@ wallet2::register_service_node_result wallet2::create_register_service_node_tx(c
   if (const auto [success, response] = get_service_nodes({service_node_key_as_str});
       !success)
     return {register_service_node_result_status::service_node_list_query_failed,
-      ERR_MSG_NETWORK_VERSION_QUERY_FAILED};
+      ERR_MSG_SERVICE_NODE_LIST_QUERY_FAILED};
   else if (response.size() >= 1)
     return {register_service_node_result_status::service_node_cannot_reregister,
       tr("This service node is already registered")};

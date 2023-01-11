@@ -244,7 +244,7 @@ std::pair<bool, nlohmann::json> NodeRPCProxy::get_service_nodes(std::vector<std:
     {"service_node_pubkeys", pubkeys}
   };
   try {
-    auto res = m_http_client.json_rpc("get_service_nodes", pubkeys);
+    auto res = m_http_client.json_rpc("get_service_nodes", req_params);
     resolved = res["service_node_states"];
   } catch (...) {
     return result;
