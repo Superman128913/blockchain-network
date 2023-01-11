@@ -2668,8 +2668,7 @@ namespace cryptonote::rpc {
         status = "Outdated {}. Current: {} Required: {}"_format(
                 name, fmt::join(cur_version, "."), fmt::join(required, "."));
         log::error(logcat, status);
-      } else if (!ed25519_pubkey.empty() // TODO: once lokinet & ss are always sending this we can remove this empty bypass
-          && ed25519_pubkey != our_ed25519_pubkey) {
+      } else if (ed25519_pubkey != our_ed25519_pubkey) {
         status = "Invalid {} pubkey: expected {}, received {}"_format(name, our_ed25519_pubkey, ed25519_pubkey);
         log::error(logcat, status);
       } else {
