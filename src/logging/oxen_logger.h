@@ -20,7 +20,9 @@ inline auto globallogcat = oxen::log::Cat("global");
 namespace oxen::logging
 {
   void
-  init(const std::string& log_location, log::Level log_level);
+  init(const std::string& log_location, log::Level log_level, bool log_to_stdout = true);
+  void
+  set_file_sink(const std::string& log_location);
   void
   set_additional_log_categories(const log::Level& log_level);
   void
