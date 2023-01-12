@@ -2,6 +2,7 @@
 #include "http_server.h"
 #include <chrono>
 #include <exception>
+#include <variant>
 #include <oxenc/variant.h>
 #include "common/command_line.h"
 #include "common/string_util.h"
@@ -87,7 +88,7 @@ namespace cryptonote::rpc {
     : m_server{server}, m_restricted{restricted}
   {
     // uWS is designed to work from a single thread, which is good (we pull off the requests and
-    // then stick them into the LMQ job queue to be scheduled along with other jobs).  But as a
+    // then stick them into the OMQ job queue to be scheduled along with other jobs).  But as a
     // consequence, we need to create everything inside that thread.  We *also* need to get the
     // (thread local) event loop pointer back from the thread so that we can shut it down later
     // (injecting a callback into it is one of the few thread-safe things we can do across threads).
@@ -268,7 +269,7 @@ namespace cryptonote::rpc {
 
   void invoke_txpool_hashes_bin(std::shared_ptr<call_data> data);
 
-  // Invokes the actual RPC request; this is called (via oxenmq) from some random LMQ worker thread,
+  // Invokes the actual RPC request; this is called (via oxenmq) from some random OMQ worker thread,
   // which means we can't just write our reply; instead we have to post it to the uWS loop.
   void invoke_rpc(std::shared_ptr<call_data> dataptr)
   {
@@ -329,8 +330,8 @@ namespace cryptonote::rpc {
     std::string call_duration;
     if (time_logging)
       call_duration = " in " + tools::friendly_duration(std::chrono::steady_clock::now() - start);
-    if (OXEN_LOG_ENABLED(info))
-      log::info(logcat, "HTTP RPC {} [{}] OK ({} bytes){}", data.uri, data.request.context.remote, result.size(), call_duration);
+    if (OXEN_LOG_ENABLED(debug))
+      log::debug(logcat, "HTTP RPC {} [{}] OK ({} bytes){}", data.uri, data.request.context.remote, result.size(), call_duration);
 
     queue_response(std::move(dataptr), std::move(result));
   }
@@ -457,7 +458,7 @@ namespace cryptonote::rpc {
   {
     std::shared_ptr<call_data> data{new call_data{*this, m_server, res, std::string{req.getUrl()}, &call}};
     auto& request = data->request;
-    request.body = ""s;
+    request.body = std::monostate{};
     request.context.admin = !m_restricted;
     request.context.source = rpc_source::http;
     request.context.remote = get_remote_address(res);
@@ -466,13 +467,18 @@ namespace cryptonote::rpc {
 
     res.onAborted([data] { data->aborted = true; });
     res.onData([data=std::move(data)](std::string_view d, bool done) mutable {
-      var::get<std::string>(data->request.body) += d;
+      if (!d.empty()) {
+        if (std::holds_alternative<std::monostate>(data->request.body))
+          data->request.body = std::string{d};
+        else
+            var::get<std::string>(data->request.body) += d;
+      }
       if (!done)
         return;
 
       auto& omq = data->core_rpc.get_core().get_omq();
       std::string cat{data->call->is_public ? "rpc" : "admin"};
-      std::string cmd{"http:" + data->uri}; // Used for LMQ job logging; prefixed with http: so we can distinguish it
+      std::string cmd{"http:" + data->uri}; // Used for OMQ job logging; prefixed with http: so we can distinguish it
       std::string remote{data->request.context.remote};
       omq.inject_task(std::move(cat), std::move(cmd), std::move(remote), [data=std::move(data)] { invoke_rpc(std::move(data)); });
     });
@@ -538,7 +544,7 @@ namespace cryptonote::rpc {
 
       auto& omq = data->core_rpc.get_core().get_omq();
       std::string cat{data->call->is_public ? "rpc" : "admin"};
-      std::string cmd{"jsonrpc:" + *method}; // Used for LMQ job logging; prefixed with jsonrpc: so we can distinguish it
+      std::string cmd{"jsonrpc:" + *method}; // Used for OMQ job logging; prefixed with jsonrpc: so we can distinguish it
       std::string remote{data->request.context.remote};
       omq.inject_task(std::move(cat), std::move(cmd), std::move(remote), [data=std::move(data)] { invoke_rpc(std::move(data)); });
     });

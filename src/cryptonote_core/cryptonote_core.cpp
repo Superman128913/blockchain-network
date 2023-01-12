@@ -952,7 +952,7 @@ namespace cryptonote
       log::info(logcat, fg(fmt::terminal_color::yellow), "-  x25519: {}", tools::type_to_hex(keys.pub_x25519));
     } else {
       // Only print the x25519 version because it's the only thing useful for a non-SN (for
-      // encrypted LMQ RPC connections).
+      // encrypted OMQ RPC connections).
       log::info(logcat, fg(fmt::terminal_color::yellow), "x25519 public key: {}", tools::type_to_hex(keys.pub_x25519));
     }
 
@@ -2286,7 +2286,7 @@ namespace cryptonote
             if (pk != m_service_keys.pub && proof.proof->public_ip == m_sn_public_ip &&
                 (proof.proof->qnet_port == m_quorumnet_port || (
                     m_nettype != network_type::DEVNET && (proof.proof->storage_https_port == storage_https_port() || proof.proof->storage_omq_port == storage_omq_port()))))
-            log::info(logcat, fg(fmt::terminal_color::red), "Another service node ({}) is broadcasting the same public IP and ports as this service node ({}:{}[qnet], :{}[SS-HTTP], :{}[SS-LMQ]). This will lead to deregistration of one or both service nodes if not corrected. (Do both service nodes have the correct IP for the service-node-public-ip setting?)", pk, epee::string_tools::get_ip_string_from_int32(m_sn_public_ip), proof.proof->qnet_port, proof.proof->storage_https_port, proof.proof->storage_omq_port);
+            log::info(logcat, fg(fmt::terminal_color::red), "Another service node ({}) is broadcasting the same public IP and ports as this service node ({}:{}[qnet], :{}[SS-HTTP], :{}[SS-OMQ]). This will lead to deregistration of one or both service nodes if not corrected. (Do both service nodes have the correct IP for the service-node-public-ip setting?)", pk, epee::string_tools::get_ip_string_from_int32(m_sn_public_ip), proof.proof->qnet_port, proof.proof->storage_https_port, proof.proof->storage_omq_port);
           });
         }
 

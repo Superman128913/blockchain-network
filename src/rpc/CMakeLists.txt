@@ -41,7 +41,7 @@ add_library(rpc
 
 add_library(daemon_rpc_server
   http_server.cpp
-  lmq_server.cpp
+  omq_server.cpp
   )
 
 add_library(rpc_http_client
@@ -52,7 +52,6 @@ target_link_libraries(rpc_commands
     rpc_common
     common
     cpr::cpr
-    nlohmann_json::nlohmann_json
   PRIVATE
     cryptonote_protocol
     logging
@@ -87,7 +86,6 @@ target_link_libraries(rpc_http_client
   PUBLIC
     common
     cpr::cpr
-    nlohmann_json::nlohmann_json
   PRIVATE
     logging
     extra)

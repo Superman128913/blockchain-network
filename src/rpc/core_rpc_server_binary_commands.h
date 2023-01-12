@@ -35,6 +35,8 @@
 
 namespace cryptonote::rpc {
 
+  struct EMPTY { KV_MAP_SERIALIZABLE };
+
   /// Specifies that the RPC call is legacy, deprecated Monero custom binary input/ouput.  If not
   /// given then the command is JSON/bt-encoded values.  For HTTP RPC this also means the command is
   /// *not* available via the HTTP JSON RPC.
@@ -241,8 +243,8 @@ namespace cryptonote::rpc {
     struct request
     {
       bool         blinked_txs_only; // Optional: If true only transactions that were sent via blink and approved are queried.
-      bool         long_poll;        // Optional: If true, this call is blocking until timeout OR tx pool has changed since the last query. TX pool change is detected by comparing the hash of all the hashes in the tx pool.  Ignored when using LMQ RPC.
-      crypto::hash tx_pool_checksum; // Optional: If `long_poll` is true the caller must pass the hashes of all their known tx pool hashes, XOR'ed together.  Ignored when using LMQ RPC.
+      bool         long_poll;        // Optional: If true, this call is blocking until timeout OR tx pool has changed since the last query. TX pool change is detected by comparing the hash of all the hashes in the tx pool.  Ignored when using OMQ RPC.
+      crypto::hash tx_pool_checksum; // Optional: If `long_poll` is true the caller must pass the hashes of all their known tx pool hashes, XOR'ed together.  Ignored when using OMQ RPC.
       KV_MAP_SERIALIZABLE
     };
 

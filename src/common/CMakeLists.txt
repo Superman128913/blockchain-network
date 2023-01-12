@@ -36,6 +36,7 @@ add_library(common
   expect.cpp
   file.cpp
   i18n.cpp
+  json_binary_proxy.cpp
   oxen.cpp
   notify.cpp
   password.cpp
@@ -66,6 +67,7 @@ target_link_libraries(common
     filesystem
     oxen::logging
     fmt::fmt
+    nlohmann_json::nlohmann_json
   PRIVATE
     sodium
     logging

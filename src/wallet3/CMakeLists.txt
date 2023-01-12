@@ -18,7 +18,6 @@ target_link_libraries(wallet3
   PUBLIC
     rpc_common
     common
-    nlohmann_json::nlohmann_json
     oxenmq::oxenmq
     oxenc::oxenc
   PRIVATE

@@ -56,8 +56,8 @@ namespace cryptonote::rpc {
 
 void RPC_COMMAND::set_bt() {
   bt = true;
-  response_b64.format = json_binary_proxy::fmt::bt;
-  response_hex.format = json_binary_proxy::fmt::bt;
+  response_b64.format = tools::json_binary_proxy::fmt::bt;
+  response_hex.format = tools::json_binary_proxy::fmt::bt;
 }
 
 void to_json(nlohmann::json& j, const block_header_response& h)
@@ -76,17 +76,18 @@ void to_json(nlohmann::json& j, const block_header_response& h)
     {"difficulty", h.difficulty},
     {"cumulative_difficulty", h.cumulative_difficulty},
     {"reward", h.reward},
-    {"miner_reward", h.reward},
+    {"coinbase_payouts", h.coinbase_payouts},
     {"block_size", h.block_size},
     {"block_weight", h.block_weight},
     {"num_txes", h.num_txes},
-    {"pow_hash", h.pow_hash ? *h.pow_hash : nullptr},
     {"long_term_weight", h.long_term_weight},
     {"miner_tx_hash", h.miner_tx_hash},
     {"miner_tx_hash", h.miner_tx_hash},
     {"tx_hashes", h.tx_hashes},
     {"service_node_winner", h.service_node_winner},
   };
+  if (h.pow_hash)
+    j["pow_hash"] = *h.pow_hash;
 };
 
 void from_json(const nlohmann::json& j, block_header_response& h)
@@ -103,14 +104,14 @@ void from_json(const nlohmann::json& j, block_header_response& h)
   j.at("difficulty").get_to(h.difficulty);
   j.at("cumulative_difficulty").get_to(h.cumulative_difficulty);
   j.at("reward").get_to(h.reward);
-  j.at("miner_reward").get_to(h.reward);
+  j.at("coinbase_payouts").get_to(h.coinbase_payouts);
   j.at("block_size").get_to(h.block_size);
   j.at("block_weight").get_to(h.block_weight);
   j.at("num_txes").get_to(h.num_txes);
-  if (j.at("pow_hash").is_null())
+  if (auto it = j.find("pow_hash"); it == j.end() || it->is_null())
     h.pow_hash = std::nullopt;
   else
-    h.pow_hash = j["pow_hash"].get<std::string>();
+    h.pow_hash = it->get<std::string>();
   j.at("long_term_weight").get_to(h.long_term_weight);
   j.at("miner_tx_hash").get_to(h.miner_tx_hash);
   j.at("miner_tx_hash").get_to(h.miner_tx_hash);
@@ -180,34 +181,6 @@ void to_json(nlohmann::json& j, const ONS_OWNERS_TO_NAMES::response_entry& r)
     {"txid", r.txid},
   };
 }
-
-KV_SERIALIZE_MAP_CODE_BEGIN(EMPTY)
-KV_SERIALIZE_MAP_CODE_END()
-
-
-KV_SERIALIZE_MAP_CODE_BEGIN(block_header_response)
-  KV_SERIALIZE(major_version)
-  KV_SERIALIZE(minor_version)
-  KV_SERIALIZE(timestamp)
-  KV_SERIALIZE(prev_hash)
-  KV_SERIALIZE(nonce)
-  KV_SERIALIZE(orphan_status)
-  KV_SERIALIZE(height)
-  KV_SERIALIZE(depth)
-  KV_SERIALIZE(hash)
-  KV_SERIALIZE(difficulty)
-  KV_SERIALIZE(cumulative_difficulty)
-  KV_SERIALIZE(reward)
-  KV_SERIALIZE(coinbase_payouts)
-  KV_SERIALIZE(block_size)
-  KV_SERIALIZE_OPT(block_weight, (uint64_t)0)
-  KV_SERIALIZE(num_txes)
-  KV_SERIALIZE(pow_hash)
-  KV_SERIALIZE_OPT(long_term_weight, (uint64_t)0)
-  KV_SERIALIZE(miner_tx_hash)
-  KV_SERIALIZE(tx_hashes)
-  KV_SERIALIZE(service_node_winner)
-KV_SERIALIZE_MAP_CODE_END()
 
 
 KV_SERIALIZE_MAP_CODE_BEGIN(GET_OUTPUT_DISTRIBUTION::request)
