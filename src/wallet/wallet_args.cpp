@@ -189,7 +189,7 @@ namespace wallet_args
         throw std::runtime_error{"Incorrect log level"};
     }
 
-    oxen::logging::init(log_path, log_level);
+    oxen::logging::init(log_path, log_level, false /*do not log to stdout.*/);
 
     if (notice)
       print("{}\n"_format(notice));
