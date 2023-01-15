@@ -107,7 +107,7 @@ public:
 
   // validate_batch_payment -> used to make sure that list of miner_tx_vouts is correct. Compares the miner_tx_vouts with a list previously extracted payments to make sure that the correct persons are being paid.
   bool validate_batch_payment(
-      const std::vector<std::tuple<crypto::public_key, uint64_t>>& miner_tx_vouts,
+      const std::vector<std::pair<crypto::public_key, uint64_t>>& miner_tx_vouts,
       const std::vector<cryptonote::batch_sn_payment>& calculated_payments_from_batching_db,
       uint64_t block_height);
   

@@ -37,7 +37,6 @@
 #include "messages/messages-debug.pb.h"
 #endif
 
-using namespace std;
 using namespace hw::trezor;
 
 namespace hw{
@@ -60,12 +59,12 @@ namespace trezor
   }
 
   google::protobuf::Message * MessageMapper::get_message(messages::MessageType wire_number) {
-    const string &messageTypeName = hw::trezor::messages::MessageType_Name(wire_number);
+    const std::string &messageTypeName = hw::trezor::messages::MessageType_Name(wire_number);
     if (messageTypeName.empty()) {
       throw exc::EncodingException(std::string("Message descriptor not found: ") + std::to_string(wire_number));
     }
 
-    string messageName = messageTypeName.substr(strlen(TYPE_PREFIX));
+    std::string messageName = messageTypeName.substr(strlen(TYPE_PREFIX));
     return MessageMapper::get_message(messageName);
   }
 
@@ -80,7 +79,7 @@ namespace trezor
 #endif
 
     google::protobuf::Descriptor const * desc = nullptr;
-    for(const string &text : PACKAGES){
+    for(const std::string &text : PACKAGES){
       desc = google::protobuf::DescriptorPool::generated_pool()
           ->FindMessageTypeByName(text + msg_name);
       if (desc != nullptr){
@@ -121,7 +120,7 @@ namespace trezor
   }
 
   messages::MessageType MessageMapper::get_message_wire_number(const std::string & msg_name){
-    string enumMessageName = std::string(TYPE_PREFIX) + msg_name;
+      std::string enumMessageName = std::string(TYPE_PREFIX) + msg_name;
 
     messages::MessageType res;
     bool r = hw::trezor::messages::MessageType_Parse(enumMessageName, &res);

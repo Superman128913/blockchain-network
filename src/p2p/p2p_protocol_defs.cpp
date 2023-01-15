@@ -1,20 +1,22 @@
 #include "p2p_protocol_defs.h"
+#include "common/string_util.h"
 #include "epee/string_tools.h"
-#include "epee/time_helper.h"
 #include "net/tor_address.h" // needed for serialization
 #include "net/i2p_address.h" // needed for serialization
 #include <fmt/core.h>
+#include <chrono>
 
 namespace nodetool {
 
   std::string print_peerlist_to_string(const std::vector<peerlist_entry>& pl)
   {
-    time_t now = time(nullptr);
+    auto now = std::chrono::system_clock::now();
     std::string result;
     for (const auto& pe : pl) {
       result += "{:016x}\t{}\tpruning seed {}\tlast_seen {}"_format(
         pe.id, pe.adr.str(), pe.pruning_seed,
-        (pe.last_seen == 0 ? std::string("never") : epee::misc_utils::get_time_interval_string(now - pe.last_seen)));
+        pe.last_seen == 0 ? "never"s : tools::friendly_duration(now - std::chrono::system_clock::from_time_t(pe.last_seen))
+      );
     }
     return result;
   }

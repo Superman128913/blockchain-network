@@ -35,7 +35,6 @@
 #include "multisig.h"
 #include "cryptonote_config.h"
 
-using namespace std;
 
 namespace cryptonote
 {

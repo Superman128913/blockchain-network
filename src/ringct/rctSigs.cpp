@@ -702,37 +702,23 @@ namespace rct {
 
     //These functions get keys from blockchain
     //replace these when connecting blockchain
-    //getKeyFromBlockchain grabs a key from the blockchain at "reference_index" to mix with
-    //populateFromBlockchain creates a keymatrix with "mixin" columns and one of the columns is inPk
-    //   the return value are the key matrix, and the index where inPk was put (random).    
-    void getKeyFromBlockchain(ctkey & a, size_t reference_index) {
-        a.mask = pkGen();
-        a.dest = pkGen();
-    }
-
-    //These functions get keys from blockchain
-    //replace these when connecting blockchain
-    //getKeyFromBlockchain grabs a key from the blockchain at "reference_index" to mix with
     //populateFromBlockchain creates a keymatrix with "mixin" + 1 columns and one of the columns is inPk
     //   the return value are the key matrix, and the index where inPk was put (random).     
-    std::tuple<ctkeyM, xmr_amount> populateFromBlockchain(ctkeyV inPk, int mixin) {
-        int rows = inPk.size();
-        ctkeyM rv(mixin + 1, inPk);
-        int index = randXmrAmount(mixin);
-        int i = 0, j = 0;
-        for (i = 0; i <= mixin; i++) {
-            if (i != index) {
-                for (j = 0; j < rows; j++) {
-                    getKeyFromBlockchain(rv[i][j], (size_t)randXmrAmount);
-                }
-            }
+    std::pair<ctkeyM, xmr_amount> populateFromBlockchain(const ctkeyV& inPk, int mixin) {
+        std::pair<ctkeyM, xmr_amount> result;
+        auto& [rv, index] = result;
+        rv.resize(mixin + 1, inPk);
+        index = randXmrAmount(mixin);
+        for (size_t i = 0; i < rv.size(); i++) {
+            if (i != index)
+                for (auto& a : rv[i])
+                    a.randomize();
         }
-        return std::make_tuple(rv, index);
+        return result;
     }
 
     //These functions get keys from blockchain
     //replace these when connecting blockchain
-    //getKeyFromBlockchain grabs a key from the blockchain at "reference_index" to mix with
     //populateFromBlockchain creates a keymatrix with "mixin" columns and one of the columns is inPk
     //   the return value are the key matrix, and the index where inPk was put (random).     
     xmr_amount populateFromBlockchainSimple(ctkeyV & mixRing, const ctkey & inPk, int mixin) {
@@ -740,7 +726,7 @@ namespace rct {
         int i = 0;
         for (i = 0; i <= mixin; i++) {
             if (i != index) {
-                getKeyFromBlockchain(mixRing[i], (size_t)randXmrAmount(1000));
+                mixRing[i].randomize();
             } else {
                 mixRing[i] = inPk;
             }

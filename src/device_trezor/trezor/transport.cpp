@@ -46,7 +46,6 @@
 #undef OXEN_DEFAULT_LOG_CATEGORY
 #define OXEN_DEFAULT_LOG_CATEGORY "device.trezor.transport"
 
-using namespace std;
 using json = rapidjson::Document;
 
 

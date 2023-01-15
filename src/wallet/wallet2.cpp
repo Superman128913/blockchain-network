@@ -69,7 +69,6 @@
 #include "rapidjson/document.h"
 #include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
-#include "common/json_util.h"
 #include "epee/memwipe.h"
 #include "common/base58.h"
 #include "common/combinator.h"
@@ -516,6 +515,30 @@ std::optional<tools::password_container> get_password(const boost::program_optio
 
   return password_prompter(verify ? tools::wallet2::tr("Enter a new password for the wallet") : tools::wallet2::tr("Wallet password"), verify);
 }
+
+#define GET_FIELD_FROM_JSON_RETURN_ON_ERROR(json, name, type, jtype, mandatory, def) \
+  type field_##name = static_cast<type>(def); \
+  bool field_##name##_found = false; \
+  (void)field_##name##_found; \
+  do if (json.HasMember(#name)) \
+  { \
+    if (json[#name].Is##jtype()) \
+    { \
+      field_##name = static_cast<type>(json[#name].Get##jtype()); \
+      field_##name##_found = true; \
+    } \
+    else \
+    { \
+      oxen::log::error(logcat, "Field {} found in JSON, but not {}", #name, #jtype); \
+      return false; \
+    } \
+  } \
+  else if (mandatory) \
+  { \
+    oxen::log::error(logcat, "Field {} not found in JSON", #name); \
+    return false; \
+  } while(0)
+
 
 std::pair<std::unique_ptr<tools::wallet2>, tools::password_container> generate_from_json(const fs::path& json_file, const boost::program_options::variables_map& vm, bool unattended, const options& opts, const std::function<std::optional<tools::password_container>(const char *, bool)> &password_prompter)
 {

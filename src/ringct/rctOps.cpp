@@ -34,7 +34,6 @@
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "rctOps.h"
 using namespace crypto;
-using namespace std;
 
 auto logcat = oxen::log::Cat("ringct");
 
@@ -280,6 +279,11 @@ namespace rct {
         return pk;
     }
 
+    void ctkey::randomize() {
+        dest = pkGen();
+        mask = pkGen();
+    }
+
     //generates a random secret and corresponding public key
     void skpkGen(key &sk, key &pk) {
         skGen(sk);
@@ -287,10 +291,12 @@ namespace rct {
     }
 
     //generates a random secret and corresponding public key
-    tuple<key, key>  skpkGen() {
-        key sk = skGen();
-        key pk = scalarmultBase(sk);
-        return make_tuple(sk, pk);
+    std::pair<key, key>  skpkGen() {
+        std::pair<key, key> result;
+        auto& [sk, pk] = result;
+        sk = skGen();
+        pk = scalarmultBase(sk);
+        return result;
     }
 
     //generates C =aG + bH from b, a is given..
@@ -299,24 +305,26 @@ namespace rct {
     }
 
     //generates a <secret , public> / Pedersen commitment to the amount
-    tuple<ctkey, ctkey> ctskpkGen(xmr_amount amount) {
-        ctkey sk, pk;
+    std::pair<ctkey, ctkey> ctskpkGen(xmr_amount amount) {
+        std::pair<ctkey, ctkey> result;
+        auto& [sk, pk] = result;
         skpkGen(sk.dest, pk.dest);
         skpkGen(sk.mask, pk.mask);
         key am = d2h(amount);
         key bH = scalarmultH(am);
         addKeys(pk.mask, pk.mask, bH);
-        return make_tuple(sk, pk);
+        return result;
     }
     
     
     //generates a <secret , public> / Pedersen commitment but takes bH as input 
-    tuple<ctkey, ctkey> ctskpkGen(const key &bH) {
-        ctkey sk, pk;
+    std::pair<ctkey, ctkey> ctskpkGen(const key &bH) {
+        std::pair<ctkey, ctkey> result;
+        auto& [sk, pk] = result;
         skpkGen(sk.dest, pk.dest);
         skpkGen(sk.mask, pk.mask);
         addKeys(pk.mask, pk.mask, bH);
-        return make_tuple(sk, pk);
+        return result;
     }
     
     key zeroCommit(xmr_amount amount) {

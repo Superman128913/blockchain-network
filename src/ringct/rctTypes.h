@@ -92,6 +92,9 @@ namespace rct {
     struct ctkey {
         key dest;
         key mask; //C here if public
+
+        // Sets dest/mask to random curve points
+        void randomize();
     };
     typedef std::vector<ctkey> ctkeyV;
     typedef std::vector<ctkeyV> ctkeyM;

@@ -519,7 +519,7 @@ namespace cryptonote {
     // We iterate through the block's coinbase payments and build a copy of our own list of the payments
     // miner_tx_vouts this will be compared against calculated_rewards and if they match we know the block is
     // paying the correct people only.
-    std::vector<std::tuple<crypto::public_key, uint64_t>> miner_tx_vouts;
+    std::vector<std::pair<crypto::public_key, uint64_t>> miner_tx_vouts;
     for (auto & vout: block.miner_tx.vout)
       miner_tx_vouts.emplace_back(var::get<txout_to_key>(vout.target).key, vout.amount);
 
@@ -591,7 +591,7 @@ namespace cryptonote {
   }
 
   bool BlockchainSQLite::validate_batch_payment(
-      const std::vector<std::tuple<crypto::public_key, uint64_t>>& miner_tx_vouts,
+      const std::vector<std::pair<crypto::public_key, uint64_t>>& miner_tx_vouts,
       const std::vector<cryptonote::batch_sn_payment>& calculated_payments_from_batching_db,
       uint64_t block_height) {
     log::trace(logcat, "BlockchainDB_SQLITE::{}", __func__);
