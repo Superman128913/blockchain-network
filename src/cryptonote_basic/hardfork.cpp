@@ -51,6 +51,7 @@ static constexpr std::array mainnet_hard_forks =
   hard_fork{hf::hf19_reward_batching,     0,   1080149, 1655154000 /*Monday, June 13, 2022 21:00 UTC */}, // Oxen 10.1: Service Node Reward Batching
   hard_fork{hf::hf19_reward_batching,     1,   1090229, 1656363600 /*Monday, June 27, 2022 21:00 UTC */}, // Minor hardfork, upgrades to session.
   hard_fork{hf::hf19_reward_batching,     2,   1146479, 1663113600 /*Wednesday, September 14, 2022 0:00 UTC */}, // Oxen 10.2: Unlock fixes, mandatory SS 2.4.0 update
+  hard_fork{hf::hf19_reward_batching,     3,   1253039, 1675900800 /*Thursday, February 9, 2023 0:00 UTC */}, // Oxen 10.3: Mandatory SS 2.5.0 update
 };
 
 static constexpr std::array testnet_hard_forks =
