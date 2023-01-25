@@ -192,8 +192,8 @@ namespace service_nodes {
   // blocks out of sync and sending something that it thinks is legit.
   inline constexpr uint64_t VOTE_OR_TX_VERIFY_HEIGHT_BUFFER    = 5;
 
-  inline constexpr std::array<uint16_t, 3> MIN_STORAGE_SERVER_VERSION{{2, 4, 0}};
-  inline constexpr std::array<uint16_t, 3> MIN_LOKINET_VERSION{{0, 9, 10}};
+  inline constexpr std::array<uint16_t, 3> MIN_STORAGE_SERVER_VERSION{{2, 5, 0}};
+  inline constexpr std::array<uint16_t, 3> MIN_LOKINET_VERSION{{0, 9, 11}};
 
   // The minimum accepted version number, broadcasted by Service Nodes via uptime proofs for each hardfork
   struct proof_version
@@ -205,8 +205,8 @@ namespace service_nodes {
   };
 
   inline constexpr std::array MIN_UPTIME_PROOF_VERSIONS = {
+    proof_version{{cryptonote::hf::hf19_reward_batching, 3}, {10,3,0}, {0,9,11}, {2,5,0}},
     proof_version{{cryptonote::hf::hf19_reward_batching, 2}, {10,2,0}, {0,9,9}, {2,4,0}},
-    proof_version{{cryptonote::hf::hf19_reward_batching, 0}, {10,0,0}, {0,9,9}, {2,3,0}},
   };
 
   using swarm_id_t = uint64_t;
