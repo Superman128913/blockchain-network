@@ -593,8 +593,7 @@ namespace nodetool
       full_addrs.insert("185.150.191.32:22022");  // Jason's seed node
       full_addrs.insert("199.127.60.6:22022");    // Oxen Foundation server "holstein"
       full_addrs.insert("23.88.6.250:22022");     // Official Session open group server
-      full_addrs.insert("144.217.243.15:22022");  // OVH(1)
-      full_addrs.insert("51.38.133.145:22022");   // OVH(2)
+      full_addrs.insert("104.194.8.115:22000");   // Oxen Foundation server "brahman"
     }
     return full_addrs;
   }
