@@ -1464,7 +1464,7 @@ namespace cryptonote
           q = get_quorum(service_nodes::quorum_type::blink, q_height);
         if (!q)
         {
-          log::info(logcat, "Don't have a quorum for height {} (yet?), ignoring this blink", q_height);
+          log::trace(logcat, "Don't have a quorum for height {} (yet?), ignoring this blink", q_height);
           no_quorum = true;
           break;
         }

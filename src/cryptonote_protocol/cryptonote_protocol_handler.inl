@@ -429,7 +429,7 @@ namespace cryptonote
       }
 
       if (context.m_need_blink_sync)
-        log::info(logcat, "{}Need to synchronized blink signatures", context);
+        log::debug(logcat, "{}Need to synchronized blink signatures", context);
     }
 
     uint64_t target = m_core.get_target_blockchain_height();
@@ -1084,7 +1084,7 @@ namespace cryptonote
     // so don't drop the connection).
     if (!syncing && (!all_okay || bad_blinks))
     {
-      log::info(logcat, "{} verification(s) failed, dropping connection", (!all_okay && bad_blinks ? "Tx and Blink" : !all_okay ? "Tx" : "Blink"));
+      log::debug(logcat, "{} verification(s) failed, dropping connection", (!all_okay && bad_blinks ? "Tx and Blink" : !all_okay ? "Tx" : "Blink"));
       drop_connection(context, false, false);
     }
 
