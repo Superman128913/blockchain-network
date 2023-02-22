@@ -26,7 +26,7 @@ namespace wallet
       
       // TODO sean this should actually be kept track of somewhere in the schema. not just max of *our* outputs
       //int64_t max_output_index = db->prepared_get<int>("SELECT max(global_index) FROM outputs;");
-      int64_t max_output_index = 100; 
+      int64_t max_output_index = 1000; 
       decoy_selector = std::make_unique<DecoySelector>(0, max_output_index);
     };
 
