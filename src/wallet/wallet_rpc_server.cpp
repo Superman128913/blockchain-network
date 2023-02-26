@@ -3247,6 +3247,7 @@ namespace {
 
   ONS_KNOWN_NAMES::response wallet_rpc_server::invoke(ONS_KNOWN_NAMES::request&& req)
   {
+    //TODO sean this needs to fit the new request format
     require_open();
     ONS_KNOWN_NAMES::response res{};
 

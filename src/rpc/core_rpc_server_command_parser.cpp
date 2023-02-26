@@ -365,6 +365,12 @@ namespace cryptonote::rpc {
         "include_expired", ons_owners_to_names.request.include_expired);
   }
 
+  void parse_request(ONS_NAMES_TO_OWNERS& ons_names_to_owners, rpc_input in) {
+    get_values(in,
+        "name_hash", required{ons_names_to_owners.request.name_hash},
+        "type", ons_names_to_owners.request.type);
+  }
+
   void parse_request(GET_QUORUM_STATE& qs, rpc_input in) {
 
     get_values(in,

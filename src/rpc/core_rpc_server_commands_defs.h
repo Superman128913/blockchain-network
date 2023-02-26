@@ -2522,52 +2522,20 @@ namespace cryptonote::rpc {
   };
 
   OXEN_RPC_DOC_INTROSPECT
-  // Get the name mapping for a Loki Name Service entry. Loki currently supports mappings
-  // for Session and Lokinet.
+  // Get the name mapping for an Oxen Name Service entry. Oxen currently supports mappings
+  // for Session, Wallet and Lokinet.
   struct ONS_NAMES_TO_OWNERS : PUBLIC
   {
     static constexpr auto names() { return NAMES("ons_names_to_owners", "lns_names_to_owners"); }
 
     static constexpr size_t MAX_REQUEST_ENTRIES      = 256;
     static constexpr size_t MAX_TYPE_REQUEST_ENTRIES = 8;
-    struct request_entry
+
+    struct request_parameters
     {
-      std::string name_hash; // The 32-byte BLAKE2b hash of the name to resolve to a public key via Loki Name Service. The value must be provided either in hex (64 hex digits) or base64 (44 characters with padding, or 43 characters without).
-      std::vector<uint16_t> types; // If empty, query all types. Currently supported types are 0 (session) and 2 (lokinet). In future updates more mapping types will be available.
-
-      KV_MAP_SERIALIZABLE
-    };
-
-    struct request
-    {
-      std::vector<request_entry> entries; // Entries to look up
-      bool include_expired;               // Optional: if provided and true, include entries in the results even if they are expired
-
-      KV_MAP_SERIALIZABLE
-    };
-
-    struct response_entry
-    {
-      uint64_t entry_index;     // The index in request_entry's `entries` array that was resolved via Loki Name Service.
-      ons::mapping_type type;   // The type of Loki Name Service entry that the owner owns: currently supported values are 0 (session), 1 (wallet) and 2 (lokinet)
-      std::string name_hash;    // The hash of the name that was queried, in base64
-      std::string owner;        // The public key that purchased the Loki Name Service entry.
-      std::optional<std::string> backup_owner; // The backup public key that the owner specified when purchasing the Loki Name Service entry. Omitted if no backup owner.
-      std::string encrypted_value; // The encrypted value that the name maps to. See the `ONS_RESOLVE` description for information on how this value can be decrypted.
-      uint64_t update_height;   // The last height that this Loki Name Service entry was updated on the Blockchain.
-      std::optional<uint64_t> expiration_height; // For records that expire, this will be set to the expiration block height.
-      std::string txid;                          // The txid of the mapping's most recent update or purchase.
-
-      KV_MAP_SERIALIZABLE
-    };
-
-    struct response
-    {
-      std::vector<response_entry> entries;
-      std::string status; // Generic RPC error code. "OK" is the success value.
-
-      KV_MAP_SERIALIZABLE
-    };
+      std::vector<std::string> name_hash; // The 32-byte BLAKE2b hash of the name to resolve to a public key via Oxen Name Service. The value must be provided either in hex (64 hex digits) or base64 (44 characters with padding, or 43 characters without).
+      std::vector<uint16_t> type; // If empty, query all types. Currently supported types are 0 (session), 1 (wallet) and 2 (lokinet). In future updates more mapping types will be available.
+    } request;
   };
 
   /// RPC: ons/ons_owners_to_names
@@ -2848,14 +2816,14 @@ namespace cryptonote::rpc {
     SUBMIT_TRANSACTION,
     SYNC_INFO,
     TEST_TRIGGER_P2P_RESYNC,
-    TEST_TRIGGER_UPTIME_PROOF
+    TEST_TRIGGER_UPTIME_PROOF,
+    ONS_NAMES_TO_OWNERS
   >;
 
   using FIXME_old_rpc_types = tools::type_list<
     RELAY_TX,
     GET_OUTPUT_DISTRIBUTION,
-    GET_SERVICE_NODE_REGISTRATION_CMD,
-    ONS_NAMES_TO_OWNERS
+    GET_SERVICE_NODE_REGISTRATION_CMD
   >;
 
 } // namespace cryptonote::rpc
