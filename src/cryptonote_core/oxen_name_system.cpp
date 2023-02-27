@@ -523,6 +523,58 @@ bool bind_and_run(ons_sql_type type, sql_compiled_statement& statement, void *co
 
 
 } // end anonymous namespace
+  
+using namespace std::literals;
+
+using stringtypemap = std::pair<std::string_view, mapping_type>;
+static constexpr std::array ons_str_type_mappings = {
+    stringtypemap{"5"sv, mapping_type::lokinet_10years},
+    stringtypemap{"4"sv, mapping_type::lokinet_5years},
+    stringtypemap{"3"sv, mapping_type::lokinet_2years},
+    stringtypemap{"2"sv, mapping_type::lokinet},
+    stringtypemap{"1"sv, mapping_type::wallet},
+    stringtypemap{"0"sv, mapping_type::session},
+    stringtypemap{"session"sv, mapping_type::session},
+    stringtypemap{"wallet"sv,  mapping_type::wallet},
+    stringtypemap{"lokinet"sv, mapping_type::lokinet},
+    stringtypemap{"lokinet_2years"sv,  mapping_type::lokinet_2years},
+    stringtypemap{"lokinet_5years"sv,  mapping_type::lokinet_5years},
+    stringtypemap{"lokinet_10years"sv, mapping_type::lokinet_10years}
+};
+
+std::optional<mapping_type>
+parse_ons_type(std::string input)
+{
+  // Lower-case the input:
+  for (auto& c : input)
+      if (c >= 'A' && c <= 'Z')
+          c += ('A' - 'a');
+
+  for (const auto& [str, map] : ons_str_type_mappings)
+    if (str == input)
+      return map;
+
+  return std::nullopt;
+}
+
+using inttypemap = std::pair<uint16_t, mapping_type>;
+static constexpr std::array ons_int_type_mappings = {
+    inttypemap{5, mapping_type::lokinet_10years},
+    inttypemap{4, mapping_type::lokinet_5years},
+    inttypemap{3, mapping_type::lokinet_2years},
+    inttypemap{2, mapping_type::lokinet},
+    inttypemap{1, mapping_type::wallet},
+    inttypemap{0, mapping_type::session}
+};
+std::optional<mapping_type>
+parse_ons_type(uint16_t input)
+{
+  for (const auto& [inttype, map] : ons_int_type_mappings)
+    if (inttype == input)
+      return map;
+
+  return std::nullopt;
+}
 
 
 bool mapping_record::active(uint64_t blockchain_height) const

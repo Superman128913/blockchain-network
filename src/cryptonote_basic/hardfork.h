@@ -55,6 +55,9 @@ namespace cryptonote
   std::pair<std::optional<uint64_t>, std::optional<uint64_t>>
   get_hard_fork_heights(network_type type, hf version);
 
+  // Returns the latest hardfork
+  hard_fork get_latest_hard_fork(network_type type);
+
   // Returns the lowest network version >= the given version, that is, it rounds up missing hf table
   // entries to the next largest entry.  Typically this returns the network version itself, but if
   // some versions are skipped (particularly on testnet/devnet/fakechain) then this will return the

@@ -467,6 +467,44 @@ namespace wallet
     return fut;
   }
 
+  std::future<std::string>
+  DefaultDaemonComms::ons_names_to_owners(const std::string& name_hash, const uint16_t type)
+  {
+    auto p = std::make_shared<std::promise<std::string> >();
+    auto fut = p->get_future();
+    auto req_cb = [p=std::move(p)](bool ok, std::vector<std::string> response)
+    {
+
+      oxenc::bt_dict_consumer dc{response[1]};
+
+      if (not dc.skip_until("result"))
+      {
+        auto reason = dc.consume_string();
+        p->set_value(std::string("ONS names to owners rejected, reason: ") + reason);
+        return;
+      }
+      auto result_list = dc.consume_list_consumer();
+      const auto result = result_list.consume_dict_data();
+
+      p->set_value(std::string(result));
+      return;
+    };
+
+    oxenc::bt_dict req_params_dict;
+
+    oxenc::bt_list name_hash_list;
+    name_hash_list.push_back(name_hash);
+    oxenc::bt_list type_list;
+    type_list.push_back(type);
+
+    req_params_dict["name_hash"] = name_hash_list;
+    req_params_dict["type"] = type_list;
+
+    omq->request(conn, "rpc.ons_names_to_owners", req_cb, oxenc::bt_serialize(req_params_dict));
+
+    return fut;
+  }
+
   void
   DefaultDaemonComms::register_wallet(wallet::Wallet& wallet, int64_t height, bool check_sync_height, bool new_wallet)
   {

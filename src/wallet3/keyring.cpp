@@ -453,4 +453,36 @@ namespace wallet
     return returned_keys;
   }
 
+  ons::generic_signature
+  Keyring::generate_ons_signature(const std::string& curr_owner, const ons::generic_owner* new_owner, const ons::generic_owner* new_backup_owner, const ons::mapping_value& encrypted_value, const crypto::hash& prev_txid, const cryptonote::network_type& nettype)
+  {
+    ons::generic_signature result;
+    cryptonote::address_parse_info curr_owner_parsed = {};
+    if (!cryptonote::get_account_address_from_str(curr_owner_parsed, nettype, curr_owner))
+        throw std::runtime_error("Could not parse address");
+
+    //TODO sean this should actually get it from the db
+    cryptonote::subaddress_index index = {0,0};
+
+    //std::optional<cryptonote::subaddress_index> index = get_subaddress_index(curr_owner_parsed.address);
+    //if (!index) return false;
+
+    auto sig_data = ons::tx_extra_signature(
+        encrypted_value.to_view(),
+        new_owner,
+        new_backup_owner,
+        prev_txid);
+    if (sig_data.empty())
+      throw std::runtime_error("Could not generate signature");
+
+    cryptonote::account_base account;
+    account.create_from_keys(cryptonote::account_public_address{spend_public_key, view_public_key}, spend_private_key, view_private_key);
+    auto& hwdev = account.get_device();
+    hw::mode_resetter rst{key_device};
+    key_device.generate_ons_signature(sig_data, account.get_keys(), index, result.monero);
+    result.type = ons::generic_owner_sig_type::monero;
+
+    return result;
+  }
+
 }  // namespace wallet

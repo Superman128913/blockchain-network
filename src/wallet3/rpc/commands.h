@@ -2481,13 +2481,11 @@ namespace wallet::rpc {
     static constexpr auto names() { return NAMES("ons_buy_mapping"); }
 
     static constexpr const char *description =
-R"(Buy a Loki Name System (ONS) mapping that maps a unique name to a Session ID or Lokinet address.
+R"(Buy an Oxen Name System (ONS) mapping that maps a unique name to a Session ID, Oxen Address or Lokinet address.
 
-Currently supports Session, Lokinet and Wallet registrations. Lokinet registrations can be for 1, 2, 5, or 10 years by specifying a type value of "lokinet", "lokinet_2y", "lokinet_5y", "lokinet_10y". Session registrations do not expire.
+Currently supports Session, Wallet and Lokinet registrations. Lokinet registrations can be for 1, 2, 5, or 10 years by specifying a type value of "lokinet", "lokinet_2y", "lokinet_5y", "lokinet_10y". Session and Wallet registrations do not expire.
 
 The owner of the ONS entry (by default, the purchasing wallet) will be permitted to submit ONS update transactions to the Loki blockchain (for example to update a Session pubkey or the target Lokinet address). You may change the primary owner or add a backup owner in the registration and can change them later with update transactions. Owner addresses can be either Loki wallets, or generic ed25519 pubkeys (for advanced uses).
-
-For Session, the recommended owner or backup owner is the ed25519 public key of the user's Session ID.
 
 When specifying owners, either a wallet (sub)address or standard ed25519 public key is supported per mapping. Updating the value that a name maps to requires one of the owners to sign the update transaction. For wallets, this is signed using the (sub)address's spend key.
 
@@ -2495,19 +2493,19 @@ For more information on updating and signing see the ONS_UPDATE_MAPPING document
 
     struct REQUEST
     {
-      std::string        type;            // The mapping type: "session", "lokinet", "lokinet_2y", "lokinet_5y", "lokinet_10y", "wallet".
-      std::string        owner;           // (Optional): The ed25519 public key or wallet address that has authority to update the mapping.
-      std::string        backup_owner;    // (Optional): The secondary, backup public key that has authority to update the mapping.
-      std::string        name;            // The name to purchase via Oxen Name Service
-      std::string        value;           // The value that the name maps to via Oxen Name Service, (i.e. For Session: [display name->session public key],  for wallets: [name->wallet address], for Lokinet: [name->domain name]).
+      std::string        type;               // The mapping type: "session", "wallet", "lokinet", "lokinet_2y", "lokinet_5y", "lokinet_10y".
+      std::string        owner;              // (Optional): The ed25519 public key or wallet address that has authority to update the mapping.
+      std::string        backup_owner;       // (Optional): The secondary, backup public key that has authority to update the mapping.
+      std::string        name;               // The name to purchase via Oxen Name Service
+      std::string        value;              // The value that the name maps to via Oxen Name Service, (i.e. For Session: [display name->session public key],  for wallets: [name->wallet address], for Lokinet: [name->domain name]).
 
-      uint32_t           account_index;   // (Optional) Transfer from this account index. (Defaults to 0)
-      std::set<uint32_t> subaddr_indices; // (Optional) Transfer from this set of subaddresses. (Defaults to 0)
-      uint32_t           priority;        // Set a priority for the transaction. Accepted values are: or 0-4 for: default, unimportant, normal, elevated, priority.
-      bool               get_tx_key;      // (Optional) Return the transaction key after sending.
-      bool               do_not_relay;    // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
-      bool               get_tx_hex;      // Return the transaction as hex string after sending (Defaults to false)
-      bool               get_tx_metadata; // Return the metadata needed to relay the transaction. (Defaults to false)
+      uint32_t           account_index;      // (Optional) Transfer from this account index. (Defaults to 0)
+      std::vector<uint32_t> subaddr_indices; // (Optional) Transfer from this set of subaddresses. (Defaults to 0)
+      uint32_t           priority;           // Set a priority for the transaction. Accepted values are: or 0-4 for: default, unimportant, normal, elevated, priority.
+      bool               get_tx_key;         // (Optional) Return the transaction key after sending.
+      bool               do_not_relay;       // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
+      bool               get_tx_hex;         // Return the transaction as hex string after sending (Defaults to false)
+      bool               get_tx_metadata;    // Return the metadata needed to relay the transaction. (Defaults to false)
     } request;
   };
 
@@ -2619,7 +2617,7 @@ If signing is performed externally then you must first encrypt the `value` (if b
       std::string        signature; // (Optional): Signature derived using libsodium generichash on {current txid blob, new value blob} of the mapping to update. By default the hash is signed using the wallet's spend key as an ed25519 keypair, if signature is specified.
 
       uint32_t           account_index;    // (Optional) Transfer from this account index. (Defaults to 0)
-      std::set<uint32_t> subaddr_indices;  // (Optional) Transfer from this set of subaddresses. (Defaults to 0)
+      std::vector<uint32_t> subaddr_indices;  // (Optional) Transfer from this set of subaddresses. (Defaults to 0)
       uint32_t           priority;         // Set a priority for the transaction. Accepted values are: 0-4 for: default, unimportant, normal, elevated, priority.
       bool               get_tx_key;       // (Optional) Return the transaction key after sending.
       bool               do_not_relay;     // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)

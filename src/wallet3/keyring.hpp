@@ -3,6 +3,7 @@
 #include <crypto/crypto.h>
 #include <cryptonote_basic/subaddress_index.h>
 #include <cryptonote_basic/cryptonote_basic.h>
+#include <cryptonote_core/oxen_name_system.h>
 #include <device/device_default.hpp>
 #include <ringct/rctSigs.h>
 
@@ -117,6 +118,9 @@ namespace wallet
 
     virtual cryptonote::account_keys
     export_keys();
+
+    virtual ons::generic_signature
+    generate_ons_signature(const std::string& curr_owner, const ons::generic_owner* new_owner, const ons::generic_owner* new_backup_owner, const ons::mapping_value& encrypted_value, const crypto::hash& prev_txid, const cryptonote::network_type& nettype);
 
     cryptonote::network_type nettype;
 

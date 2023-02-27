@@ -360,12 +360,41 @@ void parse_request(SET_LOG_CATEGORIES& req, rpc_input in) {
 }
 
 void parse_request(ONS_BUY_MAPPING& req, rpc_input in) {
+    get_values(in,
+        "account_index", req.request.account_index,
+        "backup_owner", req.request.backup_owner,
+        "do_not_relay", req.request.do_not_relay,
+        "get_tx_hex", req.request.get_tx_hex,
+        "get_tx_key", req.request.get_tx_key,
+        "get_tx_metadata", req.request.get_tx_metadata,
+        "name", req.request.name,
+        "owner", req.request.owner,
+        "priority", req.request.priority,
+        "subaddr_indices", req.request.subaddr_indices,
+        "type", req.request.type,
+        "value", req.request.value
+        );
 }
 
 void parse_request(ONS_RENEW_MAPPING& req, rpc_input in) {
 }
 
 void parse_request(ONS_UPDATE_MAPPING& req, rpc_input in) {
+    get_values(in,
+        "account_index", req.request.account_index,
+        "backup_owner", req.request.backup_owner,
+        "do_not_relay", req.request.do_not_relay,
+        "get_tx_hex", req.request.get_tx_hex,
+        "get_tx_key", req.request.get_tx_key,
+        "get_tx_metadata", req.request.get_tx_metadata,
+        "name", req.request.name,
+        "owner", req.request.owner,
+        "priority", req.request.priority,
+        "signature", req.request.signature,
+        "subaddr_indices", req.request.subaddr_indices,
+        "type", req.request.type,
+        "value", req.request.value
+        );
 }
 
 void parse_request(ONS_MAKE_UPDATE_SIGNATURE& req, rpc_input in) {

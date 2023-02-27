@@ -12,6 +12,7 @@
 #include <memory>
 
 #include <common/hex.h>
+#include <oxenc/base64.h>
 #include "mnemonics/electrum-words.h"
 
 
@@ -23,6 +24,8 @@ using cryptonote::rpc::rpc_request;
 using cryptonote::rpc::rpc_error;
 
 namespace {
+
+  static auto logcat = oxen::log::Cat("wallet");
 
   template <typename RPC>
   void register_rpc_command(std::unordered_map<std::string, std::shared_ptr<const rpc_command>>& regs)
@@ -471,12 +474,83 @@ void RequestHandler::invoke(SET_LOG_CATEGORIES& command, rpc_context context) {
 }
 
 void RequestHandler::invoke(ONS_BUY_MAPPING& command, rpc_context context) {
+  //TODO sean these params need to be accounted for
+  //  "do_not_relay", req.request.do_not_relay.
+  //  "get_tx_hex", req.request.get_tx_hex.
+  //  "get_tx_key", req.request.get_tx_key.
+  //  "get_tx_metadata", req.request.get_tx_metadata.
+  //  "priority", req.request.priority,
+  //  "subaddr_indices", req.request.subaddr_indices,
+
+  oxen::log::info(logcat, "RPC Handler received ONS_BUY_MAPPING command");
+  if (auto w = wallet.lock())
+  {
+    cryptonote::tx_destination_entry change_dest;
+    change_dest.original = w->keys->get_main_address();
+    cryptonote::address_parse_info change_addr_info;
+    cryptonote::get_account_address_from_str(change_addr_info, w->nettype, change_dest.original);
+    change_dest.amount = 0;
+    change_dest.addr = change_addr_info.address;
+    change_dest.is_subaddress = change_addr_info.is_subaddress;
+    change_dest.is_integrated = change_addr_info.has_payment_id;
+
+    auto ptx = w->tx_constructor->create_ons_buy_transaction(
+      change_dest,
+      command.request.type,
+      command.request.owner,
+      command.request.backup_owner,
+      command.request.name,
+      command.request.value
+      );
+
+    w->keys->sign_transaction(ptx);
+
+    auto submit_future = w->daemon_comms->submit_transaction(ptx.tx, false);
+
+    if (submit_future.wait_for(5s) != std::future_status::ready)
+      throw rpc_error(500, "request to daemon timed out");
+
+    command.response["status"] = "200";
+    command.response["result"] = submit_future.get();
+  }
 }
 
 void RequestHandler::invoke(ONS_RENEW_MAPPING& command, rpc_context context) {
 }
 
 void RequestHandler::invoke(ONS_UPDATE_MAPPING& command, rpc_context context) {
+  oxen::log::info(logcat, "RPC Handler received ONS_UPDATE_MAPPING command");
+  if (auto w = wallet.lock())
+  {
+    cryptonote::tx_destination_entry change_dest;
+    change_dest.original = w->keys->get_main_address();
+    cryptonote::address_parse_info change_addr_info;
+    cryptonote::get_account_address_from_str(change_addr_info, w->nettype, change_dest.original);
+    change_dest.amount = 0;
+    change_dest.addr = change_addr_info.address;
+    change_dest.is_subaddress = change_addr_info.is_subaddress;
+    change_dest.is_integrated = change_addr_info.has_payment_id;
+
+    auto ptx = w->tx_constructor->create_ons_update_transaction(
+      change_dest,
+      command.request.type ,
+      command.request.owner,
+      command.request.backup_owner,
+      command.request.name,
+      command.request.value,
+      w->keys
+      );
+
+    w->keys->sign_transaction(ptx);
+
+    auto submit_future = w->daemon_comms->submit_transaction(ptx.tx, false);
+
+    if (submit_future.wait_for(5s) != std::future_status::ready)
+      throw rpc_error(500, "request to daemon timed out");
+
+    command.response["status"] = "200";
+    command.response["result"] = submit_future.get();
+  }
 }
 
 void RequestHandler::invoke(ONS_MAKE_UPDATE_SIGNATURE& command, rpc_context context) {

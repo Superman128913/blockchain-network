@@ -116,11 +116,14 @@ def balance():
     if context.wallet is None:
         click.echo("Wallet not loaded")
         return
-    click.echo("Balance: {}".format(context.wallet.get_balance()))
+    click.echo("Balance: {:.2f} Oxen".format(context.wallet.get_balance()/1e9))
 
 @walletcli.command()
 def unlocked_balance():
-    click.echo("Unlocked Balance: {}".format(context.wallet.get_unlocked_balance()))
+    if context.wallet is None:
+        click.echo("Wallet not loaded")
+        return
+    click.echo("Unlocked Balance: {:.2f} Oxen".format(context.wallet.get_unlocked_balance()/1e9))
 
 @walletcli.command()
 def height():
@@ -135,12 +138,50 @@ def transfer():
     if address == "" or amount == 0.0:
         click.prompt("Invalid address/amount entered")
         return
-    amount_in_atomic_units = round(amount * 10e9, 0);
+    amount_in_atomic_units = round(amount * 1e9, 0);
     destination = {"address": address, "amount": amount_in_atomic_units}
     transfer_params = {"destinations": [destination]}
     transfer_future = context.rpc_future("restricted.transfer", args=transfer_params);
     transfer_response = transfer_future.get();
     click.echo("Transfer Response: {}".format(transfer_response))
+
+@walletcli.command()
+def ons_buy_mapping():
+    ons_type = click.prompt("What type of mapping would you like", type=click.Choice(['session', 'wallet', 'lokinet', 'lokinet_2years', 'lokinet_5years', 'lokinet_10years']), default="session").strip()
+    ons_name = click.prompt("Please enter the ons name you would like to register", default="").strip()
+    ons_value = click.prompt("Please enter the value for the ons mapping", default="").strip()
+    ons_owner = click.prompt("Optional: Enter the address of a different owner", default="").strip()
+    ons_backup_owner = click.prompt("Optional: Enter the address of a backup owner", default="").strip()
+
+    ons_buy_params = {
+            "name": ons_name,
+            "value": ons_value,
+            "owner": ons_owner,
+            "backup_owner": ons_backup_owner,
+            "type": ons_type,
+           }
+    transfer_future = context.rpc_future("restricted.ons_buy_mapping", args=ons_buy_params);
+    transfer_response = transfer_future.get();
+    click.echo("ONS Buy Mapping Response: {}".format(transfer_response))
+
+@walletcli.command()
+def ons_update_mapping():
+    ons_name = click.prompt("Please enter the ons name you would like to update", default="").strip()
+    ons_type = click.prompt("Please enter the type of ONS mapping this is", type=click.Choice(['session', 'wallet', 'lokinet', 'lokinet_2years', 'lokinet_5years', 'lokinet_10years']), default="session").strip()
+    ons_value = click.prompt("Optional: Please enter a value to modify the ons mapping", default="").strip()
+    ons_owner = click.prompt("Optional: Please enter an address to modify the owner", default="").strip()
+    ons_backup_owner = click.prompt("Optional: Please enter an address to modify the backup owner", default="").strip()
+
+    ons_update_params = {
+            "name": ons_name,
+            "value": ons_value,
+            "owner": ons_owner,
+            "backup_owner": ons_backup_owner,
+            "type": ons_type,
+           }
+    transfer_future = context.rpc_future("restricted.ons_update_mapping", args=ons_update_params);
+    transfer_response = transfer_future.get();
+    click.echo("ONS Update Mapping Response: {}".format(transfer_response))
 
 @walletcli.command()
 def quit():
