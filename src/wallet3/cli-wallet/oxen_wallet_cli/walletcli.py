@@ -8,11 +8,14 @@ from oxen_wallet_cli import context
 
 import pywallet3
 
+OXEN_ATOMIC_UNITS = 1e9
+
 @click.group(invoke_without_command=True)
 @click.option('--log-level', type=click.Choice(['error', 'warn', 'info', 'debug']), default="info")
 @click.option('--network', default='testnet', type=click.Choice(['mainnet', 'testnet', 'devnet'], case_sensitive=False), help='Network: mainnet|testnet|devnet.')
 @click.option('--oxend-url', default="ipc:///home/sean/.oxen/testnet/oxend.sock", type=str, help='Use the given daemon')
 @click.option('--datadir', help='A directory which the wallet will save data')
+@click.option('--rounding', help='how many decimal places will be displayed for oxen', type=int, default=2)
 @click.option('--append-network-to-datadir', default=True)
 @click.option('--wallet-name')
 # @click.option('--wallet-password')
@@ -116,14 +119,14 @@ def balance():
     if context.wallet is None:
         click.echo("Wallet not loaded")
         return
-    click.echo("Balance: {:.2f} Oxen".format(context.wallet.get_balance()/1e9))
+    click.echo("Balance: {:.{oxen_precision}f} Oxen".format(context.wallet.get_balance()/OXEN_ATOMIC_UNITS, oxen_precision=context.options["rounding"]))
 
 @walletcli.command()
 def unlocked_balance():
     if context.wallet is None:
         click.echo("Wallet not loaded")
         return
-    click.echo("Unlocked Balance: {:.2f} Oxen".format(context.wallet.get_unlocked_balance()/1e9))
+    click.echo("Unlocked Balance: {:.{oxen_precision}f} Oxen".format(context.wallet.get_unlocked_balance()/OXEN_ATOMIC_UNITS, oxen_precision=context.options["rounding"]))
 
 @walletcli.command()
 def height():
@@ -138,16 +141,23 @@ def transfer():
     if address == "" or amount == 0.0:
         click.prompt("Invalid address/amount entered")
         return
-    amount_in_atomic_units = round(amount * 1e9, 0);
+    amount_in_atomic_units = round(amount * OXEN_ATOMIC_UNITS, 0);
     destination = {"address": address, "amount": amount_in_atomic_units}
     transfer_params = {"destinations": [destination]}
     transfer_future = context.rpc_future("restricted.transfer", args=transfer_params);
     transfer_response = transfer_future.get();
     click.echo("Transfer Response: {}".format(transfer_response))
 
+lokinet_years_dict = {"1": "lokinet", "2": "lokinet_2years", "5": "lokinet_5years", "10": "lokinet_10years"}
+
+# TODO better names for these ONS commands
 @walletcli.command()
 def ons_buy_mapping():
-    ons_type = click.prompt("What type of mapping would you like", type=click.Choice(['session', 'wallet', 'lokinet', 'lokinet_2years', 'lokinet_5years', 'lokinet_10years']), default="session").strip()
+    ons_type = click.prompt("What type of mapping would you like", type=click.Choice(['session', 'wallet', 'lokinet']), default="session").strip()
+    if ons_type == "lokinet":
+        lokinet_years = click.prompt("How many years would you like the lokinet mapping for?", type=click.Choice(["1", "2", "5", "10"]), default="1").strip()
+        ons_type = lokinet_years_dict[lokinet_years]
+
     ons_name = click.prompt("Please enter the ons name you would like to register", default="").strip()
     ons_value = click.prompt("Please enter the value for the ons mapping", default="").strip()
     ons_owner = click.prompt("Optional: Enter the address of a different owner", default="").strip()
@@ -164,6 +174,7 @@ def ons_buy_mapping():
     transfer_response = transfer_future.get();
     click.echo("ONS Buy Mapping Response: {}".format(transfer_response))
 
+# TODO better names for these ONS commands
 @walletcli.command()
 def ons_update_mapping():
     ons_name = click.prompt("Please enter the ons name you would like to update", default="").strip()
