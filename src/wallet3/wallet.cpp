@@ -56,11 +56,17 @@ namespace wallet
     if (keyring)
     {
       keys = keyring;
-      db->save_keys(keys);
+      db->save_keys(
+        tools::type_to_hex(keys->spend_private_key),
+        tools::type_to_hex(keys->spend_public_key),
+        tools::type_to_hex(keys->view_private_key),
+        tools::type_to_hex(keys->view_public_key)
+        );
     }
     else
     {
-      keys = db->load_keys(nettype);
+      const auto [spend_priv, spend_pub, view_priv, view_pub] = db->load_keys();
+      keys = std::make_shared<wallet::Keyring>(spend_priv, spend_pub, view_priv, view_pub, nettype);
       tx_scanner = TransactionScanner(keys, db);
     }
     db->add_address(0, 0, keys->get_main_address());

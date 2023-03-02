@@ -12,11 +12,6 @@ namespace wallet
   namespace log = oxen::log;
   static auto logcat = log::Cat("wallet");
 
-  bool is_coinbase(const BlockTX& tx)
-  {
-    return tx.tx.vin.size() == 1 && std::holds_alternative<cryptonote::txin_gen>(tx.tx.vin[0]);
-  }
-
   std::vector<Output>
   TransactionScanner::scan_received(
       const BlockTX& tx, int64_t height, int64_t timestamp)
@@ -40,7 +35,7 @@ namespace wallet
     // A derivation is simply the private view key multiplied by the tx public key
     // do this for every tx public key in the transaction
     auto derivations = wallet_keys->generate_key_derivations(tx_public_keys);
-    bool coinbase_transaction = is_coinbase(tx);
+    bool coinbase_transaction = cryptonote::is_coinbase(tx.tx);
     // Output belongs to public key derived as follows:
     //      let `Hs` := hash_to_scalar
     //      let `B`  := recipient public spend key

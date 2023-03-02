@@ -85,7 +85,6 @@ namespace wallet
 
     // Searchs against our map for subaddress public view keys which also includes our
     // regular view key at index (0,0)
-    const auto subaddr_viewed = get_subaddress_spend_public_keys(0, 0, 1);
     if (const auto subaddress_index = subaddresses.find(candidate_key); subaddress_index != subaddresses.end())
       return (*subaddress_index).second;
 

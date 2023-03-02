@@ -256,15 +256,15 @@ namespace wallet
       throw;
     }
 
-    oxen::log::info(logcat, "Daemon Comms trying to connect to OMQ");
+    oxen::log::info(logcat, "Trying to connect to remote oxend");
     conn = omq->connect_remote(remote,
         // Callback for success case of connect remote
         [](auto){
-          oxen::log::info(logcat, "Daemon Comms successfully connected to OMQ");
+          oxen::log::info(logcat, "successfully connected via OMQ");
         },
         // Callback for failure case of connect remote
         [](auto, auto reason){
-          oxen::log::error(logcat, "Daemon Comms was not successful in connecting to OMQ. Reason: {}", reason);
+          oxen::log::error(logcat, "Daemon Comms was not successful in connecting to remote oxend. Reason: {}", reason);
         });
 
     request_top_block_info();

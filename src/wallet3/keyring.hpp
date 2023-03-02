@@ -29,6 +29,20 @@ namespace wallet
         , nettype(_nettype)
     {}
 
+    Keyring(
+        std::string _spend_private_key,
+        std::string _spend_public_key,
+        std::string _view_private_key,
+        std::string _view_public_key,
+        cryptonote::network_type _nettype = cryptonote::network_type::TESTNET)
+        : nettype(_nettype)
+    {
+      tools::hex_to_type<crypto::secret_key>(_spend_private_key, spend_private_key);
+      tools::hex_to_type<crypto::public_key>(_spend_public_key, spend_public_key);
+      tools::hex_to_type<crypto::secret_key>(_view_private_key, view_private_key);
+      tools::hex_to_type<crypto::public_key>(_view_public_key, view_public_key);
+    }
+
     Keyring() {}
 
     virtual std::string
@@ -124,15 +138,16 @@ namespace wallet
 
     cryptonote::network_type nettype;
 
-   private:
     crypto::secret_key spend_private_key;
     crypto::public_key spend_public_key;
 
     crypto::secret_key view_private_key;
     crypto::public_key view_public_key;
 
+   private:
 
     hw::core::device_default key_device;
+    //TODO persist the subaddresses list to the database
     std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddresses;
   };
 

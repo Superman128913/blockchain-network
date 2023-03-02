@@ -4,7 +4,6 @@
 #include <sqlitedb/database.hpp>
 
 #include "output.hpp"
-#include "keyring.hpp"
 
 #include <optional>
 
@@ -94,13 +93,12 @@ namespace wallet
     int64_t
     chain_output_count();
 
-    // Saves keys to the database, will check if keys match if already exists and throw 
-    // if different
+    // Saves keys to the database, will check if keys match if already exists and throw if different
     void
-    save_keys(std::shared_ptr<Keyring> keys);
+    save_keys(const std::string& spend_priv_str, const std::string& spend_pub_str, const std::string& view_priv_str, const std::string& view_pub_str);
 
-    // Loads keys from an already created database, will throw if keys don't exist
-    std::shared_ptr<Keyring>
-    load_keys(cryptonote::network_type _nettype);
+    // Loads keys from an already created database
+    std::tuple<std::string, std::string, std::string, std::string>
+    load_keys();
   };
 }
