@@ -19,14 +19,14 @@ namespace wallet
   {
     if (not response.size())
     {
-      oxen::log::warning(logcat, "on_get_blocks_response(): empty get_blocks response\n");
+      oxen::log::warning(logcat, "on_get_blocks_response(): empty get_blocks response");
       return;
     }
 
     const auto& status = response[0];
     if (status != "OK" and status != "END")
     {
-      oxen::log::warning(logcat, "get_blocks response: {}\n", response[0]);
+      oxen::log::warning(logcat, "get_blocks response: {}", response[0]);
       return;
     }
 
@@ -34,7 +34,7 @@ namespace wallet
     // TODO: decide/confirm this behavior on the daemon side of things
     if (response.size() == 1)
     {
-      oxen::log::warning(logcat, "get_blocks response.size() == 1\n");
+      oxen::log::warning(logcat, "get_blocks response.size() == 1");
       return;
     }
 
@@ -102,13 +102,13 @@ namespace wallet
     }
     catch (const std::exception& e)
     {
-      oxen::log::warning(logcat, "exception thrown: {}\n", e.what());
+      oxen::log::warning(logcat, "exception thrown: {}", e.what());
       return;
     }
 
     if (blocks.size() == 0)
     {
-      oxen::log::warning(logcat, "received no blocks, but server said response OK\n");
+      oxen::log::warning(logcat, "received no blocks, but server said response OK");
       return;
     }
 
@@ -326,9 +326,9 @@ namespace wallet
       // if not OK
       if (response[0] != "200")
       {
-        oxen::log::warning(logcat, "get_outputs response not ok: {}\n", response[0]);
+        oxen::log::warning(logcat, "get_outputs response not ok: {}", response[0]);
         if (response.size() == 2)
-          oxen::log::warning(logcat, " -- error: \"{}\"\n", response[1]);
+          oxen::log::warning(logcat, " -- error: \"{}\"", response[1]);
         return;
       }
 
@@ -336,7 +336,7 @@ namespace wallet
       // TODO: decide/confirm this behavior on the daemon side of things
       if (response.size() == 1)
       {
-        oxen::log::warning(logcat, "get_blocks response.size() == 1\n");
+        oxen::log::warning(logcat, "get_blocks response.size() == 1");
         return;
       }
 
@@ -389,13 +389,13 @@ namespace wallet
       }
       catch (const std::exception& e)
       {
-        oxen::log::warning(logcat, "exception thrown: {}\n", e.what());
+        oxen::log::warning(logcat, "exception thrown: {}", e.what());
         return;
       }
 
       if (outputs.size() == 0)
       {
-        oxen::log::warning(logcat, "received no outputs, but server said response OK\n");
+        oxen::log::warning(logcat, "received no outputs, but server said response OK");
         return;
       }
 
