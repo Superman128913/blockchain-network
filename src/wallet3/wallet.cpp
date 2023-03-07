@@ -26,6 +26,19 @@ namespace wallet
 {
   static auto logcat = oxen::log::Cat("wallet");
 
+  fs::path file_path_from_default_datadir(const Config& c, const fs::path& filename)
+  {
+    if (filename.string() == ":memory:")
+        return filename;
+
+    auto file_location = fs::absolute(fs::u8path(c.general.datadir));
+    if (c.general.nettype != "mainnet" && c.general.append_network_type_to_datadir)
+      file_location /= c.general.nettype;
+    file_location /= filename;
+
+    return file_location;
+  }
+
   Wallet::Wallet(
       std::shared_ptr<oxenmq::OxenMQ> omq,
       std::shared_ptr<Keyring> keyring,
@@ -141,9 +154,6 @@ namespace wallet
     oxen::log::trace(logcat, "add block called with block height {}", block.height);
     auto db_tx = db->db_transaction();
 
-    //TODO sean delete this:
-    try {
-
     db->store_block(block);
 
     for (const auto& tx : block.transactions)
@@ -164,9 +174,6 @@ namespace wallet
 
     db_tx.commit();
 
-    } catch (const std::exception& ex) {
-      oxen::log::warning(logcat, "Could not add blocks exception thrown: {}", ex.what());
-    }
     last_scan_height++;
   }
 
@@ -177,10 +184,7 @@ namespace wallet
       return;
 
     if (blocks.size() == 0)
-    {
-      oxen::log::warning(logcat, "blocks size is zero, this shouldn't be able to happen");
-      return;
-    }
+      throw std::runtime_error("no blocks sent to add blocks");
 
     if (blocks.front().height > last_scan_height + 1)
     {

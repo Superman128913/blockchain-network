@@ -36,22 +36,22 @@ namespace wallet
 
     PendingTransaction
     create_ons_buy_transaction(
-        const cryptonote::tx_destination_entry& change_recipient,
-        const std::string& type_str,
-        const std::string& owner_str,
-        const std::string& backup_owner_str,
-        const std::string& name,
-        const std::string& value
+        std::string_view name,
+        std::string_view type_str,
+        std::string_view value,
+        std::optional<std::string_view> owner_str,
+        std::optional<std::string_view> backup_owner_str,
+        const cryptonote::tx_destination_entry& change_recipient
         );
 
     PendingTransaction
     create_ons_update_transaction(
-        const cryptonote::tx_destination_entry& change_recipient,
-        const std::string& type_str,
-        const std::string& owner_str,
-        const std::string& backup_owner_str,
         const std::string& name,
-        const std::string& value,
+        const std::string& type_str,
+        std::optional<std::string_view> value,
+        std::optional<std::string_view> owner_str,
+        std::optional<std::string_view> backup_owner_str,
+        const cryptonote::tx_destination_entry& change_recipient,
         std::shared_ptr<Keyring> keyring
         );
 

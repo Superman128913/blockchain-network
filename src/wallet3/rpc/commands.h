@@ -2493,19 +2493,19 @@ For more information on updating and signing see the ONS_UPDATE_MAPPING document
 
     struct REQUEST
     {
-      std::string        type;               // The mapping type: "session", "wallet", "lokinet", "lokinet_2y", "lokinet_5y", "lokinet_10y".
-      std::string        owner;              // (Optional): The ed25519 public key or wallet address that has authority to update the mapping.
-      std::string        backup_owner;       // (Optional): The secondary, backup public key that has authority to update the mapping.
-      std::string        name;               // The name to purchase via Oxen Name Service
-      std::string        value;              // The value that the name maps to via Oxen Name Service, (i.e. For Session: [display name->session public key],  for wallets: [name->wallet address], for Lokinet: [name->domain name]).
+      std::string        type;                 // The mapping type: "session", "wallet", "lokinet", "lokinet_2y", "lokinet_5y", "lokinet_10y".
+      std::optional<std::string> owner;        // (Optional): The ed25519 public key or wallet address that has authority to update the mapping.
+      std::optional<std::string> backup_owner; // (Optional): The secondary, backup public key that has authority to update the mapping.
+      std::string        name;                 // The name to purchase via Oxen Name Service
+      std::string        value;                // The value that the name maps to via Oxen Name Service, (i.e. For Session: [display name->session public key],  for wallets: [name->wallet address], for Lokinet: [name->domain name]).
 
-      uint32_t           account_index;      // (Optional) Transfer from this account index. (Defaults to 0)
-      std::vector<uint32_t> subaddr_indices; // (Optional) Transfer from this set of subaddresses. (Defaults to 0)
-      uint32_t           priority;           // Set a priority for the transaction. Accepted values are: or 0-4 for: default, unimportant, normal, elevated, priority.
-      bool               get_tx_key;         // (Optional) Return the transaction key after sending.
-      bool               do_not_relay;       // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
-      bool               get_tx_hex;         // Return the transaction as hex string after sending (Defaults to false)
-      bool               get_tx_metadata;    // Return the metadata needed to relay the transaction. (Defaults to false)
+      uint32_t           account_index;        // (Optional) Transfer from this account index. (Defaults to 0)
+      std::vector<uint32_t> subaddr_indices;   // (Optional) Transfer from this set of subaddresses. (Defaults to 0)
+      uint32_t           priority;             // Set a priority for the transaction. Accepted values are: or 0-4 for: default, unimportant, normal, elevated, priority.
+      bool               get_tx_key;           // (Optional) Return the transaction key after sending.
+      bool               do_not_relay;         // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
+      bool               get_tx_hex;           // Return the transaction as hex string after sending (Defaults to false)
+      bool               get_tx_metadata;      // Return the metadata needed to relay the transaction. (Defaults to false)
     } request;
   };
 
@@ -2611,9 +2611,9 @@ If signing is performed externally then you must first encrypt the `value` (if b
     {
       std::string        type;      // The mapping type, "session", "lokinet", or "wallet".
       std::string        name;      // The name to update via Loki Name Service
-      std::string        value;     // (Optional): The new value that the name maps to via Loki Name Service. If not specified or given the empty string "", then the mapping's value remains unchanged. If using a `signature` then this value (if non-empty) must be already encrypted.
-      std::string        owner;     // (Optional): The new owner of the mapping. If not specified or given the empty string "", then the mapping's owner remains unchanged.
-      std::string        backup_owner; // (Optional): The new backup owner of the mapping. If not specified or given the empty string "", then the mapping's backup owner remains unchanged.
+      std::optional<std::string> value;     // (Optional): The new value that the name maps to via Loki Name Service. If not specified or given the empty string "", then the mapping's value remains unchanged. If using a `signature` then this value (if non-empty) must be already encrypted.
+      std::optional<std::string> owner; // (Optional): The new owner of the mapping. If not specified or given the empty string "", then the mapping's owner remains unchanged.
+      std::optional<std::string> backup_owner; // (Optional): The new backup owner of the mapping. If not specified or given the empty string "", then the mapping's backup owner remains unchanged.
       std::string        signature; // (Optional): Signature derived using libsodium generichash on {current txid blob, new value blob} of the mapping to update. By default the hash is signed using the wallet's spend key as an ed25519 keypair, if signature is specified.
 
       uint32_t           account_index;    // (Optional) Transfer from this account index. (Defaults to 0)

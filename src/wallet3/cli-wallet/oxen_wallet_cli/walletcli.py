@@ -160,16 +160,18 @@ def ons_buy_mapping():
 
     ons_name = click.prompt("Please enter the ons name you would like to register", default="").strip()
     ons_value = click.prompt("Please enter the value for the ons mapping", default="").strip()
-    ons_owner = click.prompt("Optional: Enter the address of a different owner", default="").strip()
-    ons_backup_owner = click.prompt("Optional: Enter the address of a backup owner", default="").strip()
-
     ons_buy_params = {
             "name": ons_name,
             "value": ons_value,
-            "owner": ons_owner,
-            "backup_owner": ons_backup_owner,
             "type": ons_type,
            }
+    ons_owner = click.prompt("Optional: Enter the address of a different owner", default="").strip()
+    if len(ons_owner) > 0:
+        ons_buy_params["owner"] = ons_owner
+    ons_backup_owner = click.prompt("Optional: Enter the address of a backup owner", default="").strip()
+    if len(ons_backup_owner) > 0:
+        ons_buy_params["backup_owner"] = ons_backup_owner
+
     transfer_future = context.rpc_future("restricted.ons_buy_mapping", args=ons_buy_params);
     transfer_response = transfer_future.get();
     click.echo("ONS Buy Mapping Response: {}".format(transfer_response))
@@ -179,17 +181,20 @@ def ons_buy_mapping():
 def ons_update_mapping():
     ons_name = click.prompt("Please enter the ons name you would like to update", default="").strip()
     ons_type = click.prompt("Please enter the type of ONS mapping this is", type=click.Choice(['session', 'wallet', 'lokinet', 'lokinet_2years', 'lokinet_5years', 'lokinet_10years']), default="session").strip()
-    ons_value = click.prompt("Optional: Please enter a value to modify the ons mapping", default="").strip()
-    ons_owner = click.prompt("Optional: Please enter an address to modify the owner", default="").strip()
-    ons_backup_owner = click.prompt("Optional: Please enter an address to modify the backup owner", default="").strip()
-
     ons_update_params = {
             "name": ons_name,
-            "value": ons_value,
-            "owner": ons_owner,
-            "backup_owner": ons_backup_owner,
             "type": ons_type,
            }
+    ons_value = click.prompt("Optional: Please enter a value to modify the ons mapping", default="").strip()
+    if len(ons_value) > 0:
+        ons_buy_params["value"] = ons_value
+    ons_owner = click.prompt("Optional: Please enter an address to modify the owner", default="").strip()
+    if len(ons_owner) > 0:
+        ons_buy_params["owner"] = ons_owner
+    ons_backup_owner = click.prompt("Optional: Please enter an address to modify the backup owner", default="").strip()
+    if len(ons_backup_owner) > 0:
+        ons_buy_params["backup_owner"] = ons_backup_owner
+
     transfer_future = context.rpc_future("restricted.ons_update_mapping", args=ons_update_params);
     transfer_response = transfer_future.get();
     click.echo("ONS Update Mapping Response: {}".format(transfer_response))

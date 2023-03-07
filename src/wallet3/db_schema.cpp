@@ -57,7 +57,7 @@ namespace wallet
           );
 
           -- insert metadata row as default
-          INSERT INTO metadata VALUES (0,0,"testnet",0,0,-1,"",0,0,"","","","");
+          INSERT INTO metadata VALUES (0,0,"testnet",0,0,-1,'',0,0,'','','','');
 
           CREATE TABLE blocks (
             height INTEGER NOT NULL PRIMARY KEY,
@@ -428,38 +428,25 @@ namespace wallet
   void
   WalletDB::save_keys(const std::string& spend_priv_str, const std::string& spend_pub_str, const std::string& view_priv_str, const std::string& view_pub_str)
   {
-    std::string query = "SELECT spend_priv, spend_pub, view_priv, view_pub FROM metadata WHERE id=0";
+    const auto [db_spend_priv_str, db_spend_pub_str, db_view_priv_str, db_view_pub_str] = load_keys();
 
-    auto st = prepared_st(query);
-    st->executeStep();
-    auto from_db = db::get<std::string, std::string, std::string, std::string>(st);
-    const auto loaded_spend_priv_str = std::get<0>(from_db);
-    const auto loaded_spend_pub_str = std::get<1>(from_db);
-    const auto loaded_view_priv_str = std::get<2>(from_db);
-    const auto loaded_view_pub_str = std::get<3>(from_db);
-
-    if ((loaded_spend_priv_str != "" && loaded_spend_priv_str != spend_priv_str) ||
-        (loaded_spend_pub_str != "" && loaded_spend_pub_str != spend_pub_str) ||
-        (loaded_view_priv_str != "" && loaded_view_priv_str != view_priv_str) ||
-        (loaded_view_pub_str != "" && loaded_view_pub_str != view_pub_str))
-          throw std::runtime_error("loaded keys do not match database file");
+    if ((not db_spend_priv_str.empty() && db_spend_priv_str != spend_priv_str) ||
+        (not db_spend_pub_str.empty() && db_spend_pub_str != spend_pub_str) ||
+        (not db_view_priv_str.empty() && db_view_priv_str != view_priv_str) ||
+        (not db_view_pub_str.empty() && db_view_pub_str != view_pub_str))
+          throw std::runtime_error("provided keys do not match database file");
 
     prepared_exec("UPDATE metadata SET spend_priv = ?, spend_pub = ?, view_priv = ?, view_pub = ? where id = 0;",
         spend_priv_str,
         spend_pub_str,
         view_priv_str,
         view_pub_str);
-
   }
 
   std::tuple<std::string, std::string, std::string, std::string>
   WalletDB::load_keys()
   {
-    std::string query = "SELECT spend_priv, spend_pub, view_priv, view_pub FROM metadata WHERE id=0";
-    auto st = prepared_st(query);
-    st->executeStep();
-    auto from_db = db::get<std::string, std::string, std::string, std::string>(st);
-    return std::make_tuple(std::get<0>(from_db), std::get<1>(from_db), std::get<2>(from_db), std::get<3>(from_db));
+    return prepared_get<std::string, std::string, std::string, std::string>("SELECT spend_priv, spend_pub, view_priv, view_pub FROM metadata WHERE id=0");
   }
 
 }  // namespace wallet

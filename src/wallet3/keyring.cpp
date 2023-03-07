@@ -86,7 +86,7 @@ namespace wallet
     // Searchs against our map for subaddress public view keys which also includes our
     // regular view key at index (0,0)
     if (const auto subaddress_index = subaddresses.find(candidate_key); subaddress_index != subaddresses.end())
-      return (*subaddress_index).second;
+      return subaddress_index->second;
 
     return std::nullopt;
   }

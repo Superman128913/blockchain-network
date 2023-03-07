@@ -15,7 +15,7 @@ namespace wallet
   struct LoggingConfig
   {
     std::string level = "info";
-    bool save_logs_in_subdirectory = true;            // e.g ~/.oxen-wallet/testnet/logs/wallet_logs.txt vs ~/oxen-wallet/testnet/wallet_logs.txt
+    bool save_logs_in_subdirectory = true;            // e.g ~/.oxen-wallet/testnet/logs/wallet_logs.txt vs ~/.oxen-wallet/testnet/wallet_logs.txt
     std::string logdir = "logs";                      // Directory to store log data
     std::string log_filename = "wallet_logs.txt";     // name for logs
     size_t log_file_size_limit = 1024 * 1024 * 50;    // 50MiB

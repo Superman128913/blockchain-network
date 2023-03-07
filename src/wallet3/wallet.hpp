@@ -22,19 +22,7 @@ namespace oxenmq
 
 namespace wallet
 {
-  template <typename FileType>
-  fs::path file_path_from_default_datadir(const Config& c, const FileType& filename)
-  {
-    if constexpr (std::is_same_v<FileType, std::string_view>) if (filename == ":memory:")
-        return filename;
-
-    auto file_location = fs::absolute(fs::u8path(c.general.datadir));
-    if (c.general.nettype != "mainnet" && c.general.append_network_type_to_datadir)
-      file_location /= c.general.nettype;
-    file_location /= filename;
-
-    return file_location;
-  }
+  fs::path file_path_from_default_datadir(const Config& c, const fs::path& filename);
 
   class WalletDB;
 

@@ -3,6 +3,7 @@
 #include "commands.h"
 
 #include "rpc/common/rpc_command.h"
+#include <wallet3/pending_transaction.hpp>
 
 #include <nlohmann/json.hpp>
 #include <oxenc/bt_value.h>
@@ -42,7 +43,11 @@ class RequestHandler {
 
 public:
 
+
+
   void set_wallet(std::weak_ptr<wallet::Wallet> wallet);
+
+  std::string submit_transaction(wallet::PendingTransaction& ptx);
 
   void invoke(GET_BALANCE& command, rpc_context context);
   void invoke(GET_ADDRESS& command, rpc_context context);

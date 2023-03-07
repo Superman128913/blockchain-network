@@ -59,6 +59,23 @@ void RequestHandler::set_wallet(std::weak_ptr<wallet::Wallet> ptr)
   wallet = ptr;
 }
 
+//TODO sean something here
+std::string RequestHandler::submit_transaction(wallet::PendingTransaction& ptx)
+{
+  std::string response;
+  if (auto w = wallet.lock())
+  {
+    w->keys->sign_transaction(ptx);
+
+    auto submit_future = w->daemon_comms->submit_transaction(ptx.tx, false);
+
+    if (submit_future.wait_for(5s) != std::future_status::ready)
+      throw rpc_error(500, "request to daemon timed out");
+    response = submit_future.get();
+  }
+  return response;
+}
+
 const std::unordered_map<std::string, std::shared_ptr<const rpc_command>> rpc_commands = register_rpc_commands(wallet_rpc_types{});
 
 void RequestHandler::invoke(GET_BALANCE& command, rpc_context context) {
@@ -144,7 +161,8 @@ void RequestHandler::invoke(GET_HEIGHT& command, rpc_context context) {
 }
 
 void RequestHandler::invoke(TRANSFER& command, rpc_context context) {
-std::cout << "rpc handler, handling TRANSFER\n";
+  oxen::log::info(logcat, "RPC Handler received TRANSFER command");
+  wallet::PendingTransaction ptx;
   if (auto w = wallet.lock())
   {
     // TODO: arg checking
@@ -153,8 +171,6 @@ std::cout << "rpc handler, handling TRANSFER\n";
     std::vector<cryptonote::tx_destination_entry> recipients;
     for (const auto& [dest, amount] : command.request.destinations)
     {
-std::cout << "transfer dest: " << dest << "\n";
-std::cout << "transfer amount: " << amount << "\n";
       auto& entry = recipients.emplace_back();
       cryptonote::address_parse_info addr_info;
 
@@ -179,22 +195,10 @@ std::cout << "transfer amount: " << amount << "\n";
     change_dest.is_subaddress = change_addr_info.is_subaddress;
     change_dest.is_integrated = change_addr_info.has_payment_id;
 
-    auto ptx = w->tx_constructor->create_transaction(recipients, change_dest);
-
-    w->keys->sign_transaction(ptx);
-
-std::cout << "rpc, transaction vout.size() = " << ptx.tx.vout.size() << "\n";
-std::cout << "rpc, transaction output_unlock_times.size() = " << ptx.tx.output_unlock_times.size() << "\n";
-std::cout << "rpc, ptx recipients.size() = " << ptx.recipients.size() << "\n";
-
-    auto submit_future = w->daemon_comms->submit_transaction(ptx.tx, false);
-
-    if (submit_future.wait_for(5s) != std::future_status::ready)
-      throw rpc_error(500, "request to daemon timed out");
-
-    command.response["status"] = "200";
-    command.response["result"] = submit_future.get();
+    ptx = w->tx_constructor->create_transaction(recipients, change_dest);
   }
+  command.response["result"] = submit_transaction(ptx);
+  command.response["status"] = "200";
 }
 
 void RequestHandler::invoke(TRANSFER_SPLIT& command, rpc_context context) {
@@ -483,6 +487,7 @@ void RequestHandler::invoke(ONS_BUY_MAPPING& command, rpc_context context) {
   //  "subaddr_indices", req.request.subaddr_indices,
 
   oxen::log::info(logcat, "RPC Handler received ONS_BUY_MAPPING command");
+  wallet::PendingTransaction ptx;
   if (auto w = wallet.lock())
   {
     cryptonote::tx_destination_entry change_dest;
@@ -494,25 +499,17 @@ void RequestHandler::invoke(ONS_BUY_MAPPING& command, rpc_context context) {
     change_dest.is_subaddress = change_addr_info.is_subaddress;
     change_dest.is_integrated = change_addr_info.has_payment_id;
 
-    auto ptx = w->tx_constructor->create_ons_buy_transaction(
-      change_dest,
+    ptx = w->tx_constructor->create_ons_buy_transaction(
+      command.request.name,
       command.request.type,
+      command.request.value,
       command.request.owner,
       command.request.backup_owner,
-      command.request.name,
-      command.request.value
+      change_dest
       );
-
-    w->keys->sign_transaction(ptx);
-
-    auto submit_future = w->daemon_comms->submit_transaction(ptx.tx, false);
-
-    if (submit_future.wait_for(5s) != std::future_status::ready)
-      throw rpc_error(500, "request to daemon timed out");
-
-    command.response["status"] = "200";
-    command.response["result"] = submit_future.get();
   }
+  command.response["result"] = submit_transaction(ptx);
+  command.response["status"] = "200";
 }
 
 void RequestHandler::invoke(ONS_RENEW_MAPPING& command, rpc_context context) {
@@ -520,6 +517,7 @@ void RequestHandler::invoke(ONS_RENEW_MAPPING& command, rpc_context context) {
 
 void RequestHandler::invoke(ONS_UPDATE_MAPPING& command, rpc_context context) {
   oxen::log::info(logcat, "RPC Handler received ONS_UPDATE_MAPPING command");
+  wallet::PendingTransaction ptx;
   if (auto w = wallet.lock())
   {
     cryptonote::tx_destination_entry change_dest;
@@ -531,26 +529,18 @@ void RequestHandler::invoke(ONS_UPDATE_MAPPING& command, rpc_context context) {
     change_dest.is_subaddress = change_addr_info.is_subaddress;
     change_dest.is_integrated = change_addr_info.has_payment_id;
 
-    auto ptx = w->tx_constructor->create_ons_update_transaction(
-      change_dest,
-      command.request.type ,
+    ptx = w->tx_constructor->create_ons_update_transaction(
+      command.request.name,
+      command.request.type,
+      command.request.value,
       command.request.owner,
       command.request.backup_owner,
-      command.request.name,
-      command.request.value,
+      change_dest,
       w->keys
       );
-
-    w->keys->sign_transaction(ptx);
-
-    auto submit_future = w->daemon_comms->submit_transaction(ptx.tx, false);
-
-    if (submit_future.wait_for(5s) != std::future_status::ready)
-      throw rpc_error(500, "request to daemon timed out");
-
-    command.response["status"] = "200";
-    command.response["result"] = submit_future.get();
   }
+  command.response["result"] = submit_transaction(ptx);
+  command.response["status"] = "200";
 }
 
 void RequestHandler::invoke(ONS_MAKE_UPDATE_SIGNATURE& command, rpc_context context) {

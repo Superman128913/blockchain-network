@@ -22,8 +22,8 @@ namespace wallet
     PendingTransaction new_tx(recipients);
     auto [hf, hf_uint8] = cryptonote::get_ideal_block_version(db->network_type(), db->scan_target_height());
     cryptonote::oxen_construct_tx_params tx_params{hf, cryptonote::txtype::standard, 0, 0};
-    new_tx.tx.version = cryptonote::transaction::get_max_version_for_hf(tx_params.hf_version);
-    new_tx.tx.type = tx_params.tx_type;
+    new_tx.tx.version = cryptonote::transaction::get_max_version_for_hf(hf);
+    new_tx.tx.type = cryptonote::txtype::standard;
     new_tx.fee_per_byte = fee_per_byte;
     new_tx.fee_per_output = fee_per_output;
     new_tx.change = change_recipient;
@@ -33,20 +33,19 @@ namespace wallet
 
   PendingTransaction
   TransactionConstructor::create_ons_buy_transaction(
-      const cryptonote::tx_destination_entry& change_recipient,
-      const std::string& type_str,
-      const std::string& owner_str,
-      const std::string& backup_owner_str,
-      const std::string& name,
-      const std::string& value
+      std::string_view name,
+      std::string_view type_str,
+      std::string_view value,
+      std::optional<std::string_view> owner_str,
+      std::optional<std::string_view> backup_owner_str,
+      const cryptonote::tx_destination_entry& change_recipient
       )
   {
     std::vector<cryptonote::tx_destination_entry> recipients;
     PendingTransaction new_tx(recipients);
     auto [hf, hf_uint8] = cryptonote::get_ideal_block_version(db->network_type(), db->scan_target_height());
-    cryptonote::oxen_construct_tx_params tx_params{hf, cryptonote::txtype::oxen_name_system, 0, 0};
-    new_tx.tx.version = cryptonote::transaction::get_max_version_for_hf(tx_params.hf_version);
-    new_tx.tx.type = tx_params.tx_type;
+    new_tx.tx.version = cryptonote::transaction::get_max_version_for_hf(hf);
+    new_tx.tx.type = cryptonote::txtype::oxen_name_system;
     new_tx.fee_per_byte = fee_per_byte;
     new_tx.fee_per_output = fee_per_output;
     new_tx.change = change_recipient;
@@ -54,7 +53,7 @@ namespace wallet
 
     std::string reason = "";
 
-    const auto type = ons::parse_ons_type(type_str);
+    const auto type = ons::parse_ons_type(std::string(type_str));
     if (!type.has_value())
       throw std::runtime_error("invalid type provided");
 
@@ -68,17 +67,17 @@ namespace wallet
       throw std::runtime_error(reason);
 
     if (!encrypted_value.encrypt(lower_name, &name_hash))
-      throw std::runtime_error("Fail to encrypt mapping value=" + value);
+      throw std::runtime_error("Fail to encrypt mapping value="s + value.data());
 
     ons::generic_owner owner;
     ons::generic_owner backup_owner;
 
-    if (owner_str == "")
+    if (not owner_str.has_value())
       owner = ons::make_monero_owner(change_recipient.addr, change_recipient.is_subaddress);
-    else if (!ons::parse_owner_to_generic_owner(nettype, owner_str, owner, &reason))
+    else if (not ons::parse_owner_to_generic_owner(nettype, *owner_str, owner, &reason))
       throw std::runtime_error(reason);
 
-    if (backup_owner_str != "" && !ons::parse_owner_to_generic_owner(nettype, backup_owner_str, backup_owner, &reason))
+    if (backup_owner_str.has_value() && !ons::parse_owner_to_generic_owner(nettype, *backup_owner_str, backup_owner, &reason))
       throw std::runtime_error(reason);
 
     // No prev_txid for initial ons buy
@@ -86,7 +85,7 @@ namespace wallet
 
     auto ons_buy_data = cryptonote::tx_extra_oxen_name_system::make_buy(
         owner,
-        backup_owner_str != "" ? &backup_owner : nullptr,
+        backup_owner_str.has_value() ? &backup_owner : nullptr,
         *type,
         name_hash,
         encrypted_value.to_string(),
@@ -105,16 +104,17 @@ namespace wallet
 
   PendingTransaction
   TransactionConstructor::create_ons_update_transaction(
-      const cryptonote::tx_destination_entry& change_recipient,
-      const std::string& type_str,
-      const std::string& owner_str,
-      const std::string& backup_owner_str,
       const std::string& name,
-      const std::string& value,
+      const std::string& type_str,
+      std::optional<std::string_view> value,
+      std::optional<std::string_view> owner_str,
+      std::optional<std::string_view> backup_owner_str,
+      const cryptonote::tx_destination_entry& change_recipient,
       std::shared_ptr<Keyring> keyring
       )
   {
-    if (value == "" && owner_str == "" && backup_owner_str == "")
+    if (not owner_str.has_value())
+    if (not value.has_value() && not owner_str.has_value() && not backup_owner_str.has_value())
       throw std::runtime_error("Value, owner and backup owner are not specified. Atleast one field must be specified for updating the ONS record");
 
     const auto lower_name = tools::lowercase_ascii_string(name);
@@ -130,29 +130,13 @@ namespace wallet
     if (submit_ons_future.wait_for(5s) != std::future_status::ready)
       throw std::runtime_error("request to daemon for ons_names_to_owners timed out");
 
-    const auto ons_response = submit_ons_future.get();
-    crypto::hash prev_txid;
-    std::string curr_owner;
-
-    oxenc::bt_dict_consumer dc{ons_response};
-    if (not dc.skip_until("owner"))
-    {
-      auto reason = dc.consume_string();
-      throw std::runtime_error("Submit ons names to owners rejected, reason: " + reason);
-    }
-    curr_owner = dc.consume_string();
-
-    if (not dc.skip_until("txid"))
-    {
-      auto reason = dc.consume_string();
-      throw std::runtime_error("Submit ons names to owners rejected, reason: " + reason);
-    }
-    tools::hex_to_type<crypto::hash>(dc.consume_string(), prev_txid);
+    //TODO sean stuff goes here
+    const auto [curr_owner, prev_txid] = submit_ons_future.get();
 
     ons::mapping_value encrypted_value;
-    if (value != "")
+    if (value.has_value())
     {
-      if (!ons::mapping_value::validate(nettype, *type, value, &encrypted_value, &reason))
+      if (!ons::mapping_value::validate(nettype, *type, *value, &encrypted_value, &reason))
         throw std::runtime_error(reason);
 
       if (!encrypted_value.encrypt(lower_name, &name_hash))
@@ -160,17 +144,17 @@ namespace wallet
     }
 
     ons::generic_owner owner;
-    if (owner_str != "" && !ons::parse_owner_to_generic_owner(nettype, owner_str, owner, &reason))
+    if (owner_str.has_value() && !ons::parse_owner_to_generic_owner(nettype, *owner_str, owner, &reason))
       throw std::runtime_error(reason);
 
     ons::generic_owner backup_owner;
-    if (backup_owner_str != "" && !ons::parse_owner_to_generic_owner(nettype, backup_owner_str, backup_owner, &reason))
+    if (backup_owner_str.has_value() && !ons::parse_owner_to_generic_owner(nettype, *backup_owner_str, backup_owner, &reason))
       throw std::runtime_error(reason);
 
     const auto signature = keyring->generate_ons_signature(
       curr_owner,
-      owner_str != "" ? &owner : nullptr,
-      backup_owner_str != "" ? &backup_owner : nullptr,
+      owner_str.has_value() ? &owner : nullptr,
+      backup_owner_str.has_value() ? &backup_owner : nullptr,
       encrypted_value,
       prev_txid,
       nettype
@@ -179,9 +163,8 @@ namespace wallet
     std::vector<cryptonote::tx_destination_entry> recipients;
     PendingTransaction new_tx(recipients);
     auto [hf, hf_uint8] = cryptonote::get_ideal_block_version(db->network_type(), db->scan_target_height());
-    cryptonote::oxen_construct_tx_params tx_params{hf, cryptonote::txtype::oxen_name_system, 0, 0};
-    new_tx.tx.version = cryptonote::transaction::get_max_version_for_hf(tx_params.hf_version);
-    new_tx.tx.type = tx_params.tx_type;
+    new_tx.tx.version = cryptonote::transaction::get_max_version_for_hf(hf);
+    new_tx.tx.type = cryptonote::txtype::oxen_name_system;
     new_tx.fee_per_byte = fee_per_byte;
     new_tx.fee_per_output = fee_per_output;
     new_tx.change = change_recipient;

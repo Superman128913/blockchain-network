@@ -117,8 +117,8 @@ namespace wallet
 
     omq->job([blocks=std::move(blocks),this](){
         for_each_wallet([&](std::shared_ptr<Wallet> wallet){
-              wallet->add_blocks(blocks);
-            });
+            wallet->add_blocks(blocks);
+          });
         }, sync_thread);
 
     if (status == "END")
@@ -422,34 +422,27 @@ namespace wallet
     auto fut = p->get_future();
     auto req_cb = [p=std::move(p)](bool ok, std::vector<std::string> response)
     {
-      // TODO: handle various error cases.
-      if (not ok or response.size() != 2 or response[0] != "200")
+      try 
       {
-        p->set_value("Unknown Error");
-        return;
-      }
-      else
-      {
+        if (not ok or response.size() != 2 or response[0] != "200")
+          throw std::runtime_error{"Unknown Error"};
+
         oxenc::bt_dict_consumer dc{response[1]};
         if (dc.skip_until("reason"))
-        {
-          auto reason = dc.consume_string();
-          p->set_value(std::string("Submit Transaction rejected, reason: ") + reason);
-          return;
-        }
+          throw std::runtime_error{"Submit Transaction rejected, reason: " + dc.consume_string()};
 
         if (not dc.skip_until("status"))
-        {
-          p->set_value("Invalid response from daemon");
-          return;
-        }
+          throw std::runtime_error{"Invalid response from daemon"};
 
         auto status = dc.consume_string();
 
-        if (status == "OK")
-          p->set_value("OK");
-        else
-          p->set_value(std::string("Something getting wrong.") + status);
+        if (status != "OK")
+          throw std::runtime_error{"Submit Transaction rejected, reason: " + status};
+
+        p->set_value("OK");
+
+      } catch (...) {
+        p->set_exception(std::current_exception());
       }
     };
 
@@ -467,38 +460,46 @@ namespace wallet
     return fut;
   }
 
-  std::future<std::string>
+  std::future<std::pair<std::string, crypto::hash>>
   DefaultDaemonComms::ons_names_to_owners(const std::string& name_hash, const uint16_t type)
   {
-    auto p = std::make_shared<std::promise<std::string> >();
+    auto p = std::make_shared<std::promise<std::pair<std::string, crypto::hash>>>();
     auto fut = p->get_future();
     auto req_cb = [p=std::move(p)](bool ok, std::vector<std::string> response)
     {
-
-      oxenc::bt_dict_consumer dc{response[1]};
-
-      if (not dc.skip_until("result"))
+      try 
       {
-        auto reason = dc.consume_string();
-        p->set_value(std::string("ONS names to owners rejected, reason: ") + reason);
-        return;
-      }
-      auto result_list = dc.consume_list_consumer();
-      const auto result = result_list.consume_dict_data();
+        oxenc::bt_dict_consumer dc{response[1]};
 
-      p->set_value(std::string(result));
-      return;
+        if (not dc.skip_until("result"))
+          throw std::runtime_error{"Invalid response from daemon"};
+
+        auto result_list = dc.consume_list_consumer();
+        auto result = result_list.consume_dict_consumer();
+
+        crypto::hash prev_txid;
+        std::string curr_owner;
+
+        if (not result.skip_until("owner"))
+          throw std::runtime_error{"Invalid response from daemon"};
+
+        curr_owner = dc.consume_string();
+
+        if (not result.skip_until("txid"))
+          throw std::runtime_error{"Invalid response from daemon"};
+
+        tools::hex_to_type<crypto::hash>(dc.consume_string(), prev_txid);
+
+        p->set_value(std::make_pair(curr_owner, prev_txid));
+      } catch (...) {
+        p->set_exception(std::current_exception());
+      }
     };
 
-    oxenc::bt_dict req_params_dict;
-
-    oxenc::bt_list name_hash_list;
-    name_hash_list.push_back(name_hash);
-    oxenc::bt_list type_list;
-    type_list.push_back(type);
-
-    req_params_dict["name_hash"] = name_hash_list;
-    req_params_dict["type"] = type_list;
+    oxenc::bt_dict req_params_dict{
+      {"name_hash", oxenc::bt_list{{name_hash}}},
+      {"type", oxenc::bt_list{{type}}}
+    };
 
     omq->request(conn, "rpc.ons_names_to_owners", req_cb, oxenc::bt_serialize(req_params_dict));
 
