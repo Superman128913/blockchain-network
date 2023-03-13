@@ -4,6 +4,7 @@
 #include "block.hpp"
 
 #include <common/hex.h>
+#include <common/string_util.h>
 #include <cryptonote_basic/cryptonote_basic.h>
 
 #include <fmt/core.h>
@@ -426,27 +427,39 @@ namespace wallet
     return prepared_get<int64_t>("SELECT output_count FROM metadata WHERE id=0;");
   }
   void
-  WalletDB::save_keys(const std::string& spend_priv_str, const std::string& spend_pub_str, const std::string& view_priv_str, const std::string& view_pub_str)
+  WalletDB::save_keys(const std::shared_ptr<WalletKeys> keys)
   {
-    const auto [db_spend_priv_str, db_spend_pub_str, db_view_priv_str, db_view_pub_str] = load_keys();
+    const auto maybe_db_keys = load_keys();
+    if (maybe_db_keys.has_value())
+    {
+      if ((tools::view_guts(maybe_db_keys->spend_privkey()) != tools::view_guts(keys->spend_privkey())) ||
+          (tools::view_guts(maybe_db_keys->spend_pubkey()) != tools::view_guts(keys->spend_pubkey())) ||
+          (tools::view_guts(maybe_db_keys->view_privkey()) != tools::view_guts(keys->view_privkey())) ||
+          (tools::view_guts(maybe_db_keys->view_pubkey()) != tools::view_guts(keys->view_pubkey())))
+            throw std::runtime_error("provided keys do not match database file");
+    }
 
-    if ((not db_spend_priv_str.empty() && db_spend_priv_str != spend_priv_str) ||
-        (not db_spend_pub_str.empty() && db_spend_pub_str != spend_pub_str) ||
-        (not db_view_priv_str.empty() && db_view_priv_str != view_priv_str) ||
-        (not db_view_pub_str.empty() && db_view_pub_str != view_pub_str))
-          throw std::runtime_error("provided keys do not match database file");
 
     prepared_exec("UPDATE metadata SET spend_priv = ?, spend_pub = ?, view_priv = ?, view_pub = ? where id = 0;",
-        spend_priv_str,
-        spend_pub_str,
-        view_priv_str,
-        view_pub_str);
+        std::string(tools::view_guts(keys->spend_privkey())),
+        std::string(tools::view_guts(keys->spend_pubkey())),
+        std::string(tools::view_guts(keys->view_privkey())),
+        std::string(tools::view_guts(keys->view_pubkey())));
   }
 
-  std::tuple<std::string, std::string, std::string, std::string>
+  std::optional<DBKeys>
   WalletDB::load_keys()
   {
-    return prepared_get<std::string, std::string, std::string, std::string>("SELECT spend_priv, spend_pub, view_priv, view_pub FROM metadata WHERE id=0");
+    DBKeys keys;
+    int32_t spend_key_exists = prepared_get<int32_t>("SELECT count(spend_priv) FROM metadata WHERE spend_priv IS NOT ''");
+    if (not spend_key_exists)
+      return std::nullopt;
+    auto x = prepared_get<db::blob_guts<crypto::secret_key>, db::blob_guts<crypto::public_key>, db::blob_guts<crypto::secret_key>, db::blob_guts<crypto::public_key>>(
+        "SELECT spend_priv, spend_pub, view_priv, view_pub FROM metadata WHERE id=0");
+    keys.ssk = std::get<0>(x).value;
+    keys.spk = std::get<1>(x).value;
+    keys.vsk = std::get<2>(x).value;
+    keys.vpk = std::get<3>(x).value;
+    return keys;
   }
-
 }  // namespace wallet

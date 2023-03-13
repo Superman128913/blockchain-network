@@ -10,10 +10,11 @@
 #include <optional>
 
 #include "pending_transaction.hpp"
+#include "walletkeys.hpp"
 
 namespace wallet
 {
-  class Keyring
+  class Keyring : public WalletKeys
   {
    public:
     Keyring(
@@ -143,6 +144,11 @@ namespace wallet
 
     crypto::secret_key view_private_key;
     crypto::public_key view_public_key;
+
+    const crypto::secret_key& spend_privkey() const override { return spend_private_key; }  
+    const crypto::public_key& spend_pubkey() const override { return spend_public_key; }  
+    const crypto::secret_key& view_privkey() const override { return view_private_key; }  
+    const crypto::public_key& view_pubkey() const override { return view_public_key; }
 
    private:
 

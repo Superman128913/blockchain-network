@@ -4,6 +4,7 @@
 #include <sqlitedb/database.hpp>
 
 #include "output.hpp"
+#include "walletkeys.hpp"
 
 #include <optional>
 
@@ -95,10 +96,10 @@ namespace wallet
 
     // Saves keys to the database, will check if keys match if already exists and throw if different
     void
-    save_keys(const std::string& spend_priv_str, const std::string& spend_pub_str, const std::string& view_priv_str, const std::string& view_pub_str);
+    save_keys(const std::shared_ptr<WalletKeys> keys);
 
     // Loads keys from an already created database
-    std::tuple<std::string, std::string, std::string, std::string>
+    std::optional<DBKeys>
     load_keys();
   };
 }
