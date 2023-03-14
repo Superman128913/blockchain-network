@@ -127,4 +127,11 @@ namespace wallet
     return spends;
   }
 
+  void
+  TransactionScanner::set_keys(std::shared_ptr<Keyring> keys)
+  {
+    if (wallet_keys != keys)
+      wallet_keys = keys;
+  }
+
 }  // namespace wallet

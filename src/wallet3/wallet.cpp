@@ -49,8 +49,9 @@ namespace wallet
       wallet::Config config_in)
       : omq(omq)
       , db{std::make_shared<WalletDB>(file_path_from_default_datadir(config_in, dbFilename), dbPassword)}
+      , keys{std::move(keyring)}
+      , tx_scanner{keys, db}
       , tx_constructor{tx_constructor}
-      , tx_scanner{keyring, db}
       , daemon_comms{daemon_comms}
       , omq_server{request_handler}
       , config(config_in)
@@ -66,17 +67,13 @@ namespace wallet
     omq_server.set_omq(this->omq, config.omq_rpc);
 
     db->create_schema();
-    if (keyring)
-    {
-      keys = keyring;
-      db->save_keys(keys);
-    }
-    else
+    if (!keys)
     {
       const auto db_keys = db->load_keys();
       keys = std::make_shared<wallet::Keyring>(db_keys->spend_privkey(), db_keys->spend_pubkey(), db_keys->view_privkey(), db_keys->view_pubkey(), nettype);
-      tx_scanner = TransactionScanner(keys, db);
+      tx_scanner.set_keys(keys);
     }
+    db->save_keys(keys);
     db->add_address(0, 0, keys->get_main_address());
     last_scan_height = db->last_scan_height();
     scan_target_height = db->scan_target_height();
