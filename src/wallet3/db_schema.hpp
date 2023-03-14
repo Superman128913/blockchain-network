@@ -38,6 +38,20 @@ namespace wallet
     void
     create_schema(cryptonote::network_type nettype = cryptonote::network_type::TESTNET);
 
+    // Helpers to access the metadata table
+    void set_metadata_int(const std::string& id, int64_t val);
+    int64_t get_metadata_int(const std::string& id);
+    void set_metadata_text(const std::string& id, const std::string& val);
+    std::string get_metadata_text(const std::string& id);
+    void set_metadata_blob(const std::string& id, std::string_view data);
+    std::string get_metadata_blob(const std::string& id);
+
+    template <typename T>
+    void set_metadata_blob_guts(const std::string& id, const T& val) { set_metadata_blob(id, tools::view_guts(val)); }
+
+    template <typename T>
+    T get_metadata_blob_guts(const std::string& id) { return prepared_get<db::blob_guts<T>>("SELECT val_binary FROM metadata WHERE id = ?", id); };
+
     cryptonote::network_type
     network_type();
 

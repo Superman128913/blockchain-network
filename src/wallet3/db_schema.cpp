@@ -40,25 +40,35 @@ namespace wallet
     // TODO: table for balance "per account"
     db.exec(
         R"(
-          -- CHECK (id = 0) restricts this table to a single row
           CREATE TABLE metadata (
-            id INTEGER NOT NULL PRIMARY KEY CHECK (id = 0),
-            db_version INTEGER NOT NULL DEFAULT 0,
-            nettype TEXT NOT NULL DEFAULT "testnet",
-            balance INTEGER NOT NULL DEFAULT 0,
-            unlocked_balance INTEGER NOT NULL DEFAULT 0,
-            last_scan_height INTEGER NOT NULL DEFAULT -1,
-            scan_target_hash TEXT NOT NULL,
-            scan_target_height INTEGER NOT NULL DEFAULT 0,
-            output_count INTEGER NOT NULL DEFAULT 0,
-            spend_priv BLOB,
-            spend_pub BLOB,
-            view_priv BLOB,
-            view_pub BLOB
-          );
+            id TEXT PRIMARY KEY NOT NULL,
+            val_numeric INT,
+            val_binary BLOB,
+            val_text TEXT,
+            -- Exactly one val_* must be set:
+            CHECK((val_numeric IS NOT NULL) + (val_binary IS NOT NULL) + (val_text IS NOT NULL) == 1)
+          ) STRICT;
 
-          -- insert metadata row as default
-          INSERT INTO metadata VALUES (0,0,"testnet",0,0,-1,'',0,0,'','','','');
+          INSERT INTO metadata(id, val_numeric)
+          VALUES
+            ('db_version', 0),
+            ('balance', 0),
+            ('unlocked_balance', 0),
+            ('last_scan_height', 0),
+            ('scan_target_height', 0),
+            ('output_count', 0);
+
+          INSERT INTO metadata(id, val_text)
+          VALUES
+            ('nettype', 'testnet'),
+            ('scan_target_hash', '');
+
+          INSERT INTO metadata(id, val_binary)
+          VALUES
+            ('spend_priv', x''),
+            ('spend_pub', x''),
+            ('view_priv', x''),
+            ('view_pub', x'');
 
           CREATE TABLE blocks (
             height INTEGER NOT NULL PRIMARY KEY,
@@ -71,16 +81,16 @@ namespace wallet
           CREATE TRIGGER block_added AFTER INSERT ON blocks
           FOR EACH ROW
           BEGIN
-            UPDATE metadata SET last_scan_height = NEW.height WHERE id = 0;
-            UPDATE metadata SET output_count = output_count + NEW.output_count WHERE id = 0;
+            UPDATE metadata SET val_numeric = NEW.height WHERE id = 'last_scan_height';
+            UPDATE metadata SET val_numeric = val_numeric + NEW.output_count WHERE id = 'output_count';
           END;
 
           -- update scan height when new block removed
           CREATE TRIGGER block_removed AFTER DELETE ON blocks
           FOR EACH ROW
           BEGIN
-            UPDATE metadata SET last_scan_height = OLD.height - 1 WHERE id = 0;
-            UPDATE metadata SET output_count = output_count - OLD.output_count WHERE id = 0;
+            UPDATE metadata SET val_numeric = OLD.height - 1 WHERE id = 'last_scan_height';
+            UPDATE metadata SET val_numeric = val_numeric - OLD.output_count WHERE id = 'last_scan_height';
           END;
 
           CREATE TABLE transactions (
@@ -132,14 +142,14 @@ namespace wallet
           CREATE TRIGGER output_received AFTER INSERT ON outputs
           FOR EACH ROW
           BEGIN
-            UPDATE metadata SET balance = balance + NEW.amount WHERE id = 0;
+            UPDATE metadata SET val_numeric = val_numeric + NEW.amount WHERE id = 'balance';
           END;
 
           -- update balance when output removed (blockchain re-org)
           CREATE TRIGGER output_removed AFTER DELETE ON outputs
           FOR EACH ROW
           BEGIN
-            UPDATE metadata SET balance = balance - OLD.amount WHERE id = 0;
+            UPDATE metadata SET val_numeric = val_numeric - OLD.amount WHERE id = 'balance';
           END;
 
           CREATE TABLE spends (
@@ -156,7 +166,7 @@ namespace wallet
           FOR EACH ROW
           BEGIN
             UPDATE outputs SET spent_height = NEW.height WHERE key_image = NEW.key_image;
-            UPDATE metadata SET balance = balance - (SELECT outputs.amount FROM outputs WHERE outputs.key_image = NEW.key_image);
+            UPDATE metadata SET val_numeric = val_numeric - (SELECT outputs.amount FROM outputs WHERE outputs.key_image = NEW.key_image) where id = 'balance';
           END;
 
           -- update output and balance when output un-seen as spent (blockchain re-org)
@@ -164,7 +174,7 @@ namespace wallet
           FOR EACH ROW
           BEGIN
             UPDATE outputs SET spent_height = 0 WHERE key_image = OLD.key_image;
-            UPDATE metadata SET balance = balance + (SELECT outputs.amount FROM outputs WHERE outputs.key_image = OLD.key_image);
+            UPDATE metadata SET val_numeric = val_numeric + (SELECT outputs.amount FROM outputs WHERE outputs.key_image = OLD.key_image) where id = 'balance';
           END;
 
           CREATE TRIGGER key_image_output_removed_cleaner AFTER DELETE ON outputs
@@ -182,15 +192,55 @@ namespace wallet
 
         )");
 
-    prepared_exec("UPDATE metadata SET nettype = ? WHERE id = 0;", std::string(cryptonote::network_type_to_string(nettype)));
+    set_metadata_text("nettype", std::string(cryptonote::network_type_to_string(nettype)));
 
     db_tx.commit();
+  }
+
+  // Helpers to access the metadata table
+  void
+  WalletDB::set_metadata_int(const std::string& id, int64_t val)
+  {
+    prepared_exec("UPDATE metadata SET val_numeric = ? WHERE id = ?;", val, id);
+  }
+
+  int64_t
+  WalletDB::get_metadata_int(const std::string& id)
+  {
+    return prepared_get<int64_t>("SELECT val_numeric FROM metadata WHERE id = ?;", id);
+  }
+
+  void
+  WalletDB::set_metadata_text(const std::string& id, const std::string& val)
+  {
+    prepared_exec("UPDATE metadata SET val_text = ? WHERE id = ?;", val, id);
+  }
+
+  std::string
+  WalletDB::get_metadata_text(const std::string& id)
+  {
+    return prepared_get<std::string>("SELECT val_text FROM metadata WHERE id = ?;", id);
+  }
+
+  void
+  WalletDB::set_metadata_blob(const std::string& id, std::string_view data)
+  {
+    auto st = prepared_st("UPDATE metadata SET val_binary = ? where id = ?;");
+    st->bind(1, data.data(), data.size());
+    st->bind(2, id);
+    st->exec();
+  }
+
+  std::string
+  WalletDB::get_metadata_blob(const std::string& id)
+  {
+    return prepared_get<std::string>("SELECT val_binary FROM metadata WHERE id = ?", id);
   }
 
   cryptonote::network_type
   WalletDB::network_type()
   {
-    return cryptonote::network_type_from_string(prepared_get<std::string>("SELECT nettype FROM metadata WHERE id=0;"));
+    return cryptonote::network_type_from_string(get_metadata_text("nettype"));
   }
 
 
@@ -343,26 +393,26 @@ namespace wallet
   int64_t
   WalletDB::last_scan_height()
   {
-    return prepared_get<int64_t>("SELECT last_scan_height FROM metadata WHERE id=0;");
+    return get_metadata_int("last_scan_height");
   }
 
   int64_t
   WalletDB::scan_target_height()
   {
-    return prepared_get<int64_t>("SELECT scan_target_height FROM metadata WHERE id=0;");
+    return get_metadata_int("scan_target_height");
   }
 
   void
   WalletDB::update_top_block_info(int64_t height, const crypto::hash& hash)
   {
-    prepared_exec("UPDATE metadata SET scan_target_height = ?, scan_target_hash = ? WHERE id = 0",
-      height, tools::type_to_hex(hash));
+    set_metadata_int("scan_target_height", height);
+    set_metadata_text("scan_target_hash", tools::type_to_hex(hash));
   }
 
   int64_t
   WalletDB::overall_balance()
   {
-    return prepared_get<int64_t>("SELECT balance FROM metadata WHERE id=0;");
+    return get_metadata_int("balance");
   }
 
   int64_t
@@ -424,7 +474,7 @@ namespace wallet
   int64_t
   WalletDB::chain_output_count()
   {
-    return prepared_get<int64_t>("SELECT output_count FROM metadata WHERE id=0;");
+    return get_metadata_int("output_count");
   }
   void
   WalletDB::save_keys(const std::shared_ptr<WalletKeys> keys)
@@ -439,27 +489,24 @@ namespace wallet
             throw std::runtime_error("provided keys do not match database file");
     }
 
-
-    prepared_exec("UPDATE metadata SET spend_priv = ?, spend_pub = ?, view_priv = ?, view_pub = ? where id = 0;",
-        std::string(tools::view_guts(keys->spend_privkey())),
-        std::string(tools::view_guts(keys->spend_pubkey())),
-        std::string(tools::view_guts(keys->view_privkey())),
-        std::string(tools::view_guts(keys->view_pubkey())));
+    set_metadata_blob_guts("spend_priv", keys->spend_privkey());
+    set_metadata_blob_guts("spend_pub",  keys->spend_pubkey());
+    set_metadata_blob_guts("view_priv",  keys->view_privkey());
+    set_metadata_blob_guts("view_pub",   keys->view_pubkey());
   }
 
   std::optional<DBKeys>
   WalletDB::load_keys()
   {
     DBKeys keys;
-    int32_t spend_key_exists = prepared_get<int32_t>("SELECT count(spend_priv) FROM metadata WHERE spend_priv IS NOT ''");
+    int32_t spend_key_exists = prepared_get<int32_t>("SELECT count(val_binary) FROM metadata WHERE id = 'spend_priv' AND val_binary IS NOT x''");
     if (not spend_key_exists)
       return std::nullopt;
-    auto x = prepared_get<db::blob_guts<crypto::secret_key>, db::blob_guts<crypto::public_key>, db::blob_guts<crypto::secret_key>, db::blob_guts<crypto::public_key>>(
-        "SELECT spend_priv, spend_pub, view_priv, view_pub FROM metadata WHERE id=0");
-    keys.ssk = std::get<0>(x).value;
-    keys.spk = std::get<1>(x).value;
-    keys.vsk = std::get<2>(x).value;
-    keys.vpk = std::get<3>(x).value;
+
+    keys.ssk = get_metadata_blob_guts<crypto::secret_key>("spend_priv");
+    keys.spk = get_metadata_blob_guts<crypto::public_key>("spend_pub");
+    keys.vsk = get_metadata_blob_guts<crypto::secret_key>("view_priv");
+    keys.vpk = get_metadata_blob_guts<crypto::public_key>("view_pub");
     return keys;
   }
 }  // namespace wallet
