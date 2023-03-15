@@ -89,34 +89,32 @@ void RequestHandler::invoke(GET_BALANCE& command, rpc_context context) {
 
 void RequestHandler::invoke(GET_ADDRESS& command, rpc_context context) {
   //TODO: implement fetching address/subaddress from db/keyring
-  /*
   if (auto w = wallet.lock())
   {
-    auto& addresses = (command.response["addresses"] = json::array());
-    if (command.request.address_index.size() == 0)
-    {
-      auto address = w->get_subaddress(command.request.account_index, 0);
-      addresses.push_back(json{
-        {"address", address.as_str(cryptonote::network_type::MAINNET)},
-        {"label", ""},
-        {"address_index", command.request.address_index},
-        {"used", true}
-      });
-    } else {
-      for (const auto& address_index: command.request.address_index)
-      {
-        auto address = w->get_subaddress(command.request.account_index, address_index);
-        addresses.push_back(json{
-          {"address", address.as_str(cryptonote::network_type::MAINNET)},
-          {"label", ""},
-          {"address_index", command.request.address_index},
-          {"used", true}
-        });
-      }
-    }
+    command.response["address"] = w->keys->get_main_address();
+    //auto& addresses = (command.response["addresses"] = json::array());
+    //if (command.request.address_index.size() == 0)
+    //{
+      //auto address = w->get_subaddress(command.request.account_index, 0);
+      //addresses.push_back(json{
+        //{"address", address.as_str(cryptonote::network_type::MAINNET)},
+        //{"label", ""},
+        //{"address_index", command.request.address_index},
+        //{"used", true}
+      //});
+    //} else {
+      //for (const auto& address_index: command.request.address_index)
+      //{
+        //auto address = w->get_subaddress(command.request.account_index, address_index);
+        //addresses.push_back(json{
+          //{"address", address.as_str(cryptonote::network_type::MAINNET)},
+          //{"label", ""},
+          //{"address_index", command.request.address_index},
+          //{"used", true}
+        //});
+      //}
+    //}
   }
-  */
-  
 }
 
 void RequestHandler::invoke(GET_ADDRESS_INDEX& command, rpc_context context) {

@@ -35,7 +35,6 @@ namespace wallet
         return Wallet::create(std::move(oxenmq), std::move(keyring), nullptr, std::move(comms), wallet_name + ".sqlite", "", std::move(config));
       }))
       .def("get_balance", &Wallet::get_balance)
-      .def("get_unlocked_balance", &Wallet::get_unlocked_balance)
       .def("deregister", &Wallet::deregister);
   }
 

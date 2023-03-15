@@ -111,8 +111,13 @@ def register_service_node():
 
 @walletcli.command()
 def address():
-    # click.echo("Address: {}".format(context.keyring.get_main_address()))
-    click.echo("Address: {}".format("TODO sean get the address here"))
+    if context.wallet is None:
+        click.echo("Wallet not loaded")
+        return
+    get_address_future = context.rpc_future("rpc.get_address");
+    get_address_response = get_address_future.get();
+    address = get_address_response['address']
+    click.echo("Address: {}".format(address))
 
 @walletcli.command()
 def balance():
