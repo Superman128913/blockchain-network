@@ -93,6 +93,10 @@ namespace wallet
     int64_t
     overall_balance();
 
+    // Get unlocked balance across all subaddresses
+    int64_t
+    unlocked_balance();
+
     // Get available balance with amount above an optional minimum amount.
     // TODO: subaddress specification
     int64_t

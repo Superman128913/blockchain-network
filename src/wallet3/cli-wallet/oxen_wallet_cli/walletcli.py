@@ -119,14 +119,20 @@ def balance():
     if context.wallet is None:
         click.echo("Wallet not loaded")
         return
-    click.echo("Balance: {:.{oxen_precision}f} Oxen".format(context.wallet.get_balance()/OXEN_ATOMIC_UNITS, oxen_precision=context.options["rounding"]))
+    get_balance_future = context.rpc_future("rpc.get_balance");
+    get_balance_response = get_balance_future.get();
+    balance = get_balance_response['balance']
+    click.echo("Balance: {:.{oxen_precision}f} Oxen".format(balance/OXEN_ATOMIC_UNITS, oxen_precision=context.options["rounding"]))
 
 @walletcli.command()
 def unlocked_balance():
     if context.wallet is None:
         click.echo("Wallet not loaded")
         return
-    click.echo("Unlocked Balance: {:.{oxen_precision}f} Oxen".format(context.wallet.get_unlocked_balance()/OXEN_ATOMIC_UNITS, oxen_precision=context.options["rounding"]))
+    get_balance_future = context.rpc_future("rpc.get_balance");
+    get_balance_response = get_balance_future.get();
+    unlocked_balance = get_balance_response['unlocked_balance']
+    click.echo("Unlocked Balance: {:.{oxen_precision}f} Oxen".format(unlocked_balance/OXEN_ATOMIC_UNITS, oxen_precision=context.options["rounding"]))
 
 @walletcli.command()
 def height():

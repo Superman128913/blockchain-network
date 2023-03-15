@@ -53,7 +53,6 @@ namespace wallet
           VALUES
             ('db_version', 0),
             ('balance', 0),
-            ('unlocked_balance', 0),
             ('last_scan_height', 0),
             ('scan_target_height', 0),
             ('output_count', 0);
@@ -413,6 +412,12 @@ namespace wallet
   WalletDB::overall_balance()
   {
     return get_metadata_int("balance");
+  }
+
+  int64_t
+  WalletDB::unlocked_balance()
+  {
+    return prepared_get<int64_t>("SELECT sum(o.amount) FROM outputs AS o WHERE o.spent_height = 0 AND o.spending = false AND (o.block_height + o.unlock_time) <= (SELECT m.val_numeric FROM metadata as m WHERE m.id = 'last_scan_height')");
   }
 
   int64_t

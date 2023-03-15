@@ -131,7 +131,7 @@ namespace wallet
   uint64_t
   Wallet::get_unlocked_balance()
   {
-    return 0; // TODO: this
+    return db->unlocked_balance();
   }
 
   cryptonote::account_keys
