@@ -16,7 +16,6 @@
 namespace wallet {
   class Wallet;
 }
-
 namespace wallet::rpc {
 
 class RequestHandler;
@@ -149,6 +148,7 @@ public:
   void invoke(ONS_ADD_KNOWN_NAMES& command, rpc_context context);
   void invoke(ONS_ENCRYPT_VALUE& command, rpc_context context);
   void invoke(ONS_DECRYPT_VALUE& command, rpc_context context);
+  void invoke(STATUS& command, rpc_context context);
 
 };
 

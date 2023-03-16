@@ -1,8 +1,11 @@
 import os
 from pathlib import Path
+import time
 
 import click
 import click_repl
+
+from tqdm import tqdm
 
 from oxen_wallet_cli import context
 
@@ -42,6 +45,34 @@ def walletcli(click_ctx, **options):
         click.echo("Run 'help' for help information, or 'quit' to quit.")
         click_repl.repl(click_ctx)
 
+def progress_bar():
+    click.echo("Starting Wallet Sync")
+    with tqdm(total=1, ncols = 80, nrows = 3, position = 0, leave=False, unit="blocks", colour="green") as pbar:
+        syncing = True
+        retries = 10
+        prev_height = 0
+        while syncing and retries > 0:
+            try:
+                status_future = context.rpc_future("rpc.status");
+                status_response = status_future.get();
+                pbar.total = status_response["target_height"]
+                pbar.update(status_response["sync_height"] - prev_height)
+                prev_height = status_response["sync_height"]
+                syncing = status_response["syncing"]
+                time.sleep(0.5)
+            except Excepiton as e:
+                retries -= 1
+    click.echo("Wallet Synced")
+    pbar.close()
+
+def display_status():
+    status_future = context.rpc_future("rpc.status");
+    status_response = status_future.get();
+    if status_response["syncing"]:
+        progress_bar()
+    else:
+        click.echo("Wallet Synced")
+
 @walletcli.command()
 def load_test_wallet():
     click.echo("Loading test wallet")
@@ -55,7 +86,7 @@ def load_test_wallet():
     view_pub = "8a0ebacd613e0b03b8f27bc64bd961ea2ebf4c671c6e7f3268651acf0823fed5"
 
     keyring = pywallet3.Keyring(spend_priv, spend_pub, view_priv, view_pub, context.options["network"])
-    click.echo("Wallet address {} loaded".format(keyring.get_main_address()))
+    click.echo("Wallet address " + click.style("{}", fg='cyan', bold=True).format(keyring.get_main_address()) + " loaded")
     if context.options['wallet_name'] is None:
         name = click.prompt("Wallet Name", default="{}-oxen-wallet".format(context.options["network"])).strip()
     else:
@@ -63,6 +94,7 @@ def load_test_wallet():
     context.wallet_core_config.omq_rpc.sockname = name + ".sock";
     context.wallet = pywallet3.Wallet(name, keyring, context.wallet_core_config)
     context.omq_connection()
+    display_status()
 
 @walletcli.command()
 @click.argument('seed_phrase', nargs=25)
@@ -83,6 +115,7 @@ def load_from_seed(seed_phrase, seed_phrase_passphrase):
     context.wallet_core_config.omq_rpc.sockname = name + ".sock";
     context.wallet = pywallet3.Wallet(name, keyring, context.wallet_core_config)
     context.omq_connection()
+    display_status()
 
 @walletcli.command()
 def load_from_file():
@@ -99,6 +132,7 @@ def load_from_file():
     context.wallet_core_config.omq_rpc.sockname = name + ".sock";
     context.wallet = pywallet3.Wallet(name, keyring, context.wallet_core_config)
     context.omq_connection()
+    display_status()
 
 @walletcli.command()
 def register_service_node():
@@ -108,6 +142,15 @@ def register_service_node():
         name = click.prompt("Enter the wallet address of the operator", default="").strip()
         click.echo("The wallet address to be used is: {}".format(name))
         click.echo("TODO: This function is not yet implemented")
+
+@walletcli.command()
+def status():
+    if context.wallet is None:
+        click.echo("Wallet not loaded")
+        return
+    status_future = context.rpc_future("rpc.status");
+    status_response = status_future.get();
+    click.echo("Status: {}".format(status_response))
 
 @walletcli.command()
 def address():

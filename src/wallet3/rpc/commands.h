@@ -204,6 +204,21 @@ namespace wallet::rpc {
   };
 
   OXEN_RPC_DOC_INTROSPECT
+  /// Returns the status of the wallet
+  ///
+  /// Inputs: No Inputs
+  ///
+  /// Outputs:
+  ///
+  /// - \p syncing -- True/False if the wallet is still syncing
+  /// - \p sync_height -- Current Height of Wallet
+  /// - \p target_height -- Desired Height of the Wallet
+  struct STATUS : NO_ARGS
+  {
+    static constexpr auto names() { return NAMES("status"); }
+  };
+
+  OXEN_RPC_DOC_INTROSPECT
   /// Label an address.
   ///
   /// Inputs:
@@ -2914,7 +2929,8 @@ This command is only required if the open wallet is one of the owners of a ONS r
     ONS_KNOWN_NAMES,
     ONS_ADD_KNOWN_NAMES,
     ONS_DECRYPT_VALUE,
-    ONS_ENCRYPT_VALUE
+    ONS_ENCRYPT_VALUE,
+    STATUS
   >;
 
 }

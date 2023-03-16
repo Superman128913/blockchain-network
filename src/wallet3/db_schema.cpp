@@ -401,6 +401,12 @@ namespace wallet
     return get_metadata_int("scan_target_height");
   }
 
+  int64_t
+  WalletDB::current_height()
+  {
+    return prepared_get<int64_t>("SELECT max(height) from blocks;");
+  }
+
   void
   WalletDB::update_top_block_info(int64_t height, const crypto::hash& hash)
   {

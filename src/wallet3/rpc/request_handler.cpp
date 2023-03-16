@@ -150,11 +150,12 @@ void RequestHandler::invoke(SET_ACCOUNT_TAG_DESCRIPTION& command, rpc_context co
 void RequestHandler::invoke(GET_HEIGHT& command, rpc_context context) {
   if (auto w = wallet.lock())
   {
-    auto height = w->db->scan_target_height();
+    const auto immutable_height = w->db->scan_target_height();
+    const auto height = w->db->current_height();
+
     command.response["height"] = height;
 
-    //TODO: this
-    command.response["immutable_height"] = height;
+    command.response["immutable_height"] = immutable_height;
   }
 }
 
@@ -557,6 +558,19 @@ void RequestHandler::invoke(ONS_ENCRYPT_VALUE& command, rpc_context context) {
 }
 
 void RequestHandler::invoke(ONS_DECRYPT_VALUE& command, rpc_context context) {
+}
+
+void RequestHandler::invoke(STATUS& command, rpc_context context) {
+  if (auto w = wallet.lock())
+  {
+    const auto sync_height = w->db->current_height();
+    const auto target_height = w->db->scan_target_height();
+
+    command.response["sync_height"] = sync_height;
+    command.response["target_height"] = target_height;
+
+    command.response["syncing"] = sync_height < target_height;
+  }
 }
 
 

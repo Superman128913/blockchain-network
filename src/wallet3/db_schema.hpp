@@ -85,6 +85,10 @@ namespace wallet
     int64_t
     scan_target_height();
 
+    // Returns the height of the highest block in the database
+    int64_t
+    current_height();
+
     // Update the top block height and hash.
     void
     update_top_block_info(int64_t height, const crypto::hash& hash);
