@@ -223,10 +223,7 @@ namespace wallet
   void
   WalletDB::set_metadata_blob(const std::string& id, std::string_view data)
   {
-    auto st = prepared_st("UPDATE metadata SET val_binary = ? where id = ?");
-    st->bind(1, data.data(), data.size());
-    st->bind(2, id);
-    st->exec();
+    prepared_exec("UPDATE metadata SET val_binary = ? where id = ?", db::blob_binder{data}, id);
   }
 
   std::string
