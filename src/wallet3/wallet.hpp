@@ -4,6 +4,7 @@
 #include "transaction_constructor.hpp"
 #include "daemon_comms.hpp"
 #include "keyring.hpp"
+#include "common/fs.h"
 
 #include "config/config.hpp"
 
@@ -21,6 +22,8 @@ namespace oxenmq
 
 namespace wallet
 {
+  fs::path file_path_from_default_datadir(const Config& c, const fs::path& filename);
+
   class WalletDB;
 
   struct Block;
@@ -32,7 +35,7 @@ namespace wallet
    protected:
     Wallet(
         std::shared_ptr<oxenmq::OxenMQ> omq,
-        std::shared_ptr<Keyring> keys,
+        std::shared_ptr<Keyring> keyring,
         std::shared_ptr<TransactionConstructor> tx_constructor,
         std::shared_ptr<DaemonComms> daemon_comms,
         std::string_view dbFilename,
@@ -110,6 +113,7 @@ namespace wallet
     wallet::rpc::OmqServer omq_server;
     bool running = true;
 
+    //TODO get this from config
     cryptonote::network_type nettype = cryptonote::network_type::TESTNET;
   };
 

@@ -3,7 +3,7 @@
 #include "commands.h"
 #include "command_parser.h"
 #include <wallet3/wallet.hpp>
-#include <wallet3/db_schema.hpp>
+#include <wallet3/db/walletdb.hpp>
 #include <version.h>
 
 #include <cryptonote_core/cryptonote_tx_utils.h>
@@ -12,6 +12,7 @@
 #include <memory>
 
 #include <common/hex.h>
+#include <oxenc/base64.h>
 #include "mnemonics/electrum-words.h"
 
 
@@ -23,6 +24,8 @@ using cryptonote::rpc::rpc_request;
 using cryptonote::rpc::rpc_error;
 
 namespace {
+
+  static auto logcat = oxen::log::Cat("wallet");
 
   template <typename RPC>
   void register_rpc_command(std::unordered_map<std::string, std::shared_ptr<const rpc_command>>& regs)
@@ -56,6 +59,23 @@ void RequestHandler::set_wallet(std::weak_ptr<wallet::Wallet> ptr)
   wallet = ptr;
 }
 
+//TODO sean something here
+std::string RequestHandler::submit_transaction(wallet::PendingTransaction& ptx)
+{
+  std::string response;
+  if (auto w = wallet.lock())
+  {
+    w->keys->sign_transaction(ptx);
+
+    auto submit_future = w->daemon_comms->submit_transaction(ptx.tx, false);
+
+    if (submit_future.wait_for(5s) != std::future_status::ready)
+      throw rpc_error(500, "request to daemon timed out");
+    response = submit_future.get();
+  }
+  return response;
+}
+
 const std::unordered_map<std::string, std::shared_ptr<const rpc_command>> rpc_commands = register_rpc_commands(wallet_rpc_types{});
 
 void RequestHandler::invoke(GET_BALANCE& command, rpc_context context) {
@@ -69,34 +89,32 @@ void RequestHandler::invoke(GET_BALANCE& command, rpc_context context) {
 
 void RequestHandler::invoke(GET_ADDRESS& command, rpc_context context) {
   //TODO: implement fetching address/subaddress from db/keyring
-  /*
   if (auto w = wallet.lock())
   {
-    auto& addresses = (command.response["addresses"] = json::array());
-    if (command.request.address_index.size() == 0)
-    {
-      auto address = w->get_subaddress(command.request.account_index, 0);
-      addresses.push_back(json{
-        {"address", address.as_str(cryptonote::network_type::MAINNET)},
-        {"label", ""},
-        {"address_index", command.request.address_index},
-        {"used", true}
-      });
-    } else {
-      for (const auto& address_index: command.request.address_index)
-      {
-        auto address = w->get_subaddress(command.request.account_index, address_index);
-        addresses.push_back(json{
-          {"address", address.as_str(cryptonote::network_type::MAINNET)},
-          {"label", ""},
-          {"address_index", command.request.address_index},
-          {"used", true}
-        });
-      }
-    }
+    command.response["address"] = w->keys->get_main_address();
+    //auto& addresses = (command.response["addresses"] = json::array());
+    //if (command.request.address_index.size() == 0)
+    //{
+      //auto address = w->get_subaddress(command.request.account_index, 0);
+      //addresses.push_back(json{
+        //{"address", address.as_str(cryptonote::network_type::MAINNET)},
+        //{"label", ""},
+        //{"address_index", command.request.address_index},
+        //{"used", true}
+      //});
+    //} else {
+      //for (const auto& address_index: command.request.address_index)
+      //{
+        //auto address = w->get_subaddress(command.request.account_index, address_index);
+        //addresses.push_back(json{
+          //{"address", address.as_str(cryptonote::network_type::MAINNET)},
+          //{"label", ""},
+          //{"address_index", command.request.address_index},
+          //{"used", true}
+        //});
+      //}
+    //}
   }
-  */
-  
 }
 
 void RequestHandler::invoke(GET_ADDRESS_INDEX& command, rpc_context context) {
@@ -132,16 +150,18 @@ void RequestHandler::invoke(SET_ACCOUNT_TAG_DESCRIPTION& command, rpc_context co
 void RequestHandler::invoke(GET_HEIGHT& command, rpc_context context) {
   if (auto w = wallet.lock())
   {
-    auto height = w->db->scan_target_height();
+    const auto immutable_height = w->db->scan_target_height();
+    const auto height = w->db->current_height();
+
     command.response["height"] = height;
 
-    //TODO: this
-    command.response["immutable_height"] = height;
+    command.response["immutable_height"] = immutable_height;
   }
 }
 
 void RequestHandler::invoke(TRANSFER& command, rpc_context context) {
-std::cout << "rpc handler, handling TRANSFER\n";
+  oxen::log::info(logcat, "RPC Handler received TRANSFER command");
+  wallet::PendingTransaction ptx;
   if (auto w = wallet.lock())
   {
     // TODO: arg checking
@@ -150,8 +170,6 @@ std::cout << "rpc handler, handling TRANSFER\n";
     std::vector<cryptonote::tx_destination_entry> recipients;
     for (const auto& [dest, amount] : command.request.destinations)
     {
-std::cout << "transfer dest: " << dest << "\n";
-std::cout << "transfer amount: " << amount << "\n";
       auto& entry = recipients.emplace_back();
       cryptonote::address_parse_info addr_info;
 
@@ -176,22 +194,10 @@ std::cout << "transfer amount: " << amount << "\n";
     change_dest.is_subaddress = change_addr_info.is_subaddress;
     change_dest.is_integrated = change_addr_info.has_payment_id;
 
-    auto ptx = w->tx_constructor->create_transaction(recipients, change_dest);
-
-    w->keys->sign_transaction(ptx);
-
-std::cout << "rpc, transaction vout.size() = " << ptx.tx.vout.size() << "\n";
-std::cout << "rpc, transaction output_unlock_times.size() = " << ptx.tx.output_unlock_times.size() << "\n";
-std::cout << "rpc, ptx recipients.size() = " << ptx.recipients.size() << "\n";
-
-    auto submit_future = w->daemon_comms->submit_transaction(ptx.tx, false);
-
-    if (submit_future.wait_for(5s) != std::future_status::ready)
-      throw rpc_error(500, "request to daemon timed out");
-
-    command.response["status"] = "200";
-    command.response["result"] = submit_future.get();
+    ptx = w->tx_constructor->create_transaction(recipients, change_dest);
   }
+  command.response["result"] = submit_transaction(ptx);
+  command.response["status"] = "200";
 }
 
 void RequestHandler::invoke(TRANSFER_SPLIT& command, rpc_context context) {
@@ -471,12 +477,69 @@ void RequestHandler::invoke(SET_LOG_CATEGORIES& command, rpc_context context) {
 }
 
 void RequestHandler::invoke(ONS_BUY_MAPPING& command, rpc_context context) {
+  //TODO sean these params need to be accounted for
+  //  "do_not_relay", req.request.do_not_relay.
+  //  "get_tx_hex", req.request.get_tx_hex.
+  //  "get_tx_key", req.request.get_tx_key.
+  //  "get_tx_metadata", req.request.get_tx_metadata.
+  //  "priority", req.request.priority,
+  //  "subaddr_indices", req.request.subaddr_indices,
+
+  oxen::log::info(logcat, "RPC Handler received ONS_BUY_MAPPING command");
+  wallet::PendingTransaction ptx;
+  if (auto w = wallet.lock())
+  {
+    cryptonote::tx_destination_entry change_dest;
+    change_dest.original = w->keys->get_main_address();
+    cryptonote::address_parse_info change_addr_info;
+    cryptonote::get_account_address_from_str(change_addr_info, w->nettype, change_dest.original);
+    change_dest.amount = 0;
+    change_dest.addr = change_addr_info.address;
+    change_dest.is_subaddress = change_addr_info.is_subaddress;
+    change_dest.is_integrated = change_addr_info.has_payment_id;
+
+    ptx = w->tx_constructor->create_ons_buy_transaction(
+      command.request.name,
+      command.request.type,
+      command.request.value,
+      command.request.owner,
+      command.request.backup_owner,
+      change_dest
+      );
+  }
+  command.response["result"] = submit_transaction(ptx);
+  command.response["status"] = "200";
 }
 
 void RequestHandler::invoke(ONS_RENEW_MAPPING& command, rpc_context context) {
 }
 
 void RequestHandler::invoke(ONS_UPDATE_MAPPING& command, rpc_context context) {
+  oxen::log::info(logcat, "RPC Handler received ONS_UPDATE_MAPPING command");
+  wallet::PendingTransaction ptx;
+  if (auto w = wallet.lock())
+  {
+    cryptonote::tx_destination_entry change_dest;
+    change_dest.original = w->keys->get_main_address();
+    cryptonote::address_parse_info change_addr_info;
+    cryptonote::get_account_address_from_str(change_addr_info, w->nettype, change_dest.original);
+    change_dest.amount = 0;
+    change_dest.addr = change_addr_info.address;
+    change_dest.is_subaddress = change_addr_info.is_subaddress;
+    change_dest.is_integrated = change_addr_info.has_payment_id;
+
+    ptx = w->tx_constructor->create_ons_update_transaction(
+      command.request.name,
+      command.request.type,
+      command.request.value,
+      command.request.owner,
+      command.request.backup_owner,
+      change_dest,
+      w->keys
+      );
+  }
+  command.response["result"] = submit_transaction(ptx);
+  command.response["status"] = "200";
 }
 
 void RequestHandler::invoke(ONS_MAKE_UPDATE_SIGNATURE& command, rpc_context context) {
@@ -495,6 +558,19 @@ void RequestHandler::invoke(ONS_ENCRYPT_VALUE& command, rpc_context context) {
 }
 
 void RequestHandler::invoke(ONS_DECRYPT_VALUE& command, rpc_context context) {
+}
+
+void RequestHandler::invoke(STATUS& command, rpc_context context) {
+  if (auto w = wallet.lock())
+  {
+    const auto sync_height = w->db->current_height();
+    const auto target_height = w->db->scan_target_height();
+
+    command.response["sync_height"] = sync_height;
+    command.response["target_height"] = target_height;
+
+    command.response["syncing"] = sync_height < target_height;
+  }
 }
 
 

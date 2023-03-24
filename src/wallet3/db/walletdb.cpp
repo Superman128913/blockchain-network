@@ -1,9 +1,9 @@
-#include "db_schema.hpp"
+#include "walletdb.hpp"
 
-#include "output.hpp"
-#include "block.hpp"
+#include "wallet3/block.hpp"
 
 #include <common/hex.h>
+#include <common/string_util.h>
 #include <cryptonote_basic/cryptonote_basic.h>
 
 #include <fmt/core.h>
@@ -11,6 +11,8 @@
 
 namespace wallet
 {
+  static auto logcat = oxen::log::Cat("wallet");
+
   WalletDB::~WalletDB()
   {
   }
@@ -37,21 +39,27 @@ namespace wallet
     // TODO: table for balance "per account"
     db.exec(
         R"(
-          -- CHECK (id = 0) restricts this table to a single row
           CREATE TABLE metadata (
-            id INTEGER NOT NULL PRIMARY KEY CHECK (id = 0),
-            db_version INTEGER NOT NULL DEFAULT 0,
-            nettype TEXT NOT NULL DEFAULT "testnet",
-            balance INTEGER NOT NULL DEFAULT 0,
-            unlocked_balance INTEGER NOT NULL DEFAULT 0,
-            last_scan_height INTEGER NOT NULL DEFAULT -1,
-            scan_target_hash TEXT NOT NULL,
-            scan_target_height INTEGER NOT NULL DEFAULT 0,
-            output_count INTEGER NOT NULL DEFAULT 0
-          );
+            id TEXT PRIMARY KEY NOT NULL,
+            val_numeric INT,
+            val_binary BLOB,
+            val_text TEXT,
+            -- Exactly one val_* must be set:
+            CHECK((val_numeric IS NOT NULL) + (val_binary IS NOT NULL) + (val_text IS NOT NULL) == 1)
+          ) STRICT;
 
-          -- insert metadata row as default
-          INSERT INTO metadata VALUES (0,0,"testnet",0,0,-1,"",0,0);
+          INSERT INTO metadata(id, val_numeric)
+          VALUES
+            ('db_version', 0),
+            ('balance', 0),
+            ('last_scan_height', 0),
+            ('scan_target_height', 0),
+            ('output_count', 0);
+
+          INSERT INTO metadata(id, val_text)
+          VALUES
+            ('nettype', 'testnet'),
+            ('scan_target_hash', '');
 
           CREATE TABLE blocks (
             height INTEGER NOT NULL PRIMARY KEY,
@@ -64,16 +72,16 @@ namespace wallet
           CREATE TRIGGER block_added AFTER INSERT ON blocks
           FOR EACH ROW
           BEGIN
-            UPDATE metadata SET last_scan_height = NEW.height WHERE id = 0;
-            UPDATE metadata SET output_count = output_count + NEW.output_count WHERE id = 0;
+            UPDATE metadata SET val_numeric = NEW.height WHERE id = 'last_scan_height';
+            UPDATE metadata SET val_numeric = val_numeric + NEW.output_count WHERE id = 'output_count';
           END;
 
           -- update scan height when new block removed
           CREATE TRIGGER block_removed AFTER DELETE ON blocks
           FOR EACH ROW
           BEGIN
-            UPDATE metadata SET last_scan_height = OLD.height - 1 WHERE id = 0;
-            UPDATE metadata SET output_count = output_count - OLD.output_count WHERE id = 0;
+            UPDATE metadata SET val_numeric = OLD.height - 1 WHERE id = 'last_scan_height';
+            UPDATE metadata SET val_numeric = val_numeric - OLD.output_count WHERE id = 'last_scan_height';
           END;
 
           CREATE TABLE transactions (
@@ -117,8 +125,7 @@ namespace wallet
             rct_mask BLOB NOT NULL,
             key_image INTEGER NOT NULL REFERENCES key_images(id),
             subaddress_major INTEGER NOT NULL,
-            subaddress_minor INTEGER NOT NULL,
-            FOREIGN KEY(subaddress_major, subaddress_minor) REFERENCES subaddresses(major_index, minor_index)
+            subaddress_minor INTEGER NOT NULL
           );
           CREATE INDEX output_key_image ON outputs(key_image);
 
@@ -126,14 +133,14 @@ namespace wallet
           CREATE TRIGGER output_received AFTER INSERT ON outputs
           FOR EACH ROW
           BEGIN
-            UPDATE metadata SET balance = balance + NEW.amount WHERE id = 0;
+            UPDATE metadata SET val_numeric = val_numeric + NEW.amount WHERE id = 'balance';
           END;
 
           -- update balance when output removed (blockchain re-org)
           CREATE TRIGGER output_removed AFTER DELETE ON outputs
           FOR EACH ROW
           BEGIN
-            UPDATE metadata SET balance = balance - OLD.amount WHERE id = 0;
+            UPDATE metadata SET val_numeric = val_numeric - OLD.amount WHERE id = 'balance';
           END;
 
           CREATE TABLE spends (
@@ -150,7 +157,7 @@ namespace wallet
           FOR EACH ROW
           BEGIN
             UPDATE outputs SET spent_height = NEW.height WHERE key_image = NEW.key_image;
-            UPDATE metadata SET balance = balance - (SELECT outputs.amount FROM outputs WHERE outputs.key_image = NEW.key_image);
+            UPDATE metadata SET val_numeric = val_numeric - (SELECT outputs.amount FROM outputs WHERE outputs.key_image = NEW.key_image) where id = 'balance';
           END;
 
           -- update output and balance when output un-seen as spent (blockchain re-org)
@@ -158,7 +165,7 @@ namespace wallet
           FOR EACH ROW
           BEGIN
             UPDATE outputs SET spent_height = 0 WHERE key_image = OLD.key_image;
-            UPDATE metadata SET balance = balance + (SELECT outputs.amount FROM outputs WHERE outputs.key_image = OLD.key_image);
+            UPDATE metadata SET val_numeric = val_numeric + (SELECT outputs.amount FROM outputs WHERE outputs.key_image = OLD.key_image) where id = 'balance';
           END;
 
           CREATE TRIGGER key_image_output_removed_cleaner AFTER DELETE ON outputs
@@ -176,34 +183,71 @@ namespace wallet
 
         )");
 
-    prepared_exec("UPDATE metadata SET nettype = ? WHERE id = 0;", std::string(cryptonote::network_type_to_string(nettype)));
+    set_metadata_text("nettype", std::string(cryptonote::network_type_to_string(nettype)));
 
     db_tx.commit();
+  }
+
+  // Helpers to access the metadata table
+  void
+  WalletDB::set_metadata_int(const std::string& id, int64_t val)
+  {
+    prepared_exec("INSERT INTO metadata(id, val_numeric) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET val_numeric=excluded.val_numeric", id, val);
+  }
+
+  int64_t
+  WalletDB::get_metadata_int(const std::string& id)
+  {
+    return prepared_get<int64_t>("SELECT val_numeric FROM metadata WHERE id = ?", id);
+  }
+
+  void
+  WalletDB::set_metadata_text(const std::string& id, const std::string& val)
+  {
+    prepared_exec("INSERT INTO metadata(id, val_text) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET val_text=excluded.val_text", id, val);
+  }
+
+  std::string
+  WalletDB::get_metadata_text(const std::string& id)
+  {
+    return prepared_get<std::string>("SELECT val_text FROM metadata WHERE id = ?", id);
+  }
+
+  void
+  WalletDB::set_metadata_blob(const std::string& id, std::string_view data)
+  {
+    prepared_exec("INSERT INTO metadata(id, val_binary) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET val_binary=excluded.val_binary", id, db::blob_binder{data});
+  }
+
+  std::string
+  WalletDB::get_metadata_blob(const std::string& id)
+  {
+    return prepared_get<std::string>("SELECT val_binary FROM metadata WHERE id = ?", id);
   }
 
   cryptonote::network_type
   WalletDB::network_type()
   {
-    return cryptonote::network_type_from_string(prepared_get<std::string>("SELECT nettype FROM metadata WHERE id=0;"));
+    return cryptonote::network_type_from_string(get_metadata_text("nettype"));
   }
 
 
   void
   WalletDB::add_address(int32_t major_index, int32_t minor_index, const std::string& address)
   {
-    auto exists = prepared_get<int64_t>("SELECT COUNT(*) FROM subaddresses WHERE major_index = ? AND minor_index = ?;",
+    auto exists = prepared_get<int64_t>("SELECT COUNT(*) FROM subaddresses WHERE major_index = ? AND minor_index = ?",
         major_index,
         minor_index);
 
     if (exists)
     {
-      auto existing_addr = prepared_get<std::string>("SELECT address FROM subaddresses WHERE major_index = ? AND minor_index = ?;",
+      auto existing_addr = prepared_get<std::string>("SELECT address FROM subaddresses WHERE major_index = ? AND minor_index = ?",
           major_index,
           minor_index);
 
       if (major_index == 0 and minor_index == 0 and existing_addr == "")
       {
-        prepared_exec("UPDATE subaddresses SET address = ? WHERE major_index = ? AND minor_index = ?;",
+        prepared_exec("UPDATE subaddresses SET address = ? WHERE major_index = ? AND minor_index = ?",
             address,
             major_index,
             minor_index);
@@ -216,7 +260,7 @@ namespace wallet
     }
     else
     {
-      prepared_exec("INSERT INTO subaddresses(major_index, minor_index, address, used) VALUES(?,?,?);",
+      prepared_exec("INSERT INTO subaddresses(major_index, minor_index, address, used) VALUES(?,?,?)",
           major_index,
           minor_index,
           address,
@@ -227,7 +271,7 @@ namespace wallet
   std::string
   WalletDB::get_address(int32_t major_index, int32_t minor_index)
   {
-    auto addr = prepared_maybe_get<std::string>("SELECT address FROM subaddresses WHERE major_index = ? AND minor_index = ?;",
+    auto addr = prepared_maybe_get<std::string>("SELECT address FROM subaddresses WHERE major_index = ? AND minor_index = ?",
         major_index,
         minor_index);
 
@@ -337,26 +381,38 @@ namespace wallet
   int64_t
   WalletDB::last_scan_height()
   {
-    return prepared_get<int64_t>("SELECT last_scan_height FROM metadata WHERE id=0;");
+    return get_metadata_int("last_scan_height");
   }
 
   int64_t
   WalletDB::scan_target_height()
   {
-    return prepared_get<int64_t>("SELECT scan_target_height FROM metadata WHERE id=0;");
+    return get_metadata_int("scan_target_height");
+  }
+
+  int64_t
+  WalletDB::current_height()
+  {
+    return prepared_get<int64_t>("SELECT max(height) from blocks");
   }
 
   void
   WalletDB::update_top_block_info(int64_t height, const crypto::hash& hash)
   {
-    prepared_exec("UPDATE metadata SET scan_target_height = ?, scan_target_hash = ? WHERE id = 0",
-      height, tools::type_to_hex(hash));
+    set_metadata_int("scan_target_height", height);
+    set_metadata_text("scan_target_hash", tools::type_to_hex(hash));
   }
 
   int64_t
   WalletDB::overall_balance()
   {
-    return prepared_get<int64_t>("SELECT balance FROM metadata WHERE id=0;");
+    return get_metadata_int("balance");
+  }
+
+  int64_t
+  WalletDB::unlocked_balance()
+  {
+    return prepared_get<int64_t>("SELECT sum(o.amount) FROM outputs AS o WHERE o.spent_height = 0 AND o.spending = false AND (o.block_height + o.unlock_time) <= (SELECT m.val_numeric FROM metadata as m WHERE m.id = 'last_scan_height')");
   }
 
   int64_t
@@ -418,7 +474,46 @@ namespace wallet
   int64_t
   WalletDB::chain_output_count()
   {
-    return prepared_get<int64_t>("SELECT output_count FROM metadata WHERE id=0;");
+    return get_metadata_int("output_count");
+  }
+  void
+  WalletDB::save_keys(const std::shared_ptr<WalletKeys> keys)
+  {
+    const auto maybe_db_keys = load_keys();
+    if (maybe_db_keys.has_value())
+    {
+      if ((tools::view_guts(maybe_db_keys->spend_privkey()) != tools::view_guts(keys->spend_privkey())) ||
+          (tools::view_guts(maybe_db_keys->spend_pubkey()) != tools::view_guts(keys->spend_pubkey())) ||
+          (tools::view_guts(maybe_db_keys->view_privkey()) != tools::view_guts(keys->view_privkey())) ||
+          (tools::view_guts(maybe_db_keys->view_pubkey()) != tools::view_guts(keys->view_pubkey())))
+            throw std::runtime_error("provided keys do not match database file");
+    }
+
+    set_metadata_blob_guts("spend_priv", keys->spend_privkey());
+    set_metadata_blob_guts("spend_pub",  keys->spend_pubkey());
+    set_metadata_blob_guts("view_priv",  keys->view_privkey());
+    set_metadata_blob_guts("view_pub",   keys->view_pubkey());
   }
 
+  std::optional<DBKeys>
+  WalletDB::load_keys()
+  {
+    DBKeys keys;
+    // Will throw if the keys do not exist in the database (for example when the wallet is first created) 
+    // catch this and return nullopt. This means all 4 keys need to exist in the database. In future 
+    // view only wallets will need the ability to return an empty spend_priv key
+    try {
+      keys.ssk = get_metadata_blob_guts<crypto::secret_key>("spend_priv");
+      keys.spk = get_metadata_blob_guts<crypto::public_key>("spend_pub");
+      keys.vsk = get_metadata_blob_guts<crypto::secret_key>("view_priv");
+      keys.vpk = get_metadata_blob_guts<crypto::public_key>("view_pub");
+    }
+    catch (const std::exception& e)
+    {
+      oxen::log::debug(logcat, "Could not load keys: {}", e.what());
+      return std::nullopt;
+    }
+
+    return keys;
+  }
 }  // namespace wallet

@@ -5,6 +5,7 @@
 #include <memory>
 #include "pending_transaction.hpp"
 #include "daemon_comms.hpp"
+#include "keyring.hpp"
 #include "decoy_selection/decoy_selection.hpp"
 
 namespace wallet
@@ -33,8 +34,31 @@ namespace wallet
     PendingTransaction
     create_transaction(const std::vector<cryptonote::tx_destination_entry>& recipients, const cryptonote::tx_destination_entry& change_recipient);
 
+    PendingTransaction
+    create_ons_buy_transaction(
+        std::string_view name,
+        std::string_view type_str,
+        std::string_view value,
+        std::optional<std::string_view> owner_str,
+        std::optional<std::string_view> backup_owner_str,
+        const cryptonote::tx_destination_entry& change_recipient
+        );
+
+    PendingTransaction
+    create_ons_update_transaction(
+        const std::string& name,
+        const std::string& type_str,
+        std::optional<std::string_view> value,
+        std::optional<std::string_view> owner_str,
+        std::optional<std::string_view> backup_owner_str,
+        const cryptonote::tx_destination_entry& change_recipient,
+        std::shared_ptr<Keyring> keyring
+        );
+
     uint64_t fee_per_byte = cryptonote::FEE_PER_BYTE_V13;
     uint64_t fee_per_output = cryptonote::FEE_PER_OUTPUT_V18;
+
+    cryptonote::network_type nettype = cryptonote::network_type::TESTNET;
 
     std::unique_ptr<DecoySelector> decoy_selector;
 

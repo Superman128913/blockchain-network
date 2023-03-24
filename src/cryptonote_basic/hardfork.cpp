@@ -136,6 +136,13 @@ get_hard_fork_heights(network_type nettype, hf version) {
   return found;
 }
 
+hard_fork get_latest_hard_fork(network_type nettype) {
+  if (nettype == network_type::MAINNET) return mainnet_hard_forks.back();
+  if (nettype == network_type::TESTNET) return testnet_hard_forks.back();
+  if (nettype == network_type::FAKECHAIN) return fakechain_hardforks.back();
+  return devnet_hard_forks.back();
+}
+
 hf hard_fork_ceil(network_type nettype, hf version) {
   auto [it, end] = get_hard_forks(nettype);
   for (; it != end; it++)

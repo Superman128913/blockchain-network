@@ -23,6 +23,7 @@ dependencies = [
     "Click",
     "click-repl",
     "pywallet3",
+    "tqdm",
 ]
 dynamic = ["version"]
 

@@ -3,7 +3,8 @@
 #include <SQLiteCpp/SQLiteCpp.h>
 #include <sqlitedb/database.hpp>
 
-#include "output.hpp"
+#include "wallet3/output.hpp"
+#include "wallet3/walletkeys.hpp"
 
 #include <optional>
 
@@ -36,6 +37,20 @@ namespace wallet
     // Migration code will live elsewhere.
     void
     create_schema(cryptonote::network_type nettype = cryptonote::network_type::TESTNET);
+
+    // Helpers to access the metadata table
+    void set_metadata_int(const std::string& id, int64_t val);
+    int64_t get_metadata_int(const std::string& id);
+    void set_metadata_text(const std::string& id, const std::string& val);
+    std::string get_metadata_text(const std::string& id);
+    void set_metadata_blob(const std::string& id, std::string_view data);
+    std::string get_metadata_blob(const std::string& id);
+
+    template <typename T>
+    void set_metadata_blob_guts(const std::string& id, const T& val) { set_metadata_blob(id, tools::view_guts(val)); }
+
+    template <typename T>
+    T get_metadata_blob_guts(const std::string& id) { return prepared_get<db::blob_guts<T>>("SELECT val_binary FROM metadata WHERE id = ?", id); };
 
     cryptonote::network_type
     network_type();
@@ -70,6 +85,10 @@ namespace wallet
     int64_t
     scan_target_height();
 
+    // Returns the height of the highest block in the database
+    int64_t
+    current_height();
+
     // Update the top block height and hash.
     void
     update_top_block_info(int64_t height, const crypto::hash& hash);
@@ -77,6 +96,10 @@ namespace wallet
     // Get available balance across all subaddresses
     int64_t
     overall_balance();
+
+    // Get unlocked balance across all subaddresses
+    int64_t
+    unlocked_balance();
 
     // Get available balance with amount above an optional minimum amount.
     // TODO: subaddress specification
@@ -92,5 +115,13 @@ namespace wallet
     // and thus mixable, this can be used for decoy selection.
     int64_t
     chain_output_count();
+
+    // Saves keys to the database, will check if keys match if already exists and throw if different
+    void
+    save_keys(const std::shared_ptr<WalletKeys> keys);
+
+    // Loads keys from an already created database
+    std::optional<DBKeys>
+    load_keys();
   };
 }

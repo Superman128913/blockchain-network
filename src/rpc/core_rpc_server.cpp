@@ -2894,60 +2894,63 @@ namespace cryptonote::rpc {
     test_trigger_uptime_proof.response["status"] = STATUS_OK;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  ONS_NAMES_TO_OWNERS::response core_rpc_server::invoke(ONS_NAMES_TO_OWNERS::request&& req, rpc_context context)
+  void core_rpc_server::invoke(ONS_NAMES_TO_OWNERS& ons_names_to_owners, rpc_context context)
   {
-    ONS_NAMES_TO_OWNERS::response res{};
 
     if (!context.admin)
-      check_quantity_limit(req.entries.size(), ONS_NAMES_TO_OWNERS::MAX_REQUEST_ENTRIES);
+    {
+      check_quantity_limit(ons_names_to_owners.request.name_hash.size(), ONS_NAMES_TO_OWNERS::MAX_REQUEST_ENTRIES);
+      check_quantity_limit(ons_names_to_owners.request.type.size(), ONS_NAMES_TO_OWNERS::MAX_TYPE_REQUEST_ENTRIES, "types");
+    }
 
     std::optional<uint64_t> height = m_core.get_current_blockchain_height();
     auto hf_version = get_network_version(nettype(), *height);
-    if (req.include_expired) height = std::nullopt;
 
     std::vector<ons::mapping_type> types;
+    types.clear();
+    if (types.capacity() < ons_names_to_owners.request.type.size())
+      types.reserve(ons_names_to_owners.request.type.size());
+    for (const auto type_str : ons_names_to_owners.request.type)
+    {
+      const auto maybe_type = ons::parse_ons_type(type_str);
+      if (!maybe_type.has_value())
+      {
+        ons_names_to_owners.response["status"] = "invalid type provided";
+        return;
+      }
+      types.push_back(*maybe_type);
+    }
+    ons_names_to_owners.response["type"] =ons_names_to_owners.request.type;
 
     ons::name_system_db &db = m_core.get_blockchain_storage().name_system_db();
-    for (size_t request_index = 0; request_index < req.entries.size(); request_index++)
+    for (size_t request_index = 0; request_index < ons_names_to_owners.request.name_hash.size(); request_index++)
     {
-      ONS_NAMES_TO_OWNERS::request_entry const &request = req.entries[request_index];
-      if (!context.admin)
-        check_quantity_limit(request.types.size(), ONS_NAMES_TO_OWNERS::MAX_TYPE_REQUEST_ENTRIES, "types");
-
-      types.clear();
-      if (types.capacity() < request.types.size())
-        types.reserve(request.types.size());
-      for (auto type : request.types)
-      {
-        types.push_back(static_cast<ons::mapping_type>(type));
-        if (!ons::mapping_type_allowed(hf_version, types.back()))
-          throw rpc_error{ERROR_WRONG_PARAM, "Invalid lokinet type '" + std::to_string(type) + "'"};
-      }
-
+      const auto& request = ons_names_to_owners.request.name_hash[request_index];
       // This also takes 32 raw bytes, but that is undocumented (because it is painful to pass
       // through json).
-      auto name_hash = ons::name_hash_input_to_base64(request.name_hash);
+      auto name_hash = ons::name_hash_input_to_base64(ons_names_to_owners.request.name_hash[request_index]);
       if (!name_hash)
         throw rpc_error{ERROR_WRONG_PARAM, "Invalid name_hash: expected hash as 64 hex digits or 43/44 base64 characters"};
 
-      std::vector<ons::mapping_record> records = db.get_mappings(types, *name_hash, height);
-      for (auto const &record : records)
+      std::vector<ons::mapping_record> record = db.get_mappings(types, *name_hash, height);
+      for (size_t type_index = 0; type_index < ons_names_to_owners.request.type.size(); type_index++)
       {
-        auto& entry = res.entries.emplace_back();
-        entry.entry_index                                      = request_index;
-        entry.type                                             = record.type;
-        entry.name_hash                                        = record.name_hash;
-        entry.owner                                            = record.owner.to_string(nettype());
-        if (record.backup_owner) entry.backup_owner            = record.backup_owner.to_string(nettype());
-        entry.encrypted_value                                  = oxenc::to_hex(record.encrypted_value.to_view());
-        entry.expiration_height                                = record.expiration_height;
-        entry.update_height                                    = record.update_height;
-        entry.txid                                             = tools::type_to_hex(record.txid);
+        auto& elem = ons_names_to_owners.response["result"].emplace_back();
+        elem["type"] = record[type_index].type;
+        elem["name_hash"] = record[type_index].name_hash;
+        elem["owner"] = record[type_index].owner.to_string(nettype());
+        if (record[type_index].backup_owner)
+          elem["backup_owner"] = record[type_index].backup_owner.to_string(nettype());
+        elem["encrypted_value"] = oxenc::to_hex(record[type_index].encrypted_value.to_view());
+        if (record[0].expiration_height)
+          elem["expiration_height"] = *(record[type_index].expiration_height);
+        elem["update_height"] = record[type_index].update_height;
+        elem["txid"] = tools::type_to_hex(record[type_index].txid);
       }
     }
 
-    res.status = STATUS_OK;
-    return res;
+
+    ons_names_to_owners.response["status"] = STATUS_OK;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   void core_rpc_server::invoke(ONS_OWNERS_TO_NAMES& ons_owners_to_names, rpc_context context)

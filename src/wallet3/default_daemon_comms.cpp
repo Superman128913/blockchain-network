@@ -7,27 +7,26 @@
 
 #include <cryptonote_basic/cryptonote_format_utils.h>
 #include <common/string_util.h>
-#include <epee/misc_log_ex.h>
 
 #include <iostream>
 
 namespace wallet
 {
+  static auto logcat = oxen::log::Cat("wallet");
+
   void
   DefaultDaemonComms::on_get_blocks_response(std::vector<std::string> response)
   {
     if (not response.size())
     {
-      std::cout << "on_get_blocks_response(): empty get_blocks response\n";
-      //TODO: error handling
+      oxen::log::warning(logcat, "on_get_blocks_response(): empty get_blocks response");
       return;
     }
 
     const auto& status = response[0];
     if (status != "OK" and status != "END")
     {
-      std::cout << "get_blocks response: " << response[0] << "\n";
-      //TODO: error handling
+      oxen::log::warning(logcat, "get_blocks response: {}", response[0]);
       return;
     }
 
@@ -35,7 +34,7 @@ namespace wallet
     // TODO: decide/confirm this behavior on the daemon side of things
     if (response.size() == 1)
     {
-      std::cout << "get_blocks response.size() == 1\n";
+      oxen::log::warning(logcat, "get_blocks response.size() == 1");
       return;
     }
 
@@ -103,13 +102,13 @@ namespace wallet
     }
     catch (const std::exception& e)
     {
-      std::cout << e.what() << "\n";
+      oxen::log::warning(logcat, "exception thrown: {}", e.what());
       return;
     }
 
     if (blocks.size() == 0)
     {
-      std::cout << "received no blocks, but server said response OK\n";
+      oxen::log::warning(logcat, "received no blocks, but server said response OK");
       return;
     }
 
@@ -119,7 +118,7 @@ namespace wallet
     omq->job([blocks=std::move(blocks),this](){
         for_each_wallet([&](std::shared_ptr<Wallet> wallet){
             wallet->add_blocks(blocks);
-            });
+          });
         }, sync_thread);
 
     if (status == "END")
@@ -142,6 +141,7 @@ namespace wallet
   void
   DefaultDaemonComms::request_top_block_info()
   {
+    oxen::log::trace(logcat, "request top block called");
     auto timeout_job = [self=weak_from_this()](){
       if (auto comms = self.lock())
         comms->request_top_block_info();
@@ -155,9 +155,11 @@ namespace wallet
     else
       omq->add_timer(status_timer, timeout_job, 15s);
 
+    oxen::log::trace(logcat, "requesting rpc.get_height");
     omq->request(conn, "rpc.get_height",
         [this](bool ok, std::vector<std::string> response)
         {
+          oxen::log::trace(logcat, "rpc get_height response");
           if (not ok or response.size() != 2 or response[0] != "200")
             return;
 
@@ -167,11 +169,17 @@ namespace wallet
           crypto::hash new_hash;
 
           if (not dc.skip_until("hash"))
+          {
+            oxen::log::warning(logcat, "bad response from rpc.get_height, key 'hash' missing");
             throw std::runtime_error("bad response from rpc.get_height, key 'hash' missing");
+          }
           new_hash = tools::make_from_guts<crypto::hash>(dc.consume_string_view());
 
           if (not dc.skip_until("height"))
+          {
+            oxen::log::warning(logcat, "bad response from rpc.get_height, key 'height' missing");
             throw std::runtime_error("bad response from rpc.get_height, key 'height' missing");
+          }
           new_height = dc.consume_integer<int64_t>();
 
           bool got_new = (new_height > (top_block_height + 1));
@@ -193,9 +201,11 @@ namespace wallet
           }
         }, "de");
 
+    oxen::log::trace(logcat, "requesting rpc.get_fee_estimate");
     omq->request(conn, "rpc.get_fee_estimate",
         [this](bool ok, std::vector<std::string> response)
         {
+          oxen::log::trace(logcat, "rpc get_fee estimate response");
           if (not ok or response.size() != 2 or response[0] != "200")
             return;
 
@@ -205,11 +215,17 @@ namespace wallet
           int64_t new_fee_per_output = 0;
 
           if (not dc.skip_until("fee_per_byte"))
+          {
+            oxen::log::warning(logcat, "bad response from rpc.get_fee_estimate, key 'fee_per_byte' missing");
             throw std::runtime_error("bad response from rpc.get_fee_estimate, key 'fee_per_byte' missing");
+          }
           new_fee_per_byte = dc.consume_integer<int64_t>();
 
           if (not dc.skip_until("fee_per_output"))
+          {
+            oxen::log::warning(logcat, "bad response from rpc.get_fee_estimate, key 'fee_per_output' missing");
             throw std::runtime_error("bad response from rpc.get_fee_estimate, key 'fee_per_output' missing");
+          }
           new_fee_per_output = dc.consume_integer<int64_t>();
 
           fee_per_byte = new_fee_per_byte;
@@ -229,6 +245,7 @@ namespace wallet
   void
   DefaultDaemonComms::set_remote(std::string_view address)
   {
+    oxen::log::info(logcat, "Set remote called with address: {}", address);
     try
     {
       remote = oxenmq::address{address};
@@ -239,8 +256,16 @@ namespace wallet
       throw;
     }
 
-    // TODO: proper callbacks
-    conn = omq->connect_remote(remote, [](auto){}, [](auto,auto){});
+    oxen::log::info(logcat, "Trying to connect to remote oxend");
+    conn = omq->connect_remote(remote,
+        // Callback for success case of connect remote
+        [](auto){
+          oxen::log::info(logcat, "successfully connected via OMQ");
+        },
+        // Callback for failure case of connect remote
+        [](auto, auto reason){
+          oxen::log::error(logcat, "Daemon Comms was not successful in connecting to remote oxend. Reason: {}", reason);
+        });
 
     request_top_block_info();
   }
@@ -301,10 +326,9 @@ namespace wallet
       // if not OK
       if (response[0] != "200")
       {
-        std::cout << "get_outputs response not ok: " << response[0] << "\n";
+        oxen::log::warning(logcat, "get_outputs response not ok: {}", response[0]);
         if (response.size() == 2)
-          std::cout << " -- error: \"" << response[1] << "\"\n";
-        //TODO: error handling
+          oxen::log::warning(logcat, " -- error: \"{}\"", response[1]);
         return;
       }
 
@@ -312,7 +336,7 @@ namespace wallet
       // TODO: decide/confirm this behavior on the daemon side of things
       if (response.size() == 1)
       {
-        std::cout << "get_blocks response.size() == 1\n";
+        oxen::log::warning(logcat, "get_blocks response.size() == 1");
         return;
       }
 
@@ -365,13 +389,13 @@ namespace wallet
       }
       catch (const std::exception& e)
       {
-        std::cout << e.what() << "\n";
+        oxen::log::warning(logcat, "exception thrown: {}", e.what());
         return;
       }
 
       if (outputs.size() == 0)
       {
-        std::cout << "received no outputs, but server said response OK\n";
+        oxen::log::warning(logcat, "received no outputs, but server said response OK");
         return;
       }
 
@@ -398,34 +422,27 @@ namespace wallet
     auto fut = p->get_future();
     auto req_cb = [p=std::move(p)](bool ok, std::vector<std::string> response)
     {
-      // TODO: handle various error cases.
-      if (not ok or response.size() != 2 or response[0] != "200")
+      try 
       {
-        p->set_value("Unknown Error");
-        return;
-      }
-      else
-      {
+        if (not ok or response.size() != 2 or response[0] != "200")
+          throw std::runtime_error{"Unknown Error"};
+
         oxenc::bt_dict_consumer dc{response[1]};
         if (dc.skip_until("reason"))
-        {
-          auto reason = dc.consume_string();
-          p->set_value(std::string("Submit Transaction rejected, reason: ") + reason);
-          return;
-        }
+          throw std::runtime_error{"Submit Transaction rejected, reason: " + dc.consume_string()};
 
         if (not dc.skip_until("status"))
-        {
-          p->set_value("Invalid response from daemon");
-          return;
-        }
+          throw std::runtime_error{"Invalid response from daemon"};
 
         auto status = dc.consume_string();
 
-        if (status == "OK")
-          p->set_value("OK");
-        else
-          p->set_value(std::string("Something getting wrong.") + status);
+        if (status != "OK")
+          throw std::runtime_error{"Submit Transaction rejected, reason: " + status};
+
+        p->set_value("OK");
+
+      } catch (...) {
+        p->set_exception(std::current_exception());
       }
     };
 
@@ -443,10 +460,58 @@ namespace wallet
     return fut;
   }
 
+  std::future<std::pair<std::string, crypto::hash>>
+  DefaultDaemonComms::ons_names_to_owners(const std::string& name_hash, const uint16_t type)
+  {
+    auto p = std::make_shared<std::promise<std::pair<std::string, crypto::hash>>>();
+    auto fut = p->get_future();
+    auto req_cb = [p=std::move(p)](bool ok, std::vector<std::string> response)
+    {
+      try 
+      {
+        oxenc::bt_dict_consumer dc{response[1]};
+
+        if (not dc.skip_until("result"))
+          throw std::runtime_error{"Invalid response from daemon"};
+
+        auto result_list = dc.consume_list_consumer();
+        auto result = result_list.consume_dict_consumer();
+
+        crypto::hash prev_txid;
+        std::string curr_owner;
+
+        if (not result.skip_until("owner"))
+          throw std::runtime_error{"Invalid response from daemon"};
+
+        curr_owner = dc.consume_string();
+
+        if (not result.skip_until("txid"))
+          throw std::runtime_error{"Invalid response from daemon"};
+
+        tools::hex_to_type<crypto::hash>(dc.consume_string(), prev_txid);
+
+        p->set_value(std::make_pair(curr_owner, prev_txid));
+      } catch (...) {
+        p->set_exception(std::current_exception());
+      }
+    };
+
+    oxenc::bt_dict req_params_dict{
+      {"name_hash", oxenc::bt_list{{name_hash}}},
+      {"type", oxenc::bt_list{{type}}}
+    };
+
+    omq->request(conn, "rpc.ons_names_to_owners", req_cb, oxenc::bt_serialize(req_params_dict));
+
+    return fut;
+  }
+
   void
   DefaultDaemonComms::register_wallet(wallet::Wallet& wallet, int64_t height, bool check_sync_height, bool new_wallet)
   {
+    oxen::log::trace(logcat, "Daemon Comms register_wallet called");
     omq->job([this,w=wallet.shared_from_this(),height,check_sync_height,new_wallet](){
+        oxen::log::trace(logcat, "register_wallet lambda called");
         if (wallets.count(w))
           wallets[w] = height;
         else if (new_wallet)
@@ -472,6 +537,7 @@ namespace wallet
   void
   DefaultDaemonComms::deregister_wallet(wallet::Wallet& wallet, std::promise<void>& p)
   {
+    oxen::log::trace(logcat, "Daemon Comms deregister_wallet called");
     auto dereg_finish = [this,&p]() mutable {
       p.set_value();
     };
@@ -493,7 +559,7 @@ namespace wallet
             syncing = false;
           }
 
-          std::cout << "deregister_wallet() setting sync_from_height to " << sync_from_height << "\n";
+          oxen::log::debug(logcat, "deregister_wallet() setting sync_from_height to {}", sync_from_height);
           if (sync_from_height != 0 and sync_from_height == top_block_height)
             syncing = false;
         }, sync_thread);
@@ -527,6 +593,7 @@ namespace wallet
     if ((not syncing and sync_from_height <= top_block_height) or (top_block_height == 0))
     {
       syncing = true;
+      oxen::log::debug(logcat, "Start Syncing");
       get_blocks();
     }
   }

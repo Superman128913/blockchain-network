@@ -121,7 +121,6 @@ namespace wallet::rpc {
     };
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Return the wallet's addresses for an account. Optionally filter for specific set of subaddresses.
   ///
   /// Inputs:
@@ -156,7 +155,6 @@ namespace wallet::rpc {
     };
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Get account and address indexes from a specific (sub)address.
   ///
   /// Inputs:
@@ -176,7 +174,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Create a new address for an account. Optionally, label the new address.
   ///
   /// Inputs:
@@ -203,7 +200,20 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
+  /// Returns the status of the wallet
+  ///
+  /// Inputs: No Inputs
+  ///
+  /// Outputs:
+  ///
+  /// - \p syncing -- True/False if the wallet is still syncing
+  /// - \p sync_height -- Current Height of Wallet
+  /// - \p target_height -- Desired Height of the Wallet
+  struct STATUS : NO_ARGS
+  {
+    static constexpr auto names() { return NAMES("status"); }
+  };
+
   /// Label an address.
   ///
   /// Inputs:
@@ -224,7 +234,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Get all accounts for a wallet. Optionally filter accounts by tag.
   ///
   /// Inputs:
@@ -264,7 +273,6 @@ namespace wallet::rpc {
     };
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   // Create a new account with an optional label.
   //
   // Inputs:
@@ -285,7 +293,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Label an account.
   ///
   /// Inputs:
@@ -306,7 +313,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Get a list of user-defined account tags.
   ///
   /// Inputs: None
@@ -332,7 +338,6 @@ namespace wallet::rpc {
     };
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Apply a filtering tag to a list of accounts.
   ///
   /// Inputs:
@@ -353,7 +358,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Remove filtering tag from a list of accounts.
   ///
   /// Inputs:
@@ -372,7 +376,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Set description for an account tag.
   ///
   /// Inputs:
@@ -393,7 +396,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Returns the wallet's current block height and blockchain immutable height
   ///
   /// Inputs: None
@@ -410,7 +412,6 @@ namespace wallet::rpc {
     struct REQUEST : EMPTY {} request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Send oxen to a number of recipients. To preview the transaction fee, set do_not_relay to true and get_tx_metadata to true.
   /// Submit the response using the data in get_tx_metadata in the RPC call, relay_tx.
   ///
@@ -460,7 +461,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Same as transfer, but can split into more than one tx if necessary.
   ///
   /// Inputs:
@@ -507,7 +507,6 @@ namespace wallet::rpc {
   };
 
   //TODO: Confirm these parameters and descriptions even make sense...
-  OXEN_RPC_DOC_INTROSPECT
   /// Get the details of an unsigned transaction blob
   ///
   /// Inputs:
@@ -563,7 +562,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Sign a transaction created on a read-only wallet (in cold-signing process).
   ///
   /// Inputs:
@@ -590,7 +588,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Submit a previously signed transaction on a read-only wallet (in cold-signing process).
   ///
   /// Inputs:
@@ -610,7 +607,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Send all dust outputs back to the wallet's, to make them easier to spend (and mix).
   ///
   /// Inputs:
@@ -648,7 +644,6 @@ namespace wallet::rpc {
     };
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Send all unlocked balance to an address.
   ///
   /// Inputs:
@@ -704,7 +699,6 @@ namespace wallet::rpc {
     };
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Send all of a specific unlocked output to an address.
   ///
   /// Inputs:
@@ -749,7 +743,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Relay transaction metadata to the daemon
   ///
   /// Inputs:
@@ -771,7 +764,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Tell the wallet to store its data to disk, if needed.
   ///
   /// Inputs: None
@@ -786,7 +778,6 @@ namespace wallet::rpc {
     struct REQUEST : EMPTY {} request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Payment details struct
   ///
   /// - \p payment_id -- Payment ID matching the input parameter.
@@ -809,7 +800,6 @@ namespace wallet::rpc {
     std::string address;                        // Address receiving the payment.
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Get a list of incoming payments using a given payment id.
   ///
   /// Inputs:
@@ -830,7 +820,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Get a list of incoming payments using a given payment id,
   /// or a list of payments ids, from a given height.
   ///
@@ -858,7 +847,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Transfer details struct
   ///
   /// - \p amount -- Amount of this transfer.
@@ -883,7 +871,6 @@ namespace wallet::rpc {
     bool unlocked;                              // If the TX is spendable yet
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Return a list of incoming transfers to the wallet.
   ///
   /// Inputs:
@@ -908,7 +895,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Return the private view key.
   ///
   /// Inputs: None
@@ -924,7 +910,6 @@ namespace wallet::rpc {
     struct REQUEST : EMPTY {} request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Return the private spend key.
   ///
   /// Inputs: None
@@ -940,7 +925,6 @@ namespace wallet::rpc {
     struct REQUEST : EMPTY {} request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Return the mnemonic.
   ///
   /// Inputs:
@@ -960,7 +944,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Make an integrated address from the wallet address and a payment id.
   ///
   /// Inputs:
@@ -983,7 +966,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Retrieve the standard address and payment id corresponding to an integrated address.
   ///
   /// Inputs:
@@ -1005,7 +987,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   // Stops the wallet, storing the current state.
   //
   // Inputs: None
@@ -1020,7 +1001,6 @@ namespace wallet::rpc {
     struct REQUEST : EMPTY {} request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Rescan the blockchain from scratch, losing any information
   /// which can not be recovered from the blockchain itself.
   /// This includes destination addresses, tx secret keys, tx notes, etc.
@@ -1042,7 +1022,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Set arbitrary string notes for transactions.
   ///
   /// Inputs:
@@ -1062,7 +1041,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Get string notes for transactions.
   ///
   /// Inputs:
@@ -1082,7 +1060,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Set arbitrary attribute.
   ///
   /// Inputs:
@@ -1102,7 +1079,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Get attribute value by name.
   ///
   /// Inputs:
@@ -1123,7 +1099,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Get transaction secret key from transaction id.
   ///
   /// Inputs:
@@ -1143,7 +1118,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Check a transaction in the blockchain with its secret key.
   ///
   /// Inputs:
@@ -1169,7 +1143,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Get transaction signature to prove it.
   ///
   /// Inputs:
@@ -1193,7 +1166,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Prove a transaction by checking its signature.
   ///
   /// Inputs:
@@ -1222,7 +1194,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Generate a signature to prove a spend. Unlike proving a transaction, it does not requires the destination public address.
   ///
   /// Inputs:
@@ -1244,7 +1215,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Prove a spend using a signature. Unlike proving a transaction, it does not requires the destination public address.
   ///
   /// Inputs:
@@ -1268,7 +1238,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Generate a signature to prove of an available amount in a wallet.
   ///
   /// Inputs:
@@ -1294,7 +1263,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Proves a wallet has a disposable reserve using a signature.
   ///
   /// Inputs:
@@ -1320,7 +1288,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Returns a list of transfers, by default all transfer types are included. If all requested type fields are false, then all transfers will be queried.
   ///
   /// Inputs:
@@ -1374,7 +1341,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Returns a string with the transfers formatted as csv
   ///
   /// Inputs:
@@ -1403,7 +1369,6 @@ namespace wallet::rpc {
     struct REQUEST : GET_TRANSFERS::REQUEST {} request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Show information about a transfer to/from this address.
   ///
   /// Inputs:
@@ -1428,7 +1393,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Sign a string.
   ///
   /// Inputs:
@@ -1452,7 +1416,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Verify a signature on a string.
   ///
   /// Inputs:
@@ -1476,7 +1439,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Export all outputs in hex format.
   ///
   /// Inputs:
@@ -1496,7 +1458,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Export transfers to csv
   ///
   /// Inputs:
@@ -1540,7 +1501,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Import outputs in hex format.
   ///
   /// Inputs:
@@ -1560,7 +1520,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Export a signed set of key images.
   ///
   /// Inputs:
@@ -1589,7 +1548,6 @@ namespace wallet::rpc {
     };
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Import signed key images list and verify their spent status.
   ///
   /// Inputs:
@@ -1621,7 +1579,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// URI struct
   ///
   /// - \p address -- Wallet address.
@@ -1638,7 +1595,6 @@ namespace wallet::rpc {
     std::string recipient_name; // (Optional) name of the payment recipient.
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Create a payment URI using the official URI spec.
   ///
   /// Inputs:
@@ -1655,7 +1611,6 @@ namespace wallet::rpc {
     struct REQUEST: public uri_spec {} request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Parse a payment URI to get payment information.
   ///
   /// Inputs:
@@ -1677,7 +1632,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Add an entry to the address book.
   ///
   /// Inputs:
@@ -1699,7 +1653,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Edit a entry in the address book.
   ///
   /// Inputs:
@@ -1725,7 +1678,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Retrieves entries from the address book.
   ///
   /// Inputs:
@@ -1755,7 +1707,6 @@ namespace wallet::rpc {
     };
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Delete an entry from the address book.
   ///
   /// Inputs:
@@ -1773,7 +1724,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Rescan the blockchain for spent outputs.
   ///
   /// Inputs: None
@@ -1786,7 +1736,6 @@ namespace wallet::rpc {
     struct REQUEST : EMPTY {} request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Refresh a wallet after opening.
   ///
   /// Inputs:
@@ -1807,7 +1756,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Set wallet to (not) auto-refresh on an interval
   ///
   /// Inputs:
@@ -1827,7 +1775,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Start mining in the oxen daemon.
   ///
   /// Inputs:
@@ -1845,7 +1792,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Stop mining in the oxen daemon.
   ///
   /// Inputs: None
@@ -1858,7 +1804,6 @@ namespace wallet::rpc {
     struct REQUEST : EMPTY {} request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Get a list of available languages for your wallet's seed.
   ///
   /// Inputs: None
@@ -1874,7 +1819,6 @@ namespace wallet::rpc {
     struct REQUEST : EMPTY {} request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Create a new wallet. You need to have set the argument "'--wallet-dir" when launching oxen-wallet-rpc to make this work.
   ///
   /// Inputs:
@@ -1902,7 +1846,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Open a wallet. You need to have set the argument "--wallet-dir" when launching oxen-wallet-rpc to make this work.
   /// The wallet rpc executable may only open wallet files within the same directory as wallet-dir, otherwise use the
   /// "--wallet-file" flag to open specific wallets.
@@ -1926,7 +1869,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Close the currently opened wallet, after trying to save it.
   ///
   /// Inputs:
@@ -1944,7 +1886,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Change a wallet password.
   ///
   /// Inputs:
@@ -1964,7 +1905,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Restore a wallet using the private spend key, view key and public address.
   ///
   /// Inputs:
@@ -1997,7 +1937,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Restore a wallet using the seed words.
   ///
   /// Inputs:
@@ -2032,7 +1971,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Check if a wallet is a multisig one.
   ///
   /// Inputs: None
@@ -2050,7 +1988,6 @@ namespace wallet::rpc {
     struct REQUEST : EMPTY {} request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Prepare a wallet for multisig by generating a multisig string to share with peers.
   ///
   /// Inputs: None
@@ -2065,7 +2002,6 @@ namespace wallet::rpc {
     struct REQUEST : EMPTY {} request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Make a wallet multisig by importing peers multisig string.
   ///
   /// Inputs:
@@ -2090,7 +2026,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Export multisig info for other participants.
   ///
   /// Inputs: None
@@ -2105,7 +2040,6 @@ namespace wallet::rpc {
     struct REQUEST : EMPTY {} request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Import multisig info from other participants.
   ///
   /// Inputs:
@@ -2125,7 +2059,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Turn this wallet into a multisig wallet, extra step for N-1/N wallets.
   ///
   /// Inputs:
@@ -2147,7 +2080,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// TODO: description
   ///
   /// Inputs:
@@ -2170,7 +2102,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Sign a transaction in multisig.
   ///
   /// Inputs:
@@ -2191,7 +2122,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Submit a signed multisig transaction.
   ///
   /// Inputs:
@@ -2211,7 +2141,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Get RPC version Major & Minor integer-format, where Major is the first 16 bits and Minor the last 16 bits.
   ///
   /// Inputs: None
@@ -2226,7 +2155,6 @@ namespace wallet::rpc {
     struct REQUEST : EMPTY {} request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Stake for Service Node.
   ///
   /// Inputs:
@@ -2269,7 +2197,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Register Service Node.
   ///
   /// Inputs:
@@ -2304,7 +2231,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Request to unlock stake by deregistering Service Node.
   ///
   /// Inputs:
@@ -2325,7 +2251,6 @@ namespace wallet::rpc {
     };
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Check if Service Node can unlock its stake.
   ///
   /// Inputs:
@@ -2346,7 +2271,6 @@ namespace wallet::rpc {
     };
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Parse an address to validate if it's a valid Loki address.
   ///
   /// Inputs:
@@ -2374,7 +2298,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// TODO: description
   ///
   /// Inputs:
@@ -2404,7 +2327,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// TODO: description
   ///
   /// Inputs:
@@ -2422,7 +2344,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// TODO: description
   ///
   /// Inputs:
@@ -2442,7 +2363,6 @@ namespace wallet::rpc {
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Buy a Loki Name System (ONS) mapping that maps a unique name to a Session ID or Lokinet address.
   ///
   /// Currently supports Session, Lokinet and Wallet registrations. Lokinet registrations can be for 1, 2, 5, or 10 years by specifying a type value of "lokinet", "lokinet_2y", "lokinet_5y", "lokinet_10y". Session registrations do not expire.
@@ -2481,13 +2401,11 @@ namespace wallet::rpc {
     static constexpr auto names() { return NAMES("ons_buy_mapping"); }
 
     static constexpr const char *description =
-R"(Buy a Loki Name System (ONS) mapping that maps a unique name to a Session ID or Lokinet address.
+R"(Buy an Oxen Name System (ONS) mapping that maps a unique name to a Session ID, Oxen Address or Lokinet address.
 
-Currently supports Session, Lokinet and Wallet registrations. Lokinet registrations can be for 1, 2, 5, or 10 years by specifying a type value of "lokinet", "lokinet_2y", "lokinet_5y", "lokinet_10y". Session registrations do not expire.
+Currently supports Session, Wallet and Lokinet registrations. Lokinet registrations can be for 1, 2, 5, or 10 years by specifying a type value of "lokinet", "lokinet_2y", "lokinet_5y", "lokinet_10y". Session and Wallet registrations do not expire.
 
 The owner of the ONS entry (by default, the purchasing wallet) will be permitted to submit ONS update transactions to the Loki blockchain (for example to update a Session pubkey or the target Lokinet address). You may change the primary owner or add a backup owner in the registration and can change them later with update transactions. Owner addresses can be either Loki wallets, or generic ed25519 pubkeys (for advanced uses).
-
-For Session, the recommended owner or backup owner is the ed25519 public key of the user's Session ID.
 
 When specifying owners, either a wallet (sub)address or standard ed25519 public key is supported per mapping. Updating the value that a name maps to requires one of the owners to sign the update transaction. For wallets, this is signed using the (sub)address's spend key.
 
@@ -2495,23 +2413,22 @@ For more information on updating and signing see the ONS_UPDATE_MAPPING document
 
     struct REQUEST
     {
-      std::string        type;            // The mapping type: "session", "lokinet", "lokinet_2y", "lokinet_5y", "lokinet_10y", "wallet".
-      std::string        owner;           // (Optional): The ed25519 public key or wallet address that has authority to update the mapping.
-      std::string        backup_owner;    // (Optional): The secondary, backup public key that has authority to update the mapping.
-      std::string        name;            // The name to purchase via Oxen Name Service
-      std::string        value;           // The value that the name maps to via Oxen Name Service, (i.e. For Session: [display name->session public key],  for wallets: [name->wallet address], for Lokinet: [name->domain name]).
+      std::string        type;                 // The mapping type: "session", "wallet", "lokinet", "lokinet_2y", "lokinet_5y", "lokinet_10y".
+      std::optional<std::string> owner;        // (Optional): The ed25519 public key or wallet address that has authority to update the mapping.
+      std::optional<std::string> backup_owner; // (Optional): The secondary, backup public key that has authority to update the mapping.
+      std::string        name;                 // The name to purchase via Oxen Name Service
+      std::string        value;                // The value that the name maps to via Oxen Name Service, (i.e. For Session: [display name->session public key],  for wallets: [name->wallet address], for Lokinet: [name->domain name]).
 
-      uint32_t           account_index;   // (Optional) Transfer from this account index. (Defaults to 0)
-      std::set<uint32_t> subaddr_indices; // (Optional) Transfer from this set of subaddresses. (Defaults to 0)
-      uint32_t           priority;        // Set a priority for the transaction. Accepted values are: or 0-4 for: default, unimportant, normal, elevated, priority.
-      bool               get_tx_key;      // (Optional) Return the transaction key after sending.
-      bool               do_not_relay;    // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
-      bool               get_tx_hex;      // Return the transaction as hex string after sending (Defaults to false)
-      bool               get_tx_metadata; // Return the metadata needed to relay the transaction. (Defaults to false)
+      uint32_t           account_index;        // (Optional) Transfer from this account index. (Defaults to 0)
+      std::vector<uint32_t> subaddr_indices;   // (Optional) Transfer from this set of subaddresses. (Defaults to 0)
+      uint32_t           priority;             // Set a priority for the transaction. Accepted values are: or 0-4 for: default, unimportant, normal, elevated, priority.
+      bool               get_tx_key;           // (Optional) Return the transaction key after sending.
+      bool               do_not_relay;         // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
+      bool               get_tx_hex;           // Return the transaction as hex string after sending (Defaults to false)
+      bool               get_tx_metadata;      // Return the metadata needed to relay the transaction. (Defaults to false)
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Renew an active lokinet ONS registration
   ///
   /// Renews a Loki Name System lokinet mapping by adding to the existing expiry time.
@@ -2563,7 +2480,6 @@ The renewal can be for 1, 2, 5, or 10 years by specifying a `type` value of "lok
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Update the underlying value in the name->value mapping via Loki Name Service.
   ///
   /// At least one field (value, owner, or backup owner) must be specified in the update.
@@ -2613,13 +2529,13 @@ If signing is performed externally then you must first encrypt the `value` (if b
     {
       std::string        type;      // The mapping type, "session", "lokinet", or "wallet".
       std::string        name;      // The name to update via Loki Name Service
-      std::string        value;     // (Optional): The new value that the name maps to via Loki Name Service. If not specified or given the empty string "", then the mapping's value remains unchanged. If using a `signature` then this value (if non-empty) must be already encrypted.
-      std::string        owner;     // (Optional): The new owner of the mapping. If not specified or given the empty string "", then the mapping's owner remains unchanged.
-      std::string        backup_owner; // (Optional): The new backup owner of the mapping. If not specified or given the empty string "", then the mapping's backup owner remains unchanged.
+      std::optional<std::string> value;     // (Optional): The new value that the name maps to via Loki Name Service. If not specified or given the empty string "", then the mapping's value remains unchanged. If using a `signature` then this value (if non-empty) must be already encrypted.
+      std::optional<std::string> owner; // (Optional): The new owner of the mapping. If not specified or given the empty string "", then the mapping's owner remains unchanged.
+      std::optional<std::string> backup_owner; // (Optional): The new backup owner of the mapping. If not specified or given the empty string "", then the mapping's backup owner remains unchanged.
       std::string        signature; // (Optional): Signature derived using libsodium generichash on {current txid blob, new value blob} of the mapping to update. By default the hash is signed using the wallet's spend key as an ed25519 keypair, if signature is specified.
 
       uint32_t           account_index;    // (Optional) Transfer from this account index. (Defaults to 0)
-      std::set<uint32_t> subaddr_indices;  // (Optional) Transfer from this set of subaddresses. (Defaults to 0)
+      std::vector<uint32_t> subaddr_indices;  // (Optional) Transfer from this set of subaddresses. (Defaults to 0)
       uint32_t           priority;         // Set a priority for the transaction. Accepted values are: 0-4 for: default, unimportant, normal, elevated, priority.
       bool               get_tx_key;       // (Optional) Return the transaction key after sending.
       bool               do_not_relay;     // (Optional) If true, the newly created transaction will not be relayed to the oxen network. (Defaults to false)
@@ -2629,7 +2545,6 @@ If signing is performed externally then you must first encrypt the `value` (if b
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Generate the signature necessary for updating the requested record using the wallet's active [sub]address's spend key. The signature is only valid if the queried wallet is one of the owners of the ONS record.
   ///
   /// This command is only required if the open wallet is one of the owners of a ONS record but wants the update transaction to occur via another non-owning wallet. By default, if no signature is specified to the update transaction, the open wallet is assumed the owner and it's active [sub]address's spend key will automatically be used.
@@ -2666,7 +2581,6 @@ This command is only required if the open wallet is one of the owners of a ONS r
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Takes a ONS name, upon validating it, generates the hash and returns the base64 representation of the hash suitable for use in the daemon ONS name queries.
   ///
   /// Inputs:
@@ -2688,7 +2602,6 @@ This command is only required if the open wallet is one of the owners of a ONS r
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Returns a list of known, plain-text ONS names along with record details for names that this
   /// wallet knows about.  This can optionally decrypt the ONS value as well, or else just return the
   /// encrypted value.
@@ -2736,7 +2649,6 @@ This command is only required if the open wallet is one of the owners of a ONS r
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Adds one or more names to the persistent ONS wallet cache of known names (i.e. for names that
   /// are owned by this wallet that aren't currently in the cache).
   ///
@@ -2763,7 +2675,6 @@ This command is only required if the open wallet is one of the owners of a ONS r
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Takes a ONS encrypted value and encrypts the mapping value using the ONS name.
   ///
   /// Inputs:
@@ -2787,7 +2698,6 @@ This command is only required if the open wallet is one of the owners of a ONS r
     } request;
   };
 
-  OXEN_RPC_DOC_INTROSPECT
   /// Takes a ONS encrypted value and decrypts the mapping value using the ONS name.
   ///
   /// Inputs:
@@ -2916,7 +2826,8 @@ This command is only required if the open wallet is one of the owners of a ONS r
     ONS_KNOWN_NAMES,
     ONS_ADD_KNOWN_NAMES,
     ONS_DECRYPT_VALUE,
-    ONS_ENCRYPT_VALUE
+    ONS_ENCRYPT_VALUE,
+    STATUS
   >;
 
 }

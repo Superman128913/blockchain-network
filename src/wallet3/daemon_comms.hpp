@@ -56,6 +56,9 @@ namespace wallet
 
     virtual std::future<std::string>
     submit_transaction(const cryptonote::transaction& tx, bool blink) = 0;
+
+    virtual std::future<std::pair<std::string, crypto::hash>>
+    ons_names_to_owners(const std::string& name_hash, uint16_t type) = 0;
   };
 
 }  // namespace wallet

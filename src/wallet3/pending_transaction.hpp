@@ -35,7 +35,11 @@ namespace wallet
     uint64_t fee_per_byte = cryptonote::FEE_PER_BYTE_V13;
     uint64_t fee_per_output = cryptonote::FEE_PER_OUTPUT_V18;
     size_t mixin_count = cryptonote::TX_OUTPUT_DECOYS;
-    size_t extra_size() const {return 0;};
+
+    uint64_t burn_fixed = 0;
+
+    std::vector<uint8_t> extra = {};
+    size_t extra_size() const {return extra.size();};
 
     PendingTransaction() = default;
 

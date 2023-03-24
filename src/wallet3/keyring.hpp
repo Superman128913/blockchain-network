@@ -3,16 +3,18 @@
 #include <crypto/crypto.h>
 #include <cryptonote_basic/subaddress_index.h>
 #include <cryptonote_basic/cryptonote_basic.h>
+#include <cryptonote_core/oxen_name_system.h>
 #include <device/device_default.hpp>
 #include <ringct/rctSigs.h>
 
 #include <optional>
 
 #include "pending_transaction.hpp"
+#include "walletkeys.hpp"
 
 namespace wallet
 {
-  class Keyring
+  class Keyring : public WalletKeys
   {
    public:
     Keyring(
@@ -27,6 +29,20 @@ namespace wallet
         , view_public_key(_view_public_key)
         , nettype(_nettype)
     {}
+
+    Keyring(
+        std::string _spend_private_key,
+        std::string _spend_public_key,
+        std::string _view_private_key,
+        std::string _view_public_key,
+        cryptonote::network_type _nettype = cryptonote::network_type::TESTNET)
+        : nettype(_nettype)
+    {
+      tools::hex_to_type<crypto::secret_key>(_spend_private_key, spend_private_key);
+      tools::hex_to_type<crypto::public_key>(_spend_public_key, spend_public_key);
+      tools::hex_to_type<crypto::secret_key>(_view_private_key, view_private_key);
+      tools::hex_to_type<crypto::public_key>(_view_public_key, view_public_key);
+    }
 
     Keyring() {}
 
@@ -94,9 +110,10 @@ namespace wallet
         std::vector<rct::key>& amount_keys);
 
     virtual crypto::secret_key
-    derive_transaction_secret_key(
+    derive_output_secret_key(
         const crypto::key_derivation& key_derivation,
-        const size_t output_index
+        const size_t output_index,
+        const cryptonote::subaddress_index& sub_index
     );
 
     virtual crypto::hash
@@ -109,19 +126,35 @@ namespace wallet
         PendingTransaction& ptx
     );
 
+    virtual std::vector<crypto::public_key> get_subaddress_spend_public_keys(uint32_t account, uint32_t begin, uint32_t end);
+
+    virtual void
+    expand_subaddresses(const cryptonote::subaddress_index& lookahead);
+
     virtual cryptonote::account_keys
     export_keys();
 
-   private:
+    virtual ons::generic_signature
+    generate_ons_signature(const std::string& curr_owner, const ons::generic_owner* new_owner, const ons::generic_owner* new_backup_owner, const ons::mapping_value& encrypted_value, const crypto::hash& prev_txid, const cryptonote::network_type& nettype);
+
+    cryptonote::network_type nettype;
+
     crypto::secret_key spend_private_key;
     crypto::public_key spend_public_key;
 
     crypto::secret_key view_private_key;
     crypto::public_key view_public_key;
 
-    cryptonote::network_type nettype;
+    const crypto::secret_key& spend_privkey() const override { return spend_private_key; }  
+    const crypto::public_key& spend_pubkey() const override { return spend_public_key; }  
+    const crypto::secret_key& view_privkey() const override { return view_private_key; }  
+    const crypto::public_key& view_pubkey() const override { return view_public_key; }
+
+   private:
 
     hw::core::device_default key_device;
+    //TODO persist the subaddresses list to the database
+    std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddresses;
   };
 
 }  // namespace wallet

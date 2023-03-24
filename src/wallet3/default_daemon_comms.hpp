@@ -57,6 +57,9 @@ namespace wallet
     std::future<std::string>
     submit_transaction(const cryptonote::transaction& tx, bool blink);
 
+    std::future<std::pair<std::string, crypto::hash>>
+    ons_names_to_owners(const std::string& name_hash, const uint16_t type);
+
    private:
 
     void

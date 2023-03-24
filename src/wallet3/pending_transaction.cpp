@@ -15,7 +15,7 @@ namespace wallet
         throw std::runtime_error("Transaction amounts must be positive");
       sum_recipient_amounts += recipient.amount;
     }
-    if (new_recipients.empty() || sum_recipient_amounts < 0)
+    if (sum_recipient_amounts < 0)
       throw std::runtime_error("Transaction amounts must be positive");
   }
 
@@ -55,8 +55,7 @@ namespace wallet
   int64_t
   PendingTransaction::get_fee(int64_t n_inputs) const
   {
-    // TODO sean add this 
-    int64_t fixed_fee = 0;
+    int64_t fixed_fee = burn_fixed;
     // TODO sean add this 
     int64_t burn_pct = 0;
     int64_t fee_percent = oxen::BLINK_BURN_TX_FEE_PERCENT_V18; // 100%
@@ -120,6 +119,8 @@ namespace wallet
     for (size_t i=0; i < recipients.size(); i++)
       tx.output_unlock_times.push_back(unlock_time);
     tx.output_unlock_times.push_back(change_unlock_time);
+
+    tx.extra = std::move(extra);
 
     return true;
   }

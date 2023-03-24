@@ -1,6 +1,6 @@
 #include <catch2/catch.hpp>
 
-#include <wallet3/db_schema.hpp>
+#include <wallet3/db/walletdb.hpp>
 #include <sqlitedb/database.hpp>
 
 TEST_CASE("DB Schema", "[wallet,db]")
@@ -16,11 +16,6 @@ TEST_CASE("DB Schema", "[wallet,db]")
   REQUIRE_NOTHROW(db.create_schema());
 
   REQUIRE(db.db.tableExists("blocks"));
-
-  SECTION("metadata table does not allow row insertion")
-  {
-    REQUIRE_THROWS(db.prepared_exec("INSERT INTO metadata VALUES(1,0,0,0,0);"));
-  }
 
   SECTION("Insert and fetch block")
   {
@@ -75,7 +70,7 @@ TEST_CASE("DB Triggers", "[wallet,db]")
   SECTION("Confirm output insert triggers")
   {
     REQUIRE(db.prepared_get<int64_t>("SELECT amount FROM outputs WHERE id = 0") == 42);
-    REQUIRE(db.prepared_get<int64_t>("SELECT balance FROM metadata WHERE id = 0") == 42);
+    REQUIRE(db.overall_balance() == 42);
   }
 
   REQUIRE_NOTHROW(db.prepared_exec("INSERT INTO blocks VALUES(?,?,?,?);", 1, 0, "bar", 0));
@@ -84,7 +79,7 @@ TEST_CASE("DB Triggers", "[wallet,db]")
 
   SECTION("Confirm spend insert triggers")
   {
-    REQUIRE(db.prepared_get<int64_t>("SELECT balance FROM metadata WHERE id = 0") == 0);
+    REQUIRE(db.overall_balance() == 0);
     REQUIRE(db.prepared_get<int64_t>("SELECT spent_height FROM outputs WHERE key_image = 0") == 1);
   }
 
@@ -101,7 +96,7 @@ TEST_CASE("DB Triggers", "[wallet,db]")
     // balance should be 42, and the spend should be removed.
     // existing output's spend height should be back to 0.
     REQUIRE(db.prepared_get<int>("SELECT COUNT(*) FROM spends;") == 0);
-    REQUIRE(db.prepared_get<int64_t>("SELECT balance FROM metadata WHERE id = 0") == 42);
+    REQUIRE(db.overall_balance() == 42);
     REQUIRE(db.prepared_get<int64_t>("SELECT spent_height FROM outputs WHERE key_image = 0") == 0);
   }
 
@@ -114,7 +109,7 @@ TEST_CASE("DB Triggers", "[wallet,db]")
     // balance should be 0, and the output should be removed.
     // key image should be removed as nothing references it.
     REQUIRE(db.prepared_get<int>("SELECT COUNT(*) FROM outputs;") == 0);
-    REQUIRE(db.prepared_get<int64_t>("SELECT balance FROM metadata WHERE id = 0") == 0);
+    REQUIRE(db.overall_balance() == 0);
     REQUIRE(db.prepared_get<int64_t>("SELECT COUNT(*) FROM key_images;") == 0);
   }
 }

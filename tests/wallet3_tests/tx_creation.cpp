@@ -2,7 +2,7 @@
 #include <catch2/catch.hpp>
 
 #include <wallet3/wallet.hpp>
-#include <wallet3/db_schema.hpp>
+#include <wallet3/db/walletdb.hpp>
 #include <wallet3/transaction_scanner.hpp>
 
 #include <sqlitedb/database.hpp>

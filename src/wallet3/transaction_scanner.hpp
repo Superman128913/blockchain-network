@@ -29,6 +29,9 @@ namespace wallet
     std::vector<crypto::key_image>
     scan_spent(const cryptonote::transaction& tx);
 
+    void
+    set_keys(std::shared_ptr<Keyring> keys);
+
    private:
     std::shared_ptr<Keyring> wallet_keys;
     std::shared_ptr<db::Database> db;

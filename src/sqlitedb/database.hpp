@@ -16,6 +16,7 @@
 #include <string_view>
 
 #include "common/fs.h"
+#include <common/string_util.h>
 
 namespace db
 {
@@ -49,6 +50,36 @@ namespace db
   {
     st.bindNoCopy(i, static_cast<const void*>(blob.data()), blob.size());
   }
+
+  // Wrapper for extracting BLOB values from a query without unnecessary copying.  This is intended
+  // to be called via `db::get` such as:
+  //
+  //    auto [num, data] = db::get<int, blob>(st);
+  //
+  // The `.data` string view here will point to the BLOB data directly.  Note that this view remains
+  // only value while the statement remains active, and so it must be used as needed immediately.
+  // This also means that this is *unsuitable* for one-shot methods like `prepared_get` (which
+  // finalize the statement before returning).
+  struct blob {
+      std::string_view data;
+      blob(SQLite::Column&& col)
+        : data{static_cast<const char*>(col.getBlob()), static_cast<size_t>(col.getBytes())} {}
+  };
+
+  // Takes a primitive struct from which we can directly initialize from the stored blob value.  The
+  // type `T` must be usable with `make_from_guts`.  Unlike `blob` this value *is* suitable for use
+  // in a one-shot method.
+  template <typename T>
+  struct blob_guts {
+      T value;
+      blob_guts(SQLite::Column&& col)
+          : value{tools::make_from_guts<T>(blob(std::move(col)).data)} {}
+
+      // Implicit rvalue-convertible to `T&&` so that you can use it somewhat transparently, for
+      // example, allowing implicit conversion from a `std::tuple<..., blob_guts<T>>` into a
+      // `std::tuple<..., T>`.
+      operator T&&() && { return std::move(value); }
+  };
 
   namespace detail
   {
