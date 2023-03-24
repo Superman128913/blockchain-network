@@ -3,7 +3,7 @@
 #include "decoy.hpp"
 #include "output_selection/output_selection.hpp"
 #include "decoy_selection/decoy_selection.hpp"
-#include "db_schema.hpp"
+#include "db/walletdb.hpp"
 
 #include <oxenc/base64.h>
 

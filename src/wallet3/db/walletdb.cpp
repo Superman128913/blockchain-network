@@ -1,7 +1,6 @@
-#include "db_schema.hpp"
+#include "walletdb.hpp"
 
-#include "output.hpp"
-#include "block.hpp"
+#include "wallet3/block.hpp"
 
 #include <common/hex.h>
 #include <common/string_util.h>

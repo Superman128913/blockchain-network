@@ -3,8 +3,8 @@
 #include <SQLiteCpp/SQLiteCpp.h>
 #include <sqlitedb/database.hpp>
 
-#include "output.hpp"
-#include "walletkeys.hpp"
+#include "wallet3/output.hpp"
+#include "wallet3/walletkeys.hpp"
 
 #include <optional>
 

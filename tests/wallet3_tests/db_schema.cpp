@@ -1,6 +1,6 @@
 #include <catch2/catch.hpp>
 
-#include <wallet3/db_schema.hpp>
+#include <wallet3/db/walletdb.hpp>
 #include <sqlitedb/database.hpp>
 
 TEST_CASE("DB Schema", "[wallet,db]")

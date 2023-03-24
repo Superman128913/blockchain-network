@@ -1,6 +1,6 @@
 #include "wallet.hpp"
 
-#include "db_schema.hpp"
+#include "db/walletdb.hpp"
 #include "wallet2½.hpp"
 #include "block.hpp"
 #include "block_tx.hpp"

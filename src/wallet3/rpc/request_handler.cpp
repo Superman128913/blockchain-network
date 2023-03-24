@@ -3,7 +3,7 @@
 #include "commands.h"
 #include "command_parser.h"
 #include <wallet3/wallet.hpp>
-#include <wallet3/db_schema.hpp>
+#include <wallet3/db/walletdb.hpp>
 #include <version.h>
 
 #include <cryptonote_core/cryptonote_tx_utils.h>

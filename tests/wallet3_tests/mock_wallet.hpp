@@ -3,7 +3,7 @@
 #include <wallet3/wallet.hpp>
 #include <wallet3/block.hpp>
 #include <sqlitedb/database.hpp>
-#include <wallet3/db_schema.hpp>
+#include <wallet3/db/walletdb.hpp>
 #include "mock_daemon_comms.hpp"
 
 namespace wallet
