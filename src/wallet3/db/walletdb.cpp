@@ -61,13 +61,6 @@ namespace wallet
             ('nettype', 'testnet'),
             ('scan_target_hash', '');
 
-          INSERT INTO metadata(id, val_binary)
-          VALUES
-            ('spend_priv', x''),
-            ('spend_pub', x''),
-            ('view_priv', x''),
-            ('view_pub', x'');
-
           CREATE TABLE blocks (
             height INTEGER NOT NULL PRIMARY KEY,
             output_count INTEGER NOT NULL,
@@ -199,7 +192,7 @@ namespace wallet
   void
   WalletDB::set_metadata_int(const std::string& id, int64_t val)
   {
-    prepared_exec("UPDATE metadata SET val_numeric = ? WHERE id = ?", val, id);
+    prepared_exec("INSERT INTO metadata(id, val_numeric) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET val_numeric=excluded.val_numeric", id, val);
   }
 
   int64_t
@@ -211,7 +204,7 @@ namespace wallet
   void
   WalletDB::set_metadata_text(const std::string& id, const std::string& val)
   {
-    prepared_exec("UPDATE metadata SET val_text = ? WHERE id = ?", val, id);
+    prepared_exec("INSERT INTO metadata(id, val_text) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET val_text=excluded.val_text", id, val);
   }
 
   std::string
@@ -223,7 +216,7 @@ namespace wallet
   void
   WalletDB::set_metadata_blob(const std::string& id, std::string_view data)
   {
-    prepared_exec("UPDATE metadata SET val_binary = ? where id = ?", db::blob_binder{data}, id);
+    prepared_exec("INSERT INTO metadata(id, val_binary) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET val_binary=excluded.val_binary", id, db::blob_binder{data});
   }
 
   std::string
@@ -506,14 +499,21 @@ namespace wallet
   WalletDB::load_keys()
   {
     DBKeys keys;
-    int32_t spend_key_exists = prepared_get<int32_t>("SELECT count(val_binary) FROM metadata WHERE id = 'spend_priv' AND val_binary IS NOT x''");
-    if (not spend_key_exists)
+    // Will throw if the keys do not exist in the database (for example when the wallet is first created) 
+    // catch this and return nullopt. This means all 4 keys need to exist in the database. In future 
+    // view only wallets will need the ability to return an empty spend_priv key
+    try {
+      keys.ssk = get_metadata_blob_guts<crypto::secret_key>("spend_priv");
+      keys.spk = get_metadata_blob_guts<crypto::public_key>("spend_pub");
+      keys.vsk = get_metadata_blob_guts<crypto::secret_key>("view_priv");
+      keys.vpk = get_metadata_blob_guts<crypto::public_key>("view_pub");
+    }
+    catch (const std::exception& e)
+    {
+      oxen::log::debug(logcat, "Could not load keys: {}", e.what());
       return std::nullopt;
+    }
 
-    keys.ssk = get_metadata_blob_guts<crypto::secret_key>("spend_priv");
-    keys.spk = get_metadata_blob_guts<crypto::public_key>("spend_pub");
-    keys.vsk = get_metadata_blob_guts<crypto::secret_key>("view_priv");
-    keys.vpk = get_metadata_blob_guts<crypto::public_key>("view_pub");
     return keys;
   }
 }  // namespace wallet
