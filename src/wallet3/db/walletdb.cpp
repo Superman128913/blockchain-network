@@ -199,31 +199,31 @@ namespace wallet
   void
   WalletDB::set_metadata_int(const std::string& id, int64_t val)
   {
-    prepared_exec("UPDATE metadata SET val_numeric = ? WHERE id = ?;", val, id);
+    prepared_exec("UPDATE metadata SET val_numeric = ? WHERE id = ?", val, id);
   }
 
   int64_t
   WalletDB::get_metadata_int(const std::string& id)
   {
-    return prepared_get<int64_t>("SELECT val_numeric FROM metadata WHERE id = ?;", id);
+    return prepared_get<int64_t>("SELECT val_numeric FROM metadata WHERE id = ?", id);
   }
 
   void
   WalletDB::set_metadata_text(const std::string& id, const std::string& val)
   {
-    prepared_exec("UPDATE metadata SET val_text = ? WHERE id = ?;", val, id);
+    prepared_exec("UPDATE metadata SET val_text = ? WHERE id = ?", val, id);
   }
 
   std::string
   WalletDB::get_metadata_text(const std::string& id)
   {
-    return prepared_get<std::string>("SELECT val_text FROM metadata WHERE id = ?;", id);
+    return prepared_get<std::string>("SELECT val_text FROM metadata WHERE id = ?", id);
   }
 
   void
   WalletDB::set_metadata_blob(const std::string& id, std::string_view data)
   {
-    auto st = prepared_st("UPDATE metadata SET val_binary = ? where id = ?;");
+    auto st = prepared_st("UPDATE metadata SET val_binary = ? where id = ?");
     st->bind(1, data.data(), data.size());
     st->bind(2, id);
     st->exec();
@@ -245,19 +245,19 @@ namespace wallet
   void
   WalletDB::add_address(int32_t major_index, int32_t minor_index, const std::string& address)
   {
-    auto exists = prepared_get<int64_t>("SELECT COUNT(*) FROM subaddresses WHERE major_index = ? AND minor_index = ?;",
+    auto exists = prepared_get<int64_t>("SELECT COUNT(*) FROM subaddresses WHERE major_index = ? AND minor_index = ?",
         major_index,
         minor_index);
 
     if (exists)
     {
-      auto existing_addr = prepared_get<std::string>("SELECT address FROM subaddresses WHERE major_index = ? AND minor_index = ?;",
+      auto existing_addr = prepared_get<std::string>("SELECT address FROM subaddresses WHERE major_index = ? AND minor_index = ?",
           major_index,
           minor_index);
 
       if (major_index == 0 and minor_index == 0 and existing_addr == "")
       {
-        prepared_exec("UPDATE subaddresses SET address = ? WHERE major_index = ? AND minor_index = ?;",
+        prepared_exec("UPDATE subaddresses SET address = ? WHERE major_index = ? AND minor_index = ?",
             address,
             major_index,
             minor_index);
@@ -270,7 +270,7 @@ namespace wallet
     }
     else
     {
-      prepared_exec("INSERT INTO subaddresses(major_index, minor_index, address, used) VALUES(?,?,?);",
+      prepared_exec("INSERT INTO subaddresses(major_index, minor_index, address, used) VALUES(?,?,?)",
           major_index,
           minor_index,
           address,
@@ -281,7 +281,7 @@ namespace wallet
   std::string
   WalletDB::get_address(int32_t major_index, int32_t minor_index)
   {
-    auto addr = prepared_maybe_get<std::string>("SELECT address FROM subaddresses WHERE major_index = ? AND minor_index = ?;",
+    auto addr = prepared_maybe_get<std::string>("SELECT address FROM subaddresses WHERE major_index = ? AND minor_index = ?",
         major_index,
         minor_index);
 
@@ -403,7 +403,7 @@ namespace wallet
   int64_t
   WalletDB::current_height()
   {
-    return prepared_get<int64_t>("SELECT max(height) from blocks;");
+    return prepared_get<int64_t>("SELECT max(height) from blocks");
   }
 
   void
