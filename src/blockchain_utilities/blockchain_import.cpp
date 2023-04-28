@@ -375,7 +375,7 @@ int import_from_file(
             int progress_interval = 10;
             // NOTE: use of NUM_BLOCKS_PER_CHUNK is a placeholder in case multi-block chunks are
             // later supported.
-            for (int chunk_ind = 0; chunk_ind < NUM_BLOCKS_PER_CHUNK; ++chunk_ind) {
+            for (size_t chunk_ind = 0; chunk_ind < NUM_BLOCKS_PER_CHUNK; ++chunk_ind) {
                 ++h;
                 if ((h - 1) % display_interval == 0) {
                     std::cout << refresh_string;
